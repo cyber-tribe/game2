@@ -190,17 +190,76 @@ async function bootstrap() {
   let dragStart = { x: 0, y: 0 };
   let viewStartPos = { x: 0, y: 0 };
 
+  // A second finger switches to rotating the map instead of panning/
+  // tapping. Tracked by pointerId (not just a count) since PixiJS's
+  // multi-touch events distinguish fingers that way.
+  const activePointers = new Map<number, { x: number; y: number }>();
+  let rotating = false;
+  let lastTwoFingerAngle = 0;
+  // Set for the whole gesture (first finger down to last finger up) once
+  // a second finger joins, so lifting back to one finger doesn't fire a
+  // tap and releasing the last finger doesn't resume panning.
+  let gestureHadTwoFingers = false;
+
+  const twoFingerAngle = (points: { x: number; y: number }[]): number => {
+    const [a, b] = points;
+    return Math.atan2(b.y - a.y, b.x - a.x);
+  };
+
+  // Rotates renderer.view by deltaAngle while keeping the point currently
+  // under screen position `pivot` visually fixed in place — the standard
+  // "twist" gesture feel, anchored on the midpoint between the two
+  // fingers rather than spinning around the map's corner.
+  const rotateAroundPivot = (pivot: { x: number; y: number }, deltaAngle: number) => {
+    const local = renderer.view.toLocal(pivot);
+    renderer.view.rotation += deltaAngle;
+    const cos = Math.cos(renderer.view.rotation);
+    const sin = Math.sin(renderer.view.rotation);
+    const scaledX = local.x * currentScale;
+    const scaledY = local.y * currentScale;
+    renderer.view.position.set(pivot.x - (scaledX * cos - scaledY * sin), pivot.y - (scaledX * sin + scaledY * cos));
+  };
+
   app.stage.eventMode = "static";
   app.stage.hitArea = app.screen;
 
   app.stage.on("pointerdown", (event) => {
-    pointerActive = true;
-    isDragging = false;
-    dragStart = { x: event.global.x, y: event.global.y };
-    viewStartPos = { x: renderer.view.position.x, y: renderer.view.position.y };
+    activePointers.set(event.pointerId, { x: event.global.x, y: event.global.y });
+
+    if (activePointers.size === 2) {
+      gestureHadTwoFingers = true;
+      rotating = true;
+      pointerActive = false;
+      isDragging = false;
+      lastTwoFingerAngle = twoFingerAngle([...activePointers.values()]);
+      return;
+    }
+
+    if (activePointers.size === 1) {
+      gestureHadTwoFingers = false;
+      pointerActive = true;
+      isDragging = false;
+      dragStart = { x: event.global.x, y: event.global.y };
+      viewStartPos = { x: renderer.view.position.x, y: renderer.view.position.y };
+    }
   });
 
   app.stage.on("pointermove", (event) => {
+    if (activePointers.has(event.pointerId)) {
+      activePointers.set(event.pointerId, { x: event.global.x, y: event.global.y });
+    }
+
+    if (rotating && activePointers.size === 2) {
+      const points = [...activePointers.values()];
+      const angle = twoFingerAngle(points);
+      let delta = angle - lastTwoFingerAngle;
+      if (delta > Math.PI) delta -= Math.PI * 2; // shortest way around, not through the ±180° seam
+      if (delta < -Math.PI) delta += Math.PI * 2;
+      rotateAroundPivot({ x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2 }, delta);
+      lastTwoFingerAngle = angle;
+      return;
+    }
+
     if (!pointerActive) return;
     const dx = event.global.x - dragStart.x;
     const dy = event.global.y - dragStart.y;
@@ -212,13 +271,22 @@ async function bootstrap() {
   });
 
   app.stage.on("pointerup", (event) => {
-    if (pointerActive && !isDragging) applyTool(event);
+    activePointers.delete(event.pointerId);
+    if (activePointers.size < 2) rotating = false;
+
+    if (pointerActive && !isDragging && !gestureHadTwoFingers) applyTool(event);
+
     pointerActive = false;
     isDragging = false;
+    if (activePointers.size === 0) gestureHadTwoFingers = false;
   });
-  app.stage.on("pointerupoutside", () => {
+  app.stage.on("pointerupoutside", (event) => {
+    activePointers.delete(event.pointerId);
+    if (activePointers.size < 2) rotating = false;
+
     pointerActive = false;
     isDragging = false;
+    if (activePointers.size === 0) gestureHadTwoFingers = false;
   });
 
   wireToolbar({
