@@ -1,10 +1,13 @@
 import type { System, World } from "../../ecs";
-import { DEFAULT_POPULATION_GROWTH_RATE, DEFAULT_WALKER_SPEED, HOUSE_LEVELS } from "../constants";
+import type { Heightmap } from "../../world/heightmap";
+import { DEFAULT_POPULATION_GROWTH_RATE, DEFAULT_WALKER_SPEED, HOUSE_LEVELS, TERRAIN_GROWTH_MULTIPLIER } from "../constants";
 import { House, Owner, Position, type FactionId, Walker } from "../components";
 
 export interface HouseGrowthConfig {
   /** Population units accumulated per second, before scaling by house level. */
   growthRate: number;
+  /** When given, growthRate is scaled by TERRAIN_GROWTH_MULTIPLIER[heightmap.terrain]. */
+  heightmap: Heightmap;
   /**
    * Caps how many houses a single faction may spawn walkers to build.
    * Real land scarcity (running out of flat ground) isn't modeled yet —
@@ -19,8 +22,9 @@ export interface HouseGrowthConfig {
 }
 
 export function createHouseGrowthSystem(config: Partial<HouseGrowthConfig> = {}): System {
-  const growthRate = config.growthRate ?? DEFAULT_POPULATION_GROWTH_RATE;
+  const baseGrowthRate = config.growthRate ?? DEFAULT_POPULATION_GROWTH_RATE;
   const maxHousesPerFaction = config.maxHousesPerFaction ?? Infinity;
+  const growthRate = baseGrowthRate * (config.heightmap ? TERRAIN_GROWTH_MULTIPLIER[config.heightmap.terrain] : 1);
 
   return (world, deltaSeconds) => {
     const houseCountByFaction = countHousesByFaction(world);
