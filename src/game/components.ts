@@ -1,4 +1,4 @@
-import { defineComponent } from "../ecs";
+import { defineComponent, type Entity } from "../ecs";
 
 export type FactionId = "player" | "enemy";
 
@@ -41,23 +41,26 @@ export interface House {
 }
 
 /**
- * The four influence modes from docs/game-system.md. "settle" (the
- * wander/settle systems' implicit default), "gather", and "fight" are
- * all enforced; "goToShrine" is recorded but not yet acted on — it needs
- * a leader/shrine-symbol concept that doesn't exist yet.
+ * The four influence modes from docs/game-system.md, all enforced by
+ * dedicated systems: "settle" (the wander/settle systems' implicit
+ * default), "gather" (gatherSystem), "fight" (fightTargetingSystem), and
+ * "goToShrine" (leaderSystem + goToShrineSystem).
  */
 export type BehaviorMode = "settle" | "gather" | "goToShrine" | "fight";
 
 /**
  * One FactionState entity per side. Mana is the only resource spent on
- * miracles; behaviorMode/shrinePosition steer the (not yet implemented)
- * gather/goToShrine/fight walker systems.
+ * miracles; behaviorMode/shrinePosition steer the gather/goToShrine/fight
+ * walker systems. leaderId is maintained by leaderSystem, which promotes
+ * a live walker of this faction whenever the slot is empty — it isn't set
+ * at faction creation.
  */
 export interface FactionState {
   id: FactionId;
   mana: number;
   behaviorMode: BehaviorMode;
   shrinePosition: Position;
+  leaderId?: Entity;
 }
 
 /**

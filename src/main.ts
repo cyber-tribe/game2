@@ -2,6 +2,7 @@ import { Application, type FederatedPointerEvent } from "pixi.js";
 import {
   EARTHQUAKE_MANA_COST,
   FLOOD_MANA_COST,
+  SHRINE_MOVE_MANA_COST,
   SWAMP_MANA_COST,
   TERRAIN_EDIT_MANA_COST,
   VOLCANO_MANA_COST,
@@ -95,6 +96,12 @@ async function bootstrap() {
     const local = renderer.view.toLocal(event.global);
     const vertex = renderer.pickVertex(local.x, local.y);
     if (!vertex) return;
+
+    if (toolMode === "shrine") {
+      if (!trySpendMana(simulation.world, "player", SHRINE_MOVE_MANA_COST)) return;
+      simulation.moveShrine("player", vertex);
+      return;
+    }
 
     if (toolMode === "earthquake") {
       if (!trySpendMana(simulation.world, "player", EARTHQUAKE_MANA_COST)) return;

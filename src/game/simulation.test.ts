@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyFlood, applyVolcano, isBuildable, isRock, type Heightmap } from "../world/heightmap";
-import { House, Owner, Position, Swamp, Walker } from "./components";
+import { FactionState, House, Owner, Position, Swamp, Walker } from "./components";
 import { drownFlood } from "./flood";
 import { Simulation } from "./simulation";
 import { createSwamp } from "./swamp";
@@ -163,6 +163,32 @@ describe("Simulation", () => {
     applyVolcano(heightmap, pos.x, pos.y, 1);
     expect(isBuildable(heightmap, pos.x, pos.y)).toBe(false);
     expect(isRock(heightmap, pos.x, pos.y)).toBe(true);
+  });
+
+  it("assigns a leader to each faction on the first tick", () => {
+    const sim = new Simulation({ worldWidth: 20, worldHeight: 20 });
+    sim.update(0.001);
+
+    const leaderIds = sim.world.query(FactionState).map((entity) => sim.world.get(entity, FactionState)!.leaderId);
+    expect(leaderIds).toHaveLength(2);
+    expect(leaderIds.every((id) => id !== undefined)).toBe(true);
+  });
+
+  it("under goToShrine mode, walks a lone leader to a relocated shrine and settles it there", () => {
+    const sim = new Simulation({ worldWidth: 20, worldHeight: 20, initialWalkersPerFaction: 1 });
+    sim.setBehaviorMode("player", "goToShrine");
+    const shrine = { x: 5, y: 5 };
+    sim.moveShrine("player", shrine);
+
+    // Starting distance is 10 tiles at DEFAULT_WALKER_SPEED=1.5 tiles/s: ~6.7s to arrive.
+    // Stay well under the ~5s-after-arrival mark where the settled hut would
+    // finish accumulating enough population to spawn (and instantly settle)
+    // a second walker at the same spot.
+    for (let i = 0; i < 100; i++) sim.update(0.1);
+
+    const playerHouses = sim.world.query(House, Owner, Position).filter((entity) => sim.world.get(entity, Owner)!.faction === "player");
+    expect(playerHouses).toHaveLength(1);
+    expect(sim.world.get(playerHouses[0], Position)).toEqual(shrine);
   });
 
   it("a flood submerges settled houses across the whole map, for both factions", () => {

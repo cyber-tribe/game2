@@ -37,3 +37,16 @@ export function trySpendMana(world: World, id: FactionId, amount: number): boole
   world.add(entity, FactionState, { ...state, mana: state.mana - amount });
   return true;
 }
+
+/**
+ * Moves a faction's shrinePosition — the "集結シンボル移動" miracle. Per
+ * docs/game-system.md this only relocates the target the leader/army walk
+ * toward under "goToShrine" mode; it doesn't move anyone immediately.
+ */
+export function moveShrine(world: World, id: FactionId, position: Position): void {
+  const entity = findFactionEntity(world, id);
+  if (entity === undefined) return;
+
+  const state = world.get(entity, FactionState)!;
+  world.add(entity, FactionState, { ...state, shrinePosition: position });
+}

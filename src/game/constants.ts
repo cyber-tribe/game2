@@ -52,6 +52,13 @@ export const TILES_PER_HOUSE_CAP = 8;
 export const TERRAIN_EDIT_MANA_COST = 1;
 
 /**
+ * Mana cost of moving a faction's shrine (集結シンボル移動) — "小" tier,
+ * pricier than a plain terrain edit but well below an earthquake, matching
+ * its place on the mana bar in docs/game-system.md.
+ */
+export const SHRINE_MOVE_MANA_COST = 5;
+
+/**
  * Mana cost of an earthquake. Costs far more than a plain terrain edit,
  * matching its place well to the right of "raise/lower land" on the mana
  * bar described in docs/game-system.md.
