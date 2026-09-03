@@ -7,7 +7,7 @@
 | 言語 | TypeScript | `docs/game-system.md` のデータモデル（World / Faction / Walker / House）を型で表現し、実行時エラーを減らす |
 | 描画エンジン | PixiJS (WebGL) | 地形タイル＋大量のウォーカーを毎フレーム描くのに向く軽量2D描画ライブラリ。シーン管理や物理などゲーム側の仕組みは自前で組む前提 |
 | ビルド | Vite | 高速な開発サーバーとシンプルなプロダクションビルド |
-| 実行環境 | ブラウザのみ | デスクトップ配布（Tauri等）は行わない。`npm run build` の静的ファイルをどこにでもホスティングできる構成に留める |
+| 実行環境 | 縦持ちスマホのPWA専用 | デスクトップ配布（Tauri等）は行わない。マウス／キーボード操作は前提とせず、タップ操作とHTML製の下部ツールバーのみで完結させる。`vite-plugin-pwa`でマニフェスト・Service Workerを生成し、ホーム画面に追加してアプリのように起動できるようにする |
 | バックエンド | なし | シングルプレイ対戦（ローカルAI）が基本方針のため、サーバーサイドは現時点で不要 |
 | オブジェクト管理 | 自作ECS（`src/ecs/`） | 大量のウォーカーに対する疎結合なシステム（移動/建築/戦闘/マナ生成など）を見据え、スパースセット方式の最小限のECSを自前実装。既存ライブラリ（bitECS等）は導入せず、必要な機能だけを持つ薄い実装に留める |
 | テスト | Vitest | Viteと統合済みで追加設定が少ない。ECSのようなUIを持たない純粋ロジックの正しさを検証する用途に使用 |
@@ -32,11 +32,15 @@
 
 ```
 game2/
-├── index.html          … エントリHTML（#app にPixiJSのcanvasをマウント）
-├── vite.config.ts
+├── index.html          … エントリHTML（#app にPixiJSのcanvasをマウント、
+│                          #toolbar に縦持ちスマホ向けの下部タッチUI）
+├── vite.config.ts       … vite-plugin-pwaでマニフェスト/Service Workerを生成
 ├── tsconfig.json
+├── public/
+│   └── icons/           … PWAアイコン(icon-180/192/512.png、生成方法は本文参照)
 ├── src/
-│   ├── main.ts          … ブートストラップ（Application初期化、Simulationの起動とtickループ）
+│   ├── main.ts          … ブートストラップ（Application初期化、Simulationの起動とtickループ、
+│   │                       画面幅に合わせた地図スケールのフィット）
 │   ├── ecs/             … 自作ECSコア（Entity/Component/World/System）
 │   │   ├── entity.ts        … Entity = number
 │   │   ├── component.ts     … コンポーネント型（Symbolトークン）の定義
@@ -63,6 +67,10 @@ game2/
 │       │                    逆引き(pickVertex)・編集後の再描画(redraw)を提供
 │       ├── EntityLayer.ts … ECS World上のWalker/Houseを勢力の色分けで描画
 │       └── Hud.ts         … 勢力ごとのマナ/家数/ウォーカー数と決着表示のテキストHUD
+│                            （操作方法の案内は持たず、状態表示のみ）
+│   └── ui/
+│       └── toolbar.ts     … index.html の#toolbarボタンをSimulation/toolModeに
+│                            橋渡しするwireToolbar()
 └── docs/
     ├── game-system.md   … 再現対象のゲームシステム仕様
     └── tech-stack.md     … 本ファイル
@@ -154,6 +162,40 @@ HUDに現在選択中のツールを表示する。ヘッドレスブラウザ�
 `docs/game-system.md` のデータモデル素案のうち、行動方針の`goToShrine`
 （リーダー/集結シンボルの概念が未実装）・地震以外の奇跡（沼・騎士化・
 火山・洪水・最終決戦）・征服モードの複数ワールド進行はまだ未実装。
+
+### 縦持ちスマホPWAへの一本化
+
+操作対象を縦持ちスマホのPWAのみに絞ることになったため、マウス左右
+クリック・キーボードショートカット（1〜5キー）を全廃し、以下に置き換えた。
+
+- **PWA化**：`vite-plugin-pwa`を導入し、`vite.config.ts`でマニフェスト
+  （`display: "standalone"`, `orientation: "portrait"`）とService Worker
+  （`registerType: "autoUpdate"`）を生成する。アイコンは外部依存を増やさず
+  Node標準の`zlib`だけでPNGを直接エンコードする使い捨てスクリプトで生成し
+  （`public/icons/icon-{180,192,512}.png`）、`index.html`に
+  `apple-touch-icon`・`theme-color`等のメタタグを追加した。
+- **タッチUI**：`index.html`に固定表示の下部ツールバー（HTMLボタン）を追加。
+  1行目が行動方針（定住/集結/戦闘）、2行目がタップ操作の対象（▲隆起/▼沈降/
+  💥地震）で、`src/ui/toolbar.ts`の`wireToolbar()`がボタンのクリックを
+  `Simulation.setBehaviorMode`や`main.ts`内のtoolMode変数に橋渡しする。
+  右クリックによる「沈降」は使えなくなったため、隆起と沈降を別ボタンの
+  ツールとして分離した。
+  地図本体のタップは引き続きPixiJSの`pointerdown`（マウス/タッチ両対応の
+  FederatedPointerEvent）で処理しており、変更していない。
+- **画面フィット**：`IsoRenderer.mapPixelWidth`（地図が投影される画面幅）を
+  公開し、`main.ts`の`layout()`で画面幅に収まるよう`renderer.view.scale`を
+  動的に設定する（`MAP_FIT_MARGIN`で余白確保）。地図を子に持つ
+  `EntityLayer`もこのスケールをそのまま継承する。HUDのテキストは
+  `wordWrap`を有効にし、`Hud.setMaxWidth()`で画面幅に応じて折り返し幅を
+  更新することで、狭いスマホ幅でも文字が画面外に切れないようにした。
+- **縦持ち固定**：`index.html`に`@media (orientation: landscape)`で
+  「縦持ちでご利用ください」という警告オーバーレイを表示するCSSのみの
+  対策を入れた（Screen Orientation APIによる強制ロックはインストール後の
+  PWAでも安定して効くとは限らないため採用していない）。
+
+iPhone相当のビューポート（390×664、Playwrightのタッチエミュレーション）で
+ボタンのタップ・地図のタップ・HUD表示・PWAマニフェスト/Service Worker
+の生成をヘッドレスブラウザで確認済み。
 
 ### 判明した設計上の注意点：人口成長の上限
 

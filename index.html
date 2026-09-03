@@ -2,8 +2,16 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" href="data:," />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0a1a2a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="apple-touch-icon" href="/icons/icon-180.png" />
+    <link rel="icon" href="/icons/icon-192.png" />
     <title>game2</title>
     <style>
       html, body {
@@ -11,17 +19,98 @@
         padding: 0;
         width: 100%;
         height: 100%;
-        background: #000;
+        background: #0a1a2a;
         overflow: hidden;
+        overscroll-behavior: none;
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        font-family: system-ui, -apple-system, sans-serif;
       }
+
       #app {
-        width: 100vw;
-        height: 100vh;
+        position: absolute;
+        inset: 0;
+      }
+
+      #toolbar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+        background: rgba(10, 26, 42, 0.88);
+        box-sizing: border-box;
+      }
+
+      .toolbar-row {
+        display: flex;
+        gap: 6px;
+      }
+
+      .toolbar-row button {
+        flex: 1;
+        padding: 12px 4px;
+        font-size: 14px;
+        font-family: inherit;
+        border: 1px solid #4fa8ff;
+        border-radius: 8px;
+        background: #123049;
+        color: #fff;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .toolbar-row button[aria-pressed="true"] {
+        background: #4fa8ff;
+        color: #0a1a2a;
+        font-weight: bold;
+      }
+
+      #rotate-warning {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        background: #0a1a2a;
+        color: #fff;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 24px;
+        box-sizing: border-box;
+      }
+
+      /* This game targets portrait phones only. */
+      @media (orientation: landscape) {
+        #rotate-warning {
+          display: flex;
+        }
       }
     </style>
   </head>
   <body>
     <div id="app"></div>
+
+    <div id="toolbar">
+      <div class="toolbar-row" data-group="behavior">
+        <button type="button" data-mode="settle" aria-pressed="true">定住</button>
+        <button type="button" data-mode="gather">集結</button>
+        <button type="button" data-mode="fight">戦闘</button>
+      </div>
+      <div class="toolbar-row" data-group="tool">
+        <button type="button" data-tool="raise" aria-pressed="true">▲ 隆起</button>
+        <button type="button" data-tool="lower">▼ 沈降</button>
+        <button type="button" data-tool="earthquake">💥 地震</button>
+      </div>
+    </div>
+
+    <div id="rotate-warning">
+      <p>このゲームは縦持ちでご利用ください</p>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

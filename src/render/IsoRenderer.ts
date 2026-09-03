@@ -1,8 +1,8 @@
 import { Container, Graphics } from "pixi.js";
 import { sampleElevation, type Heightmap } from "../world/heightmap";
 
-const TILE_WIDTH = 48;
-const TILE_HEIGHT = 24;
+export const TILE_WIDTH = 48;
+export const TILE_HEIGHT = 24;
 const ELEVATION_STEP = 12;
 
 const TERRAIN_COLOR: Record<Heightmap["terrain"], number> = {
@@ -28,6 +28,11 @@ export class IsoRenderer {
 
   centerOn(screenWidth: number, screenHeight: number): void {
     this.view.position.set(screenWidth / 2, screenHeight / 3);
+  }
+
+  /** Total screen-space width (at scale 1) of the diamond the map projects to. */
+  get mapPixelWidth(): number {
+    return (this.heightmap.width + this.heightmap.height) * (TILE_WIDTH / 2);
   }
 
   /**

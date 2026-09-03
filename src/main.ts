@@ -1,17 +1,18 @@
 import { Application } from "pixi.js";
-import type { BehaviorMode } from "./game/components";
 import { EARTHQUAKE_MANA_COST, TERRAIN_EDIT_MANA_COST } from "./game/constants";
 import { trySpendMana } from "./game/faction";
 import { Simulation } from "./game/simulation";
 import { EntityLayer } from "./render/EntityLayer";
 import { Hud } from "./render/Hud";
 import { IsoRenderer } from "./render/IsoRenderer";
+import { wireToolbar, type ToolMode } from "./ui/toolbar";
 import { applyEarthquake, createHeightmap, raiseVertex } from "./world/heightmap";
 
 const WORLD_WIDTH = 32;
 const WORLD_HEIGHT = 32;
 
-type ToolMode = "terrain" | "earthquake";
+/** Fraction of the screen width the map is allowed to fill when fitting a phone screen. */
+const MAP_FIT_MARGIN = 0.92;
 
 async function bootstrap() {
   const app = new Application();
@@ -37,15 +38,24 @@ async function bootstrap() {
 
   const simulation = new Simulation({ worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT, heightmap });
 
-  const center = () => renderer.centerOn(app.screen.width, app.screen.height);
-  center();
-  window.addEventListener("resize", center);
+  // Portrait phones are narrower than the map's projected width, so scale
+  // the whole map (and everything drawn inside it) down to fit — see
+  // docs/tech-stack.md's "縦持ちスマホPWA".
+  const layout = () => {
+    const scale = Math.min(1, (app.screen.width * MAP_FIT_MARGIN) / renderer.mapPixelWidth);
+    renderer.view.scale.set(scale);
+    renderer.centerOn(app.screen.width, app.screen.height);
+    hud.setMaxWidth(app.screen.width);
+  };
+  layout();
+  window.addEventListener("resize", layout);
 
-  let toolMode: ToolMode = "terrain";
+  let toolMode: ToolMode = "raise";
 
-  // Click applies whichever tool is selected (terrain edit or earthquake),
-  // paid for out of the player faction's mana.
-  app.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+  // Tap applies whichever tool is selected (raise/lower terrain, or an
+  // earthquake), paid for out of the player faction's mana. There's no
+  // right-click on a touchscreen, so raise/lower are separate tools
+  // picked from the toolbar rather than left/right click.
   app.stage.eventMode = "static";
   app.stage.hitArea = app.screen;
   app.stage.on("pointerdown", (event) => {
@@ -61,29 +71,22 @@ async function bootstrap() {
     }
 
     if (!trySpendMana(simulation.world, "player", TERRAIN_EDIT_MANA_COST)) return;
-    const delta = event.button === 2 ? -1 : 1;
-    raiseVertex(heightmap, vertex.x, vertex.y, delta);
+    raiseVertex(heightmap, vertex.x, vertex.y, toolMode === "lower" ? -1 : 1);
     renderer.redraw();
   });
 
-  // 1/2/3 switch the player's own behaviorMode (settle/gather/fight) —
-  // free, per docs/game-system.md's 行動方針. 4/5 pick which miracle a
-  // click casts.
-  const BEHAVIOR_MODE_KEYS: Record<string, BehaviorMode> = { Digit1: "settle", Digit2: "gather", Digit3: "fight" };
-  const TOOL_KEYS: Record<string, ToolMode> = { Digit4: "terrain", Digit5: "earthquake" };
-  window.addEventListener("keydown", (event) => {
-    const mode = BEHAVIOR_MODE_KEYS[event.code];
-    if (mode) simulation.setBehaviorMode("player", mode);
-
-    const tool = TOOL_KEYS[event.code];
-    if (tool) toolMode = tool;
+  wireToolbar({
+    onBehaviorMode: (mode) => simulation.setBehaviorMode("player", mode),
+    onToolMode: (mode) => {
+      toolMode = mode;
+    },
   });
 
   app.ticker.add((ticker) => {
     const deltaSeconds = ticker.deltaMS / 1000;
     simulation.update(deltaSeconds);
     entityLayer.update(simulation.world);
-    hud.update(simulation.summarize(), simulation.getOutcome(), toolMode);
+    hud.update(simulation.summarize(), simulation.getOutcome());
   });
 }
 
