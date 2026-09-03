@@ -177,8 +177,18 @@ export function findLeastFlatVertex(
   return best;
 }
 
-/** Radius (in vertices) and per-vertex height swing of a default earthquake. */
-export const DEFAULT_EARTHQUAKE_RADIUS = 3;
+/**
+ * Radius (in vertices) and per-vertex height swing of a default
+ * earthquake. Matches HOUSE_UPGRADE_FLATNESS_RADIUS (2) rather than
+ * exceeding it: earthquake is meant as "中" tier economic disruption
+ * (Populous's own earthquake softens up one settlement's land, it isn't
+ * a top-tier wipe like volcano/flood/armageddon), so its footprint
+ * shouldn't reach further than the flatness check it's meant to spoil.
+ * Previously 3 (a 7x7 area) — comfortably wider than volcano's own
+ * radius despite costing half as much, letting one cheap cast wreck
+ * several houses' flatness at once.
+ */
+export const DEFAULT_EARTHQUAKE_RADIUS = 2;
 export const DEFAULT_EARTHQUAKE_MAX_DELTA = 4;
 
 /**
