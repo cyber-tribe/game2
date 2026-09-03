@@ -8,6 +8,14 @@ export const TILE_WIDTH = 64;
 export const TILE_HEIGHT = 32;
 const ELEVATION_STEP = 16;
 
+/**
+ * Time constant (seconds) for how fast the on-screen terrain height eases
+ * toward its real value after an edit — see `update()`. Small enough that
+ * a single raise/lower tap still feels immediate (~3 time constants, or
+ * ~150ms, to visually settle) rather than sluggish.
+ */
+const ELEVATION_EASE_TIME_CONSTANT = 0.05;
+
 const TERRAIN_COLOR: Record<Heightmap["terrain"], number> = {
   grass: 0x4a8c3f,
   desert: 0xd6b25e,
@@ -23,10 +31,42 @@ export class IsoRenderer {
   readonly heightmap: Heightmap;
   private readonly graphics = new Graphics();
 
+  /**
+   * The height actually drawn on screen for each vertex — separate from
+   * heightmap.vertices (which stays the instantly-updated, authoritative
+   * value every game-logic check reads: flatness, buildability, walker
+   * footing). `update()` eases this toward heightmap.vertices each frame
+   * so a raise/lower/earthquake/volcano visibly rises or falls instead of
+   * snapping instantly, per the "terrain edits should feel good — this is
+   * the operation a player touches most" feedback.
+   */
+  private displayVertices: number[][];
+
   constructor(heightmap: Heightmap) {
     this.heightmap = heightmap;
+    this.displayVertices = heightmap.vertices.map((row) => [...row]);
     this.view.addChild(this.graphics);
     this.redraw();
+  }
+
+  /**
+   * Eases displayVertices toward the real heightmap.vertices. Call once
+   * per frame, before redraw(). Frame-rate independent: the fraction
+   * covered per call depends only on deltaSeconds, not on how often this
+   * runs.
+   */
+  update(deltaSeconds: number): void {
+    const { vertices } = this.heightmap;
+    const t = 1 - Math.exp(-deltaSeconds / ELEVATION_EASE_TIME_CONSTANT);
+
+    for (let y = 0; y < this.displayVertices.length; y++) {
+      const displayRow = this.displayVertices[y];
+      const targetRow = vertices[y];
+      for (let x = 0; x < displayRow.length; x++) {
+        const delta = targetRow[x] - displayRow[x];
+        displayRow[x] = Math.abs(delta) < 0.01 ? targetRow[x] : displayRow[x] + delta * t;
+      }
+    }
   }
 
   centerOn(screenWidth: number, screenHeight: number): void {
@@ -80,9 +120,14 @@ export class IsoRenderer {
     return best;
   }
 
-  /** Rebuilds the terrain mesh from the current heightmap. Call after editing it. */
+  /**
+   * Rebuilds the terrain mesh from the current display heights (see
+   * displayVertices) — call after editing the heightmap, and every frame
+   * update() runs, so an in-progress ease keeps redrawing until it settles.
+   */
   redraw(): void {
-    const { width, height, vertices, rockHardness, waterLevel, terrain } = this.heightmap;
+    const { width, height, rockHardness, waterLevel, terrain } = this.heightmap;
+    const vertices = this.displayVertices;
     const graphics = this.graphics;
     graphics.clear();
 
