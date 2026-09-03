@@ -28,11 +28,39 @@ export class IsoRenderer {
     this.view.position.set(screenWidth / 2, screenHeight / 3);
   }
 
+  /**
+   * Projects a fractional tile-space point (e.g. a walker mid-stride
+   * between vertices) to screen space, sitting on the interpolated
+   * terrain surface below it.
+   */
+  project(x: number, y: number): { sx: number; sy: number } {
+    return this.toScreen(x, y, this.sampleElevation(x, y));
+  }
+
   private toScreen(x: number, y: number, elevation: number) {
     return {
       sx: (x - y) * (TILE_WIDTH / 2),
       sy: (x + y) * (TILE_HEIGHT / 2) - elevation * ELEVATION_STEP,
     };
+  }
+
+  private sampleElevation(x: number, y: number): number {
+    const { width, height, vertices } = this.heightmap;
+    const cx = Math.min(Math.max(x, 0), width);
+    const cy = Math.min(Math.max(y, 0), height);
+    const x0 = Math.min(Math.floor(cx), width - 1);
+    const y0 = Math.min(Math.floor(cy), height - 1);
+    const tx = cx - x0;
+    const ty = cy - y0;
+
+    const h00 = vertices[y0][x0];
+    const h10 = vertices[y0][x0 + 1];
+    const h01 = vertices[y0 + 1][x0];
+    const h11 = vertices[y0 + 1][x0 + 1];
+
+    const top = h00 + (h10 - h00) * tx;
+    const bottom = h01 + (h11 - h01) * tx;
+    return top + (bottom - top) * ty;
   }
 
   private draw(): void {

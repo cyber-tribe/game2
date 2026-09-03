@@ -36,7 +36,7 @@ game2/
 ├── vite.config.ts
 ├── tsconfig.json
 ├── src/
-│   ├── main.ts          … ブートストラップ（Application初期化、リサイズ対応）
+│   ├── main.ts          … ブートストラップ（Application初期化、Simulationの起動とtickループ）
 │   ├── ecs/             … 自作ECSコア（Entity/Component/World/System）
 │   │   ├── entity.ts        … Entity = number
 │   │   ├── component.ts     … コンポーネント型（Symbolトークン）の定義
@@ -44,21 +44,31 @@ game2/
 │   │   ├── world.ts         … Entity/Componentの生成・破棄・クエリを管理
 │   │   ├── system.ts        … Systemの型とSchedulerによる実行
 │   │   └── world.test.ts    … 上記の単体テスト
+│   ├── game/            … ゲームドメインロジック（ECSのコンポーネント/システムを利用）
+│   │   ├── components.ts    … Position/Owner/Walker/MoveTarget/House/FactionState
+│   │   ├── constants.ts     … 速度・成長率・家レベル別ステータス等のチューニング値
+│   │   ├── faction.ts       … Faction(勢力)エンティティの生成/検索
+│   │   ├── simulation.ts    … WorldとSchedulerを束ね、tickごとにupdate()するSimulation
+│   │   └── systems/         … movement / wanderTarget / settle / houseGrowth / mana
 │   ├── world/
 │   │   └── heightmap.ts … 頂点高さマップの型と生成（現状はプレースホルダー生成）
 │   └── render/
-│       └── IsoRenderer.ts … heightmapをアイソメトリックなポリゴン群として描画
+│       ├── IsoRenderer.ts … heightmapをアイソメトリックなポリゴン群として描画し、
+│       │                    タイル座標→画面座標への投影(project)も提供
+│       ├── EntityLayer.ts … ECS World上のWalker/Houseを勢力の色分けで描画
+│       └── Hud.ts         … 勢力ごとのマナ/家数/ウォーカー数を表示するテキストHUD
 └── docs/
     ├── game-system.md   … 再現対象のゲームシステム仕様
     └── tech-stack.md     … 本ファイル
 ```
 
-現時点では「地形メッシュが描画できる」ことと「ECSコアが動く」ことまでの
-最小骨格。ECSはまだ`main.ts`のレンダリングパイプラインには接続していない。
-`docs/game-system.md` のデータモデル素案に沿って、今後
-Walker（自律ユニット）・House（集落）・Faction（マナ経済/行動方針）を
-ECS上のコンポーネント/システムとして実装し、Simulation（tick駆動の
-ゲームループ）で`Scheduler`を回す形に発展させる。
+ECSが実際のレンダリングパイプラインに接続され、`Simulation`が
+「ウォーカーが徘徊→定住して家になる→家が人口を生産して新たな
+ウォーカーを輩出→マナが蓄積する」という基本ループをブラウザ上で
+可視化できる状態まで進んだ（ヘッドレスブラウザでのスクリーンショット
+検証済み）。`docs/game-system.md` のデータモデル素案のうち、
+地形連動の目標探索・House.levelの自動アップグレード・行動方針
+（gather/goToShrine/fight）・戦闘・奇跡はまだ未実装。
 
 ## 開発コマンド
 
