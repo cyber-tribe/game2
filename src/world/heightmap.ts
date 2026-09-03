@@ -135,6 +135,48 @@ export function countFlatNeighbors(heightmap: Heightmap, x: number, y: number, r
   return count;
 }
 
+/**
+ * Finds the vertex within `radius` of the vertex nearest (x, y) whose
+ * height differs most from that center vertex, plus the one-step delta
+ * (+1/-1) that would move it toward matching. Returns null once the whole
+ * neighborhood is already flat. This is countFlatNeighbors' complement:
+ * where that measures "how flat is it", this picks the single edit that
+ * flattens it the most — used to let the enemy AI terraform around its
+ * own houses the same way a player's taps do (see
+ * game/systems/enemyTerraform.ts).
+ */
+export function findLeastFlatVertex(
+  heightmap: Heightmap,
+  x: number,
+  y: number,
+  radius: number,
+): { x: number; y: number; delta: -1 | 1 } | null {
+  const { width, height, vertices } = heightmap;
+  const cx = Math.round(Math.min(Math.max(x, 0), width));
+  const cy = Math.round(Math.min(Math.max(y, 0), height));
+  const centerHeight = vertices[cy][cx];
+
+  let best: { x: number; y: number; delta: -1 | 1 } | null = null;
+  let bestDiff = 0;
+
+  for (let dy = -radius; dy <= radius; dy++) {
+    const vy = cy + dy;
+    if (vy < 0 || vy > height) continue;
+    const row = vertices[vy];
+    for (let dx = -radius; dx <= radius; dx++) {
+      const vx = cx + dx;
+      if (vx < 0 || vx > width) continue;
+      const diff = row[vx] - centerHeight;
+      if (Math.abs(diff) > Math.abs(bestDiff)) {
+        bestDiff = diff;
+        best = { x: vx, y: vy, delta: diff > 0 ? -1 : 1 };
+      }
+    }
+  }
+
+  return best;
+}
+
 /** Radius (in vertices) and per-vertex height swing of a default earthquake. */
 export const DEFAULT_EARTHQUAKE_RADIUS = 3;
 export const DEFAULT_EARTHQUAKE_MAX_DELTA = 4;
