@@ -153,3 +153,11 @@ export const ARMAGEDDON_MANA_COST = 120;
  * earthquake back-to-back indefinitely).
  */
 export const MAX_MANA = ARMAGEDDON_MANA_COST;
+
+/**
+ * Population lead (own ÷ opponent) at which the enemy AI goes for
+ * 最終決戦 instead of routine play — see enemyMiracles.ts. 1.8 matches
+ * docs/game-system.md's "決着ボタン" framing: affordable only once a
+ * lead is already decisive, not a coin-flip finish.
+ */
+export const ARMAGEDDON_POPULATION_RATIO = 1.8;

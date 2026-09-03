@@ -341,6 +341,12 @@ describe("Simulation", () => {
     for (let i = 0; i < 200; i++) sim.update(0.1); // let houses settle for both factions
     expect(sim.world.query(House).length).toBeGreaterThan(0);
 
+    // The enemy's own earthquake sabotage (see enemyMiracles.ts) can have
+    // heaved a few vertices above 1 by now — re-flatten before flooding so
+    // this test only exercises "flood submerges land at/below the new
+    // water level", not incidental high ground from unrelated AI behavior.
+    for (const row of heightmap.vertices) row.fill(1);
+
     applyFlood(heightmap, 1); // water level now matches the land height everywhere
     drownFlood(sim.world, heightmap);
 
