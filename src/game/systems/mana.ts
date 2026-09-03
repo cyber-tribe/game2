@@ -1,10 +1,11 @@
 import type { System } from "../../ecs";
-import { HOUSE_LEVELS } from "../constants";
+import { HOUSE_LEVELS, MAX_MANA } from "../constants";
 import { FactionState, House, Owner } from "../components";
 
 /**
  * Each faction's mana grows at the combined mana rate of every house it
- * owns, per docs/game-system.md ("信者の総人口に比例して自動蓄積").
+ * owns, per docs/game-system.md ("信者の総人口に比例して自動蓄積"),
+ * clamped at MAX_MANA (the mana gauge's fixed width — see its doc comment).
  * House count is small enough in this prototype that the per-faction
  * O(houses) scan is not worth indexing away.
  */
@@ -21,7 +22,7 @@ export const manaSystem: System = (world, deltaSeconds) => {
 
     world.add(factionEntity, FactionState, {
       ...faction,
-      mana: faction.mana + manaRate * deltaSeconds,
+      mana: Math.min(MAX_MANA, faction.mana + manaRate * deltaSeconds),
     });
   }
 };

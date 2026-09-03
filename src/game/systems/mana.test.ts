@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
 import { FactionState, House, Owner, Position } from "../components";
-import { HOUSE_LEVELS } from "../constants";
+import { HOUSE_LEVELS, MAX_MANA } from "../constants";
 import { createFaction } from "../faction";
 import { manaSystem } from "./mana";
 
@@ -59,5 +59,28 @@ describe("manaSystem", () => {
     manaSystem(world, 1);
 
     expect(world.get(player, FactionState)!.mana).toBe(HOUSE_LEVELS.hut.manaRate * 2);
+  });
+
+  it("never accumulates past MAX_MANA, however much income or however long it runs", () => {
+    const world = new World();
+    const player = createFaction(world, "player", { x: 0, y: 0 });
+    createHouse(world, "player", "castle");
+    createHouse(world, "player", "castle");
+    createHouse(world, "player", "castle");
+
+    for (let i = 0; i < 100; i++) manaSystem(world, 1);
+
+    expect(world.get(player, FactionState)!.mana).toBe(MAX_MANA);
+  });
+
+  it("stops climbing exactly at MAX_MANA rather than overshooting mid-tick", () => {
+    const world = new World();
+    const player = createFaction(world, "player", { x: 0, y: 0 });
+    world.add(player, FactionState, { ...world.get(player, FactionState)!, mana: MAX_MANA - 1 });
+    createHouse(world, "player", "castle"); // manaRate high enough to overshoot in one tick
+
+    manaSystem(world, 1);
+
+    expect(world.get(player, FactionState)!.mana).toBe(MAX_MANA);
   });
 });
