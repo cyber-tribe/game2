@@ -51,6 +51,13 @@ export const TILES_PER_HOUSE_CAP = 8;
 /** Mana cost of raising or lowering one terrain vertex by one step. */
 export const TERRAIN_EDIT_MANA_COST = 1;
 
+/**
+ * Mana cost of an earthquake. Costs far more than a plain terrain edit,
+ * matching its place well to the right of "raise/lower land" on the mana
+ * bar described in docs/game-system.md.
+ */
+export const EARTHQUAKE_MANA_COST = 20;
+
 /** Two same-faction walkers within this many tiles merge under "gather". */
 export const GATHER_RANGE = 1.5;
 

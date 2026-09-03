@@ -13,12 +13,16 @@ export class Hud {
     this.view.position.set(12, 12);
   }
 
-  update(summaries: FactionSummary[], outcome: GameOutcome): void {
+  update(summaries: FactionSummary[], outcome: GameOutcome, toolMode: string): void {
     const lines = summaries.map(
       (s) =>
         `${s.id}: mana ${s.mana.toFixed(1)}  houses ${s.houses}  walkers ${s.walkers}  mode ${s.behaviorMode}`,
     );
-    lines.push("", "[1] settle  [2] gather  [3] fight — set your behavior mode");
+    lines.push(
+      "",
+      "[1] settle  [2] gather  [3] fight — set your behavior mode",
+      `[4] terrain  [5] earthquake — click tool: ${toolMode}`,
+    );
 
     if (outcome.over) {
       lines.push("", outcome.winner ? `GAME OVER — ${outcome.winner} wins` : "GAME OVER — draw");
