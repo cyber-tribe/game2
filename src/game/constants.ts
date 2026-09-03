@@ -125,3 +125,14 @@ export const FLOOD_MANA_COST = 70;
  * driven by population) is already decisive.
  */
 export const ARMAGEDDON_MANA_COST = 120;
+
+/**
+ * Mana never accumulates past this — per docs/game-system.md, "画面上に
+ * マナゲージがあり、ゲージ上に各奇跡のアイコンが並ぶ...右端＝最大コスト
+ * （最終決戦）": the gauge's right edge is the priciest miracle, not an
+ * open-ended number. Without a cap, a long-running match's ever-growing
+ * population income lets mana pile up far past any single miracle's cost,
+ * making the whole cost-gating pointless (e.g. stockpiling enough to cast
+ * earthquake back-to-back indefinitely).
+ */
+export const MAX_MANA = ARMAGEDDON_MANA_COST;

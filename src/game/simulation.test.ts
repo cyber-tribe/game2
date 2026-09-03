@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyFlood, applyVolcano, isBuildable, isRock, type Heightmap } from "../world/heightmap";
 import { FactionState, House, Owner, Position, Swamp, Walker } from "./components";
+import { MAX_MANA } from "./constants";
 import { drownFlood } from "./flood";
 import { Simulation } from "./simulation";
 import { createSwamp } from "./swamp";
@@ -31,6 +32,25 @@ describe("Simulation", () => {
 
     expect(totalHouses).toBeGreaterThan(0);
     expect(totalMana).toBeGreaterThan(0);
+  });
+
+  it("caps mana at MAX_MANA even with a generous mana income sustained for a long time", () => {
+    const sim = new Simulation({ worldWidth: 20, worldHeight: 20, initialWalkersPerFaction: 0 });
+
+    for (const faction of ["player", "enemy"] as const) {
+      for (let i = 0; i < 5; i++) {
+        const house = sim.world.createEntity();
+        sim.world.add(house, Position, { x: 5, y: 5 });
+        sim.world.add(house, Owner, { faction });
+        sim.world.add(house, House, { level: "castle", population: 0 });
+      }
+    }
+
+    for (let i = 0; i < 300; i++) sim.update(0.1);
+
+    for (const summary of sim.summarize()) {
+      expect(summary.mana).toBe(MAX_MANA);
+    }
   });
 
   it("never throws across many ticks, including varying frame deltas", () => {
