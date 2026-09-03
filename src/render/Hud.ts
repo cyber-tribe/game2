@@ -1,5 +1,6 @@
 import { Text } from "pixi.js";
-import type { FactionSummary, GameOutcome } from "../game/simulation";
+import type { FactionSummary, GameOutcome, MatchEvent } from "../game/simulation";
+import { describeMiracleEvent } from "./miracleLabels";
 
 /**
  * Compact top status readout: each faction's mana/houses/walkers/mode,
@@ -52,7 +53,7 @@ export class Hud {
     this.terrainLabel = label;
   }
 
-  update(summaries: FactionSummary[], outcome: GameOutcome): void {
+  update(summaries: FactionSummary[], outcome: GameOutcome, matchEvents: readonly MatchEvent[] = []): void {
     const lines = [
       `地形: ${this.terrainLabel}`,
       ...summaries.map((s) => {
@@ -63,8 +64,20 @@ export class Hud {
 
     if (outcome.over) {
       lines.push("", outcome.winner ? `GAME OVER — ${outcome.winner} wins` : "GAME OVER — draw");
+      // A bare win/lose line tells none of the match's actual story — see
+      // plan/0032-match-event-log.md. Every miracle either side cast,
+      // recapped in the order they happened.
+      lines.push("", "戦いの記録:", ...matchEvents.map((e) => `${formatMatchTime(e.time)} ${describeMiracleEvent(e.type, e.faction)}`));
     }
 
     this.view.text = lines.join("\n");
   }
+}
+
+/** e.g. 75.3 -> "1:15". */
+function formatMatchTime(seconds: number): string {
+  const totalSeconds = Math.floor(seconds);
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }

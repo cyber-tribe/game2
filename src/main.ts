@@ -19,6 +19,7 @@ import { eruptVolcano } from "./game/volcano";
 import { EntityLayer } from "./render/EntityLayer";
 import { Hud } from "./render/Hud";
 import { IsoRenderer } from "./render/IsoRenderer";
+import { describeMiracleEvent } from "./render/miracleLabels";
 import { Minimap } from "./render/Minimap";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
 import {
@@ -146,15 +147,19 @@ async function bootstrap() {
     toastHideTimeout = setTimeout(() => enemyEventToast.classList.add("hidden"), 3000);
   };
 
-  const ENEMY_EVENT_LABEL: Record<EnemyMiracleEvent["type"], string> = {
-    earthquake: "💥 敵が地震を起こした",
-    knight: "⚔️ 敵のリーダーが騎士化した",
-    armageddon: "☠️ 敵が最終決戦を発動した",
+  // Mirrors the shake magnitudes applyTool uses for the player's own casts
+  // of the same miracles (knight has no player-side shake to match, so
+  // keeps its original, smaller value).
+  const ENEMY_SHAKE_MAGNITUDE: Record<EnemyMiracleEvent["type"], number> = {
+    armageddon: 10,
+    volcano: 8,
+    earthquake: 6,
+    knight: 3,
   };
 
   const onEnemyAction = (event: EnemyMiracleEvent) => {
-    showEnemyEventToast(ENEMY_EVENT_LABEL[event.type]);
-    triggerShake(event.type === "armageddon" ? 10 : event.type === "earthquake" ? 6 : 3);
+    showEnemyEventToast(describeMiracleEvent(event.type, "enemy"));
+    triggerShake(ENEMY_SHAKE_MAGNITUDE[event.type]);
   };
 
   const simulation = new Simulation({ worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT, heightmap, onEnemyAction });
@@ -238,6 +243,7 @@ async function bootstrap() {
     if (toolMode === "shrine") {
       if (!trySpendMana(simulation.world, "player", SHRINE_MOVE_MANA_COST)) return;
       simulation.moveShrine("player", vertex);
+      simulation.recordEvent("player", "shrineMove");
       vibrate(15);
       return;
     }
@@ -246,6 +252,7 @@ async function bootstrap() {
       if (!trySpendMana(simulation.world, "player", EARTHQUAKE_MANA_COST)) return;
       applyEarthquake(heightmap, vertex.x, vertex.y);
       renderer.redraw();
+      simulation.recordEvent("player", "earthquake");
       triggerShake(6);
       vibrate(40);
       return;
@@ -254,6 +261,7 @@ async function bootstrap() {
     if (toolMode === "swamp") {
       if (!trySpendMana(simulation.world, "player", SWAMP_MANA_COST)) return;
       createSwamp(simulation.world, vertex.x, vertex.y);
+      simulation.recordEvent("player", "swamp");
       vibrate(25);
       return;
     }
@@ -263,6 +271,7 @@ async function bootstrap() {
       applyVolcano(heightmap, vertex.x, vertex.y);
       eruptVolcano(simulation.world, vertex.x, vertex.y, DEFAULT_VOLCANO_RADIUS);
       renderer.redraw();
+      simulation.recordEvent("player", "volcano");
       triggerShake(8);
       vibrate([40, 30, 60]);
       return;
@@ -272,6 +281,7 @@ async function bootstrap() {
       // Also a global effect (it acts on the leader, not the tapped spot).
       if (!trySpendMana(simulation.world, "player", KNIGHT_MANA_COST)) return;
       simulation.knightify("player");
+      simulation.recordEvent("player", "knight");
       vibrate(30);
       return;
     }
@@ -280,6 +290,7 @@ async function bootstrap() {
       // Global effect on both factions at once, unlike every other miracle.
       if (!trySpendMana(simulation.world, "player", ARMAGEDDON_MANA_COST)) return;
       simulation.triggerArmageddon();
+      simulation.recordEvent("player", "armageddon");
       triggerShake(10);
       vibrate([60, 40, 60, 40, 100]);
       return;
@@ -291,6 +302,7 @@ async function bootstrap() {
       applyFlood(heightmap);
       drownFlood(simulation.world, heightmap);
       renderer.redraw();
+      simulation.recordEvent("player", "flood");
       triggerShake(5);
       vibrate(50);
       return;
@@ -429,7 +441,7 @@ async function bootstrap() {
     renderer.update(deltaSeconds);
     renderer.redraw();
     entityLayer.update(simulation.world);
-    hud.update(simulation.summarize(), simulation.getOutcome());
+    hud.update(simulation.summarize(), simulation.getOutcome(), simulation.getMatchEvents());
     minimap.update(simulation.world);
 
     if (shakeTimeRemaining > 0) {

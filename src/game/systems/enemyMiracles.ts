@@ -30,6 +30,7 @@ import { distance, type Point } from "./geometry";
  */
 export type EnemyMiracleEvent =
   | { type: "earthquake"; position: Point }
+  | { type: "volcano"; position: Point }
   | { type: "knight" }
   | { type: "armageddon" };
 
@@ -122,6 +123,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
       if (target && trySpendMana(world, factionId, VOLCANO_MANA_COST)) {
         applyVolcano(heightmap, target.x, target.y);
         eruptVolcano(world, target.x, target.y, DEFAULT_VOLCANO_RADIUS);
+        onAction({ type: "volcano", position: target });
         return;
       }
     }

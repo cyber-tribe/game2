@@ -64,6 +64,27 @@ export interface GameOutcome {
   winner?: FactionId;
 }
 
+/**
+ * Every miracle a match's event log can record — deliberately excludes
+ * the plain raise/lower terrain edit, same reasoning as main.ts's
+ * vibrate(): it's the core, extremely frequent action, so logging every
+ * tap would bury the events actually worth telling a story about.
+ */
+export type MatchEventType = "shrineMove" | "earthquake" | "swamp" | "volcano" | "knight" | "armageddon" | "flood";
+
+/**
+ * A notable action recorded during a match — the raw material for a
+ * post-game recap ("戦いの記録"), per feedback that a bare win/lose line
+ * tells none of the match's actual story. Presentation (icons, Japanese
+ * phrasing) lives in render/miracleLabels.ts, not here.
+ */
+export interface MatchEvent {
+  /** Seconds since the match started (frozen once the game is over). */
+  time: number;
+  faction: FactionId;
+  type: MatchEventType;
+}
+
 /** Owns the ECS world for one match and drives it tick by tick. */
 export class Simulation {
   readonly world = new World();
@@ -79,6 +100,9 @@ export class Simulation {
    * an intentional, explainable limit.
    */
   readonly maxHousesPerFaction: number;
+
+  private readonly matchEvents: MatchEvent[] = [];
+  private elapsedTime = 0;
 
   constructor(config: SimulationConfig) {
     const playerShrine = { x: config.worldWidth * 0.25, y: config.worldHeight * 0.75 };
@@ -119,7 +143,10 @@ export class Simulation {
         createEnemyMiracleSystem({
           heightmap: config.heightmap,
           worldCenter: this.worldCenter,
-          onAction: config.onEnemyAction,
+          onAction: (event) => {
+            this.recordEvent("enemy", event.type);
+            config.onEnemyAction?.(event);
+          },
         }),
       );
   }
@@ -127,7 +154,23 @@ export class Simulation {
   /** No-ops once the game is over, per docs/game-system.md's win/lose rules. */
   update(deltaSeconds: number): void {
     if (this.getOutcome().over) return;
+    this.elapsedTime += deltaSeconds;
     this.scheduler.update(this.world, deltaSeconds);
+  }
+
+  /**
+   * Appends a miracle cast to the match's event log, timestamped against
+   * how long the match has run so far. main.ts calls this for the
+   * player's own casts (mirroring its vibrate()/triggerShake() call
+   * sites); the enemy's are recorded automatically above.
+   */
+  recordEvent(faction: FactionId, type: MatchEventType): void {
+    this.matchEvents.push({ time: this.elapsedTime, faction, type });
+  }
+
+  /** The match's full event log so far, oldest first — see MatchEvent. */
+  getMatchEvents(): readonly MatchEvent[] {
+    return this.matchEvents;
   }
 
   /** Switches a faction's influence mode (docs/game-system.md's 行動方針). Free — no mana cost. */

@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { applyFlood, applyVolcano, isBuildable, isRock, type Heightmap } from "../world/heightmap";
 import { FactionState, House, Owner, Position, Swamp, Walker } from "./components";
-import { MAX_MANA } from "./constants";
+import { ARMAGEDDON_MANA_COST, MAX_MANA } from "./constants";
 import { drownFlood } from "./flood";
 import { Simulation } from "./simulation";
 import { createSwamp } from "./swamp";
 import { eruptVolcano } from "./volcano";
+
+function flatHeightmap(width: number, height: number, elevation: number): Heightmap {
+  const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
+  const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
+  return { width, height, terrain: "grass", vertices, rockHardness, waterLevel: 0 };
+}
 
 describe("Simulation", () => {
   it("seeds both factions with the requested number of seeking walkers and nothing else", () => {
@@ -125,6 +131,67 @@ describe("Simulation", () => {
     const after = sim.summarize();
 
     expect(after).toEqual(before);
+  });
+
+  it("records a player-cast miracle timestamped against how long the match has run", () => {
+    const sim = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 1 });
+
+    sim.update(3);
+    sim.recordEvent("player", "earthquake");
+    sim.update(2);
+    sim.recordEvent("player", "volcano");
+
+    expect(sim.getMatchEvents()).toEqual([
+      { time: 3, faction: "player", type: "earthquake" },
+      { time: 5, faction: "player", type: "volcano" },
+    ]);
+  });
+
+  it("stops advancing match time (and so stops timestamping new events meaningfully) once the game is over", () => {
+    const sim = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 1 });
+
+    for (const entity of sim.world.query(Walker, Owner)) {
+      if (sim.world.get(entity, Owner)!.faction === "enemy") {
+        sim.world.destroyEntity(entity);
+      }
+    }
+
+    sim.update(3); // no-ops once over, per the test above
+    sim.update(10);
+    sim.recordEvent("player", "earthquake");
+
+    expect(sim.getMatchEvents()).toEqual([{ time: 0, faction: "player", type: "earthquake" }]);
+  });
+
+  it("automatically records a miracle the enemy AI casts on its own, not just the player's own casts", () => {
+    // Perfectly flat: createEnemyTerraformSystem also runs this same first
+    // tick and would otherwise spend a bit of the enemy's mana flattening
+    // around its house, leaving it just short of affording armageddon below
+    // (MAX_MANA equals ARMAGEDDON_MANA_COST exactly, so there's no "spare"
+    // mana to buffer against that with).
+    const heightmap = flatHeightmap(10, 10, 5);
+    const sim = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 0, heightmap });
+    const enemyEntity = [...sim.world.query(FactionState)].find(
+      (e) => sim.world.get(e, FactionState)!.id === "enemy",
+    )!;
+    sim.world.add(enemyEntity, FactionState, { ...sim.world.get(enemyEntity, FactionState)!, mana: ARMAGEDDON_MANA_COST });
+
+    const enemyHouse = sim.world.createEntity();
+    sim.world.add(enemyHouse, Position, { x: 1, y: 1 });
+    sim.world.add(enemyHouse, Owner, { faction: "enemy" });
+    // Kept under HOUSE_LEVELS.hut.capacity so a tick's population growth
+    // (or a possible flatness-driven level-up) can't spill this over into
+    // spawning a new walker and muddying the population lead being tested.
+    sim.world.add(enemyHouse, House, { level: "hut", population: 8 });
+
+    const playerHouse = sim.world.createEntity();
+    sim.world.add(playerHouse, Position, { x: 8, y: 8 });
+    sim.world.add(playerHouse, Owner, { faction: "player" });
+    sim.world.add(playerHouse, House, { level: "hut", population: 1 });
+
+    sim.update(0.1); // every decision system runs on its very first tick
+
+    expect(sim.getMatchEvents()).toEqual([{ time: 0.1, faction: "enemy", type: "armageddon" }]);
   });
 
   it("keeps every settled house on buildable land when a heightmap with water is provided", () => {

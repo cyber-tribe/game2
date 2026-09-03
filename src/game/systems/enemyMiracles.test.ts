@@ -147,11 +147,19 @@ describe("createEnemyMiracleSystem", () => {
     const target = createHouse(world, "player", 5, 5, 10); // ratio 1.3 -> past VOLCANO_POPULATION_RATIO, short of armageddon's 1.8
 
     const heightmap = flatHeightmap(10, 10, 5);
-    createEnemyMiracleSystem({ decisionInterval: 8, heightmap, worldCenter: WORLD_CENTER, rng: () => 0 })(world, 8);
+    const events: unknown[] = [];
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap,
+      worldCenter: WORLD_CENTER,
+      rng: () => 0,
+      onAction: (event) => events.push(event),
+    })(world, 8);
 
     expect(world.get(enemy, FactionState)!.mana).toBe(0);
     expect(world.isAlive(target)).toBe(false); // eruptVolcano destroys anything it lands on
     expect(heightmap.rockHardness[5][5]).toBeGreaterThan(0);
+    expect(events).toEqual([{ type: "volcano", position: { x: 5, y: 5 } }]);
   });
 
   it("does not escalate to a volcano below VOLCANO_POPULATION_RATIO, even if it can afford one", () => {
