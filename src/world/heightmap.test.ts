@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_ELEVATION,
   MIN_ELEVATION,
+  countFlatNeighbors,
   createHeightmap,
   isBuildable,
   raiseVertex,
@@ -100,5 +101,32 @@ describe("isBuildable", () => {
   it("is true above sea level", () => {
     const heightmap = flatHeightmap(2, 2, MIN_ELEVATION + 1);
     expect(isBuildable(heightmap, 1, 1)).toBe(true);
+  });
+});
+
+describe("countFlatNeighbors", () => {
+  it("counts every vertex in radius on a perfectly flat map, including the center", () => {
+    const heightmap = flatHeightmap(6, 6, 5);
+    expect(countFlatNeighbors(heightmap, 3, 3, 2)).toBe(5 * 5);
+  });
+
+  it("excludes vertices whose height differs from the center", () => {
+    const heightmap = flatHeightmap(6, 6, 5);
+    heightmap.vertices[3][4] = 9; // one neighbor raised out of the 5x5 window
+
+    expect(countFlatNeighbors(heightmap, 3, 3, 2)).toBe(5 * 5 - 1);
+  });
+
+  it("shrinks the window near the map edge instead of counting out-of-bounds vertices", () => {
+    const heightmap = flatHeightmap(4, 4, 5);
+    // center at the corner (0,0): only the 3x3 quadrant inside the map counts
+    expect(countFlatNeighbors(heightmap, 0, 0, 2)).toBe(3 * 3);
+  });
+
+  it("rounds fractional coordinates to the nearest vertex", () => {
+    const heightmap = flatHeightmap(6, 6, 5);
+    heightmap.vertices[3][3] = 9;
+
+    expect(countFlatNeighbors(heightmap, 3.4, 3.4, 0)).toBe(1);
   });
 });

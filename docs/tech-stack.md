@@ -49,11 +49,13 @@ game2/
 │   │   ├── constants.ts     … 速度・成長率・家レベル別ステータス・マナコスト等のチューニング値
 │   │   ├── faction.ts       … Faction(勢力)エンティティの生成/検索/マナ消費(trySpendMana)
 │   │   ├── simulation.ts    … WorldとSchedulerを束ね、tickごとにupdate()するSimulation
-│   │   └── systems/         … movement / wanderTarget / settle / houseGrowth / mana /
-│   │                          combat / gather / fightTargeting / enemyAi
+│   │   └── systems/         … movement / wanderTarget / settle / houseGrowth /
+│   │                          houseUpgrade / mana / combat / gather /
+│   │                          fightTargeting / enemyAi
 │   ├── world/
 │   │   └── heightmap.ts … 頂点高さマップの型と生成、raiseVertex(頂点1つの上げ下げ)、
-│   │                       sampleElevation(バイリニア補間)、isBuildable(海面より上か)
+│   │                       sampleElevation(バイリニア補間)、isBuildable(海面より上か)、
+│   │                       countFlatNeighbors(周囲の平坦さの計測)
 │   └── render/
 │       ├── IsoRenderer.ts … heightmapをアイソメトリックなポリゴン群として描画し、
 │       │                    タイル座標→画面座標への投影(project)・クリック位置→頂点の
@@ -112,8 +114,26 @@ ECSが実際のレンダリングパイプラインに接続され、`Simulation
 離れた初期配置のままブラウザで目視すると、歩いて到達するまで数十秒
 かかるため、見た目での確認より高速なヘッドレス実行の方が検証に適する）。
 
-`docs/game-system.md` のデータモデル素案のうち、House.levelの
-地形依存アップグレード（現状はhutに固定）・行動方針の`goToShrine`
+### House.levelの地形依存アップグレード
+
+`world/heightmap.ts`に`countFlatNeighbors(heightmap, x, y, radius)`を
+追加し、指定した点を中心とする(2×radius+1)四方の頂点のうち、その点の
+頂点とちょうど同じ高さを持つ頂点の数を数えるようにした（自分自身も
+必ず1個としてカウントされる）。
+
+`createHouseUpgradeSystem`はこの値を使い、`HOUSE_LEVEL_FLATNESS_REQUIREMENT`
+（`HOUSE_UPGRADE_FLATNESS_RADIUS`=2なので最大25）の閾値を満たすたびに
+家をアップグレードする。アップグレードは一方向のみ（現在のレベルより
+下がることはない）で、population等の他フィールドは保持される。
+HOUSE_LEVELSの容量・マナ産出・防御力は既存のレベル別テーブルがそのまま
+適用されるため、他システムを変更する必要はなかった。
+
+これにより「プレイヤーが地形を編集して土地を平らにする」という
+既存の地形操作機能に明確な目的（家を大きく育てる）が生まれた。
+Simulationの統合テストで、完全に平坦なheightmapを与えると家がhutより
+上のレベルまで育つことを確認済み。
+
+`docs/game-system.md` のデータモデル素案のうち、行動方針の`goToShrine`
 （リーダー/集結シンボルの概念が未実装）・地形編集以外の奇跡（地震・沼・
 騎士化・火山・洪水・最終決戦）・征服モードの複数ワールド進行はまだ
 未実装。

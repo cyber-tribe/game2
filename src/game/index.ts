@@ -5,6 +5,7 @@ export { movementSystem } from "./systems/movement";
 export { createWanderTargetSystem, type WanderTargetConfig } from "./systems/wanderTarget";
 export { createSettleSystem, type SettleConfig } from "./systems/settle";
 export { createHouseGrowthSystem, type HouseGrowthConfig } from "./systems/houseGrowth";
+export { createHouseUpgradeSystem, type HouseUpgradeConfig } from "./systems/houseUpgrade";
 export { manaSystem } from "./systems/mana";
 export { houseCaptureSystem, walkerCombatSystem } from "./systems/combat";
 export { gatherSystem } from "./systems/gather";

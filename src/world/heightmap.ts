@@ -79,3 +79,30 @@ export function sampleElevation(heightmap: Heightmap, x: number, y: number): num
 export function isBuildable(heightmap: Heightmap, x: number, y: number): boolean {
   return sampleElevation(heightmap, x, y) > MIN_ELEVATION;
 }
+
+/**
+ * How many vertices within `radius` of the vertex nearest (x, y) share its
+ * exact height — a proxy for "how much flat land surrounds this point".
+ * Used to decide whether a house's surroundings are flat enough to
+ * support a bigger building, per docs/game-system.md's "周囲の地形を
+ * さらに平らにすると自動でアップグレードされる".
+ */
+export function countFlatNeighbors(heightmap: Heightmap, x: number, y: number, radius: number): number {
+  const { width, height, vertices } = heightmap;
+  const cx = Math.round(Math.min(Math.max(x, 0), width));
+  const cy = Math.round(Math.min(Math.max(y, 0), height));
+  const centerHeight = vertices[cy][cx];
+
+  let count = 0;
+  for (let dy = -radius; dy <= radius; dy++) {
+    const vy = cy + dy;
+    if (vy < 0 || vy > height) continue;
+    const row = vertices[vy];
+    for (let dx = -radius; dx <= radius; dx++) {
+      const vx = cx + dx;
+      if (vx < 0 || vx > width) continue;
+      if (row[vx] === centerHeight) count++;
+    }
+  }
+  return count;
+}

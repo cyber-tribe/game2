@@ -8,6 +8,7 @@ import { createEnemyAiSystem } from "./systems/enemyAi";
 import { fightTargetingSystem } from "./systems/fightTargeting";
 import { gatherSystem } from "./systems/gather";
 import { createHouseGrowthSystem } from "./systems/houseGrowth";
+import { createHouseUpgradeSystem } from "./systems/houseUpgrade";
 import { manaSystem } from "./systems/mana";
 import { movementSystem } from "./systems/movement";
 import { createSettleSystem } from "./systems/settle";
@@ -75,6 +76,7 @@ export class Simulation {
       .add(walkerCombatSystem)
       .add(houseCaptureSystem)
       .add(createSettleSystem({ heightmap: config.heightmap }))
+      .add(createHouseUpgradeSystem({ heightmap: config.heightmap }))
       .add(createHouseGrowthSystem({ maxHousesPerFaction }))
       .add(manaSystem);
   }

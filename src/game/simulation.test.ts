@@ -108,4 +108,21 @@ describe("Simulation", () => {
     expect(sim.getBehaviorMode("player")).toBe("fight");
     expect(sim.getBehaviorMode("enemy")).toBe("settle");
   });
+
+  it("upgrades houses beyond hut when the whole map is perfectly flat", () => {
+    const width = 20;
+    const height = 20;
+    const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(5));
+    const heightmap: Heightmap = { width, height, terrain: "grass", vertices };
+
+    const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
+
+    for (let i = 0; i < 300; i++) {
+      sim.update(0.1);
+    }
+
+    const houses = sim.world.query(House);
+    expect(houses.length).toBeGreaterThan(0);
+    expect(houses.some((entity) => sim.world.get(entity, House)!.level !== "hut")).toBe(true);
+  });
 });
