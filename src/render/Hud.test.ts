@@ -39,6 +39,24 @@ describe("Hud.update", () => {
     expect(lines.indexOf("0:08 💥 あなたが地震を起こした")).toBeLessThan(lines.indexOf("1:15 🌋 敵が火山を起こした"));
   });
 
+  it("recaps house events with the opponent named correctly regardless of who caused them", () => {
+    const hud = new Hud();
+    const events: MatchEvent[] = [
+      { time: 3, faction: "player", type: "houseCaptured" },
+      { time: 4, faction: "enemy", type: "houseCaptured" },
+      { time: 5, faction: "player", type: "houseBurned" },
+      { time: 6, faction: "enemy", type: "houseReachedCastle" },
+    ];
+
+    hud.update(SUMMARIES, OVER, events);
+
+    const lines = hud.view.text.split("\n");
+    expect(lines).toContain("0:03 🏠 あなたが敵の家を奪った");
+    expect(lines).toContain("0:04 🏠 敵があなたの家を奪った");
+    expect(lines).toContain("0:05 🔥 あなたが敵の家を焼き払った");
+    expect(lines).toContain("0:06 🏰 敵の家がcastleまで発展した");
+  });
+
   it("still shows the GAME OVER line and an empty recap when no miracle was ever cast", () => {
     const hud = new Hud();
     hud.update(SUMMARIES, OVER, []);

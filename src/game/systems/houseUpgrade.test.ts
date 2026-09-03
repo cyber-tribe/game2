@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
 import type { Heightmap } from "../../world/heightmap";
-import { House, Position } from "../components";
+import { House, Owner, Position, type FactionId } from "../components";
 import { createHouseUpgradeSystem } from "./houseUpgrade";
 
 function flatHeightmap(width: number, height: number, elevation: number): Heightmap {
@@ -68,6 +68,32 @@ describe("createHouseUpgradeSystem", () => {
     createHouseUpgradeSystem({ heightmap })(world, 0);
 
     expect(world.get(house, House)!.level).toBe("hut");
+  });
+
+  it("reports reaching castle exactly once, not on every intermediate upgrade", () => {
+    const world = new World();
+    const heightmap = flatHeightmap(10, 10, 5); // fully flat -> hut straight to castle in one pass
+    const house = createHouse(world, 5, 5);
+    world.add(house, Owner, { faction: "player" });
+
+    const reached: FactionId[] = [];
+    createHouseUpgradeSystem({ heightmap, onReachCastle: (faction) => reached.push(faction) })(world, 0);
+    expect(world.get(house, House)!.level).toBe("castle");
+    expect(reached).toEqual(["player"]);
+
+    // Already at castle: re-running shouldn't report it again.
+    createHouseUpgradeSystem({ heightmap, onReachCastle: (faction) => reached.push(faction) })(world, 0);
+    expect(reached).toEqual(["player"]);
+  });
+
+  it("does not report reaching castle for a house without an Owner", () => {
+    const world = new World();
+    const heightmap = flatHeightmap(10, 10, 5);
+    createHouse(world, 5, 5); // no Owner attached, as in the other tests here
+
+    const reached: FactionId[] = [];
+    expect(() => createHouseUpgradeSystem({ heightmap, onReachCastle: (faction) => reached.push(faction) })(world, 0)).not.toThrow();
+    expect(reached).toEqual([]);
   });
 
   it("preserves the house's population when it upgrades", () => {

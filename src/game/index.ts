@@ -7,7 +7,7 @@ export { createSettleSystem, type SettleConfig } from "./systems/settle";
 export { createHouseGrowthSystem, type HouseGrowthConfig } from "./systems/houseGrowth";
 export { createHouseUpgradeSystem, type HouseUpgradeConfig } from "./systems/houseUpgrade";
 export { manaSystem } from "./systems/mana";
-export { houseCaptureSystem, walkerCombatSystem } from "./systems/combat";
+export { createHouseCaptureSystem, walkerCombatSystem } from "./systems/combat";
 export { gatherSystem } from "./systems/gather";
 export { fightTargetingSystem } from "./systems/fightTargeting";
 export { createEnemyAiSystem, type EnemyAiConfig } from "./systems/enemyAi";

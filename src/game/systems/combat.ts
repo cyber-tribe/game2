@@ -1,6 +1,6 @@
 import type { Entity, System, World } from "../../ecs";
 import { COMBAT_RANGE, HOUSE_LEVELS } from "../constants";
-import { House, Owner, Position, Walker } from "../components";
+import { House, Owner, Position, Walker, type FactionId } from "../components";
 import { distance, type Point } from "./geometry";
 
 function withinRange(a: Point, b: Point): boolean {
@@ -52,6 +52,13 @@ function resolveWalkerFight(world: World, a: Entity, b: Entity): void {
   }
 }
 
+export interface HouseCaptureConfig {
+  /** Called when an attacker's strength beats a house's defense and takes it over. */
+  onCapture: (attackerFaction: FactionId) => void;
+  /** Called when a knight burns a house down instead of capturing it. */
+  onBurn: (attackerFaction: FactionId) => void;
+}
+
 /**
  * A walker that reaches an enemy house assaults it: if its strength beats
  * the house's defense, the house is captured (its owner flips and its
@@ -65,31 +72,38 @@ function resolveWalkerFight(world: World, a: Entity, b: Entity): void {
  * regardless of defense) rather than capturing it, and survives to keep
  * marching ("指示に依存せず戦い続ける").
  */
-export const houseCaptureSystem: System = (world) => {
-  for (const walkerEntity of world.query(Position, Walker, Owner)) {
-    const walkerPos = world.get(walkerEntity, Position)!;
-    const walkerOwner = world.get(walkerEntity, Owner)!;
-    const walker = world.get(walkerEntity, Walker)!;
-    const isKnight = walker.state === "knight";
+export function createHouseCaptureSystem(config: Partial<HouseCaptureConfig> = {}): System {
+  const onCapture = config.onCapture ?? (() => {});
+  const onBurn = config.onBurn ?? (() => {});
 
-    for (const houseEntity of world.query(Position, House, Owner)) {
-      const houseOwner = world.get(houseEntity, Owner)!;
-      if (houseOwner.faction === walkerOwner.faction) continue;
-      if (!withinRange(walkerPos, world.get(houseEntity, Position)!)) continue;
+  return (world) => {
+    for (const walkerEntity of world.query(Position, Walker, Owner)) {
+      const walkerPos = world.get(walkerEntity, Position)!;
+      const walkerOwner = world.get(walkerEntity, Owner)!;
+      const walker = world.get(walkerEntity, Walker)!;
+      const isKnight = walker.state === "knight";
 
-      if (isKnight) {
-        world.destroyEntity(houseEntity);
+      for (const houseEntity of world.query(Position, House, Owner)) {
+        const houseOwner = world.get(houseEntity, Owner)!;
+        if (houseOwner.faction === walkerOwner.faction) continue;
+        if (!withinRange(walkerPos, world.get(houseEntity, Position)!)) continue;
+
+        if (isKnight) {
+          world.destroyEntity(houseEntity);
+          onBurn(walkerOwner.faction);
+          break;
+        }
+
+        const house = world.get(houseEntity, House)!;
+        if (walker.strength > HOUSE_LEVELS[house.level].defense) {
+          world.add(houseEntity, Owner, { faction: walkerOwner.faction });
+          world.add(houseEntity, House, { level: house.level, population: 0 });
+          onCapture(walkerOwner.faction);
+        }
+
+        world.destroyEntity(walkerEntity);
         break;
       }
-
-      const house = world.get(houseEntity, House)!;
-      if (walker.strength > HOUSE_LEVELS[house.level].defense) {
-        world.add(houseEntity, Owner, { faction: walkerOwner.faction });
-        world.add(houseEntity, House, { level: house.level, population: 0 });
-      }
-
-      world.destroyEntity(walkerEntity);
-      break;
     }
-  }
-};
+  };
+}

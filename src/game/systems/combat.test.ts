@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
 import { House, Owner, Position, Walker, type FactionId, type WalkerState } from "../components";
 import { HOUSE_LEVELS } from "../constants";
-import { houseCaptureSystem, walkerCombatSystem } from "./combat";
+import { createHouseCaptureSystem, walkerCombatSystem } from "./combat";
 
 function createWalker(
   world: World,
@@ -80,11 +80,13 @@ describe("houseCaptureSystem", () => {
     const house = createHouse(world, "enemy", 0, 0);
     const attacker = createWalker(world, "player", 0, 0, HOUSE_LEVELS.hut.defense + 1);
 
-    houseCaptureSystem(world, 0);
+    const captured: FactionId[] = [];
+    createHouseCaptureSystem({ onCapture: (faction) => captured.push(faction) })(world, 0);
 
     expect(world.get(house, Owner)).toEqual({ faction: "player" });
     expect(world.get(house, House)).toEqual({ level: "hut", population: 0 });
     expect(world.isAlive(attacker)).toBe(false);
+    expect(captured).toEqual(["player"]);
   });
 
   it("repels a walker too weak to beat the house's defense, leaving the house untouched", () => {
@@ -92,11 +94,13 @@ describe("houseCaptureSystem", () => {
     const house = createHouse(world, "enemy", 0, 0);
     const attacker = createWalker(world, "player", 0, 0, HOUSE_LEVELS.hut.defense - 1);
 
-    houseCaptureSystem(world, 0);
+    const captured: FactionId[] = [];
+    createHouseCaptureSystem({ onCapture: (faction) => captured.push(faction) })(world, 0);
 
     expect(world.get(house, Owner)).toEqual({ faction: "enemy" });
     expect(world.get(house, House)!.population).toBe(7);
     expect(world.isAlive(attacker)).toBe(false);
+    expect(captured).toEqual([]);
   });
 
   it("ignores a walker's own faction's houses", () => {
@@ -104,7 +108,7 @@ describe("houseCaptureSystem", () => {
     const house = createHouse(world, "player", 0, 0);
     const walker = createWalker(world, "player", 0, 0, 999);
 
-    houseCaptureSystem(world, 0);
+    createHouseCaptureSystem()(world, 0);
 
     expect(world.get(house, Owner)).toEqual({ faction: "player" });
     expect(world.isAlive(walker)).toBe(true);
@@ -115,7 +119,7 @@ describe("houseCaptureSystem", () => {
     const house = createHouse(world, "enemy", 20, 20);
     const walker = createWalker(world, "player", 0, 0, 999);
 
-    houseCaptureSystem(world, 0);
+    createHouseCaptureSystem()(world, 0);
 
     expect(world.get(house, Owner)).toEqual({ faction: "enemy" });
     expect(world.isAlive(walker)).toBe(true);
@@ -126,10 +130,17 @@ describe("houseCaptureSystem", () => {
     const house = createHouse(world, "enemy", 0, 0, "castle");
     const knight = createWalker(world, "player", 0, 0, 1, "knight"); // far below castle's defense
 
-    houseCaptureSystem(world, 0);
+    const burned: FactionId[] = [];
+    const captured: FactionId[] = [];
+    createHouseCaptureSystem({
+      onBurn: (faction) => burned.push(faction),
+      onCapture: (faction) => captured.push(faction),
+    })(world, 0);
 
     expect(world.isAlive(house)).toBe(false);
     expect(world.isAlive(knight)).toBe(true);
+    expect(burned).toEqual(["player"]);
+    expect(captured).toEqual([]); // burning is not capturing
   });
 
   it("a knight survives after burning a house and can keep marching", () => {
@@ -137,7 +148,7 @@ describe("houseCaptureSystem", () => {
     createHouse(world, "enemy", 0, 0);
     const knight = createWalker(world, "player", 0, 0, 1, "knight");
 
-    houseCaptureSystem(world, 0);
+    createHouseCaptureSystem()(world, 0);
 
     expect(world.isAlive(knight)).toBe(true);
   });

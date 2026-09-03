@@ -5,7 +5,7 @@ import { FactionState, House, Owner, Position, Walker, type BehaviorMode, type F
 import { DEFAULT_WALKER_SPEED, TILES_PER_HOUSE_CAP } from "./constants";
 import { createFaction, findFactionEntity, moveShrine } from "./faction";
 import { knightify } from "./knight";
-import { houseCaptureSystem, walkerCombatSystem } from "./systems/combat";
+import { createHouseCaptureSystem, walkerCombatSystem } from "./systems/combat";
 import { createEnemyAiSystem } from "./systems/enemyAi";
 import { createEnemyMiracleSystem, type EnemyMiracleEvent } from "./systems/enemyMiracles";
 import { createEnemyTerraformSystem } from "./systems/enemyTerraform";
@@ -65,18 +65,32 @@ export interface GameOutcome {
 }
 
 /**
- * Every miracle a match's event log can record — deliberately excludes
- * the plain raise/lower terrain edit, same reasoning as main.ts's
- * vibrate(): it's the core, extremely frequent action, so logging every
- * tap would bury the events actually worth telling a story about.
+ * Every notable action a match's event log can record: every miracle
+ * (deliberately excludes the plain raise/lower terrain edit, same
+ * reasoning as main.ts's vibrate() — it's the core, extremely frequent
+ * action, so logging every tap would bury the events actually worth
+ * telling a story about) plus a few house milestones dramatic enough to
+ * be worth their own line (captured, burned by a knight, or reaching the
+ * top "castle" tier — but not every intermediate upgrade/downgrade, which
+ * is far too routine).
  */
-export type MatchEventType = "shrineMove" | "earthquake" | "swamp" | "volcano" | "knight" | "armageddon" | "flood";
+export type MatchEventType =
+  | "shrineMove"
+  | "earthquake"
+  | "swamp"
+  | "volcano"
+  | "knight"
+  | "armageddon"
+  | "flood"
+  | "houseCaptured"
+  | "houseBurned"
+  | "houseReachedCastle";
 
 /**
  * A notable action recorded during a match — the raw material for a
  * post-game recap ("戦いの記録"), per feedback that a bare win/lose line
  * tells none of the match's actual story. Presentation (icons, Japanese
- * phrasing) lives in render/miracleLabels.ts, not here.
+ * phrasing) lives in render/matchEventLabels.ts, not here.
  */
 export interface MatchEvent {
   /** Seconds since the match started (frozen once the game is over). */
@@ -133,9 +147,19 @@ export class Simulation {
       .add(gatherSystem)
       .add(swampSystem)
       .add(walkerCombatSystem)
-      .add(houseCaptureSystem)
+      .add(
+        createHouseCaptureSystem({
+          onCapture: (faction) => this.recordEvent(faction, "houseCaptured"),
+          onBurn: (faction) => this.recordEvent(faction, "houseBurned"),
+        }),
+      )
       .add(createSettleSystem({ heightmap: config.heightmap }))
-      .add(createHouseUpgradeSystem({ heightmap: config.heightmap }))
+      .add(
+        createHouseUpgradeSystem({
+          heightmap: config.heightmap,
+          onReachCastle: (faction) => this.recordEvent(faction, "houseReachedCastle"),
+        }),
+      )
       .add(createHouseGrowthSystem({ maxHousesPerFaction, heightmap: config.heightmap }))
       .add(manaSystem)
       .add(createEnemyTerraformSystem({ heightmap: config.heightmap }))

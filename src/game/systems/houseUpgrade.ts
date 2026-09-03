@@ -5,12 +5,18 @@ import {
   HOUSE_LEVEL_ORDER,
   HOUSE_UPGRADE_FLATNESS_RADIUS,
 } from "../constants";
-import { House, Position } from "../components";
+import { House, Owner, Position, type FactionId } from "../components";
 
 export interface HouseUpgradeConfig {
   /** Without a heightmap there's no terrain to measure, so this is a no-op. */
   heightmap: Heightmap;
   flatnessRadius: number;
+  /**
+   * Called when a house reaches "castle", the top level — not on every
+   * intermediate upgrade, which would be too routine to be worth telling
+   * a story about (see Simulation's MatchEvent log).
+   */
+  onReachCastle: (faction: FactionId) => void;
 }
 
 /**
@@ -25,6 +31,8 @@ export function createHouseUpgradeSystem(config: Partial<HouseUpgradeConfig> = {
   const heightmap = config.heightmap;
   if (!heightmap) return () => {};
   const radius = config.flatnessRadius ?? HOUSE_UPGRADE_FLATNESS_RADIUS;
+  const onReachCastle = config.onReachCastle ?? (() => {});
+  const topLevel = HOUSE_LEVEL_ORDER[HOUSE_LEVEL_ORDER.length - 1];
 
   return (world) => {
     for (const entity of world.query(House, Position)) {
@@ -39,6 +47,9 @@ export function createHouseUpgradeSystem(config: Partial<HouseUpgradeConfig> = {
 
       if (level !== house.level) {
         world.add(entity, House, { ...house, level });
+        if (level === topLevel && house.level !== topLevel && world.has(entity, Owner)) {
+          onReachCastle(world.get(entity, Owner)!.faction);
+        }
       }
     }
   };

@@ -1,6 +1,6 @@
 import { Text } from "pixi.js";
 import type { FactionSummary, GameOutcome, MatchEvent } from "../game/simulation";
-import { describeMiracleEvent } from "./miracleLabels";
+import { describeMatchEvent } from "./matchEventLabels";
 
 /**
  * Compact top status readout: each faction's mana/houses/walkers/mode,
@@ -65,9 +65,10 @@ export class Hud {
     if (outcome.over) {
       lines.push("", outcome.winner ? `GAME OVER — ${outcome.winner} wins` : "GAME OVER — draw");
       // A bare win/lose line tells none of the match's actual story — see
-      // plan/0032-match-event-log.md. Every miracle either side cast,
-      // recapped in the order they happened.
-      lines.push("", "戦いの記録:", ...matchEvents.map((e) => `${formatMatchTime(e.time)} ${describeMiracleEvent(e.type, e.faction)}`));
+      // plan/0032-match-event-log.md and plan/0034-house-events.md. Every
+      // miracle cast and notable house event (captured, burned, reaching
+      // castle) either side caused, recapped in the order they happened.
+      lines.push("", "戦いの記録:", ...matchEvents.map((e) => `${formatMatchTime(e.time)} ${describeMatchEvent(e.type, e.faction)}`));
     }
 
     this.view.text = lines.join("\n");
