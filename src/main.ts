@@ -1,17 +1,25 @@
-import { Application } from "pixi.js";
-import type { BehaviorMode } from "./game/components";
+import { Application, type FederatedPointerEvent } from "pixi.js";
 import { EARTHQUAKE_MANA_COST, TERRAIN_EDIT_MANA_COST } from "./game/constants";
 import { trySpendMana } from "./game/faction";
 import { Simulation } from "./game/simulation";
 import { EntityLayer } from "./render/EntityLayer";
 import { Hud } from "./render/Hud";
 import { IsoRenderer } from "./render/IsoRenderer";
+import { wireToolbar, type ToolMode } from "./ui/toolbar";
 import { applyEarthquake, createHeightmap, raiseVertex } from "./world/heightmap";
 
-const WORLD_WIDTH = 32;
-const WORLD_HEIGHT = 32;
+// Smaller than a desktop map: on a phone, showing the whole thing at once
+// makes every tile too small to tap precisely, so the map is shown closer
+// to native size and panned instead — see docs/tech-stack.md.
+const WORLD_WIDTH = 20;
+const WORLD_HEIGHT = 20;
 
-type ToolMode = "terrain" | "earthquake";
+/** Reserved space (screen px) above the map for the HUD text. */
+const HUD_MARGIN = 90;
+/** Never zoom in past this, even on a tall/narrow phone. */
+const MAX_MAP_SCALE = 1.2;
+/** A finger-drag shorter than this (px) is treated as a tap, not a pan. */
+const DRAG_THRESHOLD = 10;
 
 async function bootstrap() {
   const app = new Application();
@@ -37,18 +45,37 @@ async function bootstrap() {
 
   const simulation = new Simulation({ worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT, heightmap });
 
-  const center = () => renderer.centerOn(app.screen.width, app.screen.height);
-  center();
-  window.addEventListener("resize", center);
+  // Fit the map's height (not width) into the space below the HUD and
+  // above the toolbar — portrait phones have more room vertically than
+  // horizontally, so this keeps tiles big enough to tap while still
+  // showing the map's full north-south extent; the player pans
+  // left/right to reach the rest.
+  let currentScale = 1;
+  const layout = () => {
+    const toolbarHeight = document.getElementById("toolbar")?.getBoundingClientRect().height ?? 0;
+    const availableHeight = Math.max(200, app.screen.height - toolbarHeight - HUD_MARGIN);
+    currentScale = Math.min(MAX_MAP_SCALE, availableHeight / renderer.mapPixelHeight);
+    renderer.view.scale.set(currentScale);
+    renderer.centerOn(app.screen.width, app.screen.height);
+    hud.setMaxWidth(app.screen.width);
+  };
+  layout();
+  window.addEventListener("resize", layout);
 
-  let toolMode: ToolMode = "terrain";
+  const clampPan = (x: number, y: number): { x: number; y: number } => {
+    const halfW = (renderer.mapPixelWidth * currentScale) / 2;
+    const halfH = (renderer.mapPixelHeight * currentScale) / 2;
+    const marginX = Math.min(120, app.screen.width * 0.3);
+    const marginY = Math.min(120, app.screen.height * 0.3);
+    return {
+      x: Math.min(app.screen.width + halfW - marginX, Math.max(-halfW + marginX, x)),
+      y: Math.min(app.screen.height + halfH - marginY, Math.max(-halfH + marginY, y)),
+    };
+  };
 
-  // Click applies whichever tool is selected (terrain edit or earthquake),
-  // paid for out of the player faction's mana.
-  app.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
-  app.stage.eventMode = "static";
-  app.stage.hitArea = app.screen;
-  app.stage.on("pointerdown", (event) => {
+  let toolMode: ToolMode = "raise";
+
+  const applyTool = (event: FederatedPointerEvent) => {
     const local = renderer.view.toLocal(event.global);
     const vertex = renderer.pickVertex(local.x, local.y);
     if (!vertex) return;
@@ -61,29 +88,61 @@ async function bootstrap() {
     }
 
     if (!trySpendMana(simulation.world, "player", TERRAIN_EDIT_MANA_COST)) return;
-    const delta = event.button === 2 ? -1 : 1;
-    raiseVertex(heightmap, vertex.x, vertex.y, delta);
+    raiseVertex(heightmap, vertex.x, vertex.y, toolMode === "lower" ? -1 : 1);
     renderer.redraw();
+  };
+
+  // A short tap applies the selected tool; dragging beyond DRAG_THRESHOLD
+  // pans the camera instead. Distinguishing the two is what lets a
+  // one-finger touchscreen do both without a dedicated "pan mode" toggle.
+  let pointerActive = false;
+  let isDragging = false;
+  let dragStart = { x: 0, y: 0 };
+  let viewStartPos = { x: 0, y: 0 };
+
+  app.stage.eventMode = "static";
+  app.stage.hitArea = app.screen;
+
+  app.stage.on("pointerdown", (event) => {
+    pointerActive = true;
+    isDragging = false;
+    dragStart = { x: event.global.x, y: event.global.y };
+    viewStartPos = { x: renderer.view.position.x, y: renderer.view.position.y };
   });
 
-  // 1/2/3 switch the player's own behaviorMode (settle/gather/fight) —
-  // free, per docs/game-system.md's 行動方針. 4/5 pick which miracle a
-  // click casts.
-  const BEHAVIOR_MODE_KEYS: Record<string, BehaviorMode> = { Digit1: "settle", Digit2: "gather", Digit3: "fight" };
-  const TOOL_KEYS: Record<string, ToolMode> = { Digit4: "terrain", Digit5: "earthquake" };
-  window.addEventListener("keydown", (event) => {
-    const mode = BEHAVIOR_MODE_KEYS[event.code];
-    if (mode) simulation.setBehaviorMode("player", mode);
+  app.stage.on("pointermove", (event) => {
+    if (!pointerActive) return;
+    const dx = event.global.x - dragStart.x;
+    const dy = event.global.y - dragStart.y;
+    if (!isDragging && Math.hypot(dx, dy) > DRAG_THRESHOLD) isDragging = true;
+    if (isDragging) {
+      const next = clampPan(viewStartPos.x + dx, viewStartPos.y + dy);
+      renderer.view.position.set(next.x, next.y);
+    }
+  });
 
-    const tool = TOOL_KEYS[event.code];
-    if (tool) toolMode = tool;
+  app.stage.on("pointerup", (event) => {
+    if (pointerActive && !isDragging) applyTool(event);
+    pointerActive = false;
+    isDragging = false;
+  });
+  app.stage.on("pointerupoutside", () => {
+    pointerActive = false;
+    isDragging = false;
+  });
+
+  wireToolbar({
+    onBehaviorMode: (mode) => simulation.setBehaviorMode("player", mode),
+    onToolMode: (mode) => {
+      toolMode = mode;
+    },
   });
 
   app.ticker.add((ticker) => {
     const deltaSeconds = ticker.deltaMS / 1000;
     simulation.update(deltaSeconds);
     entityLayer.update(simulation.world);
-    hud.update(simulation.summarize(), simulation.getOutcome(), toolMode);
+    hud.update(simulation.summarize(), simulation.getOutcome());
   });
 }
 

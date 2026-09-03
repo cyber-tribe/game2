@@ -1,27 +1,37 @@
 import { Text } from "pixi.js";
 import type { FactionSummary, GameOutcome } from "../game/simulation";
 
-/** Simple top-left text overlay showing each faction's mana/houses/walkers. */
+/**
+ * Compact top status readout: each faction's mana/houses/walkers/mode,
+ * plus the game-over banner. Controls themselves live in the HTML
+ * toolbar (see src/ui/toolbar.ts) — this is read-only.
+ */
 export class Hud {
   readonly view: Text;
 
   constructor() {
     this.view = new Text({
       text: "",
-      style: { fill: 0xffffff, fontSize: 14, fontFamily: "monospace" },
+      style: {
+        fill: 0xffffff,
+        fontSize: 12,
+        fontFamily: "monospace",
+        wordWrap: true,
+        wordWrapWidth: 320,
+        breakWords: true,
+      },
     });
-    this.view.position.set(12, 12);
+    this.view.position.set(10, 10);
   }
 
-  update(summaries: FactionSummary[], outcome: GameOutcome, toolMode: string): void {
+  /** Keeps status text from running off the edge of narrow phone screens. */
+  setMaxWidth(width: number): void {
+    this.view.style.wordWrapWidth = Math.max(120, width - 20);
+  }
+
+  update(summaries: FactionSummary[], outcome: GameOutcome): void {
     const lines = summaries.map(
-      (s) =>
-        `${s.id}: mana ${s.mana.toFixed(1)}  houses ${s.houses}  walkers ${s.walkers}  mode ${s.behaviorMode}`,
-    );
-    lines.push(
-      "",
-      "[1] settle  [2] gather  [3] fight — set your behavior mode",
-      `[4] terrain  [5] earthquake — click tool: ${toolMode}`,
+      (s) => `${s.id}: mana ${s.mana.toFixed(1)} house ${s.houses} walker ${s.walkers} (${s.behaviorMode})`,
     );
 
     if (outcome.over) {
