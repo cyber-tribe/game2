@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { MAX_ELEVATION, MIN_ELEVATION, createHeightmap, raiseVertex } from "./heightmap";
+import {
+  MAX_ELEVATION,
+  MIN_ELEVATION,
+  createHeightmap,
+  isBuildable,
+  raiseVertex,
+  sampleElevation,
+  type Heightmap,
+} from "./heightmap";
+
+function flatHeightmap(width: number, height: number, elevation: number): Heightmap {
+  const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
+  return { width, height, terrain: "grass", vertices };
+}
 
 describe("createHeightmap", () => {
   it("produces a (height+1) x (width+1) vertex grid with non-negative heights", () => {
@@ -48,5 +61,44 @@ describe("raiseVertex", () => {
     const heightmap = createHeightmap(2, 2);
 
     expect(() => raiseVertex(heightmap, 99, 99, 1)).not.toThrow();
+  });
+});
+
+describe("sampleElevation", () => {
+  it("returns the exact vertex height at integer coordinates", () => {
+    const heightmap = createHeightmap(4, 4);
+    heightmap.vertices[2][3] = 7;
+
+    expect(sampleElevation(heightmap, 3, 2)).toBe(7);
+  });
+
+  it("bilinearly interpolates between the four surrounding vertices", () => {
+    const heightmap = flatHeightmap(2, 2, 0);
+    heightmap.vertices[0][0] = 0;
+    heightmap.vertices[0][1] = 10;
+    heightmap.vertices[1][0] = 0;
+    heightmap.vertices[1][1] = 10;
+
+    expect(sampleElevation(heightmap, 0.5, 0)).toBeCloseTo(5);
+    expect(sampleElevation(heightmap, 1, 0)).toBeCloseTo(10);
+  });
+
+  it("clamps out-of-range coordinates to the grid edge", () => {
+    const heightmap = flatHeightmap(2, 2, 3);
+
+    expect(sampleElevation(heightmap, -5, -5)).toBe(3);
+    expect(sampleElevation(heightmap, 99, 99)).toBe(3);
+  });
+});
+
+describe("isBuildable", () => {
+  it("is false at or below sea level", () => {
+    const heightmap = flatHeightmap(2, 2, MIN_ELEVATION);
+    expect(isBuildable(heightmap, 1, 1)).toBe(false);
+  });
+
+  it("is true above sea level", () => {
+    const heightmap = flatHeightmap(2, 2, MIN_ELEVATION + 1);
+    expect(isBuildable(heightmap, 1, 1)).toBe(true);
   });
 });

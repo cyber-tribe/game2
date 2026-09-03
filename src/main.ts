@@ -32,7 +32,7 @@ async function bootstrap() {
   const hud = new Hud();
   app.stage.addChild(hud.view);
 
-  const simulation = new Simulation({ worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT });
+  const simulation = new Simulation({ worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT, heightmap });
 
   const center = () => renderer.centerOn(app.screen.width, app.screen.height);
   center();

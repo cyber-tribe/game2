@@ -47,3 +47,35 @@ export function raiseVertex(heightmap: Heightmap, x: number, y: number, delta: n
   if (!row || row[x] === undefined) return;
   row[x] = Math.min(MAX_ELEVATION, Math.max(MIN_ELEVATION, row[x] + delta));
 }
+
+/**
+ * Bilinearly interpolated elevation at a fractional tile-space point,
+ * clamped to the grid. Shared by the renderer (to place things on the
+ * surface) and by game logic (to decide what's dry land).
+ */
+export function sampleElevation(heightmap: Heightmap, x: number, y: number): number {
+  const { width, height, vertices } = heightmap;
+  const cx = Math.min(Math.max(x, 0), width);
+  const cy = Math.min(Math.max(y, 0), height);
+  const x0 = Math.min(Math.floor(cx), width - 1);
+  const y0 = Math.min(Math.floor(cy), height - 1);
+  const tx = cx - x0;
+  const ty = cy - y0;
+
+  const h00 = vertices[y0][x0];
+  const h10 = vertices[y0][x0 + 1];
+  const h01 = vertices[y0 + 1][x0];
+  const h11 = vertices[y0 + 1][x0 + 1];
+
+  const top = h00 + (h10 - h00) * tx;
+  const bottom = h01 + (h11 - h01) * tx;
+  return top + (bottom - top) * ty;
+}
+
+/**
+ * Sea level and below can't be built on or safely settled — per
+ * docs/game-system.md, "海には建物を建てられず、通常の民は入ると溺れる".
+ */
+export function isBuildable(heightmap: Heightmap, x: number, y: number): boolean {
+  return sampleElevation(heightmap, x, y) > MIN_ELEVATION;
+}

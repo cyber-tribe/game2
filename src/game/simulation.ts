@@ -1,4 +1,5 @@
 import { Scheduler, World } from "../ecs";
+import type { Heightmap } from "../world/heightmap";
 import { FactionState, House, Owner, Position, Walker, type FactionId } from "./components";
 import { DEFAULT_WALKER_SPEED, TILES_PER_HOUSE_CAP } from "./constants";
 import { createFaction } from "./faction";
@@ -6,7 +7,7 @@ import { houseCaptureSystem, walkerCombatSystem } from "./systems/combat";
 import { createHouseGrowthSystem } from "./systems/houseGrowth";
 import { manaSystem } from "./systems/mana";
 import { movementSystem } from "./systems/movement";
-import { settleSystem } from "./systems/settle";
+import { createSettleSystem } from "./systems/settle";
 import { createWanderTargetSystem } from "./systems/wanderTarget";
 
 export interface SimulationConfig {
@@ -14,6 +15,13 @@ export interface SimulationConfig {
   worldHeight: number;
   /** Walkers each faction starts with. */
   initialWalkersPerFaction?: number;
+  /**
+   * When given, walkers only wander toward and settle on buildable (above
+   * sea level) land — see docs/game-system.md. Without it, they treat the
+   * whole map as flat buildable ground, which is fine for tests that don't
+   * care about terrain.
+   */
+  heightmap?: Heightmap;
 }
 
 export interface FactionSummary {
@@ -55,11 +63,11 @@ export class Simulation {
     );
 
     this.scheduler
-      .add(createWanderTargetSystem())
+      .add(createWanderTargetSystem({ heightmap: config.heightmap }))
       .add(movementSystem)
       .add(walkerCombatSystem)
       .add(houseCaptureSystem)
-      .add(settleSystem)
+      .add(createSettleSystem({ heightmap: config.heightmap }))
       .add(createHouseGrowthSystem({ maxHousesPerFaction }))
       .add(manaSystem);
   }
