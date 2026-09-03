@@ -24,8 +24,14 @@ type Palette = Record<string, number>;
  * Simple front-facing pixel person: a "W" (walker) pattern reusing a
  * single palette key, since — unlike a house — the whole body is one
  * color (faction, or KNIGHT_COLOR for a knighted leader).
+ *
+ * Two frames — feet together vs. feet apart — give a minimal walk cycle
+ * (see EntityLayer's per-walker phase animation) instead of a single
+ * frozen pose; per feedback that pixel art alone didn't yet read as
+ * "alive", only as "no longer a plain circle".
  */
-const WALKER_PATTERN: Pattern = [".WWW.", ".WWW.", ".WWW.", "WWWWW", ".WWW.", ".W.W.", ".W.W."];
+const WALKER_PATTERN_STAND: Pattern = [".WWW.", ".WWW.", ".WWW.", "WWWWW", ".WWW.", ".W.W.", ".W.W."];
+const WALKER_PATTERN_STEP: Pattern = [".WWW.", ".WWW.", ".WWW.", "WWWWW", ".WWW.", "W...W", ".W.W."];
 
 /**
  * One pattern per HouseLevel, each roughly matching that level's existing
@@ -103,10 +109,19 @@ function drawPixelPattern(
  * Draws a pixel-art walker (a small person) instead of a plain circle.
  * `color` is the faction color, or KNIGHT_COLOR for a knighted walker —
  * the whole body is one color, so ownership/state reads the same way a
- * flat circle did, just shaped like a person now.
+ * flat circle did, just shaped like a person now. `stepping` picks
+ * between the two walk-cycle frames (see WALKER_PATTERN_STAND/_STEP);
+ * EntityLayer alternates it over time so the sprite is never frozen.
  */
-export function drawWalkerSprite(g: Graphics, centerX: number, groundY: number, color: number, scale: number): void {
-  drawPixelPattern(g, WALKER_PATTERN, { W: color }, centerX, groundY, scale);
+export function drawWalkerSprite(
+  g: Graphics,
+  centerX: number,
+  groundY: number,
+  color: number,
+  scale: number,
+  stepping: boolean,
+): void {
+  drawPixelPattern(g, stepping ? WALKER_PATTERN_STEP : WALKER_PATTERN_STAND, { W: color }, centerX, groundY, scale);
 }
 
 /**
