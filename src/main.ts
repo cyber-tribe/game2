@@ -65,6 +65,20 @@ const MIN_ZOOM_FACTOR = 0.5;
 const MAX_ZOOM_FACTOR = 2.5;
 /** A finger-drag shorter than this (px) is treated as a tap, not a pan. */
 const DRAG_THRESHOLD = 10;
+/**
+ * How much one mouse-wheel "notch" (deltaY around ±100) zooms the map on
+ * PC — see plan/0039-pc-support.md. Chosen so a single notch feels close
+ * to one pinch-zoom step; exponential so repeated notches compound evenly
+ * in both directions instead of the zoom-out direction stalling near 0.
+ */
+const WHEEL_ZOOM_SPEED = 0.0015;
+/**
+ * Rotation (radians) per Q/E keypress on PC — a mouse can't reproduce the
+ * two-finger twist gesture applyPinchTransform was built for, so this is
+ * the desktop equivalent. 15° keeps a single press feeling like a nudge,
+ * not a full spin.
+ */
+const KEY_ROTATE_STEP = Math.PI / 12;
 /** How long #tutorial-hint stays up if the player never makes a terrain edit. */
 const TUTORIAL_HINT_TIMEOUT_MS = 15000;
 /** How long a triggerShake() camera shake takes to decay to nothing. */
@@ -217,6 +231,12 @@ async function bootstrap() {
   let zoomFactor = 1;
   let currentScale = 1;
   const tutorialHint = document.getElementById("tutorial-hint");
+  // Only a mouse-driven device needs telling about the wheel/keyboard
+  // controls above — a touchscreen already has the two-finger gesture
+  // doing the same job, and this text would just be noise there.
+  if (tutorialHint && window.matchMedia("(pointer: fine)").matches) {
+    tutorialHint.textContent += "\nPC: ホイールでズーム、Q/Eキーで回転できます。";
+  }
   const layout = () => {
     const toolbarHeight = document.getElementById("toolbar")?.getBoundingClientRect().height ?? 0;
     const safeAreaTop = getSafeAreaInsetTop();
@@ -414,6 +434,28 @@ async function bootstrap() {
     const next = clampPan(pivot.x - (scaledX * cos - scaledY * sin), pivot.y - (scaledX * sin + scaledY * cos));
     renderer.view.position.set(next.x, next.y);
   };
+
+  // PC support: a mouse has no second finger for the pinch/twist gesture
+  // above, so it gets its own inputs that drive the same applyPinchTransform
+  // — see plan/0039-pc-support.md. Pan and tap-to-apply-tool already work
+  // unmodified, since a mouse fires the same pointerdown/move/up events a
+  // single touch does.
+  app.canvas.addEventListener(
+    "wheel",
+    (event) => {
+      event.preventDefault();
+      const scaleRatio = Math.exp(-event.deltaY * WHEEL_ZOOM_SPEED);
+      applyPinchTransform({ x: event.clientX, y: event.clientY }, 0, scaleRatio);
+    },
+    { passive: false },
+  );
+
+  window.addEventListener("keydown", (event) => {
+    if (event.key !== "q" && event.key !== "Q" && event.key !== "e" && event.key !== "E") return;
+    const direction = event.key.toLowerCase() === "q" ? -1 : 1;
+    const pivot = { x: app.screen.width / 2, y: app.screen.height / 2 };
+    applyPinchTransform(pivot, KEY_ROTATE_STEP * direction, 1);
+  });
 
   app.stage.eventMode = "static";
   app.stage.hitArea = app.screen;
