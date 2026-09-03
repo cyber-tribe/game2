@@ -20,7 +20,7 @@ const WATER_COLOR = 0x2a5f8c;
 /** Renders a heightmap as an isometric grid of quads, one per tile. */
 export class IsoRenderer {
   readonly view = new Container();
-  private readonly heightmap: Heightmap;
+  readonly heightmap: Heightmap;
   private readonly graphics = new Graphics();
 
   constructor(heightmap: Heightmap) {

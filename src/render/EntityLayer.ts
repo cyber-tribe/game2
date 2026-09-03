@@ -1,6 +1,8 @@
 import { Container, Graphics } from "pixi.js";
 import { FactionState, House, Owner, Position, Swamp, Walker, type FactionId, type HouseLevel } from "../game/components";
 import type { Entity, World } from "../ecs";
+import { HOUSE_LEVEL_FLATNESS_REQUIREMENT, HOUSE_LEVEL_ORDER, HOUSE_UPGRADE_FLATNESS_RADIUS } from "../game/constants";
+import { countFlatNeighbors } from "../world/heightmap";
 import { TILE_WIDTH, type IsoRenderer } from "./IsoRenderer";
 
 const FACTION_COLOR: Record<FactionId, number> = {
@@ -21,6 +23,9 @@ const KNIGHT_COLOR = 0xffcc00;
 const SWAMP_COLOR = 0x6a3fa0;
 const SHRINE_POLE_HEIGHT = 18;
 const SHRINE_FLAG_WIDTH = 10;
+const FLATNESS_BAR_HEIGHT = 3;
+const FLATNESS_BAR_GAP = 2;
+const FLATNESS_BAR_COLOR = 0xffe066;
 
 /** Draws every Swamp/Walker/House in the ECS world onto the isometric map. */
 export class EntityLayer {
@@ -73,6 +78,8 @@ export class EntityLayer {
       g.rect(sx - size / 2, sy - size, size, size)
         .fill(FACTION_COLOR[owner.faction])
         .stroke({ width: 1, color: 0x000000, alpha: 0.4 });
+
+      this.drawFlatnessBar(g, pos, house, sx, sy, size);
     }
 
     for (const entity of world.query(Position, Walker, Owner)) {
@@ -87,6 +94,46 @@ export class EntityLayer {
       g.circle(sx, sy - radius, radius)
         .fill(isKnight ? KNIGHT_COLOR : FACTION_COLOR[owner.faction])
         .stroke({ width: isLeader ? 2 : 1, color: isLeader ? 0xffffff : 0x000000, alpha: isLeader ? 0.9 : 0.5 });
+    }
+  }
+
+  /**
+   * A small bar under a house showing progress toward its next level —
+   * per the reference game's core loop, "flatten the land right around
+   * your own house to grow it" (docs/game-system.md's House.level
+   * terrain-dependent upgrade). Without this, HOUSE_LEVEL_FLATNESS_
+   * REQUIREMENT is invisible: the player sees a house upgrade only after
+   * the fact, with no feedback on how close they are while flattening.
+   * Omitted once a house is already at the top level (castle) — there's
+   * nothing left to progress toward.
+   */
+  private drawFlatnessBar(
+    g: Graphics,
+    pos: { x: number; y: number },
+    house: { level: HouseLevel },
+    sx: number,
+    sy: number,
+    size: number,
+  ): void {
+    const levelIndex = HOUSE_LEVEL_ORDER.indexOf(house.level);
+    if (levelIndex === HOUSE_LEVEL_ORDER.length - 1) return;
+
+    const nextLevel = HOUSE_LEVEL_ORDER[levelIndex + 1];
+    const currentRequirement = HOUSE_LEVEL_FLATNESS_REQUIREMENT[house.level];
+    const nextRequirement = HOUSE_LEVEL_FLATNESS_REQUIREMENT[nextLevel];
+    const flatCount = countFlatNeighbors(this.iso.heightmap, pos.x, pos.y, HOUSE_UPGRADE_FLATNESS_RADIUS);
+    const progress = Math.max(
+      0,
+      Math.min(1, (flatCount - currentRequirement) / (nextRequirement - currentRequirement)),
+    );
+
+    const barY = sy + FLATNESS_BAR_GAP;
+    g.rect(sx - size / 2, barY, size, FLATNESS_BAR_HEIGHT).fill({ color: 0x000000, alpha: 0.45 });
+    if (progress > 0) {
+      g.rect(sx - size / 2, barY, size * progress, FLATNESS_BAR_HEIGHT).fill({
+        color: FLATNESS_BAR_COLOR,
+        alpha: 0.9,
+      });
     }
   }
 }
