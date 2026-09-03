@@ -2,6 +2,7 @@ import { Application, type FederatedPointerEvent } from "pixi.js";
 import {
   EARTHQUAKE_MANA_COST,
   FLOOD_MANA_COST,
+  KNIGHT_MANA_COST,
   SHRINE_MOVE_MANA_COST,
   SWAMP_MANA_COST,
   TERRAIN_EDIT_MANA_COST,
@@ -121,6 +122,13 @@ async function bootstrap() {
       applyVolcano(heightmap, vertex.x, vertex.y);
       eruptVolcano(simulation.world, vertex.x, vertex.y, DEFAULT_VOLCANO_RADIUS);
       renderer.redraw();
+      return;
+    }
+
+    if (toolMode === "knight") {
+      // Also a global effect (it acts on the leader, not the tapped spot).
+      if (!trySpendMana(simulation.world, "player", KNIGHT_MANA_COST)) return;
+      simulation.knightify("player");
       return;
     }
 

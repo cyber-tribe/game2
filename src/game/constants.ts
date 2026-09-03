@@ -84,6 +84,13 @@ export const SWAMP_RADIUS = 1.2;
 export const SWAMP_CAPACITY = 5;
 
 /**
+ * Mana cost of knighting the leader — "大" tier, on par with a volcano:
+ * a single relentless, swamp-immune attacker that keeps destroying enemy
+ * walkers and houses without further mana until it's killed.
+ */
+export const KNIGHT_MANA_COST = 35;
+
+/**
  * Mana cost of a volcano — "大" tier, pricier than earthquake/swamp since
  * it denies land outright rather than just disrupting it temporarily.
  */

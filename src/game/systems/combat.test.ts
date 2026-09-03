@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
-import { House, Owner, Position, Walker, type FactionId } from "../components";
+import { House, Owner, Position, Walker, type FactionId, type WalkerState } from "../components";
 import { HOUSE_LEVELS } from "../constants";
 import { houseCaptureSystem, walkerCombatSystem } from "./combat";
 
@@ -10,11 +10,12 @@ function createWalker(
   x: number,
   y: number,
   strength: number,
+  state: WalkerState = "seeking",
 ) {
   const entity = world.createEntity();
   world.add(entity, Position, { x, y });
   world.add(entity, Owner, { faction });
-  world.add(entity, Walker, { strength, state: "seeking", speed: 1 });
+  world.add(entity, Walker, { strength, state, speed: 1 });
   return entity;
 }
 
@@ -118,5 +119,26 @@ describe("houseCaptureSystem", () => {
 
     expect(world.get(house, Owner)).toEqual({ faction: "enemy" });
     expect(world.isAlive(walker)).toBe(true);
+  });
+
+  it("a knight burns an enemy house down instead of capturing it, even a strong one", () => {
+    const world = new World();
+    const house = createHouse(world, "enemy", 0, 0, "castle");
+    const knight = createWalker(world, "player", 0, 0, 1, "knight"); // far below castle's defense
+
+    houseCaptureSystem(world, 0);
+
+    expect(world.isAlive(house)).toBe(false);
+    expect(world.isAlive(knight)).toBe(true);
+  });
+
+  it("a knight survives after burning a house and can keep marching", () => {
+    const world = new World();
+    createHouse(world, "enemy", 0, 0);
+    const knight = createWalker(world, "player", 0, 0, 1, "knight");
+
+    houseCaptureSystem(world, 0);
+
+    expect(world.isAlive(knight)).toBe(true);
   });
 });

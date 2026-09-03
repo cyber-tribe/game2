@@ -191,6 +191,32 @@ describe("Simulation", () => {
     expect(sim.world.get(playerHouses[0], Position)).toEqual(shrine);
   });
 
+  it("a knighted leader hunts down the enemy regardless of behaviorMode, and survives the kill", () => {
+    const sim = new Simulation({ worldWidth: 4, worldHeight: 4, initialWalkersPerFaction: 1 });
+    sim.update(0.001); // let leaderSystem assign a leader to each faction first
+    sim.knightify("player");
+
+    const [playerWalker] = sim.world.query(Walker, Owner).filter((e) => sim.world.get(e, Owner)!.faction === "player");
+    expect(sim.world.get(playerWalker, Walker)!.state).toBe("knight");
+    // Overwhelming strength removes any doubt about walker-vs-walker combat
+    // (an exact tie would destroy both sides) — this test is about the
+    // knight's unconditional targeting/burning/swamp-immunity wiring, not
+    // combat math, which walkerCombatSystem/houseCaptureSystem already
+    // cover on their own.
+    sim.world.add(playerWalker, Walker, { ...sim.world.get(playerWalker, Walker)!, strength: 999 });
+
+    for (let i = 0; i < 150; i++) sim.update(0.1);
+
+    const enemyWalkers = sim.world.query(Walker, Owner).filter((e) => sim.world.get(e, Owner)!.faction === "enemy");
+    const enemyHouses = sim.world.query(House, Owner).filter((e) => sim.world.get(e, Owner)!.faction === "enemy");
+    expect(enemyWalkers).toHaveLength(0);
+    expect(enemyHouses).toHaveLength(0); // burned, not captured
+
+    const playerWalkers = sim.world.query(Walker, Owner).filter((e) => sim.world.get(e, Owner)!.faction === "player");
+    expect(playerWalkers).toHaveLength(1);
+    expect(sim.world.get(playerWalkers[0], Walker)!.state).toBe("knight");
+  });
+
   it("a flood submerges settled houses across the whole map, for both factions", () => {
     const width = 20;
     const height = 20;

@@ -37,7 +37,7 @@ function factionsInFightMode(world: World): Set<FactionId> {
   return factions;
 }
 
-function findNearestEnemyPosition(world: World, faction: FactionId, from: Point): Point | null {
+export function findNearestEnemyPosition(world: World, faction: FactionId, from: Point): Point | null {
   let best: Point | null = null;
   let bestDistance = Infinity;
 

@@ -4,11 +4,11 @@ import { Owner, Position, Swamp, Walker } from "../components";
 import { createSwamp } from "../swamp";
 import { swampSystem } from "./swamp";
 
-function createWalker(world: World, x: number, y: number) {
+function createWalker(world: World, x: number, y: number, state: "seeking" | "knight" = "seeking") {
   const entity = world.createEntity();
   world.add(entity, Position, { x, y });
   world.add(entity, Owner, { faction: "player" });
-  world.add(entity, Walker, { strength: 1, state: "seeking", speed: 1 });
+  world.add(entity, Walker, { strength: 1, state, speed: 1 });
   return entity;
 }
 
@@ -54,5 +54,16 @@ describe("swampSystem", () => {
 
     expect(() => swampSystem(world, 0)).not.toThrow();
     expect(world.isAlive(walker)).toBe(true);
+  });
+
+  it("lets a knight walk through a swamp unharmed", () => {
+    const world = new World();
+    const swamp = createSwamp(world, 5, 5, 1, 3);
+    const knight = createWalker(world, 5, 5, "knight");
+
+    swampSystem(world, 0);
+
+    expect(world.isAlive(knight)).toBe(true);
+    expect(world.get(swamp, Swamp)!.remainingCapacity).toBe(3);
   });
 });

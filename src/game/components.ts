@@ -12,9 +12,9 @@ export interface Owner {
 }
 
 /**
- * Only "seeking" and "traveling" are driven by systems in this slice.
- * "fighting" and "knight" are placeholders for the combat/miracle work
- * described in docs/game-system.md and are not yet acted on.
+ * "seeking" and "knight" are driven by systems in this slice ("knight" via
+ * knightTargetingSystem, plus special-cased handling in swampSystem/
+ * houseCaptureSystem). "traveling" and "fighting" remain placeholders.
  */
 export type WalkerState = "seeking" | "traveling" | "fighting" | "knight";
 

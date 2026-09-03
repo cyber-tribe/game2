@@ -59,20 +59,30 @@ function resolveWalkerFight(world: World, a: Entity, b: Entity): void {
  * walker is simply repelled. Either way the attacking walker is consumed —
  * per docs/game-system.md a house fight always ends with capture or the
  * attacker's defeat, never a draw that leaves both sides as they were.
+ *
+ * A knight is the one exception: per docs/game-system.md, "敵の...家を
+ * （奪わず）焼き払う" — it burns the house down (destroys it outright,
+ * regardless of defense) rather than capturing it, and survives to keep
+ * marching ("指示に依存せず戦い続ける").
  */
 export const houseCaptureSystem: System = (world) => {
   for (const walkerEntity of world.query(Position, Walker, Owner)) {
     const walkerPos = world.get(walkerEntity, Position)!;
     const walkerOwner = world.get(walkerEntity, Owner)!;
+    const walker = world.get(walkerEntity, Walker)!;
+    const isKnight = walker.state === "knight";
 
     for (const houseEntity of world.query(Position, House, Owner)) {
       const houseOwner = world.get(houseEntity, Owner)!;
       if (houseOwner.faction === walkerOwner.faction) continue;
       if (!withinRange(walkerPos, world.get(houseEntity, Position)!)) continue;
 
-      const house = world.get(houseEntity, House)!;
-      const walker = world.get(walkerEntity, Walker)!;
+      if (isKnight) {
+        world.destroyEntity(houseEntity);
+        break;
+      }
 
+      const house = world.get(houseEntity, House)!;
       if (walker.strength > HOUSE_LEVELS[house.level].defense) {
         world.add(houseEntity, Owner, { faction: walkerOwner.faction });
         world.add(houseEntity, House, { level: house.level, population: 0 });
