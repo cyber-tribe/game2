@@ -6,7 +6,8 @@ import { distance } from "./geometry";
  * Any walker within a swamp's radius drowns — per docs/game-system.md,
  * "踏み込んだ通常の民は沈んで死ぬ". Each drowning consumes one unit of
  * the swamp's remainingCapacity; once it hits zero the swamp itself
- * dries up and is removed.
+ * dries up and is removed. Knights are the sole exception ("騎士は...沼を
+ * 避ける") and walk through unharmed.
  */
 export const swampSystem: System = (world) => {
   for (const swampEntity of world.query(Swamp, Position)) {
@@ -14,6 +15,7 @@ export const swampSystem: System = (world) => {
 
     for (const walkerEntity of world.query(Walker, Position)) {
       if (!world.isAlive(swampEntity)) break;
+      if (world.get(walkerEntity, Walker)!.state === "knight") continue;
 
       const walkerPos = world.get(walkerEntity, Position)!;
       const swamp = world.get(swampEntity, Swamp)!;

@@ -17,6 +17,8 @@ export { createSwamp } from "./swamp";
 export { swampSystem } from "./systems/swamp";
 export { eruptVolcano } from "./volcano";
 export { drownFlood } from "./flood";
+export { knightify } from "./knight";
+export { knightTargetingSystem } from "./systems/knight";
 export {
   Simulation,
   type FactionSummary,

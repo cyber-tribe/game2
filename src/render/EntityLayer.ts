@@ -17,6 +17,7 @@ const HOUSE_SIZE: Record<HouseLevel, number> = {
 
 const WALKER_RADIUS = 3;
 const LEADER_RADIUS = WALKER_RADIUS * 1.8;
+const KNIGHT_COLOR = 0xffcc00;
 const SWAMP_COLOR = 0x6a3fa0;
 const SHRINE_POLE_HEIGHT = 18;
 const SHRINE_FLAG_WIDTH = 10;
@@ -77,12 +78,14 @@ export class EntityLayer {
     for (const entity of world.query(Position, Walker, Owner)) {
       const pos = world.get(entity, Position)!;
       const owner = world.get(entity, Owner)!;
+      const walker = world.get(entity, Walker)!;
       const { sx, sy } = this.iso.project(pos.x, pos.y);
       const isLeader = leaderIds.has(entity);
+      const isKnight = walker.state === "knight";
       const radius = isLeader ? LEADER_RADIUS : WALKER_RADIUS;
 
       g.circle(sx, sy - radius, radius)
-        .fill(FACTION_COLOR[owner.faction])
+        .fill(isKnight ? KNIGHT_COLOR : FACTION_COLOR[owner.faction])
         .stroke({ width: isLeader ? 2 : 1, color: isLeader ? 0xffffff : 0x000000, alpha: isLeader ? 0.9 : 0.5 });
     }
   }

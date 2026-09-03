@@ -3,6 +3,7 @@ import type { Heightmap } from "../world/heightmap";
 import { FactionState, House, Owner, Position, Walker, type BehaviorMode, type FactionId } from "./components";
 import { DEFAULT_WALKER_SPEED, TILES_PER_HOUSE_CAP } from "./constants";
 import { createFaction, findFactionEntity, moveShrine } from "./faction";
+import { knightify } from "./knight";
 import { houseCaptureSystem, walkerCombatSystem } from "./systems/combat";
 import { createEnemyAiSystem } from "./systems/enemyAi";
 import { fightTargetingSystem } from "./systems/fightTargeting";
@@ -10,6 +11,7 @@ import { gatherSystem } from "./systems/gather";
 import { goToShrineSystem } from "./systems/goToShrine";
 import { createHouseGrowthSystem } from "./systems/houseGrowth";
 import { createHouseUpgradeSystem } from "./systems/houseUpgrade";
+import { knightTargetingSystem } from "./systems/knight";
 import { leaderSystem } from "./systems/leader";
 import { manaSystem } from "./systems/mana";
 import { movementSystem } from "./systems/movement";
@@ -75,6 +77,7 @@ export class Simulation {
       .add(leaderSystem)
       .add(fightTargetingSystem)
       .add(goToShrineSystem)
+      .add(knightTargetingSystem)
       .add(createWanderTargetSystem({ heightmap: config.heightmap }))
       .add(movementSystem)
       .add(gatherSystem)
@@ -109,6 +112,11 @@ export class Simulation {
   /** The "集結シンボル移動" miracle — relocates where "goToShrine" mode leads the army. */
   moveShrine(faction: FactionId, position: { x: number; y: number }): void {
     moveShrine(this.world, faction, position);
+  }
+
+  /** The "騎士化" miracle — turns a faction's current leader into a knight. */
+  knightify(faction: FactionId): void {
+    knightify(this.world, faction);
   }
 
   /**
