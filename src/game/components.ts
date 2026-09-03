@@ -41,10 +41,10 @@ export interface House {
 }
 
 /**
- * The four influence modes from docs/game-system.md. Only "settle" is
- * acted on so far (it's the implicit default the wander/settle systems
- * already assume); "gather"/"goToShrine"/"fight" are recorded but not
- * yet enforced.
+ * The four influence modes from docs/game-system.md. "settle" (the
+ * wander/settle systems' implicit default), "gather", and "fight" are
+ * all enforced; "goToShrine" is recorded but not yet acted on — it needs
+ * a leader/shrine-symbol concept that doesn't exist yet.
  */
 export type BehaviorMode = "settle" | "gather" | "goToShrine" | "fight";
 
@@ -60,9 +60,21 @@ export interface FactionState {
   shrinePosition: Position;
 }
 
+/**
+ * A hazard placed at a Position: any walker that wanders within `radius`
+ * drowns. Consumes one unit of `remainingCapacity` per walker swallowed
+ * and disappears once it hits zero — per docs/game-system.md, "一定数を
+ * 飲み込むと消えるタイプ". The permanent variant isn't implemented.
+ */
+export interface Swamp {
+  radius: number;
+  remainingCapacity: number;
+}
+
 export const Position = defineComponent<Position>("Position");
 export const Owner = defineComponent<Owner>("Owner");
 export const Walker = defineComponent<Walker>("Walker");
 export const MoveTarget = defineComponent<MoveTarget>("MoveTarget");
 export const House = defineComponent<House>("House");
 export const FactionState = defineComponent<FactionState>("FactionState");
+export const Swamp = defineComponent<Swamp>("Swamp");

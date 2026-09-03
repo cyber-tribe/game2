@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { isBuildable, type Heightmap } from "../world/heightmap";
-import { House, Owner, Position, Walker } from "./components";
+import { House, Owner, Position, Swamp, Walker } from "./components";
 import { Simulation } from "./simulation";
+import { createSwamp } from "./swamp";
 
 describe("Simulation", () => {
   it("seeds both factions with the requested number of seeking walkers and nothing else", () => {
@@ -124,5 +125,18 @@ describe("Simulation", () => {
     const houses = sim.world.query(House);
     expect(houses.length).toBeGreaterThan(0);
     expect(houses.some((entity) => sim.world.get(entity, House)!.level !== "hut")).toBe(true);
+  });
+
+  it("drowns walkers that wander into a conjured swamp during a normal tick", () => {
+    const sim = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 2 });
+
+    const [walker] = sim.world.query(Walker, Owner, Position);
+    const pos = sim.world.get(walker, Position)!;
+    createSwamp(sim.world, pos.x, pos.y, 100, 10); // huge radius: guaranteed to catch every walker
+
+    sim.update(0.1);
+
+    expect(sim.world.query(Walker)).toHaveLength(0);
+    expect(sim.world.query(Swamp)).toHaveLength(1);
   });
 });
