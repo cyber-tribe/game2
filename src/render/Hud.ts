@@ -41,9 +41,10 @@ export class Hud {
   }
 
   update(summaries: FactionSummary[], outcome: GameOutcome): void {
-    const lines = summaries.map(
-      (s) => `${s.id}: mana ${s.mana.toFixed(1)} house ${s.houses} walker ${s.walkers} (${s.behaviorMode})`,
-    );
+    const lines = summaries.map((s) => {
+      const houseText = s.houses >= s.housesCap ? `house ${s.houses}/${s.housesCap}（上限）` : `house ${s.houses}`;
+      return `${s.id}: mana ${s.mana.toFixed(1)} ${houseText} walker ${s.walkers} (${s.behaviorMode})`;
+    });
 
     if (outcome.over) {
       lines.push("", outcome.winner ? `GAME OVER — ${outcome.winner} wins` : "GAME OVER — draw");

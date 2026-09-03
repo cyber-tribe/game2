@@ -39,6 +39,8 @@ export interface FactionSummary {
   id: FactionId;
   mana: number;
   houses: number;
+  /** Same value for every faction — see Simulation.maxHousesPerFaction. */
+  housesCap: number;
   walkers: number;
   behaviorMode: BehaviorMode;
 }
@@ -59,6 +61,16 @@ export class Simulation {
   private readonly scheduler = new Scheduler();
   private readonly worldCenter: { x: number; y: number };
 
+  /**
+   * A faction stops spawning new walkers once it owns this many houses —
+   * see houseGrowth.ts's HouseGrowthConfig.maxHousesPerFaction doc comment
+   * for why this stand-in for real land scarcity exists. Exposed here so
+   * the HUD can show it: without visible feedback, hitting the cap looks
+   * identical to a stuck/broken game ("walkerが発生しない") rather than
+   * an intentional, explainable limit.
+   */
+  readonly maxHousesPerFaction: number;
+
   constructor(config: SimulationConfig) {
     const playerShrine = { x: config.worldWidth * 0.25, y: config.worldHeight * 0.75 };
     const enemyShrine = { x: config.worldWidth * 0.75, y: config.worldHeight * 0.25 };
@@ -75,6 +87,7 @@ export class Simulation {
       1,
       Math.floor((config.worldWidth * config.worldHeight) / TILES_PER_HOUSE_CAP),
     );
+    this.maxHousesPerFaction = maxHousesPerFaction;
 
     this.scheduler
       .add(createEnemyAiSystem())
@@ -160,7 +173,14 @@ export class Simulation {
         if (this.world.get(entity, Owner)!.faction === state.id) walkers++;
       }
 
-      summaries.push({ id: state.id, mana: state.mana, houses, walkers, behaviorMode: state.behaviorMode });
+      summaries.push({
+        id: state.id,
+        mana: state.mana,
+        houses,
+        housesCap: this.maxHousesPerFaction,
+        walkers,
+        behaviorMode: state.behaviorMode,
+      });
     }
 
     return summaries;
