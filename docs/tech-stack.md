@@ -53,15 +53,18 @@ game2/
 │   │   ├── constants.ts     … 速度・成長率・家レベル別ステータス・マナコスト等のチューニング値
 │   │   ├── faction.ts       … Faction(勢力)エンティティの生成/検索/マナ消費(trySpendMana)
 │   │   ├── swamp.ts         … Swampエンティティの生成(createSwamp)
+│   │   ├── volcano.ts       … 噴火時にHouse/Walkerを破壊するeruptVolcano
 │   │   ├── simulation.ts    … WorldとSchedulerを束ね、tickごとにupdate()するSimulation
 │   │   └── systems/         … movement / wanderTarget / settle / houseGrowth /
 │   │                          houseUpgrade / mana / combat / gather /
 │   │                          fightTargeting / enemyAi / swamp
 │   ├── world/
-│   │   └── heightmap.ts … 頂点高さマップの型と生成、raiseVertex(頂点1つの上げ下げ)、
-│   │                       sampleElevation(バイリニア補間)、isBuildable(海面より上か)、
+│   │   └── heightmap.ts … 頂点高さマップの型と生成、raiseVertex(頂点1つの上げ下げ、
+│   │                       rockHardnessも1減らす)、sampleElevation(バイリニア補間)、
+│   │                       isBuildable(海面より上かつ岩でないか)、isRock、
 │   │                       countFlatNeighbors(周囲の平坦さの計測)、
-│   │                       applyEarthquake(範囲内をランダムに隆起・陥没)
+│   │                       applyEarthquake(範囲内をランダムに隆起・陥没)、
+│   │                       applyVolcano(範囲内をMAX_ELEVATIONまで隆起させ岩化)
 │   └── render/
 │       ├── IsoRenderer.ts … heightmapをアイソメトリックなポリゴン群として描画し、
 │       │                    タイル座標→画面座標への投影(project)・クリック位置→頂点の
@@ -162,7 +165,7 @@ HUDに現在選択中のツールを表示する。ヘッドレスブラウザ�
 エラーがないことを確認済み。
 
 `docs/game-system.md` のデータモデル素案のうち、行動方針の`goToShrine`
-（リーダー/集結シンボルの概念が未実装）・沼以外の奇跡（騎士化・火山・
+（リーダー/集結シンボルの概念が未実装）・沼/火山以外の奇跡（騎士化・
 洪水・最終決戦）・征服モードの複数ワールド進行はまだ未実装。
 
 ### 奇跡「沼」
@@ -181,6 +184,32 @@ HUDに現在選択中のツールを表示する。ヘッドレスブラウザ�
 巨大な半径の沼を置けば範囲内の全ウォーカーが実際に消滅することを
 確認済み。ヘッドレスブラウザでも沼の配置・見た目・コンソールエラーが
 ないことを確認した。
+
+### 奇跡「火山」
+
+`Heightmap`に`rockHardness`（頂点ごとの岩の硬さ、0なら通常の地面）を
+追加した。`world/heightmap.ts`の`applyVolcano(heightmap, x, y, radius,
+hardness)`は対象範囲の頂点を`MAX_ELEVATION`まで一気に隆起させ、同時に
+`rockHardness`を設定する（`docs/game-system.md`の「対象地点を高く
+隆起させ、岩石で覆う」）。`raiseVertex`は編集したマスの`rockHardness`
+を1ずつ削るようにしたため、`0になるまで繰り返し地形操作をする`ことで
+岩を取り除ける（「復旧には大量の地形操作が必要」）。`isBuildable`は
+標高チェックに加えて岩でないことも見るようにし、`isRock`という判定
+関数も新設した。
+
+地震（ランダムに荒らして間接的に既存House.levelのダウングレードへ
+反応させる）とは異なり、火山はその場にあった建物ごと土地を奪う仕様
+（「敵の土地を長期的に奪う」）のため、`game/volcano.ts`の
+`eruptVolcano(world, x, y, radius)`で同じ範囲にいるHouse/Walker
+エンティティを直接破壊する処理を別途用意し、`main.ts`の火山ツールで
+`applyVolcano`（地形）と`eruptVolcano`（ECS）の両方を呼ぶようにした。
+
+`main.ts`のツールバーは2行目（沼/火山）を追加し、`VOLCANO_MANA_COST`
+（沼・地震より高い「大」ティア）を消費する。`IsoRenderer`は岩マスを
+（元の地形タイプに関わらず）rock色で描画する。Simulationの統合テストで
+既存の家が噴火で消滅し跡地が建築不可になることを確認済み。ヘッドレス
+ブラウザでも実際にタップして地図中央に巨大な岩の尖塔が出現する様子を
+確認した。
 
 ### 縦持ちスマホPWAへの一本化
 

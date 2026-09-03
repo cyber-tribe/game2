@@ -82,7 +82,7 @@ export class IsoRenderer {
 
   /** Rebuilds the terrain mesh from the current heightmap. Call after editing it. */
   redraw(): void {
-    const { width, height, vertices, terrain } = this.heightmap;
+    const { width, height, vertices, rockHardness, terrain } = this.heightmap;
     const graphics = this.graphics;
     graphics.clear();
 
@@ -93,13 +93,18 @@ export class IsoRenderer {
         const se = vertices[y + 1][x + 1];
         const sw = vertices[y + 1][x];
         const avgHeight = (nw + ne + se + sw) / 4;
+        const isRockTile =
+          rockHardness[y][x] > 0 ||
+          rockHardness[y][x + 1] > 0 ||
+          rockHardness[y + 1][x + 1] > 0 ||
+          rockHardness[y + 1][x] > 0;
 
         const p0 = this.toScreen(x, y, nw);
         const p1 = this.toScreen(x + 1, y, ne);
         const p2 = this.toScreen(x + 1, y + 1, se);
         const p3 = this.toScreen(x, y + 1, sw);
 
-        const color = avgHeight <= 0 ? WATER_COLOR : TERRAIN_COLOR[terrain];
+        const color = avgHeight <= 0 ? WATER_COLOR : isRockTile ? TERRAIN_COLOR.rock : TERRAIN_COLOR[terrain];
 
         graphics
           .poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy])

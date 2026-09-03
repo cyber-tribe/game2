@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_ELEVATION,
   MIN_ELEVATION,
+  VOLCANO_ROCK_HARDNESS,
   applyEarthquake,
+  applyVolcano,
   countFlatNeighbors,
   createHeightmap,
   isBuildable,
+  isRock,
   raiseVertex,
   sampleElevation,
   type Heightmap,
@@ -13,7 +16,8 @@ import {
 
 function flatHeightmap(width: number, height: number, elevation: number): Heightmap {
   const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
-  return { width, height, terrain: "grass", vertices };
+  const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
+  return { width, height, terrain: "grass", vertices, rockHardness };
 }
 
 describe("createHeightmap", () => {
@@ -64,6 +68,23 @@ describe("raiseVertex", () => {
 
     expect(() => raiseVertex(heightmap, 99, 99, 1)).not.toThrow();
   });
+
+  it("chips one point off a vertex's rockHardness, if any", () => {
+    const heightmap = createHeightmap(2, 2);
+    heightmap.rockHardness[0][0] = 3;
+
+    raiseVertex(heightmap, 0, 0, 1);
+
+    expect(heightmap.rockHardness[0][0]).toBe(2);
+  });
+
+  it("leaves rockHardness at 0 alone (never goes negative)", () => {
+    const heightmap = createHeightmap(2, 2);
+
+    raiseVertex(heightmap, 0, 0, 1);
+
+    expect(heightmap.rockHardness[0][0]).toBe(0);
+  });
 });
 
 describe("sampleElevation", () => {
@@ -102,6 +123,34 @@ describe("isBuildable", () => {
   it("is true above sea level", () => {
     const heightmap = flatHeightmap(2, 2, MIN_ELEVATION + 1);
     expect(isBuildable(heightmap, 1, 1)).toBe(true);
+  });
+
+  it("is false on volcano rock even above sea level", () => {
+    const heightmap = flatHeightmap(2, 2, MIN_ELEVATION + 1);
+    heightmap.rockHardness[1][1] = 5;
+
+    expect(isBuildable(heightmap, 1, 1)).toBe(false);
+  });
+});
+
+describe("isRock", () => {
+  it("is false where rockHardness is 0", () => {
+    const heightmap = flatHeightmap(2, 2, 5);
+    expect(isRock(heightmap, 1, 1)).toBe(false);
+  });
+
+  it("is true where rockHardness is above 0", () => {
+    const heightmap = flatHeightmap(2, 2, 5);
+    heightmap.rockHardness[1][1] = 1;
+
+    expect(isRock(heightmap, 1, 1)).toBe(true);
+  });
+
+  it("rounds fractional coordinates to the nearest vertex", () => {
+    const heightmap = flatHeightmap(4, 4, 5);
+    heightmap.rockHardness[2][2] = 1;
+
+    expect(isRock(heightmap, 2.4, 1.6)).toBe(true);
   });
 });
 
@@ -168,5 +217,56 @@ describe("applyEarthquake", () => {
 
     expect(() => applyEarthquake(heightmap, 0, 0, 3, 4, () => 1)).not.toThrow();
     expect(heightmap.vertices[0][0]).toBe(9);
+  });
+});
+
+describe("applyVolcano", () => {
+  it("raises every vertex within radius to MAX_ELEVATION and marks it as rock", () => {
+    const heightmap = flatHeightmap(10, 10, 3);
+
+    applyVolcano(heightmap, 5, 5, 1, 7);
+
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        expect(heightmap.vertices[5 + dy][5 + dx]).toBe(MAX_ELEVATION);
+        expect(heightmap.rockHardness[5 + dy][5 + dx]).toBe(7);
+      }
+    }
+    expect(heightmap.vertices[5][7]).toBe(3); // outside radius
+    expect(heightmap.rockHardness[5][7]).toBe(0);
+  });
+
+  it("makes the affected area unbuildable", () => {
+    const heightmap = flatHeightmap(6, 6, 3);
+
+    applyVolcano(heightmap, 3, 3, 0);
+
+    expect(isBuildable(heightmap, 3, 3)).toBe(false);
+  });
+
+  it("uses VOLCANO_ROCK_HARDNESS by default", () => {
+    const heightmap = flatHeightmap(6, 6, 3);
+
+    applyVolcano(heightmap, 3, 3, 0);
+
+    expect(heightmap.rockHardness[3][3]).toBe(VOLCANO_ROCK_HARDNESS);
+  });
+
+  it("eventually clears once enough terrain edits chip the hardness away", () => {
+    const heightmap = flatHeightmap(6, 6, 3);
+    applyVolcano(heightmap, 3, 3, 0, 2);
+
+    raiseVertex(heightmap, 3, 3, -1);
+    expect(isRock(heightmap, 3, 3)).toBe(true);
+
+    raiseVertex(heightmap, 3, 3, -1);
+    expect(isRock(heightmap, 3, 3)).toBe(false);
+  });
+
+  it("does not touch vertices outside the map bounds", () => {
+    const heightmap = flatHeightmap(4, 4, 3);
+
+    expect(() => applyVolcano(heightmap, 0, 0, 3)).not.toThrow();
+    expect(heightmap.vertices[0][0]).toBe(MAX_ELEVATION);
   });
 });
