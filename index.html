@@ -200,8 +200,14 @@
         box-sizing: border-box;
       }
 
-      /* This game targets portrait phones only. */
-      @media (orientation: landscape) {
+      /*
+       * Landscape is only a problem on a touchscreen (a phone rotated
+       * sideways, with no mouse to fall back on) — see
+       * plan/0039-pc-support.md. A mouse-driven device reports
+       * `pointer: fine`, so a widescreen PC monitor never matches this and
+       * never sees the warning, regardless of its aspect ratio.
+       */
+      @media (orientation: landscape) and (pointer: coarse) {
         #rotate-warning {
           display: flex;
         }
