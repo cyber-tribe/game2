@@ -131,6 +131,47 @@ describe("Simulation", () => {
     expect(houses.some((entity) => sim.world.get(entity, House)!.level !== "hut")).toBe(true);
   });
 
+  it("grows population slower on harsher terrain (rock) than on grass, all else equal", () => {
+    const width = 10;
+    const height = 10;
+    const flatHeightmap = (terrain: Heightmap["terrain"]): Heightmap => ({
+      width,
+      height,
+      terrain,
+      vertices: Array.from({ length: height + 1 }, () => Array(width + 1).fill(5)),
+      rockHardness: Array.from({ length: height + 1 }, () => Array(width + 1).fill(0)),
+      waterLevel: 0,
+    });
+
+    const grassSim = new Simulation({ worldWidth: width, worldHeight: height, heightmap: flatHeightmap("grass") });
+    const rockSim = new Simulation({ worldWidth: width, worldHeight: height, heightmap: flatHeightmap("rock") });
+
+    // One hand-placed hut per faction per sim, bypassing wander/settle
+    // randomness so the only variable left is the terrain-driven growth
+    // rate. Both factions need a house — leaving either at 0 houses/0
+    // walkers would end the game immediately via getOutcome().
+    for (const sim of [grassSim, rockSim]) {
+      for (const entity of sim.world.query(Walker)) sim.world.destroyEntity(entity);
+
+      for (const faction of ["player", "enemy"] as const) {
+        const house = sim.world.createEntity();
+        sim.world.add(house, Position, { x: 5, y: 5 });
+        sim.world.add(house, Owner, { faction });
+        sim.world.add(house, House, { level: "hut", population: 0 });
+      }
+    }
+
+    for (let i = 0; i < 30; i++) {
+      grassSim.update(0.1);
+      rockSim.update(0.1);
+    }
+
+    const totalPopulation = (sim: Simulation) =>
+      sim.world.query(House).reduce((sum, entity) => sum + sim.world.get(entity, House)!.population, 0);
+
+    expect(totalPopulation(grassSim)).toBeGreaterThan(totalPopulation(rockSim));
+  });
+
   it("drowns walkers that wander into a conjured swamp during a normal tick", () => {
     const sim = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 2 });
 

@@ -89,7 +89,7 @@ export class Simulation {
       .add(houseCaptureSystem)
       .add(createSettleSystem({ heightmap: config.heightmap }))
       .add(createHouseUpgradeSystem({ heightmap: config.heightmap }))
-      .add(createHouseGrowthSystem({ maxHousesPerFaction }))
+      .add(createHouseGrowthSystem({ maxHousesPerFaction, heightmap: config.heightmap }))
       .add(manaSystem);
   }
 
