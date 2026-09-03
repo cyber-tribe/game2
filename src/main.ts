@@ -1,4 +1,4 @@
-import { Application, Container, type FederatedPointerEvent } from "pixi.js";
+import { Application, Container, Rectangle, type FederatedPointerEvent } from "pixi.js";
 import {
   ARMAGEDDON_MANA_COST,
   EARTHQUAKE_MANA_COST,
@@ -19,6 +19,7 @@ import { eruptVolcano } from "./game/volcano";
 import { EntityLayer } from "./render/EntityLayer";
 import { Hud } from "./render/Hud";
 import { IsoRenderer } from "./render/IsoRenderer";
+import { Minimap } from "./render/Minimap";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
 import {
   DEFAULT_VOLCANO_RADIUS,
@@ -32,7 +33,7 @@ import {
 
 // Smaller than a desktop map: on a phone, showing the whole thing at once
 // makes every tile too small to tap precisely, so the map is shown closer
-// to native size and panned instead — see docs/tech-stack.md.
+// to native size and panned instead — see plan/archived/0009-pan-for-vertex-picking.md.
 const WORLD_WIDTH = 20;
 const WORLD_HEIGHT = 20;
 
@@ -59,6 +60,8 @@ const DRAG_THRESHOLD = 10;
 const TUTORIAL_HINT_TIMEOUT_MS = 15000;
 /** How long a triggerShake() camera shake takes to decay to nothing. */
 const SHAKE_DURATION = 0.3;
+/** Screen size (px) of the top-right overview map — see render/Minimap.ts. */
+const MINIMAP_SIZE = 72;
 
 /**
  * The device's top safe-area inset (notch/status bar), read from the CSS
@@ -71,6 +74,17 @@ const SHAKE_DURATION = 0.3;
 function getSafeAreaInsetTop(): number {
   const value = getComputedStyle(document.documentElement).getPropertyValue("--safe-area-inset-top");
   return parseFloat(value) || 0;
+}
+
+/**
+ * Best-effort haptic feedback for casting a miracle — the Vibration API is
+ * unsupported on iOS Safari (and thus on an iOS home-screen install), so
+ * this silently does nothing there instead of throwing. Not used for the
+ * plain raise/lower terrain edit: that's the core, extremely frequent
+ * action, and buzzing on every tap would feel naggy rather than special.
+ */
+function vibrate(pattern: number | number[]): void {
+  navigator.vibrate?.(pattern);
 }
 
 async function bootstrap() {
@@ -114,6 +128,9 @@ async function bootstrap() {
   const hud = new Hud();
   hud.setTerrain(TERRAIN_LABELS[heightmap.terrain]);
   app.stage.addChild(hud.view);
+
+  const minimap = new Minimap(heightmap, MINIMAP_SIZE);
+  app.stage.addChild(minimap.view);
 
   const enemyEventToast = document.getElementById("enemy-event-toast");
   let toastHideTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -159,6 +176,7 @@ async function bootstrap() {
     renderer.view.position.y += safeAreaTop;
     hud.setMaxWidth(app.screen.width);
     hud.setTopInset(safeAreaTop);
+    minimap.view.position.set(app.screen.width - MINIMAP_SIZE - 10, 10 + safeAreaTop);
     if (tutorialHint) tutorialHint.style.bottom = `${toolbarHeight + 12}px`;
   };
   layout();
@@ -182,6 +200,34 @@ async function bootstrap() {
     };
   };
 
+  // Recenters the main view on a world (tile) point without changing zoom
+  // or rotation — same pivot math as rotateAroundPivot below, just with a
+  // fixed target (the visible map's rough center) instead of the
+  // two-finger midpoint. Used by the minimap's "tap to jump" (see
+  // render/Minimap.ts's doc comment on why it exists).
+  const centerViewOn = (worldX: number, worldY: number) => {
+    const local = renderer.project(worldX, worldY);
+    const cos = Math.cos(renderer.view.rotation);
+    const sin = Math.sin(renderer.view.rotation);
+    const scaledX = local.sx * currentScale;
+    const scaledY = local.sy * currentScale;
+    const target = { x: app.screen.width / 2, y: app.screen.height / 2 };
+    const next = clampPan(target.x - (scaledX * cos - scaledY * sin), target.y - (scaledX * sin + scaledY * cos));
+    renderer.view.position.set(next.x, next.y);
+  };
+
+  minimap.view.eventMode = "static";
+  minimap.view.cursor = "pointer";
+  minimap.view.hitArea = new Rectangle(0, 0, MINIMAP_SIZE, MINIMAP_SIZE);
+  minimap.view.on("pointerdown", (event) => {
+    // Stops this tap from also reaching the main map's own pointerdown
+    // handler below (both listen on the pointer hierarchy under app.stage).
+    event.stopPropagation();
+    const local = minimap.view.toLocal(event.global);
+    const target = minimap.toWorld(local.x, local.y);
+    centerViewOn(target.x, target.y);
+  });
+
   let toolMode: ToolMode = "raise";
 
   const applyTool = (event: FederatedPointerEvent) => {
@@ -192,6 +238,7 @@ async function bootstrap() {
     if (toolMode === "shrine") {
       if (!trySpendMana(simulation.world, "player", SHRINE_MOVE_MANA_COST)) return;
       simulation.moveShrine("player", vertex);
+      vibrate(15);
       return;
     }
 
@@ -200,12 +247,14 @@ async function bootstrap() {
       applyEarthquake(heightmap, vertex.x, vertex.y);
       renderer.redraw();
       triggerShake(6);
+      vibrate(40);
       return;
     }
 
     if (toolMode === "swamp") {
       if (!trySpendMana(simulation.world, "player", SWAMP_MANA_COST)) return;
       createSwamp(simulation.world, vertex.x, vertex.y);
+      vibrate(25);
       return;
     }
 
@@ -215,6 +264,7 @@ async function bootstrap() {
       eruptVolcano(simulation.world, vertex.x, vertex.y, DEFAULT_VOLCANO_RADIUS);
       renderer.redraw();
       triggerShake(8);
+      vibrate([40, 30, 60]);
       return;
     }
 
@@ -222,6 +272,7 @@ async function bootstrap() {
       // Also a global effect (it acts on the leader, not the tapped spot).
       if (!trySpendMana(simulation.world, "player", KNIGHT_MANA_COST)) return;
       simulation.knightify("player");
+      vibrate(30);
       return;
     }
 
@@ -230,6 +281,7 @@ async function bootstrap() {
       if (!trySpendMana(simulation.world, "player", ARMAGEDDON_MANA_COST)) return;
       simulation.triggerArmageddon();
       triggerShake(10);
+      vibrate([60, 40, 60, 40, 100]);
       return;
     }
 
@@ -240,6 +292,7 @@ async function bootstrap() {
       drownFlood(simulation.world, heightmap);
       renderer.redraw();
       triggerShake(5);
+      vibrate(50);
       return;
     }
 
@@ -373,6 +426,7 @@ async function bootstrap() {
     renderer.redraw();
     entityLayer.update(simulation.world);
     hud.update(simulation.summarize(), simulation.getOutcome());
+    minimap.update(simulation.world);
 
     if (shakeTimeRemaining > 0) {
       shakeTimeRemaining = Math.max(0, shakeTimeRemaining - deltaSeconds);

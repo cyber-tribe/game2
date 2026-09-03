@@ -3,7 +3,7 @@ import { sampleElevation, type Heightmap } from "../world/heightmap";
 
 // Sized for finger taps rather than mouse clicks: at scale 1 adjacent
 // vertices sit 32px/16px apart on screen, which pickVertex's default
-// maxDistance is tuned around — see docs/tech-stack.md's "縦持ちスマホPWA".
+// maxDistance is tuned around — see plan/archived/0009-pan-for-vertex-picking.md.
 export const TILE_WIDTH = 64;
 export const TILE_HEIGHT = 32;
 const ELEVATION_STEP = 16;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
-import { FactionState, Owner, Walker } from "../components";
+import { FactionState, House, Owner, Position, Walker, type FactionId } from "../components";
 import { createFaction } from "../faction";
 import { createEnemyAiSystem } from "./enemyAi";
 
@@ -10,6 +10,20 @@ function addWalkers(world: World, count: number): void {
     world.add(entity, Owner, { faction: "enemy" });
     world.add(entity, Walker, { strength: 1, state: "seeking", speed: 1 });
   }
+}
+
+function addHouse(world: World, faction: FactionId, x: number, y: number): void {
+  const entity = world.createEntity();
+  world.add(entity, Position, { x, y });
+  world.add(entity, Owner, { faction });
+  world.add(entity, House, { level: "hut", population: 0 });
+}
+
+function addWalkerAt(world: World, faction: FactionId, x: number, y: number): void {
+  const entity = world.createEntity();
+  world.add(entity, Position, { x, y });
+  world.add(entity, Owner, { faction });
+  world.add(entity, Walker, { strength: 1, state: "seeking", speed: 1 });
 }
 
 describe("createEnemyAiSystem", () => {
@@ -83,6 +97,32 @@ describe("createEnemyAiSystem", () => {
     const system = createEnemyAiSystem({ decisionInterval: 5 });
 
     expect(() => system(world, 5)).not.toThrow();
+  });
+
+  it("switches to fight mode when an opponent walker nears one of its houses, even below the aggression threshold", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    addWalkers(world, 1); // well below the aggression threshold
+    addHouse(world, "enemy", 10, 10);
+    addWalkerAt(world, "player", 12, 10); // within the default threat radius
+
+    const system = createEnemyAiSystem({ decisionInterval: 5, aggressionThreshold: 4, threatRadius: 4 });
+    system(world, 5);
+
+    expect(world.get(enemy, FactionState)!.behaviorMode).toBe("fight");
+  });
+
+  it("stays in settle mode when an opponent walker is far from every house", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 }, "fight");
+    addWalkers(world, 1);
+    addHouse(world, "enemy", 10, 10);
+    addWalkerAt(world, "player", 50, 50); // far outside the threat radius
+
+    const system = createEnemyAiSystem({ decisionInterval: 5, aggressionThreshold: 4, threatRadius: 4 });
+    system(world, 5);
+
+    expect(world.get(enemy, FactionState)!.behaviorMode).toBe("settle");
   });
 
   it("never overrides behaviorMode once finalBattle is set, even past the aggression threshold", () => {
