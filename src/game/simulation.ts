@@ -2,13 +2,15 @@ import { Scheduler, World } from "../ecs";
 import type { Heightmap } from "../world/heightmap";
 import { FactionState, House, Owner, Position, Walker, type BehaviorMode, type FactionId } from "./components";
 import { DEFAULT_WALKER_SPEED, TILES_PER_HOUSE_CAP } from "./constants";
-import { createFaction, findFactionEntity } from "./faction";
+import { createFaction, findFactionEntity, moveShrine } from "./faction";
 import { houseCaptureSystem, walkerCombatSystem } from "./systems/combat";
 import { createEnemyAiSystem } from "./systems/enemyAi";
 import { fightTargetingSystem } from "./systems/fightTargeting";
 import { gatherSystem } from "./systems/gather";
+import { goToShrineSystem } from "./systems/goToShrine";
 import { createHouseGrowthSystem } from "./systems/houseGrowth";
 import { createHouseUpgradeSystem } from "./systems/houseUpgrade";
+import { leaderSystem } from "./systems/leader";
 import { manaSystem } from "./systems/mana";
 import { movementSystem } from "./systems/movement";
 import { createSettleSystem } from "./systems/settle";
@@ -70,7 +72,9 @@ export class Simulation {
 
     this.scheduler
       .add(createEnemyAiSystem())
+      .add(leaderSystem)
       .add(fightTargetingSystem)
+      .add(goToShrineSystem)
       .add(createWanderTargetSystem({ heightmap: config.heightmap }))
       .add(movementSystem)
       .add(gatherSystem)
@@ -100,6 +104,11 @@ export class Simulation {
   getBehaviorMode(faction: FactionId): BehaviorMode | undefined {
     const entity = findFactionEntity(this.world, faction);
     return entity === undefined ? undefined : this.world.get(entity, FactionState)!.behaviorMode;
+  }
+
+  /** The "集結シンボル移動" miracle — relocates where "goToShrine" mode leads the army. */
+  moveShrine(faction: FactionId, position: { x: number; y: number }): void {
+    moveShrine(this.world, faction, position);
   }
 
   /**

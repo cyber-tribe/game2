@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../ecs";
 import { FactionState } from "./components";
-import { createFaction, findFactionEntity, trySpendMana } from "./faction";
+import { createFaction, findFactionEntity, moveShrine, trySpendMana } from "./faction";
 
 describe("createFaction / findFactionEntity", () => {
   it("creates a faction entity with the given id and shrine, defaulting to settle mode", () => {
@@ -63,5 +63,27 @@ describe("trySpendMana", () => {
     const world = new World();
 
     expect(trySpendMana(world, "player", 1)).toBe(false);
+  });
+});
+
+describe("moveShrine", () => {
+  it("replaces the faction's shrinePosition and leaves everything else alone", () => {
+    const world = new World();
+    const player = createFaction(world, "player", { x: 0, y: 0 }, "goToShrine");
+
+    moveShrine(world, "player", { x: 7, y: 3 });
+
+    expect(world.get(player, FactionState)).toEqual({
+      id: "player",
+      mana: 0,
+      behaviorMode: "goToShrine",
+      shrinePosition: { x: 7, y: 3 },
+    });
+  });
+
+  it("does nothing when the faction doesn't exist", () => {
+    const world = new World();
+
+    expect(() => moveShrine(world, "player", { x: 1, y: 1 })).not.toThrow();
   });
 });

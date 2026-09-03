@@ -49,16 +49,19 @@ game2/
 │   │   ├── system.ts        … Systemの型とSchedulerによる実行
 │   │   └── world.test.ts    … 上記の単体テスト
 │   ├── game/            … ゲームドメインロジック（ECSのコンポーネント/システムを利用）
-│   │   ├── components.ts    … Position/Owner/Walker/MoveTarget/House/FactionState/Swamp
+│   │   ├── components.ts    … Position/Owner/Walker/MoveTarget/House/
+│   │   │                       FactionState(leaderIdを含む)/Swamp
 │   │   ├── constants.ts     … 速度・成長率・家レベル別ステータス・マナコスト等のチューニング値
-│   │   ├── faction.ts       … Faction(勢力)エンティティの生成/検索/マナ消費(trySpendMana)
+│   │   ├── faction.ts       … Faction(勢力)エンティティの生成/検索/マナ消費(trySpendMana)/
+│   │   │                       集結シンボル移動(moveShrine)
 │   │   ├── swamp.ts         … Swampエンティティの生成(createSwamp)
 │   │   ├── volcano.ts       … 噴火時にHouse/Walkerを破壊するeruptVolcano
 │   │   ├── flood.ts         … 洪水時に水没したHouse/Walkerを破壊するdrownFlood
 │   │   ├── simulation.ts    … WorldとSchedulerを束ね、tickごとにupdate()するSimulation
 │   │   └── systems/         … movement / wanderTarget / settle / houseGrowth /
 │   │                          houseUpgrade / mana / combat / gather /
-│   │                          fightTargeting / enemyAi / swamp
+│   │                          fightTargeting / enemyAi / swamp / leader /
+│   │                          goToShrine
 │   ├── world/
 │   │   └── heightmap.ts … 頂点高さマップの型と生成、raiseVertex(頂点1つの上げ下げ、
 │   │                       rockHardnessも1減らす)、sampleElevation(バイリニア補間)、
@@ -166,8 +169,8 @@ HUDに現在選択中のツールを表示する。ヘッドレスブラウザ�
 切り替えてクリックし、地形が不規則に隆起・陥没する様子とコンソール
 エラーがないことを確認済み。
 
-`docs/game-system.md` のデータモデル素案のうち、行動方針の`goToShrine`
-（リーダー/集結シンボルの概念が未実装）・沼/火山/洪水以外の奇跡
+`docs/game-system.md` のデータモデル素案のうち、リーダー/集結シンボルと
+行動方針`goToShrine`は後述の節で実装した。沼/火山/洪水以外の奇跡
 （騎士化・最終決戦）・征服モードの複数ワールド進行はまだ未実装。
 
 ### 奇跡「沼」
@@ -315,6 +318,43 @@ houseGrowthSystemとwalkerCombatSystem/houseCaptureSystemを実装した
 家数に暫定的な上限を設けて対処した。上限に達すると人口は容量で
 頭打ちになり、家を奪われるなどして数が減れば成長が再開する。
 地形ベースの土地不足が実装され次第、この暫定キャップは不要になる。
+
+### リーダーと集結シンボル（goToShrineモード）
+
+`docs/game-system.md`の「リーダー」「集結シンボル」を実装した。
+`FactionState`に`leaderId?: Entity`を追加し、`game/systems/leader.ts`の
+`leaderSystem`が毎tick、各勢力の`leaderId`が空、またはその参照先が
+もう生きていない場合に、その勢力の生存ウォーカーを1体選んで新たな
+リーダーに昇格させる。本来は「集結シンボルに最初に触れた者がリーダーに
+なる」が仕様だが、シンボルに衝突判定を持つ実体は未実装のため、
+生存する任意のウォーカーを昇格させる簡略化とした。
+
+`game/systems/goToShrine.ts`の`goToShrineSystem`はbehaviorModeが
+`goToShrine`の勢力について、リーダーには`FactionState.shrinePosition`を、
+リーダー以外の同勢力ウォーカーにはリーダーの現在地をMoveTargetとして
+設定する（`fightTargetingSystem`と同じく`createWanderTargetSystem`より
+前に実行し、既にターゲットを持つウォーカーには手を出さない）。これにより
+「民はリーダーへ、リーダーはシンボルへ向かう（軍勢の誘導）」という
+docs/game-system.mdの記述をそのまま再現している。
+
+集結シンボルの移動（奇跡「集結シンボル移動」）は`game/faction.ts`の
+`moveShrine(world, faction, position)`で`shrinePosition`を書き換えるだけの
+軽量な処理。`main.ts`のツールバー1行目に🚩ボタンを追加し、
+`SHRINE_MOVE_MANA_COST`（地形編集より高く地震より低い「小」ティア）を
+消費する。行動方針側にも🚩「集結地へ」ボタンを追加した。
+
+`EntityLayer`はどの勢力の`FactionState`についても`shrinePosition`に
+旗のグラフィックを描画し、`leaderId`が指すウォーカーは通常より大きい円＋
+白いフチで強調表示する。プレイヤーがシンボルをタップで移動させた効果が
+その場で目視確認できる。
+
+Simulationの統合テストで、①ゲーム開始直後の1tickで両勢力に
+`leaderId`が設定されること、②ウォーカー1体だけの勢力を`goToShrine`に
+切り替えてシンボルを離れた地点へ移動させると、そのリーダーが実際に
+シンボルの座標まで歩いて定住する（＝Houseがちょうどシンボル座標に
+できる）ことを確認した。ヘッドレスブラウザでも🚩集結地移動ボタンで
+旗の位置が地図上で動くこと、🚩集結地へモードに切り替えてもコンソール
+エラーが出ないことを確認済み。
 
 ## 開発コマンド
 
