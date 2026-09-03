@@ -107,6 +107,15 @@ export const ENEMY_AI_DECISION_INTERVAL = 5;
 /** Enemy walker count at/above which the AI switches to "fight" mode. */
 export const ENEMY_AI_AGGRESSION_THRESHOLD = 4;
 
+/**
+ * Distance (in tiles) at which an opposing walker near one of the enemy's
+ * houses counts as an active threat — see enemyAi.ts. Forces "fight" mode
+ * immediately, regardless of ENEMY_AI_AGGRESSION_THRESHOLD, so the enemy
+ * doesn't sit in "settle" while a house is under siege just because its
+ * total walker count hasn't reached the usual aggression bar.
+ */
+export const ENEMY_AI_THREAT_RADIUS = 4;
+
 /** Mana cost of conjuring a swamp — a "中" tier miracle, similar to an earthquake. */
 export const SWAMP_MANA_COST = 15;
 
