@@ -40,10 +40,48 @@
         bottom: 0;
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 10px;
         padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
         background: rgba(10, 26, 42, 0.88);
         box-sizing: border-box;
+      }
+
+      /*
+       * Two visually distinct button genres, per docs/game-system.md:
+       * "行動方針" (behaviorMode) is a free, always-on standing order —
+       * green. "奇跡" (miracles) are one-shot, mana-gated effects — blue.
+       * First-time players otherwise have no way to tell the two apart,
+       * since every button used to share one look.
+       */
+      .toolbar-section {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .toolbar-label {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        font-size: 11px;
+        font-weight: bold;
+        letter-spacing: 0.05em;
+        padding: 0 2px;
+      }
+
+      .toolbar-label .toolbar-label-note {
+        font-size: 10px;
+        font-weight: normal;
+        letter-spacing: normal;
+        color: #9db3c8;
+      }
+
+      [data-group="behavior"] .toolbar-label {
+        color: #7be08a;
+      }
+
+      [data-group="tool"] .toolbar-label {
+        color: #7cc0ff;
       }
 
       .toolbar-row {
@@ -67,6 +105,16 @@
         background: #4fa8ff;
         color: #0a1a2a;
         font-weight: bold;
+      }
+
+      /* Behavior-mode buttons get the green accent instead of the default miracle blue. */
+      [data-group="behavior"] button {
+        border-color: #3fbf5e;
+      }
+
+      [data-group="behavior"] button[aria-pressed="true"] {
+        background: #3fbf5e;
+        color: #06210f;
       }
 
       #rotate-warning {
@@ -95,26 +143,36 @@
     <div id="app"></div>
 
     <div id="toolbar">
-      <div class="toolbar-row" data-group="behavior">
-        <button type="button" data-mode="settle" aria-pressed="true">定住</button>
-        <button type="button" data-mode="gather">集結</button>
-        <button type="button" data-mode="goToShrine">🚩 集結地へ</button>
-        <button type="button" data-mode="fight">戦闘</button>
+      <div class="toolbar-section" data-group="behavior">
+        <div class="toolbar-label">
+          行動方針 <span class="toolbar-label-note">常に有効・マナ消費なし</span>
+        </div>
+        <div class="toolbar-row">
+          <button type="button" data-mode="settle" aria-pressed="true">定住</button>
+          <button type="button" data-mode="gather">集結</button>
+          <button type="button" data-mode="goToShrine">🚩 集結地へ</button>
+          <button type="button" data-mode="fight">戦闘</button>
+        </div>
       </div>
-      <div class="toolbar-row" data-group="tool">
-        <button type="button" data-tool="raise" aria-pressed="true">▲ 隆起</button>
-        <button type="button" data-tool="lower">▼ 沈降</button>
-        <button type="button" data-tool="shrine">🚩 集結地移動</button>
-        <button type="button" data-tool="earthquake">💥 地震</button>
-      </div>
-      <div class="toolbar-row" data-group="tool">
-        <button type="button" data-tool="swamp">🐸 沼</button>
-        <button type="button" data-tool="knight">⚔️ 騎士化</button>
-        <button type="button" data-tool="volcano">🌋 火山</button>
-        <button type="button" data-tool="flood">🌊 洪水</button>
-      </div>
-      <div class="toolbar-row" data-group="tool">
-        <button type="button" data-tool="armageddon">☠️ 最終決戦</button>
+      <div class="toolbar-section" data-group="tool">
+        <div class="toolbar-label">
+          奇跡 <span class="toolbar-label-note">タップで発動・マナを消費</span>
+        </div>
+        <div class="toolbar-row">
+          <button type="button" data-tool="raise" aria-pressed="true">▲ 隆起</button>
+          <button type="button" data-tool="lower">▼ 沈降</button>
+          <button type="button" data-tool="shrine">🚩 集結地移動</button>
+          <button type="button" data-tool="earthquake">💥 地震</button>
+        </div>
+        <div class="toolbar-row">
+          <button type="button" data-tool="swamp">🐸 沼</button>
+          <button type="button" data-tool="knight">⚔️ 騎士化</button>
+          <button type="button" data-tool="volcano">🌋 火山</button>
+          <button type="button" data-tool="flood">🌊 洪水</button>
+        </div>
+        <div class="toolbar-row">
+          <button type="button" data-tool="armageddon">☠️ 最終決戦</button>
+        </div>
       </div>
     </div>
 
