@@ -1,3 +1,4 @@
+import type { TerrainType } from "../world/heightmap";
 import type { HouseLevel } from "./components";
 
 /** Tiles per second for a freshly spawned walker. */
@@ -8,6 +9,21 @@ export const DEFAULT_WANDER_RADIUS = 6;
 
 /** Population units a house accumulates per second. */
 export const DEFAULT_POPULATION_GROWTH_RATE = 2;
+
+/**
+ * Multiplies DEFAULT_POPULATION_GROWTH_RATE by a heightmap's terrain type —
+ * per docs/game-system.md, "地形タイプ...見た目だけでなく民の成長速度
+ * などに影響する（例：草原は標準、砂漠は成長が遅い、溶岩地帯はさらに
+ * 過酷）". "rock" stands in for the doc's 溶岩地帯 (lava fields) — the
+ * harshest terrain, since this codebase doesn't model lava separately
+ * from volcano rock.
+ */
+export const TERRAIN_GROWTH_MULTIPLIER: Record<TerrainType, number> = {
+  grass: 1,
+  desert: 0.6,
+  snow: 0.75,
+  rock: 0.4,
+};
 
 /** Capacity, mana output, and defense per house level. */
 export const HOUSE_LEVELS: Record<HouseLevel, { capacity: number; manaRate: number; defense: number }> = {

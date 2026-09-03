@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
+import { createHeightmap } from "../../world/heightmap";
 import { House, Owner, Position, Walker } from "../components";
-import { HOUSE_LEVELS } from "../constants";
+import { HOUSE_LEVELS, TERRAIN_GROWTH_MULTIPLIER } from "../constants";
 import { createHouseGrowthSystem } from "./houseGrowth";
 
 function createHut(world: World, x: number, y: number, population = 0) {
@@ -81,5 +82,26 @@ describe("createHouseGrowthSystem", () => {
     system(world, 1);
 
     expect(world.query(Walker)).toHaveLength(1);
+  });
+
+  it("scales growthRate by the heightmap's terrain multiplier when one is given", () => {
+    const world = new World();
+    const house = createHut(world, 0, 0);
+    const heightmap = createHeightmap(4, 4, "desert");
+
+    const system = createHouseGrowthSystem({ growthRate: 1, heightmap });
+    system(world, 2);
+
+    expect(world.get(house, House)!.population).toBeCloseTo(2 * TERRAIN_GROWTH_MULTIPLIER.desert);
+  });
+
+  it("treats growthRate as unscaled when no heightmap is given", () => {
+    const world = new World();
+    const house = createHut(world, 0, 0);
+
+    const system = createHouseGrowthSystem({ growthRate: 1 });
+    system(world, 2);
+
+    expect(world.get(house, House)!.population).toBe(2);
   });
 });
