@@ -40,6 +40,19 @@ const MAX_MAP_SCALE = 1.2;
 /** A finger-drag shorter than this (px) is treated as a tap, not a pan. */
 const DRAG_THRESHOLD = 10;
 
+/**
+ * The device's top safe-area inset (notch/status bar), read from the CSS
+ * custom property index.html defines from `env(safe-area-inset-top)`. An
+ * installed standalone PWA draws edge-to-edge under `viewport-fit=cover`
+ * and needs this to keep the HUD/map clear of the status bar; a plain
+ * browser tab reports 0 here since its own chrome already occupies that
+ * space.
+ */
+function getSafeAreaInsetTop(): number {
+  const value = getComputedStyle(document.documentElement).getPropertyValue("--safe-area-inset-top");
+  return parseFloat(value) || 0;
+}
+
 async function bootstrap() {
   const app = new Application();
   await app.init({
@@ -72,11 +85,14 @@ async function bootstrap() {
   let currentScale = 1;
   const layout = () => {
     const toolbarHeight = document.getElementById("toolbar")?.getBoundingClientRect().height ?? 0;
-    const availableHeight = Math.max(200, app.screen.height - toolbarHeight - HUD_MARGIN);
+    const safeAreaTop = getSafeAreaInsetTop();
+    const availableHeight = Math.max(200, app.screen.height - toolbarHeight - HUD_MARGIN - safeAreaTop);
     currentScale = Math.min(MAX_MAP_SCALE, availableHeight / renderer.mapPixelHeight);
     renderer.view.scale.set(currentScale);
     renderer.centerOn(app.screen.width, app.screen.height);
+    renderer.view.position.y += safeAreaTop;
     hud.setMaxWidth(app.screen.width);
+    hud.setTopInset(safeAreaTop);
   };
   layout();
   window.addEventListener("resize", layout);
