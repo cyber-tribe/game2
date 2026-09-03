@@ -1,11 +1,13 @@
 import { Text } from "pixi.js";
-import type { FactionSummary, GameOutcome, MatchEvent } from "../game/simulation";
-import { describeMatchEvent } from "./matchEventLabels";
+import type { FactionSummary, GameOutcome } from "../game/simulation";
 
 /**
  * Compact top status readout: each faction's mana/houses/walkers/mode,
  * plus the game-over banner. Controls themselves live in the HTML
- * toolbar (see src/ui/toolbar.ts) — this is read-only.
+ * toolbar (see src/ui/toolbar.ts) — this is read-only. The post-game
+ * "戦いの記録" recap lives in an HTML overlay instead (see main.ts's
+ * #match-record), not here — it needs to scroll for a long match, which
+ * a PixiJS Text object can't do on its own.
  */
 export class Hud {
   readonly view: Text;
@@ -53,7 +55,7 @@ export class Hud {
     this.terrainLabel = label;
   }
 
-  update(summaries: FactionSummary[], outcome: GameOutcome, matchEvents: readonly MatchEvent[] = []): void {
+  update(summaries: FactionSummary[], outcome: GameOutcome): void {
     const lines = [
       `地形: ${this.terrainLabel}`,
       ...summaries.map((s) => {
@@ -64,21 +66,8 @@ export class Hud {
 
     if (outcome.over) {
       lines.push("", outcome.winner ? `GAME OVER — ${outcome.winner} wins` : "GAME OVER — draw");
-      // A bare win/lose line tells none of the match's actual story — see
-      // plan/0032-match-event-log.md and plan/0034-house-events.md. Every
-      // miracle cast and notable house event (captured, burned, reaching
-      // castle) either side caused, recapped in the order they happened.
-      lines.push("", "戦いの記録:", ...matchEvents.map((e) => `${formatMatchTime(e.time)} ${describeMatchEvent(e.type, e.faction)}`));
     }
 
     this.view.text = lines.join("\n");
   }
-}
-
-/** e.g. 75.3 -> "1:15". */
-function formatMatchTime(seconds: number): string {
-  const totalSeconds = Math.floor(seconds);
-  const minutes = Math.floor(totalSeconds / 60);
-  const remainingSeconds = totalSeconds % 60;
-  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }

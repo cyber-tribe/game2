@@ -47,3 +47,11 @@ export function describeMatchEvent(type: MatchEventType, faction: FactionId): st
   const text = MATCH_EVENT_TEMPLATE[type].replace("{subject}", subject).replace("{opponent}", opponent);
   return `${MATCH_EVENT_EMOJI[type]} ${text}`;
 }
+
+/** e.g. 75.3 -> "1:15". */
+export function formatMatchTime(seconds: number): string {
+  const totalSeconds = Math.floor(seconds);
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}

@@ -13,13 +13,13 @@ import {
 import type { EnemyMiracleEvent } from "./game/systems/enemyMiracles";
 import { trySpendMana } from "./game/faction";
 import { drownFlood } from "./game/flood";
-import { Simulation } from "./game/simulation";
+import { Simulation, type GameOutcome, type MatchEvent } from "./game/simulation";
 import { createSwamp } from "./game/swamp";
 import { eruptVolcano } from "./game/volcano";
 import { EntityLayer } from "./render/EntityLayer";
 import { Hud } from "./render/Hud";
 import { IsoRenderer } from "./render/IsoRenderer";
-import { describeMatchEvent } from "./render/matchEventLabels";
+import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
 import { Minimap } from "./render/Minimap";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
 import {
@@ -168,6 +168,28 @@ async function bootstrap() {
   const onEnemyAction = (event: EnemyMiracleEvent) => {
     showEnemyEventToast(describeMatchEvent(event.type, "enemy"));
     triggerShake(ENEMY_SHAKE_MAGNITUDE[event.type]);
+  };
+
+  const matchRecordPanel = document.getElementById("match-record");
+  const matchRecordTitle = document.getElementById("match-record-title");
+  const matchRecordList = document.getElementById("match-record-list");
+  let matchRecordShown = false;
+
+  // Shown once, the moment the match ends — a bare win/lose line tells
+  // none of the match's actual story (see plan/0032-match-event-log.md).
+  // Rendered as HTML rather than through Hud's PixiJS Text so a long
+  // match's event list can actually scroll (see index.html's #match-record).
+  const showMatchRecord = (outcome: GameOutcome, events: readonly MatchEvent[]) => {
+    if (!matchRecordPanel || !matchRecordTitle || !matchRecordList) return;
+    matchRecordTitle.textContent = outcome.winner ? `GAME OVER — ${outcome.winner} wins` : "GAME OVER — draw";
+    matchRecordList.replaceChildren(
+      ...events.map((event) => {
+        const line = document.createElement("div");
+        line.textContent = `${formatMatchTime(event.time)} ${describeMatchEvent(event.type, event.faction)}`;
+        return line;
+      }),
+    );
+    matchRecordPanel.classList.remove("hidden");
   };
 
   const simulation = new Simulation({ worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT, heightmap, onEnemyAction });
@@ -479,7 +501,12 @@ async function bootstrap() {
     renderer.update(deltaSeconds);
     renderer.redraw();
     entityLayer.update(simulation.world, deltaSeconds);
-    hud.update(simulation.summarize(), simulation.getOutcome(), simulation.getMatchEvents());
+    const outcome = simulation.getOutcome();
+    hud.update(simulation.summarize(), outcome);
+    if (outcome.over && !matchRecordShown) {
+      matchRecordShown = true;
+      showMatchRecord(outcome, simulation.getMatchEvents());
+    }
     minimap.update(simulation.world);
 
     if (shakeTimeRemaining > 0) {
