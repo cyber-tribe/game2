@@ -1,9 +1,12 @@
 import { Container, Graphics } from "pixi.js";
 import { sampleElevation, type Heightmap } from "../world/heightmap";
 
-export const TILE_WIDTH = 48;
-export const TILE_HEIGHT = 24;
-const ELEVATION_STEP = 12;
+// Sized for finger taps rather than mouse clicks: at scale 1 adjacent
+// vertices sit 32px/16px apart on screen, which pickVertex's default
+// maxDistance is tuned around — see docs/tech-stack.md's "縦持ちスマホPWA".
+export const TILE_WIDTH = 64;
+export const TILE_HEIGHT = 32;
+const ELEVATION_STEP = 16;
 
 const TERRAIN_COLOR: Record<Heightmap["terrain"], number> = {
   grass: 0x4a8c3f,
@@ -30,9 +33,13 @@ export class IsoRenderer {
     this.view.position.set(screenWidth / 2, screenHeight / 3);
   }
 
-  /** Total screen-space width (at scale 1) of the diamond the map projects to. */
+  /** Total screen-space width/height (at scale 1) of the diamond the map projects to. */
   get mapPixelWidth(): number {
     return (this.heightmap.width + this.heightmap.height) * (TILE_WIDTH / 2);
+  }
+
+  get mapPixelHeight(): number {
+    return (this.heightmap.width + this.heightmap.height) * (TILE_HEIGHT / 2);
   }
 
   /**
@@ -46,14 +53,18 @@ export class IsoRenderer {
 
   /**
    * Finds the grid vertex closest to a point in this.view's local space
-   * (e.g. from `view.toLocal(pointerEvent.global)`), for turning a click
-   * into "which vertex did the player grab". Returns null past
-   * maxDistance screen pixels from every vertex.
+   * (e.g. from `view.toLocal(pointerEvent.global)`), for turning a tap
+   * into "which vertex did the player grab". `maxDistance` is in actual
+   * screen pixels regardless of the view's current zoom (it's converted
+   * to local-space units internally), so a finger's tap tolerance stays
+   * constant even if the map is scaled down. Returns null past that
+   * distance from every vertex.
    */
-  pickVertex(localX: number, localY: number, maxDistance = 16): { x: number; y: number } | null {
+  pickVertex(localX: number, localY: number, maxDistance = 40): { x: number; y: number } | null {
     const { width, height, vertices } = this.heightmap;
+    const localMaxDistance = maxDistance / this.view.scale.x;
     let best: { x: number; y: number } | null = null;
-    let bestDistance = maxDistance;
+    let bestDistance = localMaxDistance;
 
     for (let y = 0; y <= height; y++) {
       for (let x = 0; x <= width; x++) {

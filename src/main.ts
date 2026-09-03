@@ -1,4 +1,4 @@
-import { Application } from "pixi.js";
+import { Application, type FederatedPointerEvent } from "pixi.js";
 import { EARTHQUAKE_MANA_COST, TERRAIN_EDIT_MANA_COST } from "./game/constants";
 import { trySpendMana } from "./game/faction";
 import { Simulation } from "./game/simulation";
@@ -8,11 +8,18 @@ import { IsoRenderer } from "./render/IsoRenderer";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
 import { applyEarthquake, createHeightmap, raiseVertex } from "./world/heightmap";
 
-const WORLD_WIDTH = 32;
-const WORLD_HEIGHT = 32;
+// Smaller than a desktop map: on a phone, showing the whole thing at once
+// makes every tile too small to tap precisely, so the map is shown closer
+// to native size and panned instead — see docs/tech-stack.md.
+const WORLD_WIDTH = 20;
+const WORLD_HEIGHT = 20;
 
-/** Fraction of the screen width the map is allowed to fill when fitting a phone screen. */
-const MAP_FIT_MARGIN = 0.92;
+/** Reserved space (screen px) above the map for the HUD text. */
+const HUD_MARGIN = 90;
+/** Never zoom in past this, even on a tall/narrow phone. */
+const MAX_MAP_SCALE = 1.2;
+/** A finger-drag shorter than this (px) is treated as a tap, not a pan. */
+const DRAG_THRESHOLD = 10;
 
 async function bootstrap() {
   const app = new Application();
@@ -38,27 +45,37 @@ async function bootstrap() {
 
   const simulation = new Simulation({ worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT, heightmap });
 
-  // Portrait phones are narrower than the map's projected width, so scale
-  // the whole map (and everything drawn inside it) down to fit — see
-  // docs/tech-stack.md's "縦持ちスマホPWA".
+  // Fit the map's height (not width) into the space below the HUD and
+  // above the toolbar — portrait phones have more room vertically than
+  // horizontally, so this keeps tiles big enough to tap while still
+  // showing the map's full north-south extent; the player pans
+  // left/right to reach the rest.
+  let currentScale = 1;
   const layout = () => {
-    const scale = Math.min(1, (app.screen.width * MAP_FIT_MARGIN) / renderer.mapPixelWidth);
-    renderer.view.scale.set(scale);
+    const toolbarHeight = document.getElementById("toolbar")?.getBoundingClientRect().height ?? 0;
+    const availableHeight = Math.max(200, app.screen.height - toolbarHeight - HUD_MARGIN);
+    currentScale = Math.min(MAX_MAP_SCALE, availableHeight / renderer.mapPixelHeight);
+    renderer.view.scale.set(currentScale);
     renderer.centerOn(app.screen.width, app.screen.height);
     hud.setMaxWidth(app.screen.width);
   };
   layout();
   window.addEventListener("resize", layout);
 
+  const clampPan = (x: number, y: number): { x: number; y: number } => {
+    const halfW = (renderer.mapPixelWidth * currentScale) / 2;
+    const halfH = (renderer.mapPixelHeight * currentScale) / 2;
+    const marginX = Math.min(120, app.screen.width * 0.3);
+    const marginY = Math.min(120, app.screen.height * 0.3);
+    return {
+      x: Math.min(app.screen.width + halfW - marginX, Math.max(-halfW + marginX, x)),
+      y: Math.min(app.screen.height + halfH - marginY, Math.max(-halfH + marginY, y)),
+    };
+  };
+
   let toolMode: ToolMode = "raise";
 
-  // Tap applies whichever tool is selected (raise/lower terrain, or an
-  // earthquake), paid for out of the player faction's mana. There's no
-  // right-click on a touchscreen, so raise/lower are separate tools
-  // picked from the toolbar rather than left/right click.
-  app.stage.eventMode = "static";
-  app.stage.hitArea = app.screen;
-  app.stage.on("pointerdown", (event) => {
+  const applyTool = (event: FederatedPointerEvent) => {
     const local = renderer.view.toLocal(event.global);
     const vertex = renderer.pickVertex(local.x, local.y);
     if (!vertex) return;
@@ -73,6 +90,45 @@ async function bootstrap() {
     if (!trySpendMana(simulation.world, "player", TERRAIN_EDIT_MANA_COST)) return;
     raiseVertex(heightmap, vertex.x, vertex.y, toolMode === "lower" ? -1 : 1);
     renderer.redraw();
+  };
+
+  // A short tap applies the selected tool; dragging beyond DRAG_THRESHOLD
+  // pans the camera instead. Distinguishing the two is what lets a
+  // one-finger touchscreen do both without a dedicated "pan mode" toggle.
+  let pointerActive = false;
+  let isDragging = false;
+  let dragStart = { x: 0, y: 0 };
+  let viewStartPos = { x: 0, y: 0 };
+
+  app.stage.eventMode = "static";
+  app.stage.hitArea = app.screen;
+
+  app.stage.on("pointerdown", (event) => {
+    pointerActive = true;
+    isDragging = false;
+    dragStart = { x: event.global.x, y: event.global.y };
+    viewStartPos = { x: renderer.view.position.x, y: renderer.view.position.y };
+  });
+
+  app.stage.on("pointermove", (event) => {
+    if (!pointerActive) return;
+    const dx = event.global.x - dragStart.x;
+    const dy = event.global.y - dragStart.y;
+    if (!isDragging && Math.hypot(dx, dy) > DRAG_THRESHOLD) isDragging = true;
+    if (isDragging) {
+      const next = clampPan(viewStartPos.x + dx, viewStartPos.y + dy);
+      renderer.view.position.set(next.x, next.y);
+    }
+  });
+
+  app.stage.on("pointerup", (event) => {
+    if (pointerActive && !isDragging) applyTool(event);
+    pointerActive = false;
+    isDragging = false;
+  });
+  app.stage.on("pointerupoutside", () => {
+    pointerActive = false;
+    isDragging = false;
   });
 
   wireToolbar({
