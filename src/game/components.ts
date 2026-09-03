@@ -40,8 +40,29 @@ export interface House {
   population: number;
 }
 
+/**
+ * The four influence modes from docs/game-system.md. Only "settle" is
+ * acted on so far (it's the implicit default the wander/settle systems
+ * already assume); "gather"/"goToShrine"/"fight" are recorded but not
+ * yet enforced.
+ */
+export type BehaviorMode = "settle" | "gather" | "goToShrine" | "fight";
+
+/**
+ * One FactionState entity per side. Mana is the only resource spent on
+ * miracles; behaviorMode/shrinePosition steer the (not yet implemented)
+ * gather/goToShrine/fight walker systems.
+ */
+export interface FactionState {
+  id: FactionId;
+  mana: number;
+  behaviorMode: BehaviorMode;
+  shrinePosition: Position;
+}
+
 export const Position = defineComponent<Position>("Position");
 export const Owner = defineComponent<Owner>("Owner");
 export const Walker = defineComponent<Walker>("Walker");
 export const MoveTarget = defineComponent<MoveTarget>("MoveTarget");
 export const House = defineComponent<House>("House");
+export const FactionState = defineComponent<FactionState>("FactionState");
