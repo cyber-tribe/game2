@@ -365,6 +365,11 @@ async function bootstrap() {
   // keeping the point currently under screen position `pivot` visually
   // fixed in place — the standard map-app "twist and pinch" feel, anchored
   // on the midpoint between the two fingers rather than the map's corner.
+  // Runs the result through clampPan same as single-finger panning does,
+  // so pinching in near an edge (or zooming in generally) can't drag the
+  // map far enough off-screen to strand the player — clampPan doesn't
+  // account for the map's current rotation either way, but that's the
+  // same approximation single-finger pan already lives with post-rotate.
   const applyPinchTransform = (pivot: { x: number; y: number }, deltaAngle: number, scaleRatio: number) => {
     const local = renderer.view.toLocal(pivot);
     renderer.view.rotation += deltaAngle;
@@ -375,7 +380,8 @@ async function bootstrap() {
     const sin = Math.sin(renderer.view.rotation);
     const scaledX = local.x * currentScale;
     const scaledY = local.y * currentScale;
-    renderer.view.position.set(pivot.x - (scaledX * cos - scaledY * sin), pivot.y - (scaledX * sin + scaledY * cos));
+    const next = clampPan(pivot.x - (scaledX * cos - scaledY * sin), pivot.y - (scaledX * sin + scaledY * cos));
+    renderer.view.position.set(next.x, next.y);
   };
 
   app.stage.eventMode = "static";
