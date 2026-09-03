@@ -25,6 +25,14 @@ export const TERRAIN_GROWTH_MULTIPLIER: Record<TerrainType, number> = {
   rock: 0.4,
 };
 
+/** Japanese display name for each terrain type, per docs/game-system.md's own wording. */
+export const TERRAIN_LABELS: Record<TerrainType, string> = {
+  grass: "草原",
+  desert: "砂漠",
+  snow: "雪原",
+  rock: "溶岩地帯",
+};
+
 /** Capacity, mana output, and defense per house level. */
 export const HOUSE_LEVELS: Record<HouseLevel, { capacity: number; manaRate: number; defense: number }> = {
   hut: { capacity: 10, manaRate: 1, defense: 3 },

@@ -7,6 +7,7 @@ import {
   SHRINE_MOVE_MANA_COST,
   SWAMP_MANA_COST,
   TERRAIN_EDIT_MANA_COST,
+  TERRAIN_LABELS,
   VOLCANO_MANA_COST,
 } from "./game/constants";
 import { trySpendMana } from "./game/faction";
@@ -25,6 +26,7 @@ import {
   applyVolcano,
   createHeightmap,
   raiseVertex,
+  type TerrainType,
 } from "./world/heightmap";
 
 // Smaller than a desktop map: on a phone, showing the whole thing at once
@@ -32,6 +34,19 @@ import {
 // to native size and panned instead — see docs/tech-stack.md.
 const WORLD_WIDTH = 20;
 const WORLD_HEIGHT = 20;
+
+/**
+ * Every match rolls one of these for the whole map, per
+ * docs/game-system.md's "地形タイプが複数あり...民の成長速度などに
+ * 影響する". Until 征服モード (per-world terrain assignment) exists,
+ * this is the only way a player ever sees TERRAIN_GROWTH_MULTIPLIER's
+ * effect or the non-grass IsoRenderer colors at all.
+ */
+const TERRAIN_TYPES: TerrainType[] = ["grass", "desert", "snow", "rock"];
+
+function pickRandomTerrain(): TerrainType {
+  return TERRAIN_TYPES[Math.floor(Math.random() * TERRAIN_TYPES.length)];
+}
 
 /** Reserved space (screen px) above the map for the HUD text. */
 const HUD_MARGIN = 90;
@@ -65,7 +80,7 @@ async function bootstrap() {
   if (!container) throw new Error("#app element not found");
   container.appendChild(app.canvas);
 
-  const heightmap = createHeightmap(WORLD_WIDTH, WORLD_HEIGHT);
+  const heightmap = createHeightmap(WORLD_WIDTH, WORLD_HEIGHT, pickRandomTerrain());
   const renderer = new IsoRenderer(heightmap);
   app.stage.addChild(renderer.view);
 
@@ -73,6 +88,7 @@ async function bootstrap() {
   renderer.view.addChild(entityLayer.view);
 
   const hud = new Hud();
+  hud.setTerrain(TERRAIN_LABELS[heightmap.terrain]);
   app.stage.addChild(hud.view);
 
   const simulation = new Simulation({ worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT, heightmap });
