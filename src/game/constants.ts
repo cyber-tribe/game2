@@ -41,7 +41,7 @@ export const TERRAIN_LABELS: Record<TerrainType, string> = {
  * player feedback). Cut to a fifth so a modest early economy takes
  * real, felt time to afford a mid-tier miracle, while a developed one
  * still earns power meaningfully faster than a fledgling one — see
- * plan/0018-mana-pacing-rebalance.md.
+ * plan/archived/0018-mana-pacing-rebalance.md.
  */
 export const HOUSE_LEVELS: Record<HouseLevel, { capacity: number; manaRate: number; defense: number }> = {
   hut: { capacity: 10, manaRate: 0.2, defense: 3 },
