@@ -38,6 +38,19 @@ describe("eruptVolcano", () => {
     expect(world.isAlive(walker)).toBe(false);
   });
 
+  it("destroys a house on a corner vertex of the blast's square footprint", () => {
+    // applyVolcano turns a (2*radius+1)^2 *square* of vertices to rock, but
+    // a Euclidean radius check would miss this corner (distance
+    // radius*sqrt(2) > radius), leaving a house standing on newly-unbuildable
+    // rock — see this function's doc comment.
+    const world = new World();
+    const house = createHouse(world, 6, 6);
+
+    eruptVolcano(world, 5, 5, 1);
+
+    expect(world.isAlive(house)).toBe(false);
+  });
+
   it("leaves houses and walkers outside the blast radius alone", () => {
     const world = new World();
     const house = createHouse(world, 20, 20);

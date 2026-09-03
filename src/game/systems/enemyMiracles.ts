@@ -1,11 +1,25 @@
 import type { System, World } from "../../ecs";
-import { applyEarthquake, type Heightmap } from "../../world/heightmap";
+import {
+  applyEarthquake,
+  applyVolcano,
+  DEFAULT_EARTHQUAKE_RADIUS,
+  DEFAULT_VOLCANO_RADIUS,
+  type Heightmap,
+} from "../../world/heightmap";
 import { triggerArmageddon } from "../armageddon";
 import { FactionState, House, Owner, Position, Walker, type FactionId } from "../components";
-import { ARMAGEDDON_MANA_COST, ARMAGEDDON_POPULATION_RATIO, EARTHQUAKE_MANA_COST, KNIGHT_MANA_COST } from "../constants";
+import {
+  ARMAGEDDON_MANA_COST,
+  ARMAGEDDON_POPULATION_RATIO,
+  EARTHQUAKE_MANA_COST,
+  KNIGHT_MANA_COST,
+  VOLCANO_MANA_COST,
+  VOLCANO_POPULATION_RATIO,
+} from "../constants";
 import { findFactionEntity, trySpendMana } from "../faction";
 import { knightify } from "../knight";
-import type { Point } from "./geometry";
+import { eruptVolcano } from "../volcano";
+import { distance, type Point } from "./geometry";
 
 /**
  * Reported through EnemyMiracleConfig.onAction whenever the enemy
@@ -45,13 +59,21 @@ export interface EnemyMiracleConfig {
  * 2. Already aggressive (behaviorMode "fight") with a leader who isn't a
  *    knight yet → knight them, turning the leader into a self-sufficient
  *    attacker.
- * 3. Otherwise, if it can afford it, shakes up a random opponent house
- *    with an earthquake — economic sabotage rather than pure combat.
+ * 3. A real but not-yet-decisive population lead (VOLCANO_POPULATION_
+ *    RATIO or more) → escalate to a volcano, permanently denying the
+ *    opponent's most valuable target rather than just disrupting it.
+ * 4. Otherwise, if it can afford it, shakes up the opponent's biggest
+ *    house cluster with an earthquake — economic sabotage rather than
+ *    pure combat.
  *
- * Each branch spends mana through trySpendMana exactly like a player's
- * tap, so an enemy that can't afford a step simply falls through to a
- * cheaper one (or does nothing) rather than acting for free. Skips
- * everything once finalBattle is set, same as createEnemyAiSystem.
+ * Both the earthquake and volcano targets are picked by
+ * densestOpponentCluster rather than uniformly at random: a real
+ * opponent would aim for wherever hits the most houses, not a
+ * coin-flip. Each branch spends mana through trySpendMana exactly like
+ * a player's tap, so an enemy that can't afford a step simply falls
+ * through to a cheaper one (or does nothing) rather than acting for
+ * free. Skips everything once finalBattle is set, same as
+ * createEnemyAiSystem.
  */
 export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {}): System {
   const factionId = config.factionId ?? "enemy";
@@ -76,8 +98,9 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
 
     const myPopulation = totalPopulation(world, factionId);
     const theirPopulation = totalPopulation(world, opponentId);
+    const populationRatio = theirPopulation > 0 ? myPopulation / theirPopulation : 0;
 
-    if (theirPopulation > 0 && myPopulation >= theirPopulation * ARMAGEDDON_POPULATION_RATIO) {
+    if (populationRatio >= ARMAGEDDON_POPULATION_RATIO) {
       if (trySpendMana(world, factionId, ARMAGEDDON_MANA_COST)) {
         triggerArmageddon(world, worldCenter);
         onAction({ type: "armageddon" });
@@ -94,7 +117,16 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
       }
     }
 
-    const target = randomOpponentHouse(world, opponentId, rng);
+    if (populationRatio >= VOLCANO_POPULATION_RATIO) {
+      const target = densestOpponentCluster(world, opponentId, DEFAULT_VOLCANO_RADIUS, rng);
+      if (target && trySpendMana(world, factionId, VOLCANO_MANA_COST)) {
+        applyVolcano(heightmap, target.x, target.y);
+        eruptVolcano(world, target.x, target.y, DEFAULT_VOLCANO_RADIUS);
+        return;
+      }
+    }
+
+    const target = densestOpponentCluster(world, opponentId, DEFAULT_EARTHQUAKE_RADIUS, rng);
     if (target && trySpendMana(world, factionId, EARTHQUAKE_MANA_COST)) {
       applyEarthquake(heightmap, target.x, target.y, undefined, undefined, rng);
       onAction({ type: "earthquake", position: target });
@@ -113,11 +145,23 @@ function totalPopulation(world: World, faction: FactionId): number {
   return total;
 }
 
-function randomOpponentHouse(world: World, opponentId: FactionId, rng: () => number): Point | null {
+/**
+ * Picks the opponent house surrounded by the most other opponent houses
+ * within `radius` — the settlement an earthquake/volcano would actually
+ * hit hardest — instead of a uniformly random one. Ties (including the
+ * common case of every house being equally isolated) are broken by rng
+ * so a single house still gets picked deterministically under a fixed
+ * rng in tests.
+ */
+function densestOpponentCluster(world: World, opponentId: FactionId, radius: number, rng: () => number): Point | null {
   const positions: Point[] = [];
   for (const entity of world.query(House, Position, Owner)) {
     if (world.get(entity, Owner)!.faction === opponentId) positions.push(world.get(entity, Position)!);
   }
   if (positions.length === 0) return null;
-  return positions[Math.floor(rng() * positions.length)];
+
+  const scores = positions.map((position) => positions.filter((other) => distance(position, other) <= radius).length);
+  const bestScore = Math.max(...scores);
+  const contenders = positions.filter((_, index) => scores[index] === bestScore);
+  return contenders[Math.floor(rng() * contenders.length)];
 }
