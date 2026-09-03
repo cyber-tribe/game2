@@ -1,6 +1,13 @@
 import { Application, type FederatedPointerEvent } from "pixi.js";
-import { EARTHQUAKE_MANA_COST, SWAMP_MANA_COST, TERRAIN_EDIT_MANA_COST, VOLCANO_MANA_COST } from "./game/constants";
+import {
+  EARTHQUAKE_MANA_COST,
+  FLOOD_MANA_COST,
+  SWAMP_MANA_COST,
+  TERRAIN_EDIT_MANA_COST,
+  VOLCANO_MANA_COST,
+} from "./game/constants";
 import { trySpendMana } from "./game/faction";
+import { drownFlood } from "./game/flood";
 import { Simulation } from "./game/simulation";
 import { createSwamp } from "./game/swamp";
 import { eruptVolcano } from "./game/volcano";
@@ -11,6 +18,7 @@ import { wireToolbar, type ToolMode } from "./ui/toolbar";
 import {
   DEFAULT_VOLCANO_RADIUS,
   applyEarthquake,
+  applyFlood,
   applyVolcano,
   createHeightmap,
   raiseVertex,
@@ -105,6 +113,15 @@ async function bootstrap() {
       if (!trySpendMana(simulation.world, "player", VOLCANO_MANA_COST)) return;
       applyVolcano(heightmap, vertex.x, vertex.y);
       eruptVolcano(simulation.world, vertex.x, vertex.y, DEFAULT_VOLCANO_RADIUS);
+      renderer.redraw();
+      return;
+    }
+
+    if (toolMode === "flood") {
+      // Global effect — the tap only confirms the cast, its position doesn't matter.
+      if (!trySpendMana(simulation.world, "player", FLOOD_MANA_COST)) return;
+      applyFlood(heightmap);
+      drownFlood(simulation.world, heightmap);
       renderer.redraw();
       return;
     }

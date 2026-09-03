@@ -4,6 +4,7 @@ import {
   MIN_ELEVATION,
   VOLCANO_ROCK_HARDNESS,
   applyEarthquake,
+  applyFlood,
   applyVolcano,
   countFlatNeighbors,
   createHeightmap,
@@ -14,10 +15,15 @@ import {
   type Heightmap,
 } from "./heightmap";
 
-function flatHeightmap(width: number, height: number, elevation: number): Heightmap {
+function flatHeightmap(
+  width: number,
+  height: number,
+  elevation: number,
+  waterLevel: number = MIN_ELEVATION,
+): Heightmap {
   const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
   const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
-  return { width, height, terrain: "grass", vertices, rockHardness };
+  return { width, height, terrain: "grass", vertices, rockHardness, waterLevel };
 }
 
 describe("createHeightmap", () => {
@@ -130,6 +136,16 @@ describe("isBuildable", () => {
     heightmap.rockHardness[1][1] = 5;
 
     expect(isBuildable(heightmap, 1, 1)).toBe(false);
+  });
+
+  it("is false once the flooded water level reaches the same height", () => {
+    const heightmap = flatHeightmap(2, 2, 1, 1);
+    expect(isBuildable(heightmap, 1, 1)).toBe(false);
+  });
+
+  it("is true when land still stands above a raised water level", () => {
+    const heightmap = flatHeightmap(2, 2, 5, 1);
+    expect(isBuildable(heightmap, 1, 1)).toBe(true);
   });
 });
 
@@ -268,5 +284,48 @@ describe("applyVolcano", () => {
 
     expect(() => applyVolcano(heightmap, 0, 0, 3)).not.toThrow();
     expect(heightmap.vertices[0][0]).toBe(MAX_ELEVATION);
+  });
+});
+
+describe("applyFlood", () => {
+  it("raises the water level by the given amount", () => {
+    const heightmap = flatHeightmap(4, 4, 5);
+
+    applyFlood(heightmap, 2);
+
+    expect(heightmap.waterLevel).toBe(MIN_ELEVATION + 2);
+  });
+
+  it("defaults to raising it by 1", () => {
+    const heightmap = flatHeightmap(4, 4, 5);
+
+    applyFlood(heightmap);
+
+    expect(heightmap.waterLevel).toBe(MIN_ELEVATION + 1);
+  });
+
+  it("is cumulative across multiple casts", () => {
+    const heightmap = flatHeightmap(4, 4, 5);
+
+    applyFlood(heightmap);
+    applyFlood(heightmap);
+
+    expect(heightmap.waterLevel).toBe(MIN_ELEVATION + 2);
+  });
+
+  it("clamps at MAX_ELEVATION", () => {
+    const heightmap = flatHeightmap(4, 4, 5, MAX_ELEVATION - 1);
+
+    applyFlood(heightmap, 5);
+
+    expect(heightmap.waterLevel).toBe(MAX_ELEVATION);
+  });
+
+  it("does not touch the terrain vertices themselves", () => {
+    const heightmap = flatHeightmap(4, 4, 5);
+
+    applyFlood(heightmap, 3);
+
+    expect(heightmap.vertices[2][2]).toBe(5);
   });
 });

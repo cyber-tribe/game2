@@ -14,6 +14,7 @@ export { createEnemyAiSystem, type EnemyAiConfig } from "./systems/enemyAi";
 export { createSwamp } from "./swamp";
 export { swampSystem } from "./systems/swamp";
 export { eruptVolcano } from "./volcano";
+export { drownFlood } from "./flood";
 export {
   Simulation,
   type FactionSummary,

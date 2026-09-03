@@ -54,6 +54,7 @@ game2/
 │   │   ├── faction.ts       … Faction(勢力)エンティティの生成/検索/マナ消費(trySpendMana)
 │   │   ├── swamp.ts         … Swampエンティティの生成(createSwamp)
 │   │   ├── volcano.ts       … 噴火時にHouse/Walkerを破壊するeruptVolcano
+│   │   ├── flood.ts         … 洪水時に水没したHouse/Walkerを破壊するdrownFlood
 │   │   ├── simulation.ts    … WorldとSchedulerを束ね、tickごとにupdate()するSimulation
 │   │   └── systems/         … movement / wanderTarget / settle / houseGrowth /
 │   │                          houseUpgrade / mana / combat / gather /
@@ -61,10 +62,11 @@ game2/
 │   ├── world/
 │   │   └── heightmap.ts … 頂点高さマップの型と生成、raiseVertex(頂点1つの上げ下げ、
 │   │                       rockHardnessも1減らす)、sampleElevation(バイリニア補間)、
-│   │                       isBuildable(海面より上かつ岩でないか)、isRock、
+│   │                       isBuildable(waterLevelより上かつ岩でないか)、isRock、
 │   │                       countFlatNeighbors(周囲の平坦さの計測)、
 │   │                       applyEarthquake(範囲内をランダムに隆起・陥没)、
-│   │                       applyVolcano(範囲内をMAX_ELEVATIONまで隆起させ岩化)
+│   │                       applyVolcano(範囲内をMAX_ELEVATIONまで隆起させ岩化)、
+│   │                       applyFlood(waterLevelを底上げする、地形頂点自体は不変)
 │   └── render/
 │       ├── IsoRenderer.ts … heightmapをアイソメトリックなポリゴン群として描画し、
 │       │                    タイル座標→画面座標への投影(project)・クリック位置→頂点の
@@ -165,8 +167,8 @@ HUDに現在選択中のツールを表示する。ヘッドレスブラウザ�
 エラーがないことを確認済み。
 
 `docs/game-system.md` のデータモデル素案のうち、行動方針の`goToShrine`
-（リーダー/集結シンボルの概念が未実装）・沼/火山以外の奇跡（騎士化・
-洪水・最終決戦）・征服モードの複数ワールド進行はまだ未実装。
+（リーダー/集結シンボルの概念が未実装）・沼/火山/洪水以外の奇跡
+（騎士化・最終決戦）・征服モードの複数ワールド進行はまだ未実装。
 
 ### 奇跡「沼」
 
@@ -210,6 +212,30 @@ hardness)`は対象範囲の頂点を`MAX_ELEVATION`まで一気に隆起させ�
 既存の家が噴火で消滅し跡地が建築不可になることを確認済み。ヘッドレス
 ブラウザでも実際にタップして地図中央に巨大な岩の尖塔が出現する様子を
 確認した。
+
+### 奇跡「洪水」
+
+`Heightmap`に`waterLevel`（現在の海面高さ、初期値は`MIN_ELEVATION`）を
+追加した。当初のdocs/game-system.mdのデータモデル素案（`docs/game-system.md`
+内のSimulation設計メモ）で構想していた通りの実装で、地形の頂点標高
+（`vertices`）自体は変えずに「水没とみなす基準線」だけを動かす方式にした。
+`world/heightmap.ts`の`applyFlood(heightmap, amount)`は`waterLevel`を
+加算する（既定+1、`MAX_ELEVATION`でクランプ、複数回発動で累積する）。
+`isBuildable`・`IsoRenderer`の水面描画とも、判定基準を固定値`0`から
+`heightmap.waterLevel`に変更した。
+
+洪水は特定の1マスではなく地図全体に効く奇跡のため、`applyEarthquake`等の
+ような対象座標を取らない。`game/flood.ts`の`drownFlood(world, heightmap)`
+は、水没した（`sampleElevation`が新しい`waterLevel`以下になった）House/
+Walkerを勢力を問わず一括で破壊する（`docs/game-system.md`の「使用側も
+被害を受けるため高台の確保が前提」を再現）。
+
+`main.ts`のツールバー3行目に🌀洪水ボタンを追加し、`FLOOD_MANA_COST`
+（沼・地震・火山より高い「特大」ティア）を消費する。地図上のタップ位置
+自体は使わず、タップは発動の確認としてのみ機能する。Simulationの統合
+テストで、両陣営が定住した後に洪水を起こすと全ての家が水没して消滅
+することを確認済み。ヘッドレスブラウザでも実際に2回連続で発動し、
+海（水域）が目に見えて広がる様子とコンソールエラーがないことを確認した。
 
 ### 縦持ちスマホPWAへの一本化
 

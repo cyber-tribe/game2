@@ -13,6 +13,12 @@ export interface Heightmap {
    * 操作が必要".
    */
   rockHardness: number[][];
+  /**
+   * Current sea level — starts at MIN_ELEVATION and only ever rises, via
+   * applyFlood. Anything at or below it is water, per docs/game-system.md's
+   * 洪水, "海面を1段上昇させる".
+   */
+  waterLevel: number;
 }
 
 /** Elevation is clamped to this range — 0 is sea level. */
@@ -42,7 +48,7 @@ export function createHeightmap(
     vertices.push(row);
     rockHardness.push(new Array(width + 1).fill(0));
   }
-  return { width, height, terrain, vertices, rockHardness };
+  return { width, height, terrain, vertices, rockHardness, waterLevel: MIN_ELEVATION };
 }
 
 /**
@@ -94,10 +100,12 @@ export function isRock(heightmap: Heightmap, x: number, y: number): boolean {
 /**
  * Sea level and below can't be built on or safely settled — per
  * docs/game-system.md, "海には建物を建てられず、通常の民は入ると溺れる".
- * Volcano rock can't be built on either, per "岩の上には建築できない".
+ * Sea level is `heightmap.waterLevel`, which starts at MIN_ELEVATION but
+ * can rise (see applyFlood). Volcano rock can't be built on either, per
+ * "岩の上には建築できない".
  */
 export function isBuildable(heightmap: Heightmap, x: number, y: number): boolean {
-  return sampleElevation(heightmap, x, y) > MIN_ELEVATION && !isRock(heightmap, x, y);
+  return sampleElevation(heightmap, x, y) > heightmap.waterLevel && !isRock(heightmap, x, y);
 }
 
 /**
@@ -195,4 +203,18 @@ export function applyVolcano(
       heightmap.rockHardness[vy][vx] = hardness;
     }
   }
+}
+
+/** How much a single flood cast raises the sea level. */
+export const DEFAULT_FLOOD_AMOUNT = 1;
+
+/**
+ * Permanently raises the sea level — docs/game-system.md's 洪水,
+ * "海面を1段上昇させる". Cumulative: casting it again raises it further.
+ * Clamped to MAX_ELEVATION (an all-water map). Doesn't touch `vertices`
+ * or evict anyone standing on newly-submerged ground itself — see
+ * game/flood.ts's drownFlood for that.
+ */
+export function applyFlood(heightmap: Heightmap, amount: number = DEFAULT_FLOOD_AMOUNT): void {
+  heightmap.waterLevel = Math.min(MAX_ELEVATION, heightmap.waterLevel + amount);
 }

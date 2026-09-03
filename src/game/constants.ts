@@ -81,3 +81,9 @@ export const SWAMP_CAPACITY = 5;
  * it denies land outright rather than just disrupting it temporarily.
  */
 export const VOLCANO_MANA_COST = 40;
+
+/**
+ * Mana cost of a flood — "特大" tier, the priciest miracle short of the
+ * final battle, since it endangers the caster's own low-lying land too.
+ */
+export const FLOOD_MANA_COST = 70;
