@@ -96,4 +96,16 @@ describe("Simulation", () => {
       expect(isBuildable(heightmap, pos.x, pos.y)).toBe(true);
     }
   });
+
+  it("defaults both factions to settle mode and lets behaviorMode be switched freely", () => {
+    const sim = new Simulation({ worldWidth: 10, worldHeight: 10 });
+
+    expect(sim.getBehaviorMode("player")).toBe("settle");
+    expect(sim.getBehaviorMode("enemy")).toBe("settle");
+
+    sim.setBehaviorMode("player", "fight");
+
+    expect(sim.getBehaviorMode("player")).toBe("fight");
+    expect(sim.getBehaviorMode("enemy")).toBe("settle");
+  });
 });

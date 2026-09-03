@@ -1,4 +1,5 @@
 import { Application } from "pixi.js";
+import type { BehaviorMode } from "./game/components";
 import { TERRAIN_EDIT_MANA_COST } from "./game/constants";
 import { trySpendMana } from "./game/faction";
 import { Simulation } from "./game/simulation";
@@ -52,6 +53,14 @@ async function bootstrap() {
     const delta = event.button === 2 ? -1 : 1;
     raiseVertex(heightmap, vertex.x, vertex.y, delta);
     renderer.redraw();
+  });
+
+  // 1/2/3 switch the player's own behaviorMode (settle/gather/fight) —
+  // free, per docs/game-system.md's 行動方針.
+  const BEHAVIOR_MODE_KEYS: Record<string, BehaviorMode> = { Digit1: "settle", Digit2: "gather", Digit3: "fight" };
+  window.addEventListener("keydown", (event) => {
+    const mode = BEHAVIOR_MODE_KEYS[event.code];
+    if (mode) simulation.setBehaviorMode("player", mode);
   });
 
   app.ticker.add((ticker) => {

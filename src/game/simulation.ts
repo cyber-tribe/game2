@@ -1,9 +1,12 @@
 import { Scheduler, World } from "../ecs";
 import type { Heightmap } from "../world/heightmap";
-import { FactionState, House, Owner, Position, Walker, type FactionId } from "./components";
+import { FactionState, House, Owner, Position, Walker, type BehaviorMode, type FactionId } from "./components";
 import { DEFAULT_WALKER_SPEED, TILES_PER_HOUSE_CAP } from "./constants";
-import { createFaction } from "./faction";
+import { createFaction, findFactionEntity } from "./faction";
 import { houseCaptureSystem, walkerCombatSystem } from "./systems/combat";
+import { createEnemyAiSystem } from "./systems/enemyAi";
+import { fightTargetingSystem } from "./systems/fightTargeting";
+import { gatherSystem } from "./systems/gather";
 import { createHouseGrowthSystem } from "./systems/houseGrowth";
 import { manaSystem } from "./systems/mana";
 import { movementSystem } from "./systems/movement";
@@ -29,6 +32,7 @@ export interface FactionSummary {
   mana: number;
   houses: number;
   walkers: number;
+  behaviorMode: BehaviorMode;
 }
 
 export interface GameOutcome {
@@ -63,8 +67,11 @@ export class Simulation {
     );
 
     this.scheduler
+      .add(createEnemyAiSystem())
+      .add(fightTargetingSystem)
       .add(createWanderTargetSystem({ heightmap: config.heightmap }))
       .add(movementSystem)
+      .add(gatherSystem)
       .add(walkerCombatSystem)
       .add(houseCaptureSystem)
       .add(createSettleSystem({ heightmap: config.heightmap }))
@@ -76,6 +83,19 @@ export class Simulation {
   update(deltaSeconds: number): void {
     if (this.getOutcome().over) return;
     this.scheduler.update(this.world, deltaSeconds);
+  }
+
+  /** Switches a faction's influence mode (docs/game-system.md's 行動方針). Free — no mana cost. */
+  setBehaviorMode(faction: FactionId, mode: BehaviorMode): void {
+    const entity = findFactionEntity(this.world, faction);
+    if (entity === undefined) return;
+    const state = this.world.get(entity, FactionState)!;
+    this.world.add(entity, FactionState, { ...state, behaviorMode: mode });
+  }
+
+  getBehaviorMode(faction: FactionId): BehaviorMode | undefined {
+    const entity = findFactionEntity(this.world, faction);
+    return entity === undefined ? undefined : this.world.get(entity, FactionState)!.behaviorMode;
   }
 
   /**
@@ -105,7 +125,7 @@ export class Simulation {
         if (this.world.get(entity, Owner)!.faction === state.id) walkers++;
       }
 
-      summaries.push({ id: state.id, mana: state.mana, houses, walkers });
+      summaries.push({ id: state.id, mana: state.mana, houses, walkers, behaviorMode: state.behaviorMode });
     }
 
     return summaries;

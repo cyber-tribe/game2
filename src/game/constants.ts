@@ -35,3 +35,12 @@ export const TILES_PER_HOUSE_CAP = 8;
 
 /** Mana cost of raising or lowering one terrain vertex by one step. */
 export const TERRAIN_EDIT_MANA_COST = 1;
+
+/** Two same-faction walkers within this many tiles merge under "gather". */
+export const GATHER_RANGE = 1.5;
+
+/** How often (in seconds) the enemy AI re-evaluates its behaviorMode. */
+export const ENEMY_AI_DECISION_INTERVAL = 5;
+
+/** Enemy walker count at/above which the AI switches to "fight" mode. */
+export const ENEMY_AI_AGGRESSION_THRESHOLD = 4;
