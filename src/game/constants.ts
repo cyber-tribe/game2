@@ -170,3 +170,12 @@ export const MAX_MANA = ARMAGEDDON_MANA_COST;
  * lead is already decisive, not a coin-flip finish.
  */
 export const ARMAGEDDON_POPULATION_RATIO = 1.8;
+
+/**
+ * Population lead at which the enemy AI escalates from earthquake to
+ * volcano — see enemyMiracles.ts. Sits between "even game" (1.0) and
+ * ARMAGEDDON_POPULATION_RATIO: a real but not yet decisive advantage, at
+ * which permanently denying the opponent land is worth the extra mana
+ * over just temporarily disrupting it.
+ */
+export const VOLCANO_POPULATION_RATIO = 1.3;

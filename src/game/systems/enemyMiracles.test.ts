@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
 import type { Heightmap } from "../../world/heightmap";
 import { FactionState, House, Owner, Position, Walker } from "../components";
-import { ARMAGEDDON_MANA_COST, EARTHQUAKE_MANA_COST, KNIGHT_MANA_COST } from "../constants";
+import { ARMAGEDDON_MANA_COST, EARTHQUAKE_MANA_COST, KNIGHT_MANA_COST, VOLCANO_MANA_COST } from "../constants";
 import { createFaction } from "../faction";
 import { createEnemyMiracleSystem } from "./enemyMiracles";
 
@@ -114,6 +114,60 @@ describe("createEnemyMiracleSystem", () => {
     // The whole neighborhood around (5, 5) should no longer be uniformly flat.
     const touched = heightmap.vertices.some((row) => row.some((h) => h !== 5));
     expect(touched).toBe(true);
+  });
+
+  it("escalates to a volcano once its population lead is real but not yet decisive, if it can afford it", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: VOLCANO_MANA_COST });
+    createFaction(world, "player", { x: 9, y: 9 });
+    createHouse(world, "enemy", 0, 0, 13);
+    const target = createHouse(world, "player", 5, 5, 10); // ratio 1.3 -> past VOLCANO_POPULATION_RATIO, short of armageddon's 1.8
+
+    const heightmap = flatHeightmap(10, 10, 5);
+    createEnemyMiracleSystem({ decisionInterval: 8, heightmap, worldCenter: WORLD_CENTER, rng: () => 0 })(world, 8);
+
+    expect(world.get(enemy, FactionState)!.mana).toBe(0);
+    expect(world.isAlive(target)).toBe(false); // eruptVolcano destroys anything it lands on
+    expect(heightmap.rockHardness[5][5]).toBeGreaterThan(0);
+  });
+
+  it("does not escalate to a volcano below VOLCANO_POPULATION_RATIO, even if it can afford one", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: VOLCANO_MANA_COST });
+    createFaction(world, "player", { x: 9, y: 9 });
+    createHouse(world, "enemy", 0, 0, 10);
+    const target = createHouse(world, "player", 5, 5, 10); // even population -> no escalation
+
+    const heightmap = flatHeightmap(10, 10, 5);
+    createEnemyMiracleSystem({ decisionInterval: 8, heightmap, worldCenter: WORLD_CENTER, rng: () => 0 })(world, 8);
+
+    expect(world.isAlive(target)).toBe(true); // no volcano landed on it
+    // Falls through to the (much cheaper) earthquake instead, so mana isn't fully spent.
+    expect(world.get(enemy, FactionState)!.mana).toBe(VOLCANO_MANA_COST - EARTHQUAKE_MANA_COST);
+  });
+
+  it("targets the opponent's densest house cluster instead of picking uniformly at random", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: EARTHQUAKE_MANA_COST });
+    createFaction(world, "player", { x: 19, y: 19 });
+    createHouse(world, "player", 5, 5); // clustered pair
+    createHouse(world, "player", 6, 5);
+    createHouse(world, "player", 15, 15); // isolated, created last
+
+    const heightmap = flatHeightmap(20, 20, 5);
+    // A rng biased toward the last index would pick the isolated house under
+    // a naive uniformly-random choice — proving the cluster is preferred on
+    // its merits, not by coincidence of rng.
+    createEnemyMiracleSystem({ decisionInterval: 8, heightmap, worldCenter: WORLD_CENTER, rng: () => 0.99 })(world, 8);
+
+    expect(heightmap.vertices[15][15]).toBe(5); // untouched — well outside the earthquake's radius around the cluster
+    const clusterTouched = heightmap.vertices
+      .slice(2, 9)
+      .some((row) => row.slice(2, 9).some((h) => h !== 5));
+    expect(clusterTouched).toBe(true);
   });
 
   it("does nothing when the opponent has no houses to target and no other action applies", () => {
