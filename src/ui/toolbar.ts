@@ -1,6 +1,6 @@
 import type { BehaviorMode } from "../game/components";
 
-export type ToolMode = "raise" | "lower" | "earthquake" | "swamp" | "volcano";
+export type ToolMode = "raise" | "lower" | "earthquake" | "swamp" | "volcano" | "flood";
 
 export interface ToolbarCallbacks {
   onBehaviorMode: (mode: BehaviorMode) => void;

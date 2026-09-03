@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { applyVolcano, isBuildable, isRock, type Heightmap } from "../world/heightmap";
+import { applyFlood, applyVolcano, isBuildable, isRock, type Heightmap } from "../world/heightmap";
 import { House, Owner, Position, Swamp, Walker } from "./components";
+import { drownFlood } from "./flood";
 import { Simulation } from "./simulation";
 import { createSwamp } from "./swamp";
 import { eruptVolcano } from "./volcano";
@@ -84,7 +85,7 @@ describe("Simulation", () => {
       Array.from({ length: width + 1 }, (_, x) => (x >= waterFrom && x < waterTo ? 0 : 5)),
     );
     const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
-    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness };
+    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness, waterLevel: 0 };
 
     const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
 
@@ -117,7 +118,7 @@ describe("Simulation", () => {
     const height = 20;
     const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(5));
     const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
-    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness };
+    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness, waterLevel: 0 };
 
     const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
 
@@ -148,7 +149,7 @@ describe("Simulation", () => {
     const height = 20;
     const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(5));
     const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
-    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness };
+    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness, waterLevel: 0 };
 
     const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
 
@@ -162,5 +163,23 @@ describe("Simulation", () => {
     applyVolcano(heightmap, pos.x, pos.y, 1);
     expect(isBuildable(heightmap, pos.x, pos.y)).toBe(false);
     expect(isRock(heightmap, pos.x, pos.y)).toBe(true);
+  });
+
+  it("a flood submerges settled houses across the whole map, for both factions", () => {
+    const width = 20;
+    const height = 20;
+    const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(1)); // uniformly low land
+    const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
+    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness, waterLevel: 0 };
+
+    const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
+
+    for (let i = 0; i < 200; i++) sim.update(0.1); // let houses settle for both factions
+    expect(sim.world.query(House).length).toBeGreaterThan(0);
+
+    applyFlood(heightmap, 1); // water level now matches the land height everywhere
+    drownFlood(sim.world, heightmap);
+
+    expect(sim.world.query(House)).toHaveLength(0);
   });
 });
