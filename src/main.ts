@@ -70,6 +70,17 @@ function getSafeAreaInsetTop(): number {
   return parseFloat(value) || 0;
 }
 
+/**
+ * Best-effort haptic feedback for casting a miracle — the Vibration API is
+ * unsupported on iOS Safari (and thus on an iOS home-screen install), so
+ * this silently does nothing there instead of throwing. Not used for the
+ * plain raise/lower terrain edit: that's the core, extremely frequent
+ * action, and buzzing on every tap would feel naggy rather than special.
+ */
+function vibrate(pattern: number | number[]): void {
+  navigator.vibrate?.(pattern);
+}
+
 async function bootstrap() {
   const app = new Application();
   await app.init({
@@ -145,6 +156,7 @@ async function bootstrap() {
     if (toolMode === "shrine") {
       if (!trySpendMana(simulation.world, "player", SHRINE_MOVE_MANA_COST)) return;
       simulation.moveShrine("player", vertex);
+      vibrate(15);
       return;
     }
 
@@ -152,12 +164,14 @@ async function bootstrap() {
       if (!trySpendMana(simulation.world, "player", EARTHQUAKE_MANA_COST)) return;
       applyEarthquake(heightmap, vertex.x, vertex.y);
       renderer.redraw();
+      vibrate(40);
       return;
     }
 
     if (toolMode === "swamp") {
       if (!trySpendMana(simulation.world, "player", SWAMP_MANA_COST)) return;
       createSwamp(simulation.world, vertex.x, vertex.y);
+      vibrate(25);
       return;
     }
 
@@ -166,6 +180,7 @@ async function bootstrap() {
       applyVolcano(heightmap, vertex.x, vertex.y);
       eruptVolcano(simulation.world, vertex.x, vertex.y, DEFAULT_VOLCANO_RADIUS);
       renderer.redraw();
+      vibrate([40, 30, 60]);
       return;
     }
 
@@ -173,6 +188,7 @@ async function bootstrap() {
       // Also a global effect (it acts on the leader, not the tapped spot).
       if (!trySpendMana(simulation.world, "player", KNIGHT_MANA_COST)) return;
       simulation.knightify("player");
+      vibrate(30);
       return;
     }
 
@@ -180,6 +196,7 @@ async function bootstrap() {
       // Global effect on both factions at once, unlike every other miracle.
       if (!trySpendMana(simulation.world, "player", ARMAGEDDON_MANA_COST)) return;
       simulation.triggerArmageddon();
+      vibrate([60, 40, 60, 40, 100]);
       return;
     }
 
@@ -189,6 +206,7 @@ async function bootstrap() {
       applyFlood(heightmap);
       drownFlood(simulation.world, heightmap);
       renderer.redraw();
+      vibrate(50);
       return;
     }
 
