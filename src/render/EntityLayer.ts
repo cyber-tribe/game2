@@ -4,21 +4,18 @@ import type { Entity, World } from "../ecs";
 import { HOUSE_LEVEL_FLATNESS_REQUIREMENT, HOUSE_LEVEL_ORDER, HOUSE_UPGRADE_FLATNESS_RADIUS } from "../game/constants";
 import { countFlatNeighbors } from "../world/heightmap";
 import { TILE_WIDTH, type IsoRenderer } from "./IsoRenderer";
+import { drawHouseSprite, drawWalkerSprite, HOUSE_PATTERN_WIDTH } from "./pixelArt";
 
 const FACTION_COLOR: Record<FactionId, number> = {
   player: 0x4fa8ff,
   enemy: 0xd94f4f,
 };
 
-const HOUSE_SIZE: Record<HouseLevel, number> = {
-  hut: 10,
-  lodge: 14,
-  manor: 18,
-  castle: 24,
-};
-
-const WALKER_RADIUS = 3;
-const LEADER_RADIUS = WALKER_RADIUS * 1.8;
+/** Pixel size of one "pixel" in a walker's sprite (see pixelArt.ts's WALKER_PATTERN, 5 cols wide). */
+const WALKER_PIXEL_SIZE = 1.3;
+const LEADER_PIXEL_SIZE = WALKER_PIXEL_SIZE * 1.8;
+/** Radius of the highlight halo drawn behind a leader's sprite. */
+const LEADER_HALO_RADIUS = 7;
 const KNIGHT_COLOR = 0xffcc00;
 const SWAMP_COLOR = 0x6a3fa0;
 const SHRINE_POLE_HEIGHT = 18;
@@ -73,13 +70,9 @@ export class EntityLayer {
       const owner = world.get(entity, Owner)!;
       const house = world.get(entity, House)!;
       const { sx, sy } = this.iso.project(pos.x, pos.y);
-      const size = HOUSE_SIZE[house.level];
 
-      g.rect(sx - size / 2, sy - size, size, size)
-        .fill(FACTION_COLOR[owner.faction])
-        .stroke({ width: 1, color: 0x000000, alpha: 0.4 });
-
-      this.drawFlatnessBar(g, pos, house, sx, sy, size);
+      drawHouseSprite(g, sx, sy, house.level, FACTION_COLOR[owner.faction]);
+      this.drawFlatnessBar(g, pos, house, sx, sy, HOUSE_PATTERN_WIDTH[house.level]);
     }
 
     for (const entity of world.query(Position, Walker, Owner)) {
@@ -89,11 +82,12 @@ export class EntityLayer {
       const { sx, sy } = this.iso.project(pos.x, pos.y);
       const isLeader = leaderIds.has(entity);
       const isKnight = walker.state === "knight";
-      const radius = isLeader ? LEADER_RADIUS : WALKER_RADIUS;
+      const pixelSize = isLeader ? LEADER_PIXEL_SIZE : WALKER_PIXEL_SIZE;
 
-      g.circle(sx, sy - radius, radius)
-        .fill(isKnight ? KNIGHT_COLOR : FACTION_COLOR[owner.faction])
-        .stroke({ width: isLeader ? 2 : 1, color: isLeader ? 0xffffff : 0x000000, alpha: isLeader ? 0.9 : 0.5 });
+      if (isLeader) {
+        g.circle(sx, sy - LEADER_HALO_RADIUS, LEADER_HALO_RADIUS).fill({ color: 0xffffff, alpha: 0.35 });
+      }
+      drawWalkerSprite(g, sx, sy, isKnight ? KNIGHT_COLOR : FACTION_COLOR[owner.faction], pixelSize);
     }
   }
 
