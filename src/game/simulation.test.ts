@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Owner, Walker } from "./components";
 import { Simulation } from "./simulation";
 
 describe("Simulation", () => {
@@ -36,5 +37,38 @@ describe("Simulation", () => {
         sim.update(i % 2 === 0 ? 0.016 : 0.25);
       }
     }).not.toThrow();
+  });
+
+  it("reports the game as ongoing while both factions have walkers or houses", () => {
+    const sim = new Simulation({ worldWidth: 10, worldHeight: 10 });
+    expect(sim.getOutcome()).toEqual({ over: false });
+  });
+
+  it("declares the surviving faction the winner once the other has nothing left", () => {
+    const sim = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 1 });
+
+    for (const entity of sim.world.query(Walker, Owner)) {
+      if (sim.world.get(entity, Owner)!.faction === "enemy") {
+        sim.world.destroyEntity(entity);
+      }
+    }
+
+    expect(sim.getOutcome()).toEqual({ over: true, winner: "player" });
+  });
+
+  it("stops advancing the simulation once the game is over", () => {
+    const sim = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 1 });
+
+    for (const entity of sim.world.query(Walker, Owner)) {
+      if (sim.world.get(entity, Owner)!.faction === "enemy") {
+        sim.world.destroyEntity(entity);
+      }
+    }
+
+    const before = sim.summarize();
+    sim.update(5);
+    const after = sim.summarize();
+
+    expect(after).toEqual(before);
   });
 });

@@ -40,7 +40,7 @@ async function bootstrap() {
     const deltaSeconds = ticker.deltaMS / 1000;
     simulation.update(deltaSeconds);
     entityLayer.update(simulation.world);
-    hud.update(simulation.summarize());
+    hud.update(simulation.summarize(), simulation.getOutcome());
   });
 }
 

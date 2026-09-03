@@ -23,6 +23,16 @@ export interface FactionSummary {
   walkers: number;
 }
 
+export interface GameOutcome {
+  over: boolean;
+  /**
+   * Absent when the game isn't over yet, or in the edge case where both
+   * factions lose their last walker/house on the same tick — a draw the
+   * design doc doesn't otherwise account for ("引き分けはなく").
+   */
+  winner?: FactionId;
+}
+
 /** Owns the ECS world for one match and drives it tick by tick. */
 export class Simulation {
   readonly world = new World();
@@ -54,8 +64,21 @@ export class Simulation {
       .add(manaSystem);
   }
 
+  /** No-ops once the game is over, per docs/game-system.md's win/lose rules. */
   update(deltaSeconds: number): void {
+    if (this.getOutcome().over) return;
     this.scheduler.update(this.world, deltaSeconds);
+  }
+
+  /**
+   * A faction with no walkers and no houses left has lost
+   * ("敗北：自陣営の民が全滅する"). The other side wins.
+   */
+  getOutcome(): GameOutcome {
+    const survivors = this.summarize().filter((s) => s.walkers > 0 || s.houses > 0);
+
+    if (survivors.length > 1) return { over: false };
+    return { over: true, winner: survivors[0]?.id };
   }
 
   /** Per-faction snapshot used by the HUD and by tests. */

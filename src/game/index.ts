@@ -7,4 +7,9 @@ export { settleSystem } from "./systems/settle";
 export { createHouseGrowthSystem, type HouseGrowthConfig } from "./systems/houseGrowth";
 export { manaSystem } from "./systems/mana";
 export { houseCaptureSystem, walkerCombatSystem } from "./systems/combat";
-export { Simulation, type FactionSummary, type SimulationConfig } from "./simulation";
+export {
+  Simulation,
+  type FactionSummary,
+  type GameOutcome,
+  type SimulationConfig,
+} from "./simulation";

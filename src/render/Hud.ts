@@ -1,5 +1,5 @@
 import { Text } from "pixi.js";
-import type { FactionSummary } from "../game/simulation";
+import type { FactionSummary, GameOutcome } from "../game/simulation";
 
 /** Simple top-left text overlay showing each faction's mana/houses/walkers. */
 export class Hud {
@@ -13,9 +13,15 @@ export class Hud {
     this.view.position.set(12, 12);
   }
 
-  update(summaries: FactionSummary[]): void {
-    this.view.text = summaries
-      .map((s) => `${s.id}: mana ${s.mana.toFixed(1)}  houses ${s.houses}  walkers ${s.walkers}`)
-      .join("\n");
+  update(summaries: FactionSummary[], outcome: GameOutcome): void {
+    const lines = summaries.map(
+      (s) => `${s.id}: mana ${s.mana.toFixed(1)}  houses ${s.houses}  walkers ${s.walkers}`,
+    );
+
+    if (outcome.over) {
+      lines.push("", outcome.winner ? `GAME OVER — ${outcome.winner} wins` : "GAME OVER — draw");
+    }
+
+    this.view.text = lines.join("\n");
   }
 }
