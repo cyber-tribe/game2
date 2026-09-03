@@ -6,4 +6,5 @@ export { createWanderTargetSystem, type WanderTargetConfig } from "./systems/wan
 export { settleSystem } from "./systems/settle";
 export { createHouseGrowthSystem, type HouseGrowthConfig } from "./systems/houseGrowth";
 export { manaSystem } from "./systems/mana";
+export { houseCaptureSystem, walkerCombatSystem } from "./systems/combat";
 export { Simulation, type FactionSummary, type SimulationConfig } from "./simulation";

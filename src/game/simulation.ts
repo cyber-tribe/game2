@@ -1,7 +1,8 @@
 import { Scheduler, World } from "../ecs";
 import { FactionState, House, Owner, Position, Walker, type FactionId } from "./components";
-import { DEFAULT_WALKER_SPEED } from "./constants";
+import { DEFAULT_WALKER_SPEED, TILES_PER_HOUSE_CAP } from "./constants";
 import { createFaction } from "./faction";
+import { houseCaptureSystem, walkerCombatSystem } from "./systems/combat";
 import { createHouseGrowthSystem } from "./systems/houseGrowth";
 import { manaSystem } from "./systems/mana";
 import { movementSystem } from "./systems/movement";
@@ -38,11 +39,18 @@ export class Simulation {
     this.spawnWalkers("player", playerShrine, initialWalkers);
     this.spawnWalkers("enemy", enemyShrine, initialWalkers);
 
+    const maxHousesPerFaction = Math.max(
+      1,
+      Math.floor((config.worldWidth * config.worldHeight) / TILES_PER_HOUSE_CAP),
+    );
+
     this.scheduler
       .add(createWanderTargetSystem())
       .add(movementSystem)
+      .add(walkerCombatSystem)
+      .add(houseCaptureSystem)
       .add(settleSystem)
-      .add(createHouseGrowthSystem())
+      .add(createHouseGrowthSystem({ maxHousesPerFaction }))
       .add(manaSystem);
   }
 

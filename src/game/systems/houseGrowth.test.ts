@@ -53,4 +53,33 @@ describe("createHouseGrowthSystem", () => {
     expect(world.query(Walker)).toHaveLength(2);
     expect(world.get(house, House)!.population).toBeCloseTo(capacity * 0.5);
   });
+
+  it("stops spawning once the faction is at its house cap, stalling population at capacity", () => {
+    const world = new World();
+    const capacity = HOUSE_LEVELS.hut.capacity;
+    createHut(world, 0, 0);
+    const house = createHut(world, 1, 1, capacity - 1);
+
+    const system = createHouseGrowthSystem({ growthRate: capacity * 3, maxHousesPerFaction: 2 });
+    system(world, 1);
+
+    expect(world.query(Walker)).toHaveLength(0);
+    expect(world.get(house, House)!.population).toBe(capacity);
+  });
+
+  it("resumes spawning once a house is destroyed and the faction drops back under the cap", () => {
+    const world = new World();
+    const capacity = HOUSE_LEVELS.hut.capacity;
+    const other = createHut(world, 0, 0);
+    createHut(world, 1, 1, capacity - 1);
+
+    const system = createHouseGrowthSystem({ growthRate: capacity, maxHousesPerFaction: 2 });
+    system(world, 1);
+    expect(world.query(Walker)).toHaveLength(0);
+
+    world.destroyEntity(other);
+    system(world, 1);
+
+    expect(world.query(Walker)).toHaveLength(1);
+  });
 });

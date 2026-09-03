@@ -1,0 +1,84 @@
+import type { Entity, System, World } from "../../ecs";
+import { COMBAT_RANGE, HOUSE_LEVELS } from "../constants";
+import { House, Owner, Position, Walker } from "../components";
+
+function withinRange(a: { x: number; y: number }, b: { x: number; y: number }): boolean {
+  return Math.hypot(a.x - b.x, a.y - b.y) <= COMBAT_RANGE;
+}
+
+/**
+ * Any two walkers from opposing factions within COMBAT_RANGE fight: the
+ * stronger one survives with its strength reduced by the loser's, and the
+ * loser is destroyed. An exact tie destroys both. This runs regardless of
+ * behaviorMode — per docs/game-system.md, contact between enemy walkers
+ * always triggers combat.
+ *
+ * O(n²) over all walkers; fine at prototype scale, but will need spatial
+ * partitioning once walker counts grow large.
+ */
+export const walkerCombatSystem: System = (world) => {
+  const walkers = world.query(Position, Walker, Owner);
+
+  for (let i = 0; i < walkers.length; i++) {
+    const a = walkers[i];
+    if (!world.isAlive(a)) continue;
+
+    for (let j = i + 1; j < walkers.length; j++) {
+      const b = walkers[j];
+      if (!world.isAlive(b)) continue;
+      if (world.get(a, Owner)!.faction === world.get(b, Owner)!.faction) continue;
+      if (!withinRange(world.get(a, Position)!, world.get(b, Position)!)) continue;
+
+      resolveWalkerFight(world, a, b);
+      if (!world.isAlive(a)) break;
+    }
+  }
+};
+
+function resolveWalkerFight(world: World, a: Entity, b: Entity): void {
+  const walkerA = world.get(a, Walker)!;
+  const walkerB = world.get(b, Walker)!;
+
+  if (walkerA.strength > walkerB.strength) {
+    world.add(a, Walker, { ...walkerA, strength: walkerA.strength - walkerB.strength });
+    world.destroyEntity(b);
+  } else if (walkerB.strength > walkerA.strength) {
+    world.add(b, Walker, { ...walkerB, strength: walkerB.strength - walkerA.strength });
+    world.destroyEntity(a);
+  } else {
+    world.destroyEntity(a);
+    world.destroyEntity(b);
+  }
+}
+
+/**
+ * A walker that reaches an enemy house assaults it: if its strength beats
+ * the house's defense, the house is captured (its owner flips and its
+ * population resets, but its level/structure survives); otherwise the
+ * walker is simply repelled. Either way the attacking walker is consumed —
+ * per docs/game-system.md a house fight always ends with capture or the
+ * attacker's defeat, never a draw that leaves both sides as they were.
+ */
+export const houseCaptureSystem: System = (world) => {
+  for (const walkerEntity of world.query(Position, Walker, Owner)) {
+    const walkerPos = world.get(walkerEntity, Position)!;
+    const walkerOwner = world.get(walkerEntity, Owner)!;
+
+    for (const houseEntity of world.query(Position, House, Owner)) {
+      const houseOwner = world.get(houseEntity, Owner)!;
+      if (houseOwner.faction === walkerOwner.faction) continue;
+      if (!withinRange(walkerPos, world.get(houseEntity, Position)!)) continue;
+
+      const house = world.get(houseEntity, House)!;
+      const walker = world.get(walkerEntity, Walker)!;
+
+      if (walker.strength > HOUSE_LEVELS[house.level].defense) {
+        world.add(houseEntity, Owner, { faction: walkerOwner.faction });
+        world.add(houseEntity, House, { level: house.level, population: 0 });
+      }
+
+      world.destroyEntity(walkerEntity);
+      break;
+    }
+  }
+};
