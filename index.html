@@ -186,6 +186,54 @@
         opacity: 0;
       }
 
+      /*
+       * The post-game "戦いの記録" recap (see main.ts's showMatchRecord).
+       * A PixiJS Text object (used for the rest of the HUD) can't scroll,
+       * and a long match can produce more event lines than fit on
+       * screen — an HTML overlay gets real scrolling for free. Shown
+       * once, when the match ends; there's no way to dismiss it since
+       * the match is over and nothing else happens after this.
+       */
+      #match-record {
+        position: fixed;
+        left: 10px;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        max-height: 70vh;
+        display: flex;
+        flex-direction: column;
+        background: rgba(10, 26, 42, 0.95);
+        border: 1px solid #4fa8ff;
+        border-radius: 10px;
+        padding: 14px;
+        box-sizing: border-box;
+        color: #fff;
+        z-index: 8;
+      }
+
+      #match-record.hidden {
+        display: none;
+      }
+
+      #match-record-title {
+        flex: none;
+        font-size: 15px;
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+
+      #match-record-list {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        /* Overrides the page-wide touch-action: none so a finger-drag here
+           actually scrolls the list instead of being swallowed as a map gesture. */
+        touch-action: pan-y;
+        font-size: 13px;
+        line-height: 1.7;
+      }
+
       #rotate-warning {
         display: none;
         position: fixed;
@@ -216,6 +264,11 @@
     </div>
 
     <div id="enemy-event-toast" class="hidden"></div>
+
+    <div id="match-record" class="hidden">
+      <div id="match-record-title"></div>
+      <div id="match-record-list"></div>
+    </div>
 
     <div id="toolbar">
       <div class="toolbar-section" data-group="behavior">

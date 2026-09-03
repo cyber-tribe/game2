@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { FactionSummary, GameOutcome, MatchEvent } from "../game/simulation";
+import type { FactionSummary, GameOutcome } from "../game/simulation";
 import { Hud } from "./Hud";
 
 const SUMMARIES: FactionSummary[] = [
@@ -11,57 +11,24 @@ const ONGOING: GameOutcome = { over: false };
 const OVER: GameOutcome = { over: true, winner: "enemy" };
 
 describe("Hud.update", () => {
-  it("shows no match record while the game is still ongoing", () => {
+  it("shows no GAME OVER line while the game is still ongoing", () => {
     const hud = new Hud();
-    hud.update(SUMMARIES, ONGOING, [{ time: 5, faction: "player", type: "earthquake" }]);
+    hud.update(SUMMARIES, ONGOING);
 
-    expect(hud.view.text).not.toContain("戦いの記録");
     expect(hud.view.text).not.toContain("GAME OVER");
   });
 
-  it("recaps every match event in order once the game is over, timestamped as m:ss", () => {
+  it("shows the GAME OVER line with the winner once the game is over", () => {
     const hud = new Hud();
-    const events: MatchEvent[] = [
-      { time: 8, faction: "player", type: "earthquake" },
-      { time: 75, faction: "enemy", type: "volcano" },
-      { time: 130, faction: "enemy", type: "armageddon" },
-    ];
-
-    hud.update(SUMMARIES, OVER, events);
+    hud.update(SUMMARIES, OVER);
 
     expect(hud.view.text).toContain("GAME OVER — enemy wins");
-    expect(hud.view.text).toContain("戦いの記録:");
-    const lines = hud.view.text.split("\n");
-    expect(lines).toContain("0:08 💥 あなたが地震を起こした");
-    expect(lines).toContain("1:15 🌋 敵が火山を起こした");
-    expect(lines).toContain("2:10 ☠️ 敵が最終決戦を発動した");
-    // Recap order follows event order, not some other sort.
-    expect(lines.indexOf("0:08 💥 あなたが地震を起こした")).toBeLessThan(lines.indexOf("1:15 🌋 敵が火山を起こした"));
   });
 
-  it("recaps house events with the opponent named correctly regardless of who caused them", () => {
+  it("shows a draw when the outcome has no winner", () => {
     const hud = new Hud();
-    const events: MatchEvent[] = [
-      { time: 3, faction: "player", type: "houseCaptured" },
-      { time: 4, faction: "enemy", type: "houseCaptured" },
-      { time: 5, faction: "player", type: "houseBurned" },
-      { time: 6, faction: "enemy", type: "houseReachedCastle" },
-    ];
+    hud.update(SUMMARIES, { over: true });
 
-    hud.update(SUMMARIES, OVER, events);
-
-    const lines = hud.view.text.split("\n");
-    expect(lines).toContain("0:03 🏠 あなたが敵の家を奪った");
-    expect(lines).toContain("0:04 🏠 敵があなたの家を奪った");
-    expect(lines).toContain("0:05 🔥 あなたが敵の家を焼き払った");
-    expect(lines).toContain("0:06 🏰 敵の家がcastleまで発展した");
-  });
-
-  it("still shows the GAME OVER line and an empty recap when no miracle was ever cast", () => {
-    const hud = new Hud();
-    hud.update(SUMMARIES, OVER, []);
-
-    expect(hud.view.text).toContain("GAME OVER — enemy wins");
-    expect(hud.view.text).toContain("戦いの記録:");
+    expect(hud.view.text).toContain("GAME OVER — draw");
   });
 });
