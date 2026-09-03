@@ -7,6 +7,7 @@ import { createFaction, findFactionEntity, moveShrine } from "./faction";
 import { knightify } from "./knight";
 import { houseCaptureSystem, walkerCombatSystem } from "./systems/combat";
 import { createEnemyAiSystem } from "./systems/enemyAi";
+import { createEnemyMiracleSystem } from "./systems/enemyMiracles";
 import { createEnemyTerraformSystem } from "./systems/enemyTerraform";
 import { fightTargetingSystem } from "./systems/fightTargeting";
 import { gatherSystem } from "./systems/gather";
@@ -105,7 +106,8 @@ export class Simulation {
       .add(createHouseUpgradeSystem({ heightmap: config.heightmap }))
       .add(createHouseGrowthSystem({ maxHousesPerFaction, heightmap: config.heightmap }))
       .add(manaSystem)
-      .add(createEnemyTerraformSystem({ heightmap: config.heightmap }));
+      .add(createEnemyTerraformSystem({ heightmap: config.heightmap }))
+      .add(createEnemyMiracleSystem({ heightmap: config.heightmap, worldCenter: this.worldCenter }));
   }
 
   /** No-ops once the game is over, per docs/game-system.md's win/lose rules. */

@@ -315,6 +315,11 @@ async function bootstrap() {
   app.ticker.add((ticker) => {
     const deltaSeconds = ticker.deltaMS / 1000;
     simulation.update(deltaSeconds);
+    // The enemy also edits the terrain now (see enemyTerraform.ts and
+    // enemyMiracles.ts's earthquake), not just the player's own taps —
+    // without redrawing every tick, those changes were invisible until
+    // the player's next tap happened to trigger one.
+    renderer.redraw();
     entityLayer.update(simulation.world);
     hud.update(simulation.summarize(), simulation.getOutcome());
   });
