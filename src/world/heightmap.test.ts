@@ -8,6 +8,7 @@ import {
   applyVolcano,
   countFlatNeighbors,
   createHeightmap,
+  findLeastFlatVertex,
   isBuildable,
   isRock,
   raiseVertex,
@@ -194,6 +195,44 @@ describe("countFlatNeighbors", () => {
     heightmap.vertices[3][3] = 9;
 
     expect(countFlatNeighbors(heightmap, 3.4, 3.4, 0)).toBe(1);
+  });
+});
+
+describe("findLeastFlatVertex", () => {
+  it("returns null on a perfectly flat neighborhood", () => {
+    const heightmap = flatHeightmap(6, 6, 5);
+    expect(findLeastFlatVertex(heightmap, 3, 3, 2)).toBeNull();
+  });
+
+  it("picks the single vertex that differs most from the center, with delta toward it", () => {
+    const heightmap = flatHeightmap(6, 6, 5);
+    heightmap.vertices[3][4] = 8; // +3 off center
+    heightmap.vertices[2][3] = 3; // -2 off center, smaller gap
+
+    const result = findLeastFlatVertex(heightmap, 3, 3, 2);
+
+    expect(result).toEqual({ x: 4, y: 3, delta: -1 });
+  });
+
+  it("returns a delta that raises a vertex lower than the center", () => {
+    const heightmap = flatHeightmap(6, 6, 5);
+    heightmap.vertices[3][4] = 2;
+
+    expect(findLeastFlatVertex(heightmap, 3, 3, 2)).toEqual({ x: 4, y: 3, delta: 1 });
+  });
+
+  it("shrinks the window near the map edge instead of looking out-of-bounds", () => {
+    const heightmap = flatHeightmap(4, 4, 5);
+    heightmap.vertices[0][3] = 9; // dx=3 is past radius 2 from the (0,0) corner, so out of the scanned window
+
+    expect(findLeastFlatVertex(heightmap, 0, 0, 2)).toBeNull();
+  });
+
+  it("rounds fractional coordinates to the nearest vertex", () => {
+    const heightmap = flatHeightmap(6, 6, 5);
+    heightmap.vertices[3][4] = 9; // one step right of the vertex nearest (3.4, 3.4)
+
+    expect(findLeastFlatVertex(heightmap, 3.4, 3.4, 1)).toEqual({ x: 4, y: 3, delta: -1 });
   });
 });
 

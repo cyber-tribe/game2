@@ -54,6 +54,8 @@ const HUD_MARGIN = 90;
 const MAX_MAP_SCALE = 1.2;
 /** A finger-drag shorter than this (px) is treated as a tap, not a pan. */
 const DRAG_THRESHOLD = 10;
+/** How long #tutorial-hint stays up if the player never makes a terrain edit. */
+const TUTORIAL_HINT_TIMEOUT_MS = 15000;
 
 /**
  * The device's top safe-area inset (notch/status bar), read from the CSS
@@ -99,6 +101,7 @@ async function bootstrap() {
   // showing the map's full north-south extent; the player pans
   // left/right to reach the rest.
   let currentScale = 1;
+  const tutorialHint = document.getElementById("tutorial-hint");
   const layout = () => {
     const toolbarHeight = document.getElementById("toolbar")?.getBoundingClientRect().height ?? 0;
     const safeAreaTop = getSafeAreaInsetTop();
@@ -109,9 +112,17 @@ async function bootstrap() {
     renderer.view.position.y += safeAreaTop;
     hud.setMaxWidth(app.screen.width);
     hud.setTopInset(safeAreaTop);
+    if (tutorialHint) tutorialHint.style.bottom = `${toolbarHeight + 12}px`;
   };
   layout();
   window.addEventListener("resize", layout);
+
+  // Nudges a first-time player toward the core loop — see Hud.ts's
+  // comment on why the canvas HUD itself carries no such guidance.
+  // Dismissed by the player's first terrain edit, or after a timeout for
+  // anyone who's just watching instead of tapping.
+  const dismissTutorialHint = () => tutorialHint?.classList.add("hidden");
+  setTimeout(dismissTutorialHint, TUTORIAL_HINT_TIMEOUT_MS);
 
   const clampPan = (x: number, y: number): { x: number; y: number } => {
     const halfW = (renderer.mapPixelWidth * currentScale) / 2;
@@ -184,6 +195,7 @@ async function bootstrap() {
     if (!trySpendMana(simulation.world, "player", TERRAIN_EDIT_MANA_COST)) return;
     raiseVertex(heightmap, vertex.x, vertex.y, toolMode === "lower" ? -1 : 1);
     renderer.redraw();
+    dismissTutorialHint();
   };
 
   // A short tap applies the selected tool; dragging beyond DRAG_THRESHOLD
