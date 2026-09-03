@@ -255,6 +255,25 @@
         -webkit-tap-highlight-color: transparent;
       }
 
+      /*
+       * A secondary action below the primary "もう一度遊ぶ" button — see
+       * plan/0040-post-game-feedback.md. Styled as an outline rather than
+       * a solid button so it doesn't compete with the rematch button for
+       * attention; opens this repo's GitHub issue form in a new tab.
+       */
+      #feedback-link {
+        flex: none;
+        margin-top: 8px;
+        padding: 10px;
+        font-size: 13px;
+        text-align: center;
+        border: 1px solid #4fa8ff;
+        border-radius: 8px;
+        color: #7cc0ff;
+        text-decoration: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
       #rotate-warning {
         display: none;
         position: fixed;
@@ -296,6 +315,7 @@
       <div id="match-record-title"></div>
       <div id="match-record-list"></div>
       <button type="button" id="play-again">もう一度遊ぶ</button>
+      <a id="feedback-link" href="#" target="_blank" rel="noopener">📝 フィードバックを送る（GitHub Issue）</a>
     </div>
 
     <div id="toolbar">
