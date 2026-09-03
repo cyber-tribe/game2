@@ -173,7 +173,16 @@ async function bootstrap() {
   const matchRecordPanel = document.getElementById("match-record");
   const matchRecordTitle = document.getElementById("match-record-title");
   const matchRecordList = document.getElementById("match-record-list");
+  const playAgainButton = document.getElementById("play-again");
   let matchRecordShown = false;
+
+  // Simplest possible reset: reload the page for a fresh heightmap/Simulation
+  // and default camera/UI state, rather than hand-rolling teardown of every
+  // stateful object main.ts builds. See plan/0038-play-again.md — this
+  // button exists as playtesting infrastructure, not a polished transition.
+  playAgainButton?.addEventListener("click", () => {
+    window.location.reload();
+  });
 
   // Shown once, the moment the match ends — a bare win/lose line tells
   // none of the match's actual story (see plan/0032-match-event-log.md).

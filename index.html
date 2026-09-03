@@ -234,6 +234,27 @@
         line-height: 1.7;
       }
 
+      /*
+       * Kept pinned below the (scrollable) event list rather than inside
+       * it, so it's always visible without scrolling down — see
+       * plan/0038-play-again.md. This button is deliberately left in place
+       * with no other post-game screen: whether a player presses it
+       * unprompted is itself the signal being observed (自発的再戦率).
+       */
+      #play-again {
+        flex: none;
+        margin-top: 12px;
+        padding: 12px;
+        font-size: 15px;
+        font-weight: bold;
+        font-family: inherit;
+        border: 1px solid #4fa8ff;
+        border-radius: 8px;
+        background: #4fa8ff;
+        color: #0a1a2a;
+        -webkit-tap-highlight-color: transparent;
+      }
+
       #rotate-warning {
         display: none;
         position: fixed;
@@ -268,6 +289,7 @@
     <div id="match-record" class="hidden">
       <div id="match-record-title"></div>
       <div id="match-record-list"></div>
+      <button type="button" id="play-again">もう一度遊ぶ</button>
     </div>
 
     <div id="toolbar">
