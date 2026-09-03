@@ -7,6 +7,18 @@ import { findFactionEntity, trySpendMana } from "../faction";
 import { knightify } from "../knight";
 import type { Point } from "./geometry";
 
+/**
+ * Reported through EnemyMiracleConfig.onAction whenever the enemy
+ * actually casts something (not on a decision pass that affords
+ * nothing) — the game-logic side has no idea whether anyone is even
+ * looking at the map right now, so it just reports what happened and
+ * lets the caller (main.ts) decide how to surface it.
+ */
+export type EnemyMiracleEvent =
+  | { type: "earthquake"; position: Point }
+  | { type: "knight" }
+  | { type: "armageddon" };
+
 export interface EnemyMiracleConfig {
   factionId: FactionId;
   opponentId: FactionId;
@@ -16,6 +28,8 @@ export interface EnemyMiracleConfig {
   decisionInterval: number;
   /** Injectable RNG, in [0, 1), for deterministic tests. */
   rng: () => number;
+  /** Called once per miracle actually cast — see EnemyMiracleEvent. */
+  onAction: (event: EnemyMiracleEvent) => void;
 }
 
 /**
@@ -47,6 +61,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
   if (!heightmap || !worldCenter) return () => {};
   const decisionInterval = config.decisionInterval ?? 8;
   const rng = config.rng ?? Math.random;
+  const onAction = config.onAction ?? (() => {});
   let timeSincePass = decisionInterval;
 
   return (world, deltaSeconds) => {
@@ -65,6 +80,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
     if (theirPopulation > 0 && myPopulation >= theirPopulation * ARMAGEDDON_POPULATION_RATIO) {
       if (trySpendMana(world, factionId, ARMAGEDDON_MANA_COST)) {
         triggerArmageddon(world, worldCenter);
+        onAction({ type: "armageddon" });
         return;
       }
     }
@@ -73,6 +89,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
       const leader = world.get(state.leaderId, Walker);
       if (leader && leader.state !== "knight" && trySpendMana(world, factionId, KNIGHT_MANA_COST)) {
         knightify(world, factionId);
+        onAction({ type: "knight" });
         return;
       }
     }
@@ -80,6 +97,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
     const target = randomOpponentHouse(world, opponentId, rng);
     if (target && trySpendMana(world, factionId, EARTHQUAKE_MANA_COST)) {
       applyEarthquake(heightmap, target.x, target.y, undefined, undefined, rng);
+      onAction({ type: "earthquake", position: target });
     }
   };
 }

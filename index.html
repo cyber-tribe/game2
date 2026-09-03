@@ -157,6 +157,35 @@
         opacity: 0;
       }
 
+      /*
+       * A brief banner for enemy-cast miracles (see enemyMiracles.ts).
+       * Once the enemy AI started acting on its own, anything it did
+       * outside the player's current pan/zoom was otherwise completely
+       * invisible — this at least says something happened, even if the
+       * player has to check the minimap or pan over to see where.
+       */
+      #enemy-event-toast {
+        position: fixed;
+        top: calc(74px + env(safe-area-inset-top));
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 8px 16px;
+        background: rgba(153, 32, 32, 0.92);
+        border-radius: 999px;
+        color: #fff;
+        font-size: 13px;
+        font-weight: bold;
+        white-space: nowrap;
+        pointer-events: none;
+        opacity: 1;
+        transition: opacity 0.5s ease;
+        z-index: 6;
+      }
+
+      #enemy-event-toast.hidden {
+        opacity: 0;
+      }
+
       #rotate-warning {
         display: none;
         position: fixed;
@@ -185,6 +214,8 @@
     <div id="tutorial-hint">
       🙏 まずは自分の民（丸いマーク）の周りをタップして地形を平らにしよう。家が育ち、人口とマナが増えていく。
     </div>
+
+    <div id="enemy-event-toast" class="hidden"></div>
 
     <div id="toolbar">
       <div class="toolbar-section" data-group="behavior">

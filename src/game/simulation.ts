@@ -7,7 +7,7 @@ import { createFaction, findFactionEntity, moveShrine } from "./faction";
 import { knightify } from "./knight";
 import { houseCaptureSystem, walkerCombatSystem } from "./systems/combat";
 import { createEnemyAiSystem } from "./systems/enemyAi";
-import { createEnemyMiracleSystem } from "./systems/enemyMiracles";
+import { createEnemyMiracleSystem, type EnemyMiracleEvent } from "./systems/enemyMiracles";
 import { createEnemyTerraformSystem } from "./systems/enemyTerraform";
 import { fightTargetingSystem } from "./systems/fightTargeting";
 import { gatherSystem } from "./systems/gather";
@@ -34,6 +34,14 @@ export interface SimulationConfig {
    * care about terrain.
    */
   heightmap?: Heightmap;
+  /**
+   * Called whenever the enemy actually casts a miracle (see
+   * enemyMiracles.ts's EnemyMiracleEvent) — lets main.ts surface it
+   * (screen shake, a toast) even when it happens off the player's
+   * current view, without the simulation itself knowing anything about
+   * rendering.
+   */
+  onEnemyAction?: (event: EnemyMiracleEvent) => void;
 }
 
 export interface FactionSummary {
@@ -107,7 +115,13 @@ export class Simulation {
       .add(createHouseGrowthSystem({ maxHousesPerFaction, heightmap: config.heightmap }))
       .add(manaSystem)
       .add(createEnemyTerraformSystem({ heightmap: config.heightmap }))
-      .add(createEnemyMiracleSystem({ heightmap: config.heightmap, worldCenter: this.worldCenter }));
+      .add(
+        createEnemyMiracleSystem({
+          heightmap: config.heightmap,
+          worldCenter: this.worldCenter,
+          onAction: config.onEnemyAction,
+        }),
+      );
   }
 
   /** No-ops once the game is over, per docs/game-system.md's win/lose rules. */
