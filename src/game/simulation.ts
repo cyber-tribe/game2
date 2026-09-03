@@ -12,6 +12,7 @@ import { createHouseUpgradeSystem } from "./systems/houseUpgrade";
 import { manaSystem } from "./systems/mana";
 import { movementSystem } from "./systems/movement";
 import { createSettleSystem } from "./systems/settle";
+import { swampSystem } from "./systems/swamp";
 import { createWanderTargetSystem } from "./systems/wanderTarget";
 
 export interface SimulationConfig {
@@ -73,6 +74,7 @@ export class Simulation {
       .add(createWanderTargetSystem({ heightmap: config.heightmap }))
       .add(movementSystem)
       .add(gatherSystem)
+      .add(swampSystem)
       .add(walkerCombatSystem)
       .add(houseCaptureSystem)
       .add(createSettleSystem({ heightmap: config.heightmap }))

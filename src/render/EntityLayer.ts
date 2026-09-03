@@ -1,7 +1,7 @@
 import { Container, Graphics } from "pixi.js";
-import { House, Owner, Position, Walker, type FactionId, type HouseLevel } from "../game/components";
+import { House, Owner, Position, Swamp, Walker, type FactionId, type HouseLevel } from "../game/components";
 import type { World } from "../ecs";
-import type { IsoRenderer } from "./IsoRenderer";
+import { TILE_WIDTH, type IsoRenderer } from "./IsoRenderer";
 
 const FACTION_COLOR: Record<FactionId, number> = {
   player: 0x4fa8ff,
@@ -16,8 +16,9 @@ const HOUSE_SIZE: Record<HouseLevel, number> = {
 };
 
 const WALKER_RADIUS = 3;
+const SWAMP_COLOR = 0x6a3fa0;
 
-/** Draws every Walker and House in the ECS world onto the isometric map. */
+/** Draws every Swamp/Walker/House in the ECS world onto the isometric map. */
 export class EntityLayer {
   readonly view = new Container();
   private readonly graphics = new Graphics();
@@ -29,6 +30,17 @@ export class EntityLayer {
   update(world: World): void {
     const g = this.graphics;
     g.clear();
+
+    for (const entity of world.query(Position, Swamp)) {
+      const pos = world.get(entity, Position)!;
+      const swamp = world.get(entity, Swamp)!;
+      const { sx, sy } = this.iso.project(pos.x, pos.y);
+      const screenRadius = swamp.radius * (TILE_WIDTH / 2);
+
+      g.circle(sx, sy, screenRadius)
+        .fill({ color: SWAMP_COLOR, alpha: 0.55 })
+        .stroke({ width: 1, color: 0x2a1a3a, alpha: 0.6 });
+    }
 
     for (const entity of world.query(Position, House, Owner)) {
       const pos = world.get(entity, Position)!;

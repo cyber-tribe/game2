@@ -49,13 +49,14 @@ game2/
 │   │   ├── system.ts        … Systemの型とSchedulerによる実行
 │   │   └── world.test.ts    … 上記の単体テスト
 │   ├── game/            … ゲームドメインロジック（ECSのコンポーネント/システムを利用）
-│   │   ├── components.ts    … Position/Owner/Walker/MoveTarget/House/FactionState
+│   │   ├── components.ts    … Position/Owner/Walker/MoveTarget/House/FactionState/Swamp
 │   │   ├── constants.ts     … 速度・成長率・家レベル別ステータス・マナコスト等のチューニング値
 │   │   ├── faction.ts       … Faction(勢力)エンティティの生成/検索/マナ消費(trySpendMana)
+│   │   ├── swamp.ts         … Swampエンティティの生成(createSwamp)
 │   │   ├── simulation.ts    … WorldとSchedulerを束ね、tickごとにupdate()するSimulation
 │   │   └── systems/         … movement / wanderTarget / settle / houseGrowth /
 │   │                          houseUpgrade / mana / combat / gather /
-│   │                          fightTargeting / enemyAi
+│   │                          fightTargeting / enemyAi / swamp
 │   ├── world/
 │   │   └── heightmap.ts … 頂点高さマップの型と生成、raiseVertex(頂点1つの上げ下げ)、
 │   │                       sampleElevation(バイリニア補間)、isBuildable(海面より上か)、
@@ -65,7 +66,8 @@ game2/
 │       ├── IsoRenderer.ts … heightmapをアイソメトリックなポリゴン群として描画し、
 │       │                    タイル座標→画面座標への投影(project)・クリック位置→頂点の
 │       │                    逆引き(pickVertex)・編集後の再描画(redraw)を提供
-│       ├── EntityLayer.ts … ECS World上のWalker/Houseを勢力の色分けで描画
+│       ├── EntityLayer.ts … ECS World上のSwamp/Walker/Houseを描画
+│       │                    （Walker/Houseは勢力の色分け、Swampは半透明の紫の円）
 │       └── Hud.ts         … 勢力ごとのマナ/家数/ウォーカー数と決着表示のテキストHUD
 │                            （操作方法の案内は持たず、状態表示のみ）
 │   └── ui/
@@ -160,8 +162,25 @@ HUDに現在選択中のツールを表示する。ヘッドレスブラウザ�
 エラーがないことを確認済み。
 
 `docs/game-system.md` のデータモデル素案のうち、行動方針の`goToShrine`
-（リーダー/集結シンボルの概念が未実装）・地震以外の奇跡（沼・騎士化・
-火山・洪水・最終決戦）・征服モードの複数ワールド進行はまだ未実装。
+（リーダー/集結シンボルの概念が未実装）・沼以外の奇跡（騎士化・火山・
+洪水・最終決戦）・征服モードの複数ワールド進行はまだ未実装。
+
+### 奇跡「沼」
+
+`Swamp`コンポーネント（`radius`, `remainingCapacity`）を追加し、
+`game/swamp.ts`の`createSwamp(world, x, y, radius, capacity)`で任意の
+座標に配置できるようにした。`swampSystem`は毎tick、沼の半径以内に
+入ったウォーカーを問答無用で消滅させ、`remainingCapacity`を1減らす。
+0になった沼自体も消える（`docs/game-system.md`の「一定数を飲み込むと
+消えるタイプ」）。恒久タイプや、騎士が沼を回避する挙動（騎士自体が
+未実装）は対応していない。
+
+地震と同じく`main.ts`のツールバー（🌊 沼）から発動し、`SWAMP_MANA_COST`
+を消費する。`EntityLayer`は沼を紫がかった半透明の円として、家・
+ウォーカーより先に（背面に）描画する。Simulationの統合テストで、
+巨大な半径の沼を置けば範囲内の全ウォーカーが実際に消滅することを
+確認済み。ヘッドレスブラウザでも沼の配置・見た目・コンソールエラーが
+ないことを確認した。
 
 ### 縦持ちスマホPWAへの一本化
 

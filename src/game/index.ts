@@ -11,6 +11,8 @@ export { houseCaptureSystem, walkerCombatSystem } from "./systems/combat";
 export { gatherSystem } from "./systems/gather";
 export { fightTargetingSystem } from "./systems/fightTargeting";
 export { createEnemyAiSystem, type EnemyAiConfig } from "./systems/enemyAi";
+export { createSwamp } from "./swamp";
+export { swampSystem } from "./systems/swamp";
 export {
   Simulation,
   type FactionSummary,

@@ -66,3 +66,12 @@ export const ENEMY_AI_DECISION_INTERVAL = 5;
 
 /** Enemy walker count at/above which the AI switches to "fight" mode. */
 export const ENEMY_AI_AGGRESSION_THRESHOLD = 4;
+
+/** Mana cost of conjuring a swamp — a "中" tier miracle, similar to an earthquake. */
+export const SWAMP_MANA_COST = 15;
+
+/** Radius (in tiles) a conjured swamp drowns walkers within. */
+export const SWAMP_RADIUS = 1.2;
+
+/** How many walkers a swamp swallows before it dries up and disappears. */
+export const SWAMP_CAPACITY = 5;
