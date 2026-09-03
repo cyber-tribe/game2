@@ -53,7 +53,9 @@ export type BehaviorMode = "settle" | "gather" | "goToShrine" | "fight";
  * miracles; behaviorMode/shrinePosition steer the gather/goToShrine/fight
  * walker systems. leaderId is maintained by leaderSystem, which promotes
  * a live walker of this faction whenever the slot is empty — it isn't set
- * at faction creation.
+ * at faction creation. finalBattle is set once by the "最終決戦" miracle
+ * and, once true, makes createEnemyAiSystem stop overriding behaviorMode —
+ * there is no walking it back.
  */
 export interface FactionState {
   id: FactionId;
@@ -61,6 +63,7 @@ export interface FactionState {
   behaviorMode: BehaviorMode;
   shrinePosition: Position;
   leaderId?: Entity;
+  finalBattle?: boolean;
 }
 
 /**

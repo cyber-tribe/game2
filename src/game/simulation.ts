@@ -1,5 +1,6 @@
 import { Scheduler, World } from "../ecs";
 import type { Heightmap } from "../world/heightmap";
+import { triggerArmageddon } from "./armageddon";
 import { FactionState, House, Owner, Position, Walker, type BehaviorMode, type FactionId } from "./components";
 import { DEFAULT_WALKER_SPEED, TILES_PER_HOUSE_CAP } from "./constants";
 import { createFaction, findFactionEntity, moveShrine } from "./faction";
@@ -55,10 +56,12 @@ export interface GameOutcome {
 export class Simulation {
   readonly world = new World();
   private readonly scheduler = new Scheduler();
+  private readonly worldCenter: { x: number; y: number };
 
   constructor(config: SimulationConfig) {
     const playerShrine = { x: config.worldWidth * 0.25, y: config.worldHeight * 0.75 };
     const enemyShrine = { x: config.worldWidth * 0.75, y: config.worldHeight * 0.25 };
+    this.worldCenter = { x: config.worldWidth / 2, y: config.worldHeight / 2 };
 
     createFaction(this.world, "player", playerShrine);
     createFaction(this.world, "enemy", enemyShrine);
@@ -117,6 +120,15 @@ export class Simulation {
   /** The "騎士化" miracle — turns a faction's current leader into a knight. */
   knightify(faction: FactionId): void {
     knightify(this.world, faction);
+  }
+
+  /**
+   * The "最終決戦" miracle — abandons every house on both sides and sends
+   * everyone to the map's center for a final battle. Affects both factions
+   * regardless of who casts it.
+   */
+  triggerArmageddon(): void {
+    triggerArmageddon(this.world, this.worldCenter);
   }
 
   /**

@@ -17,7 +17,9 @@ export interface EnemyAiConfig {
  * once its walker count reaches aggressionThreshold, and otherwise
  * settles. This is deliberately simple — a proper AI would also react to
  * mana, threats, and territory — but it gives the enemy some autonomy
- * instead of sitting in "settle" forever.
+ * instead of sitting in "settle" forever. Stops making decisions entirely
+ * once FactionState.finalBattle is set by the "最終決戦" miracle, so it
+ * can't override the goToShrine march to the final battle.
  */
 export function createEnemyAiSystem(config: Partial<EnemyAiConfig> = {}): System {
   const factionId = config.factionId ?? "enemy";
@@ -33,10 +35,12 @@ export function createEnemyAiSystem(config: Partial<EnemyAiConfig> = {}): System
     const factionEntity = findFactionEntity(world, factionId);
     if (factionEntity === undefined) return;
 
+    const state = world.get(factionEntity, FactionState)!;
+    if (state.finalBattle) return; // once the final battle starts, there's no going back to routine decisions
+
     const walkerCount = countOwned(world, factionId, Walker);
     const nextMode: BehaviorMode = walkerCount >= aggressionThreshold ? "fight" : "settle";
 
-    const state = world.get(factionEntity, FactionState)!;
     if (state.behaviorMode !== nextMode) {
       world.add(factionEntity, FactionState, { ...state, behaviorMode: nextMode });
     }

@@ -84,4 +84,16 @@ describe("createEnemyAiSystem", () => {
 
     expect(() => system(world, 5)).not.toThrow();
   });
+
+  it("never overrides behaviorMode once finalBattle is set, even past the aggression threshold", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 }, "goToShrine");
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, finalBattle: true });
+    addWalkers(world, 10); // would normally force "fight"
+
+    const system = createEnemyAiSystem({ decisionInterval: 5, aggressionThreshold: 4 });
+    system(world, 5);
+
+    expect(world.get(enemy, FactionState)!.behaviorMode).toBe("goToShrine");
+  });
 });
