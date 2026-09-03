@@ -101,3 +101,11 @@ export const VOLCANO_MANA_COST = 40;
  * final battle, since it endangers the caster's own low-lying land too.
  */
 export const FLOOD_MANA_COST = 70;
+
+/**
+ * Mana cost of triggering the final battle — "最大" tier, the priciest
+ * miracle of all, matching docs/game-system.md's "人口で明確に勝っている
+ * ときの「決着ボタン」": affordable only once a faction's mana lead (itself
+ * driven by population) is already decisive.
+ */
+export const ARMAGEDDON_MANA_COST = 120;

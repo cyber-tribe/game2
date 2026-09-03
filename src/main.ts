@@ -1,5 +1,6 @@
 import { Application, type FederatedPointerEvent } from "pixi.js";
 import {
+  ARMAGEDDON_MANA_COST,
   EARTHQUAKE_MANA_COST,
   FLOOD_MANA_COST,
   KNIGHT_MANA_COST,
@@ -129,6 +130,13 @@ async function bootstrap() {
       // Also a global effect (it acts on the leader, not the tapped spot).
       if (!trySpendMana(simulation.world, "player", KNIGHT_MANA_COST)) return;
       simulation.knightify("player");
+      return;
+    }
+
+    if (toolMode === "armageddon") {
+      // Global effect on both factions at once, unlike every other miracle.
+      if (!trySpendMana(simulation.world, "player", ARMAGEDDON_MANA_COST)) return;
+      simulation.triggerArmageddon();
       return;
     }
 

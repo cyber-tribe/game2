@@ -217,6 +217,26 @@ describe("Simulation", () => {
     expect(sim.world.get(playerWalkers[0], Walker)!.state).toBe("knight");
   });
 
+  it("armageddon abandons every house, sends both factions to the center, and forces the game to a conclusion", () => {
+    const sim = new Simulation({ worldWidth: 20, worldHeight: 20, initialWalkersPerFaction: 1 });
+
+    for (let i = 0; i < 150; i++) sim.update(0.1); // let each faction's lone walker settle into a house
+    expect(sim.world.query(House).length).toBeGreaterThan(0);
+
+    sim.triggerArmageddon();
+
+    expect(sim.world.query(House)).toHaveLength(0); // every house abandoned
+    expect(sim.getBehaviorMode("player")).toBe("goToShrine");
+    expect(sim.getBehaviorMode("enemy")).toBe("goToShrine");
+
+    // Houses that had spread far from the center before armageddon convert
+    // into walkers that need time to march back in, so this budget is
+    // generous (mirrors the ~30s it took empirically in a worst-case trace).
+    for (let i = 0; i < 400; i++) sim.update(0.1);
+
+    expect(sim.getOutcome().over).toBe(true);
+  });
+
   it("a flood submerges settled houses across the whole map, for both factions", () => {
     const width = 20;
     const height = 20;

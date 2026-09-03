@@ -19,6 +19,7 @@ export { eruptVolcano } from "./volcano";
 export { drownFlood } from "./flood";
 export { knightify } from "./knight";
 export { knightTargetingSystem } from "./systems/knight";
+export { triggerArmageddon } from "./armageddon";
 export {
   Simulation,
   type FactionSummary,

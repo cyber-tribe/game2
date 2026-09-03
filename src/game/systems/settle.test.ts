@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
 import type { Heightmap } from "../../world/heightmap";
-import { House, MoveTarget, Owner, Position, Walker } from "../components";
+import { FactionState, House, MoveTarget, Owner, Position, Walker } from "../components";
+import { createFaction } from "../faction";
 import { createSettleSystem } from "./settle";
 
 function flatHeightmap(width: number, height: number, elevation: number): Heightmap {
@@ -81,6 +82,21 @@ describe("createSettleSystem", () => {
 
     expect(world.isAlive(walker)).toBe(true);
     expect(world.has(walker, MoveTarget)).toBe(false);
+    expect(world.query(House)).toHaveLength(0);
+  });
+
+  it("never settles a walker whose faction is in the final battle", () => {
+    const world = new World();
+    const faction = createFaction(world, "player", { x: 0, y: 0 });
+    world.add(faction, FactionState, { ...world.get(faction, FactionState)!, finalBattle: true });
+    const walker = world.createEntity();
+    world.add(walker, Position, { x: 3, y: 4 });
+    world.add(walker, Owner, { faction: "player" });
+    world.add(walker, Walker, { strength: 1, state: "seeking", speed: 1 });
+
+    createSettleSystem()(world, 0);
+
+    expect(world.isAlive(walker)).toBe(true);
     expect(world.query(House)).toHaveLength(0);
   });
 });
