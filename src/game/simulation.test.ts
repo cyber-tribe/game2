@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Owner, Walker } from "./components";
+import { isBuildable, type Heightmap } from "../world/heightmap";
+import { House, Owner, Position, Walker } from "./components";
 import { Simulation } from "./simulation";
 
 describe("Simulation", () => {
@@ -70,5 +71,58 @@ describe("Simulation", () => {
     const after = sim.summarize();
 
     expect(after).toEqual(before);
+  });
+
+  it("keeps every settled house on buildable land when a heightmap with water is provided", () => {
+    const width = 20;
+    const height = 20;
+    const waterFrom = 8;
+    const waterTo = 12; // a strip of sea across the middle of the map
+    const vertices = Array.from({ length: height + 1 }, () =>
+      Array.from({ length: width + 1 }, (_, x) => (x >= waterFrom && x < waterTo ? 0 : 5)),
+    );
+    const heightmap: Heightmap = { width, height, terrain: "grass", vertices };
+
+    const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
+
+    for (let i = 0; i < 300; i++) {
+      sim.update(0.1);
+    }
+
+    const houses = sim.world.query(House, Position);
+    expect(houses.length).toBeGreaterThan(0);
+    for (const entity of houses) {
+      const pos = sim.world.get(entity, Position)!;
+      expect(isBuildable(heightmap, pos.x, pos.y)).toBe(true);
+    }
+  });
+
+  it("defaults both factions to settle mode and lets behaviorMode be switched freely", () => {
+    const sim = new Simulation({ worldWidth: 10, worldHeight: 10 });
+
+    expect(sim.getBehaviorMode("player")).toBe("settle");
+    expect(sim.getBehaviorMode("enemy")).toBe("settle");
+
+    sim.setBehaviorMode("player", "fight");
+
+    expect(sim.getBehaviorMode("player")).toBe("fight");
+    expect(sim.getBehaviorMode("enemy")).toBe("settle");
+  });
+
+  it("upgrades houses beyond hut when the whole map is perfectly flat", () => {
+    const width = 20;
+    const height = 20;
+    const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(5));
+    const heightmap: Heightmap = { width, height, terrain: "grass", vertices };
+
+    const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
+
+    for (let i = 0; i < 300; i++) {
+      sim.update(0.1);
+    }
+
+    const houses = sim.world.query(House);
+    expect(houses.length).toBeGreaterThan(0);
+    expect(houses.some((entity) => sim.world.get(entity, House)!.level !== "hut")).toBe(true);
   });
 });

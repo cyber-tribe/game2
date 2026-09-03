@@ -9,17 +9,32 @@ export const DEFAULT_WANDER_RADIUS = 6;
 /** Population units a house accumulates per second. */
 export const DEFAULT_POPULATION_GROWTH_RATE = 2;
 
-/**
- * Capacity, mana output, and defense per house level. Level-up itself is
- * driven by surrounding terrain flatness per docs/game-system.md and is
- * not yet implemented (it needs the heightmap wired into the ECS) — for
- * now every house stays at "hut" and only the population/spawn loop runs.
- */
+/** Capacity, mana output, and defense per house level. */
 export const HOUSE_LEVELS: Record<HouseLevel, { capacity: number; manaRate: number; defense: number }> = {
   hut: { capacity: 10, manaRate: 1, defense: 3 },
   lodge: { capacity: 20, manaRate: 3, defense: 6 },
   manor: { capacity: 35, manaRate: 6, defense: 12 },
   castle: { capacity: 60, manaRate: 12, defense: 20 },
+};
+
+/** hut < lodge < manor < castle, for comparing/advancing levels. */
+export const HOUSE_LEVEL_ORDER: HouseLevel[] = ["hut", "lodge", "manor", "castle"];
+
+/** How far around a house (in tiles) countFlatNeighbors looks when checking for an upgrade. */
+export const HOUSE_UPGRADE_FLATNESS_RADIUS = 2;
+
+/**
+ * Minimum countFlatNeighbors(heightmap, house.x, house.y, HOUSE_UPGRADE_FLATNESS_RADIUS)
+ * needed to reach each level — per docs/game-system.md, "周囲の地形をさらに
+ * 平らにすると自動でアップグレードされる". At radius 2 the window holds
+ * at most 25 vertices, so these are placeholder tuning values within that
+ * range; "hut" has no requirement since it's the starting level.
+ */
+export const HOUSE_LEVEL_FLATNESS_REQUIREMENT: Record<HouseLevel, number> = {
+  hut: 0,
+  lodge: 5,
+  manor: 10,
+  castle: 18,
 };
 
 /** A walker and an enemy walker/house within this many tiles fight it out. */
@@ -32,3 +47,15 @@ export const COMBAT_RANGE = 0.5;
  * terrain-based flat-land scarcity is implemented.
  */
 export const TILES_PER_HOUSE_CAP = 8;
+
+/** Mana cost of raising or lowering one terrain vertex by one step. */
+export const TERRAIN_EDIT_MANA_COST = 1;
+
+/** Two same-faction walkers within this many tiles merge under "gather". */
+export const GATHER_RANGE = 1.5;
+
+/** How often (in seconds) the enemy AI re-evaluates its behaviorMode. */
+export const ENEMY_AI_DECISION_INTERVAL = 5;
+
+/** Enemy walker count at/above which the AI switches to "fight" mode. */
+export const ENEMY_AI_AGGRESSION_THRESHOLD = 4;

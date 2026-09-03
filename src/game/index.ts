@@ -1,12 +1,16 @@
 export * from "./components";
 export * from "./constants";
-export { createFaction, findFactionEntity } from "./faction";
+export { createFaction, findFactionEntity, trySpendMana } from "./faction";
 export { movementSystem } from "./systems/movement";
 export { createWanderTargetSystem, type WanderTargetConfig } from "./systems/wanderTarget";
-export { settleSystem } from "./systems/settle";
+export { createSettleSystem, type SettleConfig } from "./systems/settle";
 export { createHouseGrowthSystem, type HouseGrowthConfig } from "./systems/houseGrowth";
+export { createHouseUpgradeSystem, type HouseUpgradeConfig } from "./systems/houseUpgrade";
 export { manaSystem } from "./systems/mana";
 export { houseCaptureSystem, walkerCombatSystem } from "./systems/combat";
+export { gatherSystem } from "./systems/gather";
+export { fightTargetingSystem } from "./systems/fightTargeting";
+export { createEnemyAiSystem, type EnemyAiConfig } from "./systems/enemyAi";
 export {
   Simulation,
   type FactionSummary,

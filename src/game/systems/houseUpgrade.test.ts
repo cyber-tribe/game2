@@ -1,0 +1,82 @@
+import { describe, expect, it } from "vitest";
+import { World } from "../../ecs";
+import type { Heightmap } from "../../world/heightmap";
+import { House, Position } from "../components";
+import { createHouseUpgradeSystem } from "./houseUpgrade";
+
+function flatHeightmap(width: number, height: number, elevation: number): Heightmap {
+  const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
+  return { width, height, terrain: "grass", vertices };
+}
+
+function createHouse(world: World, x: number, y: number, level: House["level"] = "hut") {
+  const entity = world.createEntity();
+  world.add(entity, Position, { x, y });
+  world.add(entity, House, { level, population: 0 });
+  return entity;
+}
+
+describe("createHouseUpgradeSystem", () => {
+  it("is a no-op when no heightmap is given", () => {
+    const world = new World();
+    const house = createHouse(world, 5, 5);
+
+    const system = createHouseUpgradeSystem();
+    expect(() => system(world, 0)).not.toThrow();
+    expect(world.get(house, House)!.level).toBe("hut");
+  });
+
+  it("leaves a hut alone when the surrounding land isn't flat enough", () => {
+    const world = new World();
+    const heightmap = flatHeightmap(10, 10, 5);
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        heightmap.vertices[5 + dy][5 + dx] = 99; // break every neighbor but the center
+      }
+    }
+    const house = createHouse(world, 5, 5);
+
+    createHouseUpgradeSystem({ heightmap })(world, 0);
+
+    expect(world.get(house, House)!.level).toBe("hut");
+  });
+
+  it("upgrades a hut on perfectly flat land all the way to castle", () => {
+    const world = new World();
+    const heightmap = flatHeightmap(10, 10, 5); // fully flat: max possible flat-neighbor count
+    const house = createHouse(world, 5, 5);
+
+    createHouseUpgradeSystem({ heightmap })(world, 0);
+
+    expect(world.get(house, House)!.level).toBe("castle");
+  });
+
+  it("never downgrades a house even if its level exceeds what current flatness would grant", () => {
+    const world = new World();
+    const heightmap = flatHeightmap(10, 10, 5);
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        heightmap.vertices[5 + dy][5 + dx] = 99; // flatness would now only justify "hut"
+      }
+    }
+    const house = createHouse(world, 5, 5, "castle");
+
+    createHouseUpgradeSystem({ heightmap })(world, 0);
+
+    expect(world.get(house, House)!.level).toBe("castle");
+  });
+
+  it("preserves the house's population when it upgrades", () => {
+    const world = new World();
+    const heightmap = flatHeightmap(10, 10, 5);
+    const house = world.createEntity();
+    world.add(house, Position, { x: 5, y: 5 });
+    world.add(house, House, { level: "hut", population: 7 });
+
+    createHouseUpgradeSystem({ heightmap })(world, 0);
+
+    expect(world.get(house, House)!.population).toBe(7);
+  });
+});

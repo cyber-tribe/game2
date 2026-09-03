@@ -15,8 +15,10 @@ export class Hud {
 
   update(summaries: FactionSummary[], outcome: GameOutcome): void {
     const lines = summaries.map(
-      (s) => `${s.id}: mana ${s.mana.toFixed(1)}  houses ${s.houses}  walkers ${s.walkers}`,
+      (s) =>
+        `${s.id}: mana ${s.mana.toFixed(1)}  houses ${s.houses}  walkers ${s.walkers}  mode ${s.behaviorMode}`,
     );
+    lines.push("", "[1] settle  [2] gather  [3] fight — set your behavior mode");
 
     if (outcome.over) {
       lines.push("", outcome.winner ? `GAME OVER — ${outcome.winner} wins` : "GAME OVER — draw");

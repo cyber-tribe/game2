@@ -46,31 +46,97 @@ game2/
 │   │   └── world.test.ts    … 上記の単体テスト
 │   ├── game/            … ゲームドメインロジック（ECSのコンポーネント/システムを利用）
 │   │   ├── components.ts    … Position/Owner/Walker/MoveTarget/House/FactionState
-│   │   ├── constants.ts     … 速度・成長率・家レベル別ステータス等のチューニング値
-│   │   ├── faction.ts       … Faction(勢力)エンティティの生成/検索
+│   │   ├── constants.ts     … 速度・成長率・家レベル別ステータス・マナコスト等のチューニング値
+│   │   ├── faction.ts       … Faction(勢力)エンティティの生成/検索/マナ消費(trySpendMana)
 │   │   ├── simulation.ts    … WorldとSchedulerを束ね、tickごとにupdate()するSimulation
-│   │   └── systems/         … movement / wanderTarget / settle / houseGrowth / mana
+│   │   └── systems/         … movement / wanderTarget / settle / houseGrowth /
+│   │                          houseUpgrade / mana / combat / gather /
+│   │                          fightTargeting / enemyAi
 │   ├── world/
-│   │   └── heightmap.ts … 頂点高さマップの型と生成（現状はプレースホルダー生成）
+│   │   └── heightmap.ts … 頂点高さマップの型と生成、raiseVertex(頂点1つの上げ下げ)、
+│   │                       sampleElevation(バイリニア補間)、isBuildable(海面より上か)、
+│   │                       countFlatNeighbors(周囲の平坦さの計測)
 │   └── render/
 │       ├── IsoRenderer.ts … heightmapをアイソメトリックなポリゴン群として描画し、
-│       │                    タイル座標→画面座標への投影(project)も提供
+│       │                    タイル座標→画面座標への投影(project)・クリック位置→頂点の
+│       │                    逆引き(pickVertex)・編集後の再描画(redraw)を提供
 │       ├── EntityLayer.ts … ECS World上のWalker/Houseを勢力の色分けで描画
-│       └── Hud.ts         … 勢力ごとのマナ/家数/ウォーカー数を表示するテキストHUD
+│       └── Hud.ts         … 勢力ごとのマナ/家数/ウォーカー数と決着表示のテキストHUD
 └── docs/
     ├── game-system.md   … 再現対象のゲームシステム仕様
     └── tech-stack.md     … 本ファイル
 ```
 
 ECSが実際のレンダリングパイプラインに接続され、`Simulation`が
-「ウォーカーが徘徊→定住して家になる→家が人口を生産して新たな
-ウォーカーを輩出→マナが蓄積する→敵と接触すれば戦い、敵の家は
-奪うか撃退する→どちらかの勢力が全滅したら決着」という基本ループを
-ブラウザ上で可視化できる状態まで進んだ（ヘッドレスブラウザでの
-スクリーンショット検証済み）。`docs/game-system.md` のデータモデル
-素案のうち、地形連動の目標探索・House.levelの自動アップグレード・
-行動方針（gather/goToShrine/fight）・奇跡・プレイヤー操作（地形編集や
-奇跡の発動）・征服モードの複数ワールド進行はまだ未実装。
+「ウォーカーが地形を考慮しつつ徘徊→陸地に定住して家になる→家が
+人口を生産して新たなウォーカーを輩出→マナが蓄積する→敵と接触すれば
+戦い、敵の家は奪うか撃退する→どちらかの勢力が全滅したら決着」という
+基本ループをブラウザ上で可視化できる状態まで進んだ。加えて、
+プレイヤーは左クリックで地形の頂点を1段上げ、右クリックで1段下げられる
+（`docs/game-system.md`の最も基本の介入）。1回の操作につき
+`TERRAIN_EDIT_MANA_COST`分のマナを消費し、プレイヤー勢力のマナが
+足りなければ何も起きない。いずれもヘッドレスブラウザでの実際の
+クリック操作とスクリーンショットで検証済み。
+
+`createWanderTargetSystem`/`createSettleSystem`は`Heightmap`を渡すと
+`world/heightmap.ts`の`isBuildable`（海面=0以下かどうか）で判定し、
+海に定住しようとした場合はその場では建てず、目標を持たないまま
+次のtickで新しい徘徊先を探し直す。地形は`main.ts`で描画用に生成した
+`Heightmap`オブジェクトをそのまま`Simulation`にも渡しているため、
+プレイヤーが地形を編集すると即座にウォーカーのAIにも反映される。
+ヘッドレスブラウザでの目視確認とSimulationの統合テスト（水域に家が
+建たないことを検証）の両方で確認済み。
+
+### 行動方針（settle / gather / fight）とごく簡単な敵AI
+
+`FactionState.behaviorMode`は当初型だけ定義されていたが、以下のシステムで
+実際に機能するようにした。
+
+- `gatherSystem`：behaviorModeが`gather`の勢力について、`GATHER_RANGE`
+  以内にいる同勢力の「探索中」ウォーカー同士をstrength合算の1体に統合する。
+- `fightTargetingSystem`：behaviorModeが`fight`の勢力について、目標を
+  持たない探索中ウォーカーに最も近い敵ウォーカー／家をMoveTargetとして
+  設定する（`createWanderTargetSystem`より前に実行し、既にターゲットが
+  付いたウォーカーは通常の徘徊には流れない）。実際の勝敗は既存の
+  `walkerCombatSystem`/`houseCaptureSystem`が引き続き解決する。
+- `createEnemyAiSystem`：`docs/game-system.md`の「敵AI」の最小限の実装。
+  一定間隔（`ENEMY_AI_DECISION_INTERVAL`）ごとに敵勢力のウォーカー数を見て、
+  閾値（`ENEMY_AI_AGGRESSION_THRESHOLD`）以上ならfight、未満ならsettleに
+  切り替える。マナや脅威度までは見ておらず、あくまで「敵が何もしない
+  置物ではない」ことを保証する最小実装。
+- プレイヤー自身の行動方針は`main.ts`でキーボードの1/2/3キー
+  （settle/gather/fight）に割り当て、HUDに現在のモードを表示する。
+  `Simulation.setBehaviorMode`/`getBehaviorMode`はマナを消費しない
+  （`docs/game-system.md`の「影響」はコストなしという記述の通り）。
+
+ヘッドレスシミュレーションで、開始直後から両勢力をfightモードにすると
+実際に接触・交戦し、両者壊滅（相討ち）に至ることを確認済み（対角線上に
+離れた初期配置のままブラウザで目視すると、歩いて到達するまで数十秒
+かかるため、見た目での確認より高速なヘッドレス実行の方が検証に適する）。
+
+### House.levelの地形依存アップグレード
+
+`world/heightmap.ts`に`countFlatNeighbors(heightmap, x, y, radius)`を
+追加し、指定した点を中心とする(2×radius+1)四方の頂点のうち、その点の
+頂点とちょうど同じ高さを持つ頂点の数を数えるようにした（自分自身も
+必ず1個としてカウントされる）。
+
+`createHouseUpgradeSystem`はこの値を使い、`HOUSE_LEVEL_FLATNESS_REQUIREMENT`
+（`HOUSE_UPGRADE_FLATNESS_RADIUS`=2なので最大25）の閾値を満たすたびに
+家をアップグレードする。アップグレードは一方向のみ（現在のレベルより
+下がることはない）で、population等の他フィールドは保持される。
+HOUSE_LEVELSの容量・マナ産出・防御力は既存のレベル別テーブルがそのまま
+適用されるため、他システムを変更する必要はなかった。
+
+これにより「プレイヤーが地形を編集して土地を平らにする」という
+既存の地形操作機能に明確な目的（家を大きく育てる）が生まれた。
+Simulationの統合テストで、完全に平坦なheightmapを与えると家がhutより
+上のレベルまで育つことを確認済み。
+
+`docs/game-system.md` のデータモデル素案のうち、行動方針の`goToShrine`
+（リーダー/集結シンボルの概念が未実装）・地形編集以外の奇跡（地震・沼・
+騎士化・火山・洪水・最終決戦）・征服モードの複数ワールド進行はまだ
+未実装。
 
 ### 判明した設計上の注意点：人口成長の上限
 

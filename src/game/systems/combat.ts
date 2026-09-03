@@ -1,9 +1,10 @@
 import type { Entity, System, World } from "../../ecs";
 import { COMBAT_RANGE, HOUSE_LEVELS } from "../constants";
 import { House, Owner, Position, Walker } from "../components";
+import { distance, type Point } from "./geometry";
 
-function withinRange(a: { x: number; y: number }, b: { x: number; y: number }): boolean {
-  return Math.hypot(a.x - b.x, a.y - b.y) <= COMBAT_RANGE;
+function withinRange(a: Point, b: Point): boolean {
+  return distance(a, b) <= COMBAT_RANGE;
 }
 
 /**
