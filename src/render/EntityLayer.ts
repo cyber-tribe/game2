@@ -23,17 +23,38 @@ const SHRINE_FLAG_WIDTH = 10;
 const FLATNESS_BAR_HEIGHT = 3;
 const FLATNESS_BAR_GAP = 2;
 const FLATNESS_BAR_COLOR = 0xffe066;
+/** Radians/second the walk-cycle phase advances — see the per-walker animation in update(). */
+const WALK_CYCLE_SPEED = 6;
+/** How far (screen px) a walker bobs at the peak of its step. */
+const WALK_BOB_AMPLITUDE = 1;
+
+/**
+ * The walk-cycle state for a walker at a given moment — a per-walker phase
+ * offset (from its own position, so it's stable frame to frame without
+ * tracking anything extra) keeps the whole army from stepping in unison.
+ * Pulled out as a pure function so the animation math is unit-testable
+ * without needing a Graphics/canvas context.
+ */
+export function walkCycle(
+  elapsedTime: number,
+  pos: { x: number; y: number },
+): { stepping: boolean; bob: number } {
+  const phase = elapsedTime * WALK_CYCLE_SPEED + (pos.x * 3 + pos.y * 5);
+  return { stepping: Math.sin(phase) > 0, bob: Math.abs(Math.sin(phase)) * WALK_BOB_AMPLITUDE };
+}
 
 /** Draws every Swamp/Walker/House in the ECS world onto the isometric map. */
 export class EntityLayer {
   readonly view = new Container();
   private readonly graphics = new Graphics();
+  private elapsedTime = 0;
 
   constructor(private readonly iso: IsoRenderer) {
     this.view.addChild(this.graphics);
   }
 
-  update(world: World): void {
+  update(world: World, deltaSeconds = 0): void {
+    this.elapsedTime += deltaSeconds;
     const g = this.graphics;
     g.clear();
 
@@ -84,10 +105,12 @@ export class EntityLayer {
       const isKnight = walker.state === "knight";
       const pixelSize = isLeader ? LEADER_PIXEL_SIZE : WALKER_PIXEL_SIZE;
 
+      const { stepping, bob } = walkCycle(this.elapsedTime, pos);
+
       if (isLeader) {
-        g.circle(sx, sy - LEADER_HALO_RADIUS, LEADER_HALO_RADIUS).fill({ color: 0xffffff, alpha: 0.35 });
+        g.circle(sx, sy - bob - LEADER_HALO_RADIUS, LEADER_HALO_RADIUS).fill({ color: 0xffffff, alpha: 0.35 });
       }
-      drawWalkerSprite(g, sx, sy, isKnight ? KNIGHT_COLOR : FACTION_COLOR[owner.faction], pixelSize);
+      drawWalkerSprite(g, sx, sy - bob, isKnight ? KNIGHT_COLOR : FACTION_COLOR[owner.faction], pixelSize, stepping);
     }
   }
 

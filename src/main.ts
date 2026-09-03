@@ -472,7 +472,7 @@ async function bootstrap() {
     // were invisible until the player's next tap happened to trigger one.
     renderer.update(deltaSeconds);
     renderer.redraw();
-    entityLayer.update(simulation.world);
+    entityLayer.update(simulation.world, deltaSeconds);
     hud.update(simulation.summarize(), simulation.getOutcome(), simulation.getMatchEvents());
     minimap.update(simulation.world);
 
