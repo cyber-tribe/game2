@@ -20,6 +20,37 @@ describe("Simulation", () => {
     }
   });
 
+  it("exposes the same housesCap to every faction, derived from world size", () => {
+    const sim = new Simulation({ worldWidth: 20, worldHeight: 20 });
+
+    expect(sim.maxHousesPerFaction).toBeGreaterThan(0);
+    for (const summary of sim.summarize()) {
+      expect(summary.housesCap).toBe(sim.maxHousesPerFaction);
+    }
+  });
+
+  it("stops spawning new walkers once a faction's house count reaches its cap", () => {
+    const sim = new Simulation({ worldWidth: 4, worldHeight: 4, initialWalkersPerFaction: 0 });
+    // TILES_PER_HOUSE_CAP=8 over a 4x4=16 tile world caps at 2 houses per faction.
+    expect(sim.maxHousesPerFaction).toBe(2);
+
+    for (const faction of ["player", "enemy"] as const) {
+      for (let i = 0; i < sim.maxHousesPerFaction; i++) {
+        const house = sim.world.createEntity();
+        sim.world.add(house, Position, { x: 1, y: 1 });
+        sim.world.add(house, Owner, { faction });
+        sim.world.add(house, House, { level: "castle", population: 0 }); // capacity 60, high manaRate
+      }
+    }
+
+    for (let i = 0; i < 100; i++) sim.update(1); // plenty of time/mana to spawn if the cap didn't hold
+
+    for (const summary of sim.summarize()) {
+      expect(summary.houses).toBe(summary.housesCap);
+      expect(summary.walkers).toBe(0);
+    }
+  });
+
   it("lets walkers wander, settle into houses, and start producing mana over time", () => {
     const sim = new Simulation({ worldWidth: 20, worldHeight: 20 });
 

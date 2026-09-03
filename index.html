@@ -125,6 +125,38 @@
         color: #06210f;
       }
 
+      /*
+       * A one-time nudge toward the game's core loop — flatten the land
+       * right around your own walkers/houses to grow them — since the
+       * PIXI-canvas HUD is deliberately status-only (see Hud.ts) and
+       * otherwise a first-time player has no in-game explanation of what
+       * to do first. Positioned just above the toolbar; main.ts sets its
+       * `bottom` alongside the map's own layout() so it never overlaps
+       * the toolbar regardless of how many rows it wraps to.
+       */
+      #tutorial-hint {
+        position: fixed;
+        left: 10px;
+        right: 10px;
+        bottom: 320px;
+        padding: 10px 14px;
+        background: rgba(10, 26, 42, 0.92);
+        border: 1px solid #4fa8ff;
+        border-radius: 10px;
+        color: #fff;
+        font-size: 13px;
+        line-height: 1.5;
+        box-sizing: border-box;
+        pointer-events: none;
+        opacity: 1;
+        transition: opacity 0.5s ease;
+        z-index: 5;
+      }
+
+      #tutorial-hint.hidden {
+        opacity: 0;
+      }
+
       #rotate-warning {
         display: none;
         position: fixed;
@@ -149,6 +181,10 @@
   </head>
   <body>
     <div id="app"></div>
+
+    <div id="tutorial-hint">
+      🙏 まずは自分の民（丸いマーク）の周りをタップして地形を平らにしよう。家が育ち、人口とマナが増えていく。
+    </div>
 
     <div id="toolbar">
       <div class="toolbar-section" data-group="behavior">

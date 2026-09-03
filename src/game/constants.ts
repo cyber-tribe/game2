@@ -25,12 +25,29 @@ export const TERRAIN_GROWTH_MULTIPLIER: Record<TerrainType, number> = {
   rock: 0.4,
 };
 
-/** Capacity, mana output, and defense per house level. */
+/** Japanese display name for each terrain type, per docs/game-system.md's own wording. */
+export const TERRAIN_LABELS: Record<TerrainType, string> = {
+  grass: "草原",
+  desert: "砂漠",
+  snow: "雪原",
+  rock: "溶岩地帯",
+};
+
+/**
+ * Capacity, mana output, and defense per house level. manaRate was
+ * originally 1/3/6/12 — a couple of houses alone refilled EARTHQUAKE_
+ * MANA_COST in a few seconds, making mana a non-factor rather than the
+ * scarce resource docs/game-system.md describes ("マナは無制限なのか"
+ * player feedback). Cut to a fifth so a modest early economy takes
+ * real, felt time to afford a mid-tier miracle, while a developed one
+ * still earns power meaningfully faster than a fledgling one — see
+ * plan/0018-mana-pacing-rebalance.md.
+ */
 export const HOUSE_LEVELS: Record<HouseLevel, { capacity: number; manaRate: number; defense: number }> = {
-  hut: { capacity: 10, manaRate: 1, defense: 3 },
-  lodge: { capacity: 20, manaRate: 3, defense: 6 },
-  manor: { capacity: 35, manaRate: 6, defense: 12 },
-  castle: { capacity: 60, manaRate: 12, defense: 20 },
+  hut: { capacity: 10, manaRate: 0.2, defense: 3 },
+  lodge: { capacity: 20, manaRate: 0.5, defense: 6 },
+  manor: { capacity: 35, manaRate: 1, defense: 12 },
+  castle: { capacity: 60, manaRate: 2, defense: 20 },
 };
 
 /** hut < lodge < manor < castle, for comparing/advancing levels. */
