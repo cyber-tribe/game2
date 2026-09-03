@@ -24,7 +24,7 @@ export default defineConfig(({ command }) => ({
         description: "神視点リアルタイム戦略ゲーム",
         lang: "ja",
         display: "standalone",
-        // Portrait phones only — see docs/tech-stack.md.
+        // Portrait phones only — see plan/archived/0008-portrait-smartphone-pwa.md.
         orientation: "portrait",
         background_color: "#0a1a2a",
         theme_color: "#0a1a2a",

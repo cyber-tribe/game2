@@ -20,7 +20,7 @@ export interface ToolbarCallbacks {
  * Wires the static button markup in index.html's #toolbar to the given
  * callbacks. Phones have no keyboard or right-click, so every player
  * action (behaviorMode, which miracle a tap casts) is a tap target here
- * instead — see docs/tech-stack.md's "縦持ちスマホPWA".
+ * instead — see plan/archived/0008-portrait-smartphone-pwa.md.
  */
 export function wireToolbar(callbacks: ToolbarCallbacks): void {
   wireGroup<BehaviorMode>("[data-mode]", "mode", callbacks.onBehaviorMode);

@@ -31,7 +31,7 @@ import {
 
 // Smaller than a desktop map: on a phone, showing the whole thing at once
 // makes every tile too small to tap precisely, so the map is shown closer
-// to native size and panned instead — see docs/tech-stack.md.
+// to native size and panned instead — see plan/archived/0009-pan-for-vertex-picking.md.
 const WORLD_WIDTH = 20;
 const WORLD_HEIGHT = 20;
 
