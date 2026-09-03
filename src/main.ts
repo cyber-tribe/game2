@@ -1,4 +1,4 @@
-import { Application, type FederatedPointerEvent } from "pixi.js";
+import { Application, Rectangle, type FederatedPointerEvent } from "pixi.js";
 import {
   ARMAGEDDON_MANA_COST,
   EARTHQUAKE_MANA_COST,
@@ -18,6 +18,7 @@ import { eruptVolcano } from "./game/volcano";
 import { EntityLayer } from "./render/EntityLayer";
 import { Hud } from "./render/Hud";
 import { IsoRenderer } from "./render/IsoRenderer";
+import { Minimap } from "./render/Minimap";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
 import {
   DEFAULT_VOLCANO_RADIUS,
@@ -56,6 +57,8 @@ const MAX_MAP_SCALE = 1.2;
 const DRAG_THRESHOLD = 10;
 /** How long #tutorial-hint stays up if the player never makes a terrain edit. */
 const TUTORIAL_HINT_TIMEOUT_MS = 15000;
+/** Screen size (px) of the top-right overview map — see render/Minimap.ts. */
+const MINIMAP_SIZE = 72;
 
 /**
  * The device's top safe-area inset (notch/status bar), read from the CSS
@@ -93,6 +96,9 @@ async function bootstrap() {
   hud.setTerrain(TERRAIN_LABELS[heightmap.terrain]);
   app.stage.addChild(hud.view);
 
+  const minimap = new Minimap(heightmap, MINIMAP_SIZE);
+  app.stage.addChild(minimap.view);
+
   const simulation = new Simulation({ worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT, heightmap });
 
   // Fit the map's height (not width) into the space below the HUD and
@@ -112,6 +118,7 @@ async function bootstrap() {
     renderer.view.position.y += safeAreaTop;
     hud.setMaxWidth(app.screen.width);
     hud.setTopInset(safeAreaTop);
+    minimap.view.position.set(app.screen.width - MINIMAP_SIZE - 10, 10 + safeAreaTop);
     if (tutorialHint) tutorialHint.style.bottom = `${toolbarHeight + 12}px`;
   };
   layout();
@@ -134,6 +141,34 @@ async function bootstrap() {
       y: Math.min(app.screen.height + halfH - marginY, Math.max(-halfH + marginY, y)),
     };
   };
+
+  // Recenters the main view on a world (tile) point without changing zoom
+  // or rotation — same pivot math as rotateAroundPivot below, just with a
+  // fixed target (the visible map's rough center) instead of the
+  // two-finger midpoint. Used by the minimap's "tap to jump" (see
+  // render/Minimap.ts's doc comment on why it exists).
+  const centerViewOn = (worldX: number, worldY: number) => {
+    const local = renderer.project(worldX, worldY);
+    const cos = Math.cos(renderer.view.rotation);
+    const sin = Math.sin(renderer.view.rotation);
+    const scaledX = local.sx * currentScale;
+    const scaledY = local.sy * currentScale;
+    const target = { x: app.screen.width / 2, y: app.screen.height / 2 };
+    const next = clampPan(target.x - (scaledX * cos - scaledY * sin), target.y - (scaledX * sin + scaledY * cos));
+    renderer.view.position.set(next.x, next.y);
+  };
+
+  minimap.view.eventMode = "static";
+  minimap.view.cursor = "pointer";
+  minimap.view.hitArea = new Rectangle(0, 0, MINIMAP_SIZE, MINIMAP_SIZE);
+  minimap.view.on("pointerdown", (event) => {
+    // Stops this tap from also reaching the main map's own pointerdown
+    // handler below (both listen on the pointer hierarchy under app.stage).
+    event.stopPropagation();
+    const local = minimap.view.toLocal(event.global);
+    const target = minimap.toWorld(local.x, local.y);
+    centerViewOn(target.x, target.y);
+  });
 
   let toolMode: ToolMode = "raise";
 
@@ -322,6 +357,7 @@ async function bootstrap() {
     renderer.redraw();
     entityLayer.update(simulation.world);
     hud.update(simulation.summarize(), simulation.getOutcome());
+    minimap.update(simulation.world);
   });
 }
 
