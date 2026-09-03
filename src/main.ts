@@ -1,4 +1,4 @@
-import { Application, Rectangle, type FederatedPointerEvent } from "pixi.js";
+import { Application, Container, Rectangle, type FederatedPointerEvent } from "pixi.js";
 import {
   ARMAGEDDON_MANA_COST,
   EARTHQUAKE_MANA_COST,
@@ -10,6 +10,7 @@ import {
   TERRAIN_LABELS,
   VOLCANO_MANA_COST,
 } from "./game/constants";
+import type { EnemyMiracleEvent } from "./game/systems/enemyMiracles";
 import { trySpendMana } from "./game/faction";
 import { drownFlood } from "./game/flood";
 import { Simulation } from "./game/simulation";
@@ -57,6 +58,8 @@ const MAX_MAP_SCALE = 1.2;
 const DRAG_THRESHOLD = 10;
 /** How long #tutorial-hint stays up if the player never makes a terrain edit. */
 const TUTORIAL_HINT_TIMEOUT_MS = 15000;
+/** How long a triggerShake() camera shake takes to decay to nothing. */
+const SHAKE_DURATION = 0.3;
 /** Screen size (px) of the top-right overview map — see render/Minimap.ts. */
 const MINIMAP_SIZE = 72;
 
@@ -98,7 +101,26 @@ async function bootstrap() {
 
   const heightmap = createHeightmap(WORLD_WIDTH, WORLD_HEIGHT, pickRandomTerrain());
   const renderer = new IsoRenderer(heightmap);
-  app.stage.addChild(renderer.view);
+
+  // A wrapper around renderer.view purely for screen shake (see
+  // triggerShake below): renderer.view.position is the "real" camera
+  // state that pan/zoom/rotate all read and write, so shake is kept as a
+  // separate, temporary offset layered on top rather than fighting with
+  // that bookkeeping.
+  const worldContainer = new Container();
+  worldContainer.addChild(renderer.view);
+  app.stage.addChild(worldContainer);
+
+  // A brief camera shake for high-impact miracles (地震/火山/洪水/最終決戦)
+  // — per feedback that these otherwise "just change the board" with no
+  // sense of impact. Decays linearly over SHAKE_DURATION; ticked below
+  // alongside the simulation.
+  let shakeTimeRemaining = 0;
+  let shakeMagnitude = 0;
+  const triggerShake = (magnitude: number) => {
+    shakeTimeRemaining = SHAKE_DURATION;
+    shakeMagnitude = magnitude;
+  };
 
   const entityLayer = new EntityLayer(renderer);
   renderer.view.addChild(entityLayer.view);
@@ -110,7 +132,32 @@ async function bootstrap() {
   const minimap = new Minimap(heightmap, MINIMAP_SIZE);
   app.stage.addChild(minimap.view);
 
-  const simulation = new Simulation({ worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT, heightmap });
+  const enemyEventToast = document.getElementById("enemy-event-toast");
+  let toastHideTimeout: ReturnType<typeof setTimeout> | undefined;
+
+  // Surfaces enemy-cast miracles even when they happen outside the
+  // player's current view — see index.html's comment on #enemy-event-toast
+  // for why this matters more now that the enemy AI acts on its own.
+  const showEnemyEventToast = (text: string) => {
+    if (!enemyEventToast) return;
+    enemyEventToast.textContent = text;
+    enemyEventToast.classList.remove("hidden");
+    clearTimeout(toastHideTimeout);
+    toastHideTimeout = setTimeout(() => enemyEventToast.classList.add("hidden"), 3000);
+  };
+
+  const ENEMY_EVENT_LABEL: Record<EnemyMiracleEvent["type"], string> = {
+    earthquake: "💥 敵が地震を起こした",
+    knight: "⚔️ 敵のリーダーが騎士化した",
+    armageddon: "☠️ 敵が最終決戦を発動した",
+  };
+
+  const onEnemyAction = (event: EnemyMiracleEvent) => {
+    showEnemyEventToast(ENEMY_EVENT_LABEL[event.type]);
+    triggerShake(event.type === "armageddon" ? 10 : event.type === "earthquake" ? 6 : 3);
+  };
+
+  const simulation = new Simulation({ worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT, heightmap, onEnemyAction });
 
   // Fit the map's height (not width) into the space below the HUD and
   // above the toolbar — portrait phones have more room vertically than
@@ -199,6 +246,7 @@ async function bootstrap() {
       if (!trySpendMana(simulation.world, "player", EARTHQUAKE_MANA_COST)) return;
       applyEarthquake(heightmap, vertex.x, vertex.y);
       renderer.redraw();
+      triggerShake(6);
       vibrate(40);
       return;
     }
@@ -215,6 +263,7 @@ async function bootstrap() {
       applyVolcano(heightmap, vertex.x, vertex.y);
       eruptVolcano(simulation.world, vertex.x, vertex.y, DEFAULT_VOLCANO_RADIUS);
       renderer.redraw();
+      triggerShake(8);
       vibrate([40, 30, 60]);
       return;
     }
@@ -231,6 +280,7 @@ async function bootstrap() {
       // Global effect on both factions at once, unlike every other miracle.
       if (!trySpendMana(simulation.world, "player", ARMAGEDDON_MANA_COST)) return;
       simulation.triggerArmageddon();
+      triggerShake(10);
       vibrate([60, 40, 60, 40, 100]);
       return;
     }
@@ -241,6 +291,7 @@ async function bootstrap() {
       applyFlood(heightmap);
       drownFlood(simulation.world, heightmap);
       renderer.redraw();
+      triggerShake(5);
       vibrate(50);
       return;
     }
@@ -376,6 +427,14 @@ async function bootstrap() {
     entityLayer.update(simulation.world);
     hud.update(simulation.summarize(), simulation.getOutcome());
     minimap.update(simulation.world);
+
+    if (shakeTimeRemaining > 0) {
+      shakeTimeRemaining = Math.max(0, shakeTimeRemaining - deltaSeconds);
+      const strength = (shakeTimeRemaining / SHAKE_DURATION) * shakeMagnitude;
+      worldContainer.position.set((Math.random() * 2 - 1) * strength, (Math.random() * 2 - 1) * strength);
+    } else if (worldContainer.position.x !== 0 || worldContainer.position.y !== 0) {
+      worldContainer.position.set(0, 0);
+    }
   });
 }
 

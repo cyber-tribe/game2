@@ -46,11 +46,18 @@ describe("createEnemyMiracleSystem", () => {
     createHouse(world, "enemy", 5, 5, 20); // 20 vs 1 -> well past the ratio
     createHouse(world, "player", 8, 8, 1);
 
-    const system = createEnemyMiracleSystem({ decisionInterval: 8, heightmap: flatHeightmap(10, 10, 5), worldCenter: WORLD_CENTER });
+    const events: unknown[] = [];
+    const system = createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap: flatHeightmap(10, 10, 5),
+      worldCenter: WORLD_CENTER,
+      onAction: (event) => events.push(event),
+    });
     system(world, 8);
 
     expect(world.get(enemy, FactionState)!.finalBattle).toBe(true);
     expect(world.get(enemy, FactionState)!.mana).toBe(0);
+    expect(events).toEqual([{ type: "armageddon" }]);
   });
 
   it("does not trigger final battle without a decisive population lead", () => {
@@ -77,10 +84,17 @@ describe("createEnemyMiracleSystem", () => {
     });
     createFaction(world, "player", { x: 9, y: 9 });
 
-    createEnemyMiracleSystem({ decisionInterval: 8, heightmap: flatHeightmap(10, 10, 5), worldCenter: WORLD_CENTER })(world, 8);
+    const events: unknown[] = [];
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap: flatHeightmap(10, 10, 5),
+      worldCenter: WORLD_CENTER,
+      onAction: (event) => events.push(event),
+    })(world, 8);
 
     expect(world.get(leader, Walker)!.state).toBe("knight");
     expect(world.get(enemy, FactionState)!.mana).toBe(0);
+    expect(events).toEqual([{ type: "knight" }]);
   });
 
   it("does not knight an already-knighted leader", () => {
@@ -107,13 +121,21 @@ describe("createEnemyMiracleSystem", () => {
     createHouse(world, "player", 5, 5);
 
     const heightmap = flatHeightmap(10, 10, 5);
-    const system = createEnemyMiracleSystem({ decisionInterval: 8, heightmap, worldCenter: WORLD_CENTER, rng: () => 0 });
+    const events: unknown[] = [];
+    const system = createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap,
+      worldCenter: WORLD_CENTER,
+      rng: () => 0,
+      onAction: (event) => events.push(event),
+    });
     system(world, 8);
 
     expect(world.get(enemy, FactionState)!.mana).toBe(0);
     // The whole neighborhood around (5, 5) should no longer be uniformly flat.
     const touched = heightmap.vertices.some((row) => row.some((h) => h !== 5));
     expect(touched).toBe(true);
+    expect(events).toEqual([{ type: "earthquake", position: { x: 5, y: 5 } }]);
   });
 
   it("does nothing when the opponent has no houses to target and no other action applies", () => {
@@ -122,9 +144,16 @@ describe("createEnemyMiracleSystem", () => {
     world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: EARTHQUAKE_MANA_COST });
     createFaction(world, "player", { x: 9, y: 9 });
 
-    createEnemyMiracleSystem({ decisionInterval: 8, heightmap: flatHeightmap(10, 10, 5), worldCenter: WORLD_CENTER })(world, 8);
+    const events: unknown[] = [];
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap: flatHeightmap(10, 10, 5),
+      worldCenter: WORLD_CENTER,
+      onAction: (event) => events.push(event),
+    })(world, 8);
 
     expect(world.get(enemy, FactionState)!.mana).toBe(EARTHQUAKE_MANA_COST); // nothing to target, nothing spent
+    expect(events).toEqual([]);
   });
 
   it("does not act once finalBattle is already set", () => {
