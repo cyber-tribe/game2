@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_ELEVATION,
   MIN_ELEVATION,
+  applyEarthquake,
   countFlatNeighbors,
   createHeightmap,
   isBuildable,
@@ -128,5 +129,44 @@ describe("countFlatNeighbors", () => {
     heightmap.vertices[3][3] = 9;
 
     expect(countFlatNeighbors(heightmap, 3.4, 3.4, 0)).toBe(1);
+  });
+});
+
+describe("applyEarthquake", () => {
+  it("perturbs every vertex within radius and leaves the rest untouched", () => {
+    const heightmap = flatHeightmap(10, 10, 5);
+
+    applyEarthquake(heightmap, 5, 5, 2, 3, () => 1); // rng=1 -> delta always +maxDelta
+
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        expect(heightmap.vertices[5 + dy][5 + dx]).toBe(8);
+      }
+    }
+    expect(heightmap.vertices[5][8]).toBe(5); // outside radius
+    expect(heightmap.vertices[8][5]).toBe(5); // outside radius
+  });
+
+  it("can lower vertices too, clamped at MIN_ELEVATION", () => {
+    const heightmap = flatHeightmap(6, 6, 2);
+
+    applyEarthquake(heightmap, 3, 3, 1, 5, () => 0); // rng=0 -> delta always -maxDelta
+
+    expect(heightmap.vertices[3][3]).toBe(MIN_ELEVATION);
+  });
+
+  it("clamps at MAX_ELEVATION when the swing would push a vertex too high", () => {
+    const heightmap = flatHeightmap(6, 6, MAX_ELEVATION - 1);
+
+    applyEarthquake(heightmap, 3, 3, 0, 5, () => 1); // rng=1 -> delta always +maxDelta
+
+    expect(heightmap.vertices[3][3]).toBe(MAX_ELEVATION);
+  });
+
+  it("does not touch vertices outside the map bounds", () => {
+    const heightmap = flatHeightmap(4, 4, 5);
+
+    expect(() => applyEarthquake(heightmap, 0, 0, 3, 4, () => 1)).not.toThrow();
+    expect(heightmap.vertices[0][0]).toBe(9);
   });
 });

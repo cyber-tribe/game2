@@ -14,10 +14,12 @@ export interface HouseUpgradeConfig {
 }
 
 /**
- * Levels a house up (never down) once the land around it is flat enough —
- * see docs/game-system.md and HOUSE_LEVEL_FLATNESS_REQUIREMENT. Capacity,
- * mana output, and defense all scale with the new level automatically via
- * HOUSE_LEVELS, read by the other systems.
+ * Keeps a house's level matched to how flat the land around it currently
+ * is — see docs/game-system.md and HOUSE_LEVEL_FLATNESS_REQUIREMENT.
+ * Moves in both directions: flattening more land upgrades it, and
+ * roughing up its surroundings (e.g. an earthquake) can downgrade it.
+ * Capacity, mana output, and defense all scale with the new level
+ * automatically via HOUSE_LEVELS, read by the other systems.
  */
 export function createHouseUpgradeSystem(config: Partial<HouseUpgradeConfig> = {}): System {
   const heightmap = config.heightmap;
@@ -30,13 +32,13 @@ export function createHouseUpgradeSystem(config: Partial<HouseUpgradeConfig> = {
       const pos = world.get(entity, Position)!;
       const flatCount = countFlatNeighbors(heightmap, pos.x, pos.y, radius);
 
-      let bestLevel = house.level;
-      for (const level of HOUSE_LEVEL_ORDER) {
-        if (flatCount >= HOUSE_LEVEL_FLATNESS_REQUIREMENT[level]) bestLevel = level;
+      let level = HOUSE_LEVEL_ORDER[0];
+      for (const candidate of HOUSE_LEVEL_ORDER) {
+        if (flatCount >= HOUSE_LEVEL_FLATNESS_REQUIREMENT[candidate]) level = candidate;
       }
 
-      if (HOUSE_LEVEL_ORDER.indexOf(bestLevel) > HOUSE_LEVEL_ORDER.indexOf(house.level)) {
-        world.add(entity, House, { ...house, level: bestLevel });
+      if (level !== house.level) {
+        world.add(entity, House, { ...house, level });
       }
     }
   };

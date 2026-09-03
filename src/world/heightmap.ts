@@ -106,3 +106,38 @@ export function countFlatNeighbors(heightmap: Heightmap, x: number, y: number, r
   }
   return count;
 }
+
+/** Radius (in vertices) and per-vertex height swing of a default earthquake. */
+export const DEFAULT_EARTHQUAKE_RADIUS = 3;
+export const DEFAULT_EARTHQUAKE_MAX_DELTA = 4;
+
+/**
+ * Randomly heaves or drops every vertex within `radius` of (centerX,
+ * centerY), each by an independent delta in [-maxDelta, maxDelta] —
+ * docs/game-system.md's "対象範囲の地形をランダムに隆起・陥没させ、
+ * 平地を壊す". Breaking up flat land this way is what makes earthquake
+ * useful against enemy settlements: createHouseUpgradeSystem reacts to
+ * the resulting drop in flatness by downgrading houses caught in it.
+ */
+export function applyEarthquake(
+  heightmap: Heightmap,
+  centerX: number,
+  centerY: number,
+  radius: number = DEFAULT_EARTHQUAKE_RADIUS,
+  maxDelta: number = DEFAULT_EARTHQUAKE_MAX_DELTA,
+  rng: () => number = Math.random,
+): void {
+  const cx = Math.round(centerX);
+  const cy = Math.round(centerY);
+
+  for (let dy = -radius; dy <= radius; dy++) {
+    const vy = cy + dy;
+    if (vy < 0 || vy > heightmap.height) continue;
+    for (let dx = -radius; dx <= radius; dx++) {
+      const vx = cx + dx;
+      if (vx < 0 || vx > heightmap.width) continue;
+      const delta = Math.round((rng() * 2 - 1) * maxDelta);
+      raiseVertex(heightmap, vx, vy, delta);
+    }
+  }
+}

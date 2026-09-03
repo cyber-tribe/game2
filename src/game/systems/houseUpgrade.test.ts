@@ -52,20 +52,21 @@ describe("createHouseUpgradeSystem", () => {
     expect(world.get(house, House)!.level).toBe("castle");
   });
 
-  it("never downgrades a house even if its level exceeds what current flatness would grant", () => {
+  it("downgrades a house when its surroundings become rough (e.g. an earthquake)", () => {
     const world = new World();
     const heightmap = flatHeightmap(10, 10, 5);
+    const house = createHouse(world, 5, 5, "castle");
+
     for (let dy = -2; dy <= 2; dy++) {
       for (let dx = -2; dx <= 2; dx++) {
         if (dx === 0 && dy === 0) continue;
-        heightmap.vertices[5 + dy][5 + dx] = 99; // flatness would now only justify "hut"
+        heightmap.vertices[5 + dy][5 + dx] = 99; // flatness now only justifies "hut"
       }
     }
-    const house = createHouse(world, 5, 5, "castle");
 
     createHouseUpgradeSystem({ heightmap })(world, 0);
 
-    expect(world.get(house, House)!.level).toBe("castle");
+    expect(world.get(house, House)!.level).toBe("hut");
   });
 
   it("preserves the house's population when it upgrades", () => {
