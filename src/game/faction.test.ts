@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../ecs";
 import { FactionState } from "./components";
-import { createFaction, findFactionEntity } from "./faction";
+import { createFaction, findFactionEntity, trySpendMana } from "./faction";
 
 describe("createFaction / findFactionEntity", () => {
   it("creates a faction entity with the given id and shrine, defaulting to settle mode", () => {
@@ -37,5 +37,31 @@ describe("createFaction / findFactionEntity", () => {
     createFaction(world, "player", { x: 0, y: 0 });
 
     expect(findFactionEntity(world, "enemy")).toBeUndefined();
+  });
+});
+
+describe("trySpendMana", () => {
+  it("deducts the amount and returns true when the faction can afford it", () => {
+    const world = new World();
+    const player = createFaction(world, "player", { x: 0, y: 0 });
+    world.add(player, FactionState, { ...world.get(player, FactionState)!, mana: 10 });
+
+    expect(trySpendMana(world, "player", 4)).toBe(true);
+    expect(world.get(player, FactionState)!.mana).toBe(6);
+  });
+
+  it("leaves mana untouched and returns false when the faction can't afford it", () => {
+    const world = new World();
+    const player = createFaction(world, "player", { x: 0, y: 0 });
+    world.add(player, FactionState, { ...world.get(player, FactionState)!, mana: 2 });
+
+    expect(trySpendMana(world, "player", 4)).toBe(false);
+    expect(world.get(player, FactionState)!.mana).toBe(2);
+  });
+
+  it("returns false when the faction doesn't exist", () => {
+    const world = new World();
+
+    expect(trySpendMana(world, "player", 1)).toBe(false);
   });
 });

@@ -46,17 +46,18 @@ game2/
 │   │   └── world.test.ts    … 上記の単体テスト
 │   ├── game/            … ゲームドメインロジック（ECSのコンポーネント/システムを利用）
 │   │   ├── components.ts    … Position/Owner/Walker/MoveTarget/House/FactionState
-│   │   ├── constants.ts     … 速度・成長率・家レベル別ステータス等のチューニング値
-│   │   ├── faction.ts       … Faction(勢力)エンティティの生成/検索
+│   │   ├── constants.ts     … 速度・成長率・家レベル別ステータス・マナコスト等のチューニング値
+│   │   ├── faction.ts       … Faction(勢力)エンティティの生成/検索/マナ消費(trySpendMana)
 │   │   ├── simulation.ts    … WorldとSchedulerを束ね、tickごとにupdate()するSimulation
-│   │   └── systems/         … movement / wanderTarget / settle / houseGrowth / mana
+│   │   └── systems/         … movement / wanderTarget / settle / houseGrowth / mana / combat
 │   ├── world/
-│   │   └── heightmap.ts … 頂点高さマップの型と生成（現状はプレースホルダー生成）
+│   │   └── heightmap.ts … 頂点高さマップの型と生成、raiseVertex(頂点1つの上げ下げ)
 │   └── render/
 │       ├── IsoRenderer.ts … heightmapをアイソメトリックなポリゴン群として描画し、
-│       │                    タイル座標→画面座標への投影(project)も提供
+│       │                    タイル座標→画面座標への投影(project)・クリック位置→頂点の
+│       │                    逆引き(pickVertex)・編集後の再描画(redraw)を提供
 │       ├── EntityLayer.ts … ECS World上のWalker/Houseを勢力の色分けで描画
-│       └── Hud.ts         … 勢力ごとのマナ/家数/ウォーカー数を表示するテキストHUD
+│       └── Hud.ts         … 勢力ごとのマナ/家数/ウォーカー数と決着表示のテキストHUD
 └── docs/
     ├── game-system.md   … 再現対象のゲームシステム仕様
     └── tech-stack.md     … 本ファイル
@@ -66,11 +67,16 @@ ECSが実際のレンダリングパイプラインに接続され、`Simulation
 「ウォーカーが徘徊→定住して家になる→家が人口を生産して新たな
 ウォーカーを輩出→マナが蓄積する→敵と接触すれば戦い、敵の家は
 奪うか撃退する→どちらかの勢力が全滅したら決着」という基本ループを
-ブラウザ上で可視化できる状態まで進んだ（ヘッドレスブラウザでの
-スクリーンショット検証済み）。`docs/game-system.md` のデータモデル
-素案のうち、地形連動の目標探索・House.levelの自動アップグレード・
-行動方針（gather/goToShrine/fight）・奇跡・プレイヤー操作（地形編集や
-奇跡の発動）・征服モードの複数ワールド進行はまだ未実装。
+ブラウザ上で可視化できる状態まで進んだ。加えて、プレイヤーは
+左クリックで地形の頂点を1段上げ、右クリックで1段下げられる
+（`docs/game-system.md`の最も基本の介入）。1回の操作につき
+`TERRAIN_EDIT_MANA_COST`分のマナを消費し、プレイヤー勢力のマナが
+足りなければ何も起きない。いずれもヘッドレスブラウザでの実際の
+クリック操作とスクリーンショットで検証済み。`docs/game-system.md`
+のデータモデル素案のうち、地形連動の目標探索・House.levelの自動
+アップグレード・行動方針（gather/goToShrine/fight）・地形編集以外の
+奇跡（地震・沼・騎士化・火山・洪水・最終決戦）・征服モードの複数
+ワールド進行はまだ未実装。
 
 ### 判明した設計上の注意点：人口成長の上限
 

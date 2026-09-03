@@ -32,3 +32,6 @@ export const COMBAT_RANGE = 0.5;
  * terrain-based flat-land scarcity is implemented.
  */
 export const TILES_PER_HOUSE_CAP = 8;
+
+/** Mana cost of raising or lowering one terrain vertex by one step. */
+export const TERRAIN_EDIT_MANA_COST = 1;

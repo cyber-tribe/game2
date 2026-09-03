@@ -20,3 +20,20 @@ export function findFactionEntity(world: World, id: FactionId): Entity | undefin
   }
   return undefined;
 }
+
+/**
+ * Deducts a miracle's mana cost from a faction if (and only if) it can
+ * afford it. Every divine power — terrain edits included — spends mana
+ * through this, so "can't afford it" and "faction doesn't exist" are
+ * both just a `false` return rather than a thrown error.
+ */
+export function trySpendMana(world: World, id: FactionId, amount: number): boolean {
+  const entity = findFactionEntity(world, id);
+  if (entity === undefined) return false;
+
+  const state = world.get(entity, FactionState)!;
+  if (state.mana < amount) return false;
+
+  world.add(entity, FactionState, { ...state, mana: state.mana - amount });
+  return true;
+}

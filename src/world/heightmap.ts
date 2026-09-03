@@ -8,6 +8,10 @@ export interface Heightmap {
   vertices: number[][];
 }
 
+/** Elevation is clamped to this range — 0 is sea level. */
+export const MIN_ELEVATION = 0;
+export const MAX_ELEVATION = 20;
+
 /**
  * Simple smooth pseudo-random heightmap for prototyping the renderer.
  * Real terrain generation belongs to a later worldgen step.
@@ -30,4 +34,16 @@ export function createHeightmap(
     vertices.push(row);
   }
   return { width, height, terrain, vertices };
+}
+
+/**
+ * Raises (positive delta) or lowers (negative delta) a single vertex,
+ * clamped to [MIN_ELEVATION, MAX_ELEVATION]. Mutates the heightmap in
+ * place — per docs/game-system.md this is the most basic divine power,
+ * meant to be called once per player click, not per frame.
+ */
+export function raiseVertex(heightmap: Heightmap, x: number, y: number, delta: number): void {
+  const row = heightmap.vertices[y];
+  if (!row || row[x] === undefined) return;
+  row[x] = Math.min(MAX_ELEVATION, Math.max(MIN_ELEVATION, row[x] + delta));
 }
