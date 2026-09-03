@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isBuildable, type Heightmap } from "../world/heightmap";
+import { applyVolcano, isBuildable, isRock, type Heightmap } from "../world/heightmap";
 import { House, Owner, Position, Swamp, Walker } from "./components";
 import { Simulation } from "./simulation";
 import { createSwamp } from "./swamp";
+import { eruptVolcano } from "./volcano";
 
 describe("Simulation", () => {
   it("seeds both factions with the requested number of seeking walkers and nothing else", () => {
@@ -82,7 +83,8 @@ describe("Simulation", () => {
     const vertices = Array.from({ length: height + 1 }, () =>
       Array.from({ length: width + 1 }, (_, x) => (x >= waterFrom && x < waterTo ? 0 : 5)),
     );
-    const heightmap: Heightmap = { width, height, terrain: "grass", vertices };
+    const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
+    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness };
 
     const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
 
@@ -114,7 +116,8 @@ describe("Simulation", () => {
     const width = 20;
     const height = 20;
     const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(5));
-    const heightmap: Heightmap = { width, height, terrain: "grass", vertices };
+    const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
+    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness };
 
     const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
 
@@ -138,5 +141,26 @@ describe("Simulation", () => {
 
     expect(sim.world.query(Walker)).toHaveLength(0);
     expect(sim.world.query(Swamp)).toHaveLength(1);
+  });
+
+  it("erupting a volcano destroys a house standing there and marks the land unbuildable", () => {
+    const width = 20;
+    const height = 20;
+    const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(5));
+    const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
+    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness };
+
+    const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
+
+    for (let i = 0; i < 200; i++) sim.update(0.1); // let some houses settle
+    const [house] = sim.world.query(House, Position);
+    const pos = sim.world.get(house, Position)!;
+
+    eruptVolcano(sim.world, pos.x, pos.y, 1);
+    expect(sim.world.isAlive(house)).toBe(false);
+
+    applyVolcano(heightmap, pos.x, pos.y, 1);
+    expect(isBuildable(heightmap, pos.x, pos.y)).toBe(false);
+    expect(isRock(heightmap, pos.x, pos.y)).toBe(true);
   });
 });

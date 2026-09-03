@@ -8,7 +8,8 @@ function halfWaterHeightmap(width: number, height: number, landFromX: number): H
   const vertices = Array.from({ length: height + 1 }, () =>
     Array.from({ length: width + 1 }, (_, x) => (x >= landFromX ? 5 : 0)),
   );
-  return { width, height, terrain: "grass", vertices };
+  const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
+  return { width, height, terrain: "grass", vertices, rockHardness };
 }
 
 function queueRng(values: number[]): () => number {

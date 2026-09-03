@@ -6,7 +6,8 @@ import { createHouseUpgradeSystem } from "./houseUpgrade";
 
 function flatHeightmap(width: number, height: number, elevation: number): Heightmap {
   const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
-  return { width, height, terrain: "grass", vertices };
+  const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
+  return { width, height, terrain: "grass", vertices, rockHardness };
 }
 
 function createHouse(world: World, x: number, y: number, level: House["level"] = "hut") {

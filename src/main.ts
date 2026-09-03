@@ -1,13 +1,20 @@
 import { Application, type FederatedPointerEvent } from "pixi.js";
-import { EARTHQUAKE_MANA_COST, SWAMP_MANA_COST, TERRAIN_EDIT_MANA_COST } from "./game/constants";
+import { EARTHQUAKE_MANA_COST, SWAMP_MANA_COST, TERRAIN_EDIT_MANA_COST, VOLCANO_MANA_COST } from "./game/constants";
 import { trySpendMana } from "./game/faction";
 import { Simulation } from "./game/simulation";
 import { createSwamp } from "./game/swamp";
+import { eruptVolcano } from "./game/volcano";
 import { EntityLayer } from "./render/EntityLayer";
 import { Hud } from "./render/Hud";
 import { IsoRenderer } from "./render/IsoRenderer";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
-import { applyEarthquake, createHeightmap, raiseVertex } from "./world/heightmap";
+import {
+  DEFAULT_VOLCANO_RADIUS,
+  applyEarthquake,
+  applyVolcano,
+  createHeightmap,
+  raiseVertex,
+} from "./world/heightmap";
 
 // Smaller than a desktop map: on a phone, showing the whole thing at once
 // makes every tile too small to tap precisely, so the map is shown closer
@@ -91,6 +98,14 @@ async function bootstrap() {
     if (toolMode === "swamp") {
       if (!trySpendMana(simulation.world, "player", SWAMP_MANA_COST)) return;
       createSwamp(simulation.world, vertex.x, vertex.y);
+      return;
+    }
+
+    if (toolMode === "volcano") {
+      if (!trySpendMana(simulation.world, "player", VOLCANO_MANA_COST)) return;
+      applyVolcano(heightmap, vertex.x, vertex.y);
+      eruptVolcano(simulation.world, vertex.x, vertex.y, DEFAULT_VOLCANO_RADIUS);
+      renderer.redraw();
       return;
     }
 

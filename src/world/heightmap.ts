@@ -6,6 +6,13 @@ export interface Heightmap {
   terrain: TerrainType;
   /** Vertex heights, indexed [y][x], size (height+1) x (width+1). */
   vertices: number[][];
+  /**
+   * How much longer a vertex stays impassable rock (from a volcano),
+   * indexed like `vertices`. 0 means ordinary ground. Chipped away by
+   * raiseVertex — see docs/game-system.md's 火山, "復旧には大量の地形
+   * 操作が必要".
+   */
+  rockHardness: number[][];
 }
 
 /** Elevation is clamped to this range — 0 is sea level. */
@@ -22,6 +29,7 @@ export function createHeightmap(
   terrain: TerrainType = "grass",
 ): Heightmap {
   const vertices: number[][] = [];
+  const rockHardness: number[][] = [];
   for (let y = 0; y <= height; y++) {
     const row: number[] = [];
     for (let x = 0; x <= width; x++) {
@@ -32,8 +40,9 @@ export function createHeightmap(
       row.push(Math.max(0, Math.round(wave + 3)));
     }
     vertices.push(row);
+    rockHardness.push(new Array(width + 1).fill(0));
   }
-  return { width, height, terrain, vertices };
+  return { width, height, terrain, vertices, rockHardness };
 }
 
 /**
@@ -46,6 +55,9 @@ export function raiseVertex(heightmap: Heightmap, x: number, y: number, delta: n
   const row = heightmap.vertices[y];
   if (!row || row[x] === undefined) return;
   row[x] = Math.min(MAX_ELEVATION, Math.max(MIN_ELEVATION, row[x] + delta));
+
+  const hardnessRow = heightmap.rockHardness[y];
+  if (hardnessRow[x] > 0) hardnessRow[x] -= 1;
 }
 
 /**
@@ -72,12 +84,20 @@ export function sampleElevation(heightmap: Heightmap, x: number, y: number): num
   return top + (bottom - top) * ty;
 }
 
+/** True if the vertex nearest (x, y) is volcano rock — see applyVolcano. */
+export function isRock(heightmap: Heightmap, x: number, y: number): boolean {
+  const cx = Math.round(Math.min(Math.max(x, 0), heightmap.width));
+  const cy = Math.round(Math.min(Math.max(y, 0), heightmap.height));
+  return heightmap.rockHardness[cy][cx] > 0;
+}
+
 /**
  * Sea level and below can't be built on or safely settled — per
  * docs/game-system.md, "海には建物を建てられず、通常の民は入ると溺れる".
+ * Volcano rock can't be built on either, per "岩の上には建築できない".
  */
 export function isBuildable(heightmap: Heightmap, x: number, y: number): boolean {
-  return sampleElevation(heightmap, x, y) > MIN_ELEVATION;
+  return sampleElevation(heightmap, x, y) > MIN_ELEVATION && !isRock(heightmap, x, y);
 }
 
 /**
@@ -138,6 +158,41 @@ export function applyEarthquake(
       if (vx < 0 || vx > heightmap.width) continue;
       const delta = Math.round((rng() * 2 - 1) * maxDelta);
       raiseVertex(heightmap, vx, vy, delta);
+    }
+  }
+}
+
+/** Radius (in vertices) and rock hardness of a default volcano. */
+export const DEFAULT_VOLCANO_RADIUS = 1;
+export const VOLCANO_ROCK_HARDNESS = 20;
+
+/**
+ * Heaves every vertex within `radius` of (centerX, centerY) up to
+ * MAX_ELEVATION and covers it in rock — docs/game-system.md's "対象地点
+ * を高く隆起させ、岩石で覆う". Unlike an earthquake this is deterministic
+ * and one-directional: it always builds a peak, never a pit. The rock
+ * makes the area unbuildable (see isBuildable) until enough later
+ * raiseVertex calls chip its hardness down to 0 — "復旧には大量の地形
+ * 操作が必要".
+ */
+export function applyVolcano(
+  heightmap: Heightmap,
+  centerX: number,
+  centerY: number,
+  radius: number = DEFAULT_VOLCANO_RADIUS,
+  hardness: number = VOLCANO_ROCK_HARDNESS,
+): void {
+  const cx = Math.round(centerX);
+  const cy = Math.round(centerY);
+
+  for (let dy = -radius; dy <= radius; dy++) {
+    const vy = cy + dy;
+    if (vy < 0 || vy > heightmap.height) continue;
+    for (let dx = -radius; dx <= radius; dx++) {
+      const vx = cx + dx;
+      if (vx < 0 || vx > heightmap.width) continue;
+      heightmap.vertices[vy][vx] = MAX_ELEVATION;
+      heightmap.rockHardness[vy][vx] = hardness;
     }
   }
 }

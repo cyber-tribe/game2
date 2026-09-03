@@ -75,3 +75,9 @@ export const SWAMP_RADIUS = 1.2;
 
 /** How many walkers a swamp swallows before it dries up and disappears. */
 export const SWAMP_CAPACITY = 5;
+
+/**
+ * Mana cost of a volcano — "大" tier, pricier than earthquake/swamp since
+ * it denies land outright rather than just disrupting it temporarily.
+ */
+export const VOLCANO_MANA_COST = 40;
