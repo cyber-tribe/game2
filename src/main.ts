@@ -55,6 +55,14 @@ function pickRandomTerrain(): TerrainType {
 const HUD_MARGIN = 90;
 /** Never zoom in past this, even on a tall/narrow phone. */
 const MAX_MAP_SCALE = 1.2;
+/**
+ * Bounds on the pinch-zoom multiplier applied on top of the auto-fit scale
+ * layout() computes — see zoomFactor below. 0.5 lets a player pinch out far
+ * enough to plan across the whole map; 2.5 lets them pinch in close enough
+ * to place a precise edit without the auto-fit scale itself changing.
+ */
+const MIN_ZOOM_FACTOR = 0.5;
+const MAX_ZOOM_FACTOR = 2.5;
 /** A finger-drag shorter than this (px) is treated as a tap, not a pan. */
 const DRAG_THRESHOLD = 10;
 /** How long #tutorial-hint stays up if the player never makes a terrain edit. */
@@ -168,14 +176,22 @@ async function bootstrap() {
   // above the toolbar — portrait phones have more room vertically than
   // horizontally, so this keeps tiles big enough to tap while still
   // showing the map's full north-south extent; the player pans
-  // left/right to reach the rest.
+  // left/right to reach the rest. currentScale = baseScale * zoomFactor:
+  // baseScale is this auto-fit value (recomputed on resize), zoomFactor is
+  // the player's own pinch-zoom adjustment on top of it (see
+  // applyPinchTransform below) — kept separate so a resize (e.g. the
+  // on-screen keyboard, though this app has no text input, or a rare
+  // orientation flicker) doesn't wipe out a zoom the player dialed in.
+  let baseScale = 1;
+  let zoomFactor = 1;
   let currentScale = 1;
   const tutorialHint = document.getElementById("tutorial-hint");
   const layout = () => {
     const toolbarHeight = document.getElementById("toolbar")?.getBoundingClientRect().height ?? 0;
     const safeAreaTop = getSafeAreaInsetTop();
     const availableHeight = Math.max(200, app.screen.height - toolbarHeight - HUD_MARGIN - safeAreaTop);
-    currentScale = Math.min(MAX_MAP_SCALE, availableHeight / renderer.mapPixelHeight);
+    baseScale = Math.min(MAX_MAP_SCALE, availableHeight / renderer.mapPixelHeight);
+    currentScale = baseScale * zoomFactor;
     renderer.view.scale.set(currentScale);
     renderer.centerOn(app.screen.width, app.screen.height);
     renderer.view.position.y += safeAreaTop;
@@ -322,12 +338,13 @@ async function bootstrap() {
   let dragStart = { x: 0, y: 0 };
   let viewStartPos = { x: 0, y: 0 };
 
-  // A second finger switches to rotating the map instead of panning/
-  // tapping. Tracked by pointerId (not just a count) since PixiJS's
+  // A second finger switches to rotating/pinch-zooming the map instead of
+  // panning/tapping. Tracked by pointerId (not just a count) since PixiJS's
   // multi-touch events distinguish fingers that way.
   const activePointers = new Map<number, { x: number; y: number }>();
   let rotating = false;
   let lastTwoFingerAngle = 0;
+  let lastTwoFingerDistance = 0;
   // Set for the whole gesture (first finger down to last finger up) once
   // a second finger joins, so lifting back to one finger doesn't fire a
   // tap and releasing the last finger doesn't resume panning.
@@ -338,13 +355,22 @@ async function bootstrap() {
     return Math.atan2(b.y - a.y, b.x - a.x);
   };
 
-  // Rotates renderer.view by deltaAngle while keeping the point currently
-  // under screen position `pivot` visually fixed in place — the standard
-  // "twist" gesture feel, anchored on the midpoint between the two
-  // fingers rather than spinning around the map's corner.
-  const rotateAroundPivot = (pivot: { x: number; y: number }, deltaAngle: number) => {
+  const twoFingerDistance = (points: { x: number; y: number }[]): number => {
+    const [a, b] = points;
+    return Math.hypot(b.x - a.x, b.y - a.y);
+  };
+
+  // Rotates renderer.view by deltaAngle and scales it by scaleRatio at once
+  // (a two-finger touch naturally twists and pinches together), while
+  // keeping the point currently under screen position `pivot` visually
+  // fixed in place — the standard map-app "twist and pinch" feel, anchored
+  // on the midpoint between the two fingers rather than the map's corner.
+  const applyPinchTransform = (pivot: { x: number; y: number }, deltaAngle: number, scaleRatio: number) => {
     const local = renderer.view.toLocal(pivot);
     renderer.view.rotation += deltaAngle;
+    zoomFactor = Math.min(MAX_ZOOM_FACTOR, Math.max(MIN_ZOOM_FACTOR, zoomFactor * scaleRatio));
+    currentScale = baseScale * zoomFactor;
+    renderer.view.scale.set(currentScale);
     const cos = Math.cos(renderer.view.rotation);
     const sin = Math.sin(renderer.view.rotation);
     const scaledX = local.x * currentScale;
@@ -363,7 +389,9 @@ async function bootstrap() {
       rotating = true;
       pointerActive = false;
       isDragging = false;
-      lastTwoFingerAngle = twoFingerAngle([...activePointers.values()]);
+      const points = [...activePointers.values()];
+      lastTwoFingerAngle = twoFingerAngle(points);
+      lastTwoFingerDistance = twoFingerDistance(points);
       return;
     }
 
@@ -387,8 +415,12 @@ async function bootstrap() {
       let delta = angle - lastTwoFingerAngle;
       if (delta > Math.PI) delta -= Math.PI * 2; // shortest way around, not through the ±180° seam
       if (delta < -Math.PI) delta += Math.PI * 2;
-      rotateAroundPivot({ x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2 }, delta);
+      const distance = twoFingerDistance(points);
+      const scaleRatio = lastTwoFingerDistance > 0 ? distance / lastTwoFingerDistance : 1;
+      const pivot = { x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2 };
+      applyPinchTransform(pivot, delta, scaleRatio);
       lastTwoFingerAngle = angle;
+      lastTwoFingerDistance = distance;
       return;
     }
 
