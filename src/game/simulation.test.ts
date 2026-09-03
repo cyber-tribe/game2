@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyFlood, applyVolcano, isBuildable, isRock, type Heightmap } from "../world/heightmap";
 import { FactionState, House, Owner, Position, Swamp, Walker } from "./components";
-import { ARMAGEDDON_MANA_COST, MAX_MANA } from "./constants";
+import { ARMAGEDDON_MANA_COST, HOUSE_LEVELS, MAX_MANA } from "./constants";
 import { drownFlood } from "./flood";
 import { Simulation } from "./simulation";
 import { createSwamp } from "./swamp";
@@ -185,13 +185,70 @@ describe("Simulation", () => {
     sim.world.add(enemyHouse, House, { level: "hut", population: 8 });
 
     const playerHouse = sim.world.createEntity();
-    sim.world.add(playerHouse, Position, { x: 8, y: 8 });
+    // Corner-adjacent (both axes near an edge, like the enemy's house
+    // above): countFlatNeighbors can't see past the map edge on either
+    // side here, so this stays below castle's flatness requirement and
+    // won't fire an unrelated houseReachedCastle event on this same first
+    // tick (a house away from every edge, on this perfectly flat map,
+    // would reach castle immediately).
+    sim.world.add(playerHouse, Position, { x: 9, y: 9 });
     sim.world.add(playerHouse, Owner, { faction: "player" });
     sim.world.add(playerHouse, House, { level: "hut", population: 1 });
 
     sim.update(0.1); // every decision system runs on its very first tick
 
     expect(sim.getMatchEvents()).toEqual([{ time: 0.1, faction: "enemy", type: "armageddon" }]);
+  });
+
+  it("records houseCaptured when a walker takes an enemy house in combat", () => {
+    const sim = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 0 });
+    const enemyHouse = sim.world.createEntity();
+    sim.world.add(enemyHouse, Position, { x: 5, y: 5 });
+    sim.world.add(enemyHouse, Owner, { faction: "enemy" });
+    sim.world.add(enemyHouse, House, { level: "hut", population: 0 });
+
+    const attacker = sim.world.createEntity();
+    sim.world.add(attacker, Position, { x: 5, y: 5 });
+    sim.world.add(attacker, Owner, { faction: "player" });
+    sim.world.add(attacker, Walker, { strength: HOUSE_LEVELS.hut.defense + 1, state: "seeking", speed: 1 });
+
+    sim.update(0.1);
+
+    expect(sim.getMatchEvents()).toContainEqual({ time: 0.1, faction: "player", type: "houseCaptured" });
+  });
+
+  it("records houseBurned when a knight burns an enemy house down", () => {
+    const sim = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 0 });
+    const enemyHouse = sim.world.createEntity();
+    sim.world.add(enemyHouse, Position, { x: 5, y: 5 });
+    sim.world.add(enemyHouse, Owner, { faction: "enemy" });
+    sim.world.add(enemyHouse, House, { level: "hut", population: 0 });
+
+    const knight = sim.world.createEntity();
+    sim.world.add(knight, Position, { x: 5, y: 5 });
+    sim.world.add(knight, Owner, { faction: "player" });
+    sim.world.add(knight, Walker, { strength: 1, state: "knight", speed: 1 });
+
+    sim.update(0.1);
+
+    expect(sim.getMatchEvents()).toContainEqual({ time: 0.1, faction: "player", type: "houseBurned" });
+  });
+
+  it("records houseReachedCastle when a house's surroundings become flat enough", () => {
+    const heightmap = flatHeightmap(20, 20, 5); // fully flat, comfortably away from any edge
+    // initialWalkersPerFaction defaults to giving both sides walkers, so
+    // the enemy isn't already "defeated" (0 walkers, 0 houses) the instant
+    // update() checks the outcome — which would skip the whole tick,
+    // including houseUpgradeSystem, before it ever ran.
+    const sim = new Simulation({ worldWidth: 20, worldHeight: 20, heightmap });
+    const house = sim.world.createEntity();
+    sim.world.add(house, Position, { x: 10, y: 10 });
+    sim.world.add(house, Owner, { faction: "player" });
+    sim.world.add(house, House, { level: "hut", population: 0 });
+
+    sim.update(0.1);
+
+    expect(sim.getMatchEvents()).toContainEqual({ time: 0.1, faction: "player", type: "houseReachedCastle" });
   });
 
   it("keeps every settled house on buildable land when a heightmap with water is provided", () => {

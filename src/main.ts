@@ -19,7 +19,7 @@ import { eruptVolcano } from "./game/volcano";
 import { EntityLayer } from "./render/EntityLayer";
 import { Hud } from "./render/Hud";
 import { IsoRenderer } from "./render/IsoRenderer";
-import { describeMiracleEvent } from "./render/miracleLabels";
+import { describeMatchEvent } from "./render/matchEventLabels";
 import { Minimap } from "./render/Minimap";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
 import {
@@ -166,7 +166,7 @@ async function bootstrap() {
   };
 
   const onEnemyAction = (event: EnemyMiracleEvent) => {
-    showEnemyEventToast(describeMiracleEvent(event.type, "enemy"));
+    showEnemyEventToast(describeMatchEvent(event.type, "enemy"));
     triggerShake(ENEMY_SHAKE_MAGNITUDE[event.type]);
   };
 
