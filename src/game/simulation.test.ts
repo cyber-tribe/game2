@@ -26,6 +26,28 @@ describe("Simulation", () => {
     }
   });
 
+  it("passes enemyAggressionThreshold through to the enemy AI (see game/worlds.ts's per-world difficulty tuning)", () => {
+    const aggressive = new Simulation({
+      worldWidth: 20,
+      worldHeight: 20,
+      initialWalkersPerFaction: 3,
+      enemyAggressionThreshold: 3,
+      enemyDecisionInterval: 1,
+    });
+    aggressive.update(0.1);
+    expect(aggressive.summarize().find((s) => s.id === "enemy")!.behaviorMode).toBe("fight");
+
+    const passive = new Simulation({
+      worldWidth: 20,
+      worldHeight: 20,
+      initialWalkersPerFaction: 3,
+      enemyAggressionThreshold: 10,
+      enemyDecisionInterval: 1,
+    });
+    passive.update(0.1);
+    expect(passive.summarize().find((s) => s.id === "enemy")!.behaviorMode).toBe("settle");
+  });
+
   it("lists every walker as an InspectableEntity with its faction/strength/state", () => {
     const sim = new Simulation({ worldWidth: 20, worldHeight: 20, initialWalkersPerFaction: 2 });
 

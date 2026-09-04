@@ -245,6 +245,8 @@ async function bootstrap(world: WorldDefinition) {
     worldHeight: world.worldHeight,
     heightmap,
     terrainEditRule,
+    enemyDecisionInterval: world.enemyDecisionInterval,
+    enemyAggressionThreshold: world.enemyAggressionThreshold,
     onEnemyAction,
   });
 
@@ -777,9 +779,12 @@ function showWorldSelect(): void {
         const detail = document.createElement("span");
         detail.className = "world-select-detail";
         const ruleLabel = world.terrainEditRule !== "both" ? `・${TERRAIN_EDIT_RULE_LABELS[world.terrainEditRule]}` : "";
+        // WORLDS is itself ordered by difficulty (see its own doc comment),
+        // so the world's own position in the list doubles as a simple
+        // difficulty indicator — no separate derived score needed.
         detail.textContent = locked
           ? "パスワードが必要です"
-          : `${TERRAIN_LABELS[world.terrain]}・${world.worldWidth}×${world.worldHeight}${ruleLabel}`;
+          : `${TERRAIN_LABELS[world.terrain]}・${world.worldWidth}×${world.worldHeight}${ruleLabel}・難易度${index + 1}/${WORLDS.length}`;
 
         button.append(name, detail);
         if (!locked) {
