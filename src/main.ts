@@ -22,21 +22,24 @@ import { WORLDS, nextWorldId, unlockedCountForPassword, type WorldDefinition } f
 import { EntityLayer } from "./render/EntityLayer";
 import { describeInspectableEntity } from "./render/entityInfoLabel";
 import { Hud } from "./render/Hud";
-import { IsoRenderer } from "./render/IsoRenderer";
+import { IsoRenderer, visibleTileBounds, type TileBounds } from "./render/IsoRenderer";
 import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
 import { Minimap } from "./render/Minimap";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
 import { DEFAULT_EARTHQUAKE_RADIUS, DEFAULT_VOLCANO_RADIUS, applyEarthquake, applyFlood, applyVolcano, createHeightmap, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
 
-/** Reserved space (screen px) above the map for the HUD text. */
-const HUD_MARGIN = 90;
-/** Never zoom in past this, even on a tall/narrow phone. */
-const MAX_MAP_SCALE = 1.2;
 /**
- * Bounds on the pinch-zoom multiplier applied on top of the auto-fit scale
- * layout() computes — see zoomFactor below. 0.5 lets a player pinch out far
- * enough to plan across the whole map; 2.5 lets them pinch in close enough
- * to place a precise edit without the auto-fit scale itself changing.
+ * The camera's fixed base scale — see layout()'s doc comment for why this
+ * no longer auto-fits the whole (now much bigger) map to the screen. 1
+ * matches IsoRenderer's own TILE_WIDTH/TILE_HEIGHT, i.e. tiles render at
+ * their native, comfortably tap-able size.
+ */
+const BASE_MAP_SCALE = 1;
+/**
+ * Bounds on the pinch-zoom multiplier applied on top of BASE_MAP_SCALE —
+ * see zoomFactor below. 0.5 lets a player pinch out far enough to plan
+ * across a wider area at once; 2.5 lets them pinch in close enough to
+ * place a precise edit.
  */
 const MIN_ZOOM_FACTOR = 0.5;
 const MAX_ZOOM_FACTOR = 2.5;
@@ -100,7 +103,12 @@ async function bootstrap(world: WorldDefinition) {
   await app.init({
     resizeTo: window,
     background: "#0a1a2a",
-    antialias: true,
+    // Off, not on: MSAA roughly doubled full-screen frame cost in testing
+    // (see plan/0062-original-scale-map.md) once the map — and so the
+    // terrain mesh redrawn every frame — grew from ≤32x32 to 64x64. This
+    // game's flat-shaded low-poly style barely shows the difference; a
+    // lower, steadier frame rate would be far more noticeable.
+    antialias: false,
   });
 
   const container = document.getElementById("app");
@@ -260,19 +268,17 @@ async function bootstrap(world: WorldDefinition) {
     if (simulation.releasePopulation("player") > 0) vibrate(15);
   });
 
-  // Fit the map's height (not width) into the space below the HUD and
-  // above the toolbar — portrait phones have more room vertically than
-  // horizontally, so this keeps tiles big enough to tap while still
-  // showing the map's full north-south extent; the player pans
-  // left/right to reach the rest. currentScale = baseScale * zoomFactor:
-  // baseScale is this auto-fit value (recomputed on resize), zoomFactor is
-  // the player's own pinch-zoom adjustment on top of it (see
-  // applyPinchTransform below) — kept separate so a resize (e.g. the
-  // on-screen keyboard, though this app has no text input, or a rare
-  // orientation flicker) doesn't wipe out a zoom the player dialed in.
-  let baseScale = 1;
+  // The map is now far bigger than any one screen (see
+  // plan/0062-original-scale-map.md) — like the original, the camera
+  // always renders at a fixed, comfortably tap-able native scale (see
+  // IsoRenderer's own TILE_WIDTH/TILE_HEIGHT doc comment) and the player
+  // pans to reach the rest, rather than the whole map ever shrinking to
+  // fit on screen. currentScale = baseScale * zoomFactor: baseScale is
+  // this fixed value, zoomFactor is the player's own pinch-zoom adjustment
+  // on top of it (see applyPinchTransform below).
+  let baseScale = BASE_MAP_SCALE;
   let zoomFactor = 1;
-  let currentScale = 1;
+  let currentScale = baseScale;
   const tutorialHint = document.getElementById("tutorial-hint");
   // Only a mouse-driven device needs telling about the wheel/keyboard
   // controls above — a touchscreen already has the two-finger gesture
@@ -280,29 +286,6 @@ async function bootstrap(world: WorldDefinition) {
   if (tutorialHint && window.matchMedia("(pointer: fine)").matches) {
     tutorialHint.textContent += "\nPC: ホイールでズーム、Q/Eキーで回転できます。";
   }
-  const layout = () => {
-    const toolbarHeight = document.getElementById("toolbar")?.getBoundingClientRect().height ?? 0;
-    const safeAreaTop = getSafeAreaInsetTop();
-    const availableHeight = Math.max(200, app.screen.height - toolbarHeight - HUD_MARGIN - safeAreaTop);
-    baseScale = Math.min(MAX_MAP_SCALE, availableHeight / renderer.mapPixelHeight);
-    currentScale = baseScale * zoomFactor;
-    renderer.view.scale.set(currentScale);
-    renderer.centerOn(app.screen.width, app.screen.height);
-    renderer.view.position.y += safeAreaTop;
-    hud.setMaxWidth(app.screen.width);
-    hud.setTopInset(safeAreaTop);
-    minimap.view.position.set(app.screen.width - MINIMAP_SIZE - 10, 10 + safeAreaTop);
-    if (tutorialHint) tutorialHint.style.bottom = `${toolbarHeight + 12}px`;
-  };
-  layout();
-  window.addEventListener("resize", layout);
-
-  // Nudges a first-time player toward the core loop — see Hud.ts's
-  // comment on why the canvas HUD itself carries no such guidance.
-  // Dismissed by the player's first terrain edit, or after a timeout for
-  // anyone who's just watching instead of tapping.
-  const dismissTutorialHint = () => tutorialHint?.classList.add("hidden");
-  setTimeout(dismissTutorialHint, TUTORIAL_HINT_TIMEOUT_MS);
 
   const clampPan = (x: number, y: number): { x: number; y: number } => {
     const halfW = (renderer.mapPixelWidth * currentScale) / 2;
@@ -317,19 +300,70 @@ async function bootstrap(world: WorldDefinition) {
 
   // Recenters the main view on a world (tile) point without changing zoom
   // or rotation — same pivot math as rotateAroundPivot below, just with a
-  // fixed target (the visible map's rough center) instead of the
-  // two-finger midpoint. Used by the minimap's "tap to jump" (see
-  // render/Minimap.ts's doc comment on why it exists).
-  const centerViewOn = (worldX: number, worldY: number) => {
+  // fixed target (the screen center, nudged down by extraOffsetY) instead
+  // of the two-finger midpoint. Used by the minimap's "tap to jump" (see
+  // render/Minimap.ts's doc comment on why it exists) and by layout()'s
+  // one-time initial centering on the player's own shrine, below.
+  const centerViewOn = (worldX: number, worldY: number, extraOffsetY = 0) => {
     const local = renderer.project(worldX, worldY);
     const cos = Math.cos(renderer.view.rotation);
     const sin = Math.sin(renderer.view.rotation);
     const scaledX = local.sx * currentScale;
     const scaledY = local.sy * currentScale;
-    const target = { x: app.screen.width / 2, y: app.screen.height / 2 };
+    const target = { x: app.screen.width / 2, y: app.screen.height / 2 + extraOffsetY };
     const next = clampPan(target.x - (scaledX * cos - scaledY * sin), target.y - (scaledX * sin + scaledY * cos));
     renderer.view.position.set(next.x, next.y);
   };
+
+  // Centers on the player's own starting village exactly once — like the
+  // original, arriving anywhere else (the map's geometric center, say)
+  // would often show nothing but empty land. Only on this first call:
+  // recentering again on every later layout() (e.g. a phone rotation)
+  // would otherwise yank the camera back and discard wherever the player
+  // has since panned to.
+  let hasCenteredOnce = false;
+  const layout = () => {
+    const toolbarHeight = document.getElementById("toolbar")?.getBoundingClientRect().height ?? 0;
+    const safeAreaTop = getSafeAreaInsetTop();
+    currentScale = baseScale * zoomFactor;
+    renderer.view.scale.set(currentScale);
+    if (!hasCenteredOnce) {
+      const shrine = simulation.getShrinePosition("player");
+      if (shrine) centerViewOn(shrine.x, shrine.y, safeAreaTop);
+      hasCenteredOnce = true;
+    }
+    hud.setMaxWidth(app.screen.width);
+    hud.setTopInset(safeAreaTop);
+    minimap.view.position.set(app.screen.width - MINIMAP_SIZE - 10, 10 + safeAreaTop);
+    if (tutorialHint) tutorialHint.style.bottom = `${toolbarHeight + 12}px`;
+  };
+  layout();
+  window.addEventListener("resize", layout);
+
+  // Which tiles the current camera could possibly show, in world (tile)
+  // coordinates — see IsoRenderer's visibleTileBounds doc comment for why
+  // this matters now that the map is far bigger than one screen. Recomputed
+  // fresh wherever it's needed (the ticker below, and every immediate
+  // redraw() a miracle triggers) rather than cached, since pan/zoom/rotate
+  // can change between any two calls.
+  const visibleBounds = () =>
+    visibleTileBounds(
+      [
+        renderer.view.toLocal({ x: 0, y: 0 }),
+        renderer.view.toLocal({ x: app.screen.width, y: 0 }),
+        renderer.view.toLocal({ x: app.screen.width, y: app.screen.height }),
+        renderer.view.toLocal({ x: 0, y: app.screen.height }),
+      ],
+      heightmap.width,
+      heightmap.height,
+    );
+
+  // Nudges a first-time player toward the core loop — see Hud.ts's
+  // comment on why the canvas HUD itself carries no such guidance.
+  // Dismissed by the player's first terrain edit, or after a timeout for
+  // anyone who's just watching instead of tapping.
+  const dismissTutorialHint = () => tutorialHint?.classList.add("hidden");
+  setTimeout(dismissTutorialHint, TUTORIAL_HINT_TIMEOUT_MS);
 
   minimap.view.eventMode = "static";
   minimap.view.cursor = "pointer";
@@ -383,7 +417,7 @@ async function bootstrap(world: WorldDefinition) {
     if (!isTerrainEditAllowed(terrainEditRule, delta)) return;
     if (!trySpendMana(simulation.world, "player", TERRAIN_EDIT_MANA_COST)) return;
     raiseVertex(heightmap, vertex.x, vertex.y, delta);
-    renderer.redraw();
+    renderer.redraw(visibleBounds());
     dismissTutorialHint();
   };
 
@@ -412,7 +446,7 @@ async function bootstrap(world: WorldDefinition) {
       if (!trySpendMana(simulation.world, "player", EARTHQUAKE_MANA_COST)) return;
       applyEarthquake(heightmap, vertex.x, vertex.y);
       collapseSwampsNear(simulation.world, vertex.x, vertex.y, DEFAULT_EARTHQUAKE_RADIUS);
-      renderer.redraw();
+      renderer.redraw(visibleBounds());
       simulation.recordEvent("player", "earthquake");
       triggerShake(6);
       vibrate(40);
@@ -433,7 +467,7 @@ async function bootstrap(world: WorldDefinition) {
       if (!trySpendMana(simulation.world, "player", VOLCANO_MANA_COST)) return;
       applyVolcano(heightmap, vertex.x, vertex.y);
       eruptVolcano(simulation.world, vertex.x, vertex.y, DEFAULT_VOLCANO_RADIUS);
-      renderer.redraw();
+      renderer.redraw(visibleBounds());
       simulation.recordEvent("player", "volcano");
       triggerShake(8);
       vibrate([40, 30, 60]);
@@ -467,7 +501,7 @@ async function bootstrap(world: WorldDefinition) {
       if (!trySpendMana(simulation.world, "player", FLOOD_MANA_COST)) return;
       applyFlood(heightmap);
       drownFlood(simulation.world, heightmap, (event) => simulation.recordImpactEffect(event));
-      renderer.redraw();
+      renderer.redraw(visibleBounds());
       simulation.recordEvent("player", "flood");
       triggerShake(5);
       vibrate(50);
@@ -711,6 +745,12 @@ async function bootstrap(world: WorldDefinition) {
     .querySelectorAll<HTMLButtonElement>('#toolbar [data-tool="raise"], #toolbar [data-tool="lower"]')
     .forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.tool === toolMode)));
 
+  // Which bounds renderer.redraw() last actually ran with — see the ticker
+  // below's skip-if-nothing-would-look-different check.
+  let lastRedrawnBounds: TileBounds | undefined;
+  const boundsEqual = (a: TileBounds, b: TileBounds) =>
+    a.minX === b.minX && a.maxX === b.maxX && a.minY === b.minY && a.maxY === b.maxY;
+
   app.ticker.add((ticker) => {
     const deltaSeconds = ticker.deltaMS / 1000;
     simulation.update(deltaSeconds);
@@ -722,7 +762,21 @@ async function bootstrap(world: WorldDefinition) {
     // player's own taps — without redrawing every tick, those changes
     // were invisible until the player's next tap happened to trigger one.
     renderer.update(deltaSeconds);
-    renderer.redraw();
+    const bounds = visibleBounds();
+    // Rebuilding the whole terrain mesh (redraw()) — recomputing every
+    // tile's screen-space quad, its rock/lava state, etc. — is real CPU
+    // work that scales with tile count, which now (see
+    // plan/0062-original-scale-map.md) means up to a screen's worth of a
+    // 64x64 world instead of a whole ≤32x32 one. Most frames, with the
+    // camera held still and no edit in progress, that work would rebuild
+    // the exact same mesh already on screen. Skipping it whenever the
+    // visible bounds haven't moved and nothing's still animating (see
+    // IsoRenderer.isAnimating) avoids that redundant CPU cost without ever
+    // skipping a frame that would actually look different.
+    if (!lastRedrawnBounds || !boundsEqual(bounds, lastRedrawnBounds) || renderer.isAnimating(bounds)) {
+      renderer.redraw(bounds);
+      lastRedrawnBounds = bounds;
+    }
     entityLayer.update(simulation.world, deltaSeconds, simulation.getImpactEffects());
     const outcome = simulation.getOutcome();
     hud.update(simulation.summarize(), outcome);
@@ -781,10 +835,12 @@ function showWorldSelect(): void {
         const ruleLabel = world.terrainEditRule !== "both" ? `・${TERRAIN_EDIT_RULE_LABELS[world.terrainEditRule]}` : "";
         // WORLDS is itself ordered by difficulty (see its own doc comment),
         // so the world's own position in the list doubles as a simple
-        // difficulty indicator — no separate derived score needed.
+        // difficulty indicator — no separate derived score needed. Map
+        // size is no longer shown here since every world is the same
+        // fixed 64x64 (see plan/0062-original-scale-map.md).
         detail.textContent = locked
           ? "パスワードが必要です"
-          : `${TERRAIN_LABELS[world.terrain]}・${world.worldWidth}×${world.worldHeight}${ruleLabel}・難易度${index + 1}/${WORLDS.length}`;
+          : `${TERRAIN_LABELS[world.terrain]}${ruleLabel}・難易度${index + 1}/${WORLDS.length}`;
 
         button.append(name, detail);
         if (!locked) {

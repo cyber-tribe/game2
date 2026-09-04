@@ -1,5 +1,5 @@
 import { Container, Graphics } from "pixi.js";
-import { sampleElevation, VOLCANO_ROCK_HARDNESS, type Heightmap } from "../world/heightmap";
+import { MAX_ELEVATION, sampleElevation, VOLCANO_ROCK_HARDNESS, type Heightmap } from "../world/heightmap";
 
 // Sized for finger taps rather than mouse clicks: at scale 1 adjacent
 // vertices sit 32px/16px apart on screen, which pickVertex's default
@@ -108,6 +108,73 @@ export function volcanoGlowIntensity(
   return base * pulse;
 }
 
+export interface TileBounds {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}
+
+/**
+ * Extra tiles of padding around the exact projected screen rectangle in
+ * visibleTileBounds — a raised vertex sits higher on screen (smaller sy)
+ * than the flat (elevation-0) inverse projection assumes, by up to
+ * MAX_ELEVATION*ELEVATION_STEP px. Since ELEVATION_STEP equals TILE_HEIGHT/2
+ * here, that's exactly MAX_ELEVATION of "sum" (= sy/(TILE_HEIGHT/2)), which
+ * splits evenly between tileX and tileY (each is (sum±diff)/2) — so half of
+ * MAX_ELEVATION covers it, plus a little slack for the lava-flow pass's own
+ * overshoot past a rock tile's edges, so a tall mountain's peak or a swamp/
+ * farmland tint just past the exact edge never pops in/out as the camera
+ * pans. (`diff` — sx/(TILE_WIDTH/2) — has no elevation term at all, so it
+ * never needs padding; padding every side the same is just simpler than
+ * tracking that asymmetry.)
+ */
+const TILE_BOUNDS_MARGIN = Math.ceil(MAX_ELEVATION / 2) + 2;
+
+/**
+ * Which tiles could possibly be visible given the 4 corners of the screen,
+ * expressed in renderer.view's local space (e.g. via `view.toLocal(...)` on
+ * each screen corner) — the inverse of toScreen, ignoring each vertex's own
+ * elevation (accounted for instead by padding the result — see
+ * TILE_BOUNDS_MARGIN). Lets redraw() skip tiles nowhere near the camera
+ * instead of rebuilding the whole map's mesh every frame regardless of
+ * zoom/pan — necessary once the map is much bigger than a single screen
+ * (see plan/0062-original-scale-map.md), the same technical constraint the
+ * original game's own hardware was built around. Pulled out as a pure
+ * function so the tile selection is unit-testable without a Graphics/
+ * canvas context or a live PixiJS view.
+ */
+export function visibleTileBounds(
+  localCorners: readonly { x: number; y: number }[],
+  mapWidth: number,
+  mapHeight: number,
+  margin = TILE_BOUNDS_MARGIN,
+): TileBounds {
+  let minTileX = Infinity;
+  let maxTileX = -Infinity;
+  let minTileY = Infinity;
+  let maxTileY = -Infinity;
+
+  for (const { x: sx, y: sy } of localCorners) {
+    // Inverse of toScreen(x, y, 0): sx = (x-y)*(TILE_WIDTH/2), sy = (x+y)*(TILE_HEIGHT/2).
+    const sum = sy / (TILE_HEIGHT / 2);
+    const diff = sx / (TILE_WIDTH / 2);
+    const tileX = (sum + diff) / 2;
+    const tileY = (sum - diff) / 2;
+    minTileX = Math.min(minTileX, tileX);
+    maxTileX = Math.max(maxTileX, tileX);
+    minTileY = Math.min(minTileY, tileY);
+    maxTileY = Math.max(maxTileY, tileY);
+  }
+
+  return {
+    minX: Math.max(0, Math.floor(minTileX - margin)),
+    maxX: Math.min(mapWidth - 1, Math.ceil(maxTileX + margin)),
+    minY: Math.max(0, Math.floor(minTileY - margin)),
+    maxY: Math.min(mapHeight - 1, Math.ceil(maxTileY + margin)),
+  };
+}
+
 /** Renders a heightmap as an isometric grid of quads, one per tile. */
 export class IsoRenderer {
   readonly view = new Container();
@@ -127,6 +194,15 @@ export class IsoRenderer {
 
   /** Seconds since construction — drives the lava-crack pulse in redraw(). */
   private elapsedTime = 0;
+
+  /**
+   * Whether the last redraw() found any glowing lava within its bounds —
+   * see isAnimating(). One-redraw-old by nature (set at the end of
+   * redraw(), read before the next one), which just means a volcano's
+   * pulse can take one extra frame to resume after it first pans into
+   * view — imperceptible in practice.
+   */
+  private hasActiveLava = false;
 
   constructor(heightmap: Heightmap) {
     this.heightmap = heightmap;
@@ -156,8 +232,36 @@ export class IsoRenderer {
     }
   }
 
-  centerOn(screenWidth: number, screenHeight: number): void {
-    this.view.position.set(screenWidth / 2, screenHeight / 3);
+  /**
+   * Whether redraw() is worth calling again even though the camera itself
+   * hasn't moved — terrain still easing toward a recent edit (see
+   * displayVertices), or a volcano's lava still pulsing — somewhere within
+   * `bounds`. Lets the caller (main.ts's ticker) skip rebuilding the whole
+   * terrain mesh on a frame where nothing *visible* would actually look
+   * different — the dominant cost once the map is much bigger than one
+   * screen (see plan/0062-original-scale-map.md). Scoped to `bounds`
+   * rather than the whole map on purpose: the enemy AI terraforms and
+   * fights continuously wherever its own houses are, often nowhere near
+   * the player's current view, and that shouldn't by itself keep forcing
+   * full redraws of a part of the map nobody's even looking at.
+   */
+  isAnimating(bounds: TileBounds): boolean {
+    return this.isEasing(bounds) || this.hasActiveLava;
+  }
+
+  /** Vertex coordinates run 0..width/height inclusive — one past a tile's own x/y. */
+  private isEasing(bounds: TileBounds): boolean {
+    const { vertices } = this.heightmap;
+    const maxVertexY = Math.min(bounds.maxY + 1, vertices.length - 1);
+    const maxVertexX = Math.min(bounds.maxX + 1, vertices[0].length - 1);
+    for (let y = bounds.minY; y <= maxVertexY; y++) {
+      const displayRow = this.displayVertices[y];
+      const targetRow = vertices[y];
+      for (let x = bounds.minX; x <= maxVertexX; x++) {
+        if (Math.abs(targetRow[x] - displayRow[x]) >= 0.01) return true;
+      }
+    }
+    return false;
   }
 
   /** Total screen-space width/height (at scale 1) of the diamond the map projects to. */
@@ -211,38 +315,59 @@ export class IsoRenderer {
    * Rebuilds the terrain mesh from the current display heights (see
    * displayVertices) — call after editing the heightmap, and every frame
    * update() runs, so an in-progress ease keeps redrawing until it settles.
+   *
+   * `bounds` (see visibleTileBounds) restricts the rebuild to just those
+   * tiles, for maps much bigger than a single screen — omit it (as the
+   * constructor and tests do) to rebuild the whole map, e.g. for an
+   * initial full-map render before any camera/viewport exists yet.
    */
-  redraw(): void {
+  redraw(bounds?: TileBounds): void {
     const { width, height, rockHardness, waterLevel, terrain } = this.heightmap;
     const vertices = this.displayVertices;
     const graphics = this.graphics;
     graphics.clear();
 
+    const minX = bounds?.minX ?? 0;
+    const maxX = bounds?.maxX ?? width - 1;
+    const minY = bounds?.minY ?? 0;
+    const maxY = bounds?.maxY ?? height - 1;
+    const boundsWidth = maxX - minX + 1;
+    const boundsHeight = maxY - minY + 1;
+
     // Precomputed once so the lava-flow pass (below) can look at each rock
     // tile's neighbors without recomputing isRockTile for them repeatedly.
+    // Indexed by offset from (minX, minY), not by true tile coordinates —
+    // drawLavaFlow's isRim treats anything outside this same bounded window
+    // as non-rock, same as it already treats the true map edge. That can
+    // only misjudge a rim right at the edge of `bounds`, which — thanks to
+    // visibleTileBounds' own padding — is always well past what's actually
+    // on screen.
     const isRockTile: boolean[][] = [];
     const avgHardnessGrid: number[][] = [];
-    for (let y = 0; y < height; y++) {
-      isRockTile.push([]);
-      avgHardnessGrid.push([]);
-      for (let x = 0; x < width; x++) {
+    for (let y = minY; y <= maxY; y++) {
+      const rockRow: boolean[] = [];
+      const hardnessRow: number[] = [];
+      for (let x = minX; x <= maxX; x++) {
         const cornerHardness = [
           rockHardness[y][x],
           rockHardness[y][x + 1],
           rockHardness[y + 1][x + 1],
           rockHardness[y + 1][x],
         ];
-        isRockTile[y].push(cornerHardness.some((h) => h > 0));
-        avgHardnessGrid[y].push(cornerHardness.reduce((sum, h) => sum + h, 0) / 4);
+        rockRow.push(cornerHardness.some((h) => h > 0));
+        hardnessRow.push(cornerHardness.reduce((sum, h) => sum + h, 0) / 4);
       }
+      isRockTile.push(rockRow);
+      avgHardnessGrid.push(hardnessRow);
     }
+    this.hasActiveLava = isRockTile.some((row) => row.some(Boolean));
 
     // Pass 1: every tile's ground fill. Kept separate from the lava-flow
     // pass below so a flow can never end up hidden underneath a
     // later-drawn neighboring tile — flows always paint on top, regardless
     // of which tile happens to iterate first.
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
         const avgHeight = (vertices[y][x] + vertices[y][x + 1] + vertices[y + 1][x + 1] + vertices[y + 1][x]) / 4;
         const p0 = this.toScreen(x, y, vertices[y][x]);
         const p1 = this.toScreen(x + 1, y, vertices[y][x + 1]);
@@ -250,7 +375,11 @@ export class IsoRenderer {
         const p3 = this.toScreen(x, y + 1, vertices[y + 1][x]);
 
         const color =
-          avgHeight <= waterLevel ? WATER_COLOR : isRockTile[y][x] ? VOLCANO_ROCK_COLOR : TERRAIN_COLOR[terrain];
+          avgHeight <= waterLevel
+            ? WATER_COLOR
+            : isRockTile[y - minY][x - minX]
+              ? VOLCANO_ROCK_COLOR
+              : TERRAIN_COLOR[terrain];
 
         graphics
           .poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy])
@@ -260,9 +389,9 @@ export class IsoRenderer {
     }
 
     // Pass 2: lava flows, rim tiles only (see VOLCANO_ROCK_COLOR's doc comment).
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        if (!isRockTile[y][x]) continue;
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        if (!isRockTile[y - minY][x - minX]) continue;
         const avgHeight = (vertices[y][x] + vertices[y][x + 1] + vertices[y + 1][x + 1] + vertices[y + 1][x]) / 4;
         if (avgHeight <= waterLevel) continue;
 
@@ -270,7 +399,21 @@ export class IsoRenderer {
         const p1 = this.toScreen(x + 1, y, vertices[y][x + 1]);
         const p2 = this.toScreen(x + 1, y + 1, vertices[y + 1][x + 1]);
         const p3 = this.toScreen(x, y + 1, vertices[y + 1][x]);
-        this.drawLavaFlow(graphics, x, y, p0, p1, p2, p3, avgHardnessGrid[y][x], isRockTile, width, height);
+        this.drawLavaFlow(
+          graphics,
+          x,
+          y,
+          p0,
+          p1,
+          p2,
+          p3,
+          avgHardnessGrid[y - minY][x - minX],
+          isRockTile,
+          minX,
+          minY,
+          boundsWidth,
+          boundsHeight,
+        );
       }
     }
   }
@@ -294,14 +437,24 @@ export class IsoRenderer {
     p3: { sx: number; sy: number },
     avgHardness: number,
     isRockTile: boolean[][],
-    gridWidth: number,
-    gridHeight: number,
+    boundsMinX: number,
+    boundsMinY: number,
+    boundsWidth: number,
+    boundsHeight: number,
   ): void {
     const intensity = volcanoGlowIntensity(avgHardness, VOLCANO_ROCK_HARDNESS, this.elapsedTime, tileHash(x, y));
     if (intensity <= 0.02) return;
 
-    const isRim = (nx: number, ny: number) =>
-      nx < 0 || ny < 0 || nx >= gridWidth || ny >= gridHeight || !isRockTile[ny][nx];
+    // x/y here (and so nx/ny) are true tile coordinates, kept stable
+    // regardless of the current camera/bounds — only tileHash above needs
+    // that stability (a tile's own pulse phase shouldn't shift as the
+    // player pans). isRockTile itself is offset by (boundsMinX, boundsMinY)
+    // — see redraw() — so lookups into it need converting back first.
+    const isRim = (nx: number, ny: number) => {
+      const lx = nx - boundsMinX;
+      const ly = ny - boundsMinY;
+      return lx < 0 || ly < 0 || lx >= boundsWidth || ly >= boundsHeight || !isRockTile[ly][lx];
+    };
 
     // Each tile edge here is named by the neighbor it borders — see toScreen:
     // north (y-1) and west (x-1) sit higher on screen than south/east.
