@@ -15,6 +15,7 @@ import {
   isRock,
   isTerrainEditAllowed,
   pickTerrainEditRule,
+  raiseTile,
   raiseVertex,
   sampleElevation,
   type Heightmap,
@@ -117,6 +118,62 @@ describe("raiseVertex", () => {
     raiseVertex(heightmap, 0, 0, 1);
 
     expect(heightmap.rockHardness[0][0]).toBe(0);
+  });
+});
+
+describe("raiseTile", () => {
+  it("raises all 4 corners of the targeted tile by delta, and no others", () => {
+    const heightmap = createHeightmap(3, 3);
+    heightmap.vertices[1][1] = 5;
+    heightmap.vertices[1][2] = 5;
+    heightmap.vertices[2][2] = 5;
+    heightmap.vertices[2][1] = 5;
+    heightmap.vertices[0][0] = 5;
+
+    raiseTile(heightmap, 1, 1, 3);
+
+    expect(heightmap.vertices[1][1]).toBe(8);
+    expect(heightmap.vertices[1][2]).toBe(8);
+    expect(heightmap.vertices[2][2]).toBe(8);
+    expect(heightmap.vertices[2][1]).toBe(8);
+    // A vertex diagonally outside tile (1,1)'s own 4 corners is untouched.
+    expect(heightmap.vertices[0][0]).toBe(5);
+  });
+
+  it("leaves an already-flat tile perfectly flat (all 4 corners still equal)", () => {
+    const heightmap = createHeightmap(3, 3);
+    heightmap.vertices[0][0] = 4;
+    heightmap.vertices[0][1] = 4;
+    heightmap.vertices[1][1] = 4;
+    heightmap.vertices[1][0] = 4;
+
+    raiseTile(heightmap, 0, 0, 2);
+
+    const corners = [heightmap.vertices[0][0], heightmap.vertices[0][1], heightmap.vertices[1][1], heightmap.vertices[1][0]];
+    expect(new Set(corners).size).toBe(1);
+    expect(corners[0]).toBe(6);
+  });
+
+  it("clamps each corner independently at MAX_ELEVATION/MIN_ELEVATION, same as raiseVertex", () => {
+    const heightmap = createHeightmap(2, 2);
+    heightmap.vertices[0][0] = MAX_ELEVATION;
+    heightmap.vertices[0][1] = 0;
+
+    raiseTile(heightmap, 0, 0, 5);
+
+    expect(heightmap.vertices[0][0]).toBe(MAX_ELEVATION);
+    expect(heightmap.vertices[0][1]).toBe(5);
+  });
+
+  it("chips rockHardness off every corner it touches", () => {
+    const heightmap = createHeightmap(2, 2);
+    heightmap.rockHardness[0][0] = 3;
+    heightmap.rockHardness[1][1] = 2;
+
+    raiseTile(heightmap, 0, 0, 1);
+
+    expect(heightmap.rockHardness[0][0]).toBe(2);
+    expect(heightmap.rockHardness[1][1]).toBe(1);
   });
 });
 

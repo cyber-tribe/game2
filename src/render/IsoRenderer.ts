@@ -355,6 +355,39 @@ export class IsoRenderer {
   }
 
   /**
+   * Finds the tile whose flat-topped block (see redraw()) center is
+   * closest to a point in this.view's local space — the tile-face analog
+   * of pickVertex, used by the raise/lower terrain tool so one edit
+   * affects a whole tile at once instead of a single corner point, per
+   * the original game's tile-based terraforming (see
+   * plan/0065-tile-based-terraform.md). Same maxDistance semantics as
+   * pickVertex. A tile's center sits at its 4 corners' average height —
+   * exactly what `sampleElevation` at the tile's midpoint (x+0.5, y+0.5)
+   * already computes, so this reads the true heightmap rather than
+   * duplicating that average here.
+   */
+  pickTile(localX: number, localY: number, maxDistance = 40): { x: number; y: number } | null {
+    const { width, height } = this.heightmap;
+    const localMaxDistance = maxDistance / this.view.scale.x;
+    let best: { x: number; y: number } | null = null;
+    let bestDistance = localMaxDistance;
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const elevation = sampleElevation(this.heightmap, x + 0.5, y + 0.5);
+        const { sx, sy } = this.toScreen(x + 0.5, y + 0.5, elevation);
+        const distance = Math.hypot(sx - localX, sy - localY);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          best = { x, y };
+        }
+      }
+    }
+
+    return best;
+  }
+
+  /**
    * Rebuilds the terrain from the current display heights (see
    * displayVertices) — call after editing the heightmap, and every frame
    * update() runs, so an in-progress ease keeps redrawing until it settles.
