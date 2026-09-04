@@ -26,6 +26,32 @@ describe("Simulation", () => {
     }
   });
 
+  it("lists every walker as an InspectableEntity with its faction/strength/state", () => {
+    const sim = new Simulation({ worldWidth: 20, worldHeight: 20, initialWalkersPerFaction: 2 });
+
+    const walkers = sim.listInspectableEntities().filter((e) => e.kind === "walker");
+    expect(walkers).toHaveLength(4);
+    for (const walker of walkers) {
+      expect(walker.kind).toBe("walker");
+      expect(["player", "enemy"]).toContain(walker.faction);
+      expect(walker.strength).toBe(1);
+      expect(walker.state).toBe("seeking");
+    }
+  });
+
+  it("lists a house as an InspectableEntity with its faction/level/population/capacity", () => {
+    const sim = new Simulation({ worldWidth: 20, worldHeight: 20, initialWalkersPerFaction: 0 });
+    const house = sim.world.createEntity();
+    sim.world.add(house, Position, { x: 3, y: 4 });
+    sim.world.add(house, Owner, { faction: "enemy" });
+    sim.world.add(house, House, { level: "manor", population: 12 });
+
+    const entities = sim.listInspectableEntities();
+    expect(entities).toEqual([
+      { kind: "house", faction: "enemy", position: { x: 3, y: 4 }, level: "manor", population: 12, capacity: HOUSE_LEVELS.manor.capacity },
+    ]);
+  });
+
   it("exposes the same housesCap to every faction, derived from world size", () => {
     const sim = new Simulation({ worldWidth: 20, worldHeight: 20 });
 

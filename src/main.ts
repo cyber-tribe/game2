@@ -16,10 +16,11 @@ import {
 import type { EnemyMiracleEvent } from "./game/systems/enemyMiracles";
 import { trySpendMana } from "./game/faction";
 import { drownFlood } from "./game/flood";
-import { Simulation, type GameOutcome, type MatchEvent } from "./game/simulation";
+import { Simulation, type GameOutcome, type InspectableEntity, type MatchEvent } from "./game/simulation";
 import { collapseSwampsNear, createSwamp } from "./game/swamp";
 import { eruptVolcano } from "./game/volcano";
 import { EntityLayer } from "./render/EntityLayer";
+import { describeInspectableEntity } from "./render/entityInfoLabel";
 import { Hud } from "./render/Hud";
 import { IsoRenderer } from "./render/IsoRenderer";
 import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
@@ -183,6 +184,20 @@ async function bootstrap() {
     toastHideTimeout = setTimeout(() => enemyEventToast.classList.add("hidden"), 3000);
   };
 
+  const entityInfoPanel = document.getElementById("entity-info-panel");
+  let entityInfoHideTimeout: ReturnType<typeof setTimeout> | undefined;
+
+  // Shows one walker/house's own detail under the "🔍 照会" tool (see
+  // applyTool's "inspect" branch and index.html's comment on
+  // #entity-info-panel) — docs/game-system.md 11節's 情報パネル.
+  const showEntityInfo = (text: string) => {
+    if (!entityInfoPanel) return;
+    entityInfoPanel.textContent = text;
+    entityInfoPanel.classList.remove("hidden");
+    clearTimeout(entityInfoHideTimeout);
+    entityInfoHideTimeout = setTimeout(() => entityInfoPanel.classList.add("hidden"), 4000);
+  };
+
   // Mirrors the shake magnitudes applyTool uses for the player's own casts
   // of the same miracles (knight has no player-side shake to match, so
   // keeps its original, smaller value).
@@ -336,8 +351,38 @@ async function bootstrap() {
   // leave the player's very first tap doing nothing.
   let toolMode: ToolMode = terrainEditRule === "lowerOnly" ? "lower" : "raise";
 
+  // Finds the walker/house closest to a tapped point in renderer.view's
+  // local space, for the "🔍 照会" tool — mirrors IsoRenderer.pickVertex's
+  // own nearest-within-maxDistance approach (maxDistance in real screen
+  // px, converted to local-space units so a finger's tap tolerance stays
+  // constant regardless of the current zoom), just against entities'
+  // projected screen positions instead of the vertex grid.
+  const pickInspectableEntity = (localX: number, localY: number, maxDistance = 40): InspectableEntity | null => {
+    const localMaxDistance = maxDistance / renderer.view.scale.x;
+    let best: InspectableEntity | null = null;
+    let bestDistance = localMaxDistance;
+
+    for (const entity of simulation.listInspectableEntities()) {
+      const { sx, sy } = renderer.project(entity.position.x, entity.position.y);
+      const distance = Math.hypot(sx - localX, sy - localY);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = entity;
+      }
+    }
+
+    return best;
+  };
+
   const applyTool = (event: FederatedPointerEvent) => {
     const local = renderer.view.toLocal(event.global);
+
+    if (toolMode === "inspect") {
+      const entity = pickInspectableEntity(local.x, local.y);
+      if (entity) showEntityInfo(describeInspectableEntity(entity));
+      return;
+    }
+
     const vertex = renderer.pickVertex(local.x, local.y);
     if (!vertex) return;
 
