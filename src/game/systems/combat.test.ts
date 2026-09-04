@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
-import { House, Owner, Position, Walker, type FactionId, type WalkerState } from "../components";
-import { HOUSE_LEVELS } from "../constants";
+import { House, KnightCooldown, Owner, Position, Walker, type FactionId, type WalkerState } from "../components";
+import { HOUSE_LEVELS, KNIGHT_BURN_COOLDOWN } from "../constants";
 import { createHouseCaptureSystem, walkerCombatSystem } from "./combat";
 
 function createWalker(
@@ -151,5 +151,15 @@ describe("houseCaptureSystem", () => {
     createHouseCaptureSystem()(world, 0);
 
     expect(world.isAlive(knight)).toBe(true);
+  });
+
+  it("puts a knight on KnightCooldown after it burns a house, so it can't instantly march on", () => {
+    const world = new World();
+    createHouse(world, "enemy", 0, 0);
+    const knight = createWalker(world, "player", 0, 0, 1, "knight");
+
+    createHouseCaptureSystem()(world, 0);
+
+    expect(world.get(knight, KnightCooldown)).toEqual({ remaining: KNIGHT_BURN_COOLDOWN });
   });
 });

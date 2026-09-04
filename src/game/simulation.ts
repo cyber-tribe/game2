@@ -14,7 +14,7 @@ import { gatherSystem } from "./systems/gather";
 import { goToShrineSystem } from "./systems/goToShrine";
 import { createHouseGrowthSystem } from "./systems/houseGrowth";
 import { createHouseUpgradeSystem } from "./systems/houseUpgrade";
-import { knightTargetingSystem } from "./systems/knight";
+import { knightCooldownSystem, knightTargetingSystem } from "./systems/knight";
 import { leaderSystem } from "./systems/leader";
 import { manaSystem } from "./systems/mana";
 import { movementSystem } from "./systems/movement";
@@ -142,6 +142,7 @@ export class Simulation {
       .add(fightTargetingSystem)
       .add(goToShrineSystem)
       .add(knightTargetingSystem)
+      .add(knightCooldownSystem)
       .add(createWanderTargetSystem({ heightmap: config.heightmap }))
       .add(movementSystem)
       .add(gatherSystem)

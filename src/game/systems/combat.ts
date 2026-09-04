@@ -1,6 +1,6 @@
 import type { Entity, System, World } from "../../ecs";
-import { COMBAT_RANGE, HOUSE_LEVELS } from "../constants";
-import { House, Owner, Position, Walker, type FactionId } from "../components";
+import { COMBAT_RANGE, HOUSE_LEVELS, KNIGHT_BURN_COOLDOWN } from "../constants";
+import { House, KnightCooldown, Owner, Position, Walker, type FactionId } from "../components";
 import { distance, type Point } from "./geometry";
 
 function withinRange(a: Point, b: Point): boolean {
@@ -91,6 +91,9 @@ export function createHouseCaptureSystem(config: Partial<HouseCaptureConfig> = {
         if (isKnight) {
           world.destroyEntity(houseEntity);
           onBurn(walkerOwner.faction);
+          // See KnightCooldown's doc comment / knightTargetingSystem — without
+          // this a knight instantly marches on to its next-nearest target.
+          world.add(walkerEntity, KnightCooldown, { remaining: KNIGHT_BURN_COOLDOWN });
           break;
         }
 

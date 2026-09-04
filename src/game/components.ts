@@ -77,6 +77,16 @@ export interface Swamp {
   remainingCapacity: number;
 }
 
+/**
+ * A brief rest a knight takes right after burning a house, before
+ * knightTargetingSystem will send it marching after its next target — see
+ * that system's doc comment for why this exists. Only ever attached to a
+ * "knight"-state Walker; removed once `remaining` counts down to 0.
+ */
+export interface KnightCooldown {
+  remaining: number;
+}
+
 export const Position = defineComponent<Position>("Position");
 export const Owner = defineComponent<Owner>("Owner");
 export const Walker = defineComponent<Walker>("Walker");
@@ -84,3 +94,4 @@ export const MoveTarget = defineComponent<MoveTarget>("MoveTarget");
 export const House = defineComponent<House>("House");
 export const FactionState = defineComponent<FactionState>("FactionState");
 export const Swamp = defineComponent<Swamp>("Swamp");
+export const KnightCooldown = defineComponent<KnightCooldown>("KnightCooldown");

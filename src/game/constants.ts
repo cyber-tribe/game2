@@ -150,6 +150,18 @@ export const SWAMP_CAPACITY = 5;
 export const KNIGHT_MANA_COST = 35;
 
 /**
+ * Seconds a knight rests after burning a house before knightTargetingSystem
+ * sends it after its next target — see that system's doc comment. Without
+ * this, a knight instantly retargets and marches on arrival every tick, so
+ * a single knight could burn through a whole undefended settlement in
+ * seconds, collapsing the "小競り合い→復興/逆転" phases a match is meant to
+ * have into a single instant (see plan/0044-knight-cooldown.md). Matches
+ * the scale of other AI decision intervals in this file (ENEMY_AI_
+ * DECISION_INTERVAL etc.) rather than being a much larger, separate design.
+ */
+export const KNIGHT_BURN_COOLDOWN = 6;
+
+/**
  * Mana cost of a volcano — "大" tier, pricier than earthquake/swamp since
  * it denies land outright rather than just disrupting it temporarily.
  */
