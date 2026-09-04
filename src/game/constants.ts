@@ -144,6 +144,20 @@ export const HOUSE_LEVEL_FLATNESS_REQUIREMENT: Record<HouseLevel, number> = {
   castle: 18,
 };
 
+/**
+ * Radius (in tiles) of the farmland tint EntityLayer draws around each
+ * house — docs/game-system.md 5節's "家の周囲は農地になり、視覚的に
+ * 勢力圏を示す". Scales with house level, same idea as HOUSE_PATTERN_
+ * WIDTH's sprite-size progression: a castle's territory should read as
+ * larger than a hut's, not just its building.
+ */
+export const FARMLAND_RADIUS: Record<HouseLevel, number> = {
+  hut: 1,
+  lodge: 1.5,
+  manor: 2,
+  castle: 2.5,
+};
+
 /** A walker and an enemy walker/house within this many tiles fight it out. */
 export const COMBAT_RANGE = 0.5;
 
