@@ -176,7 +176,7 @@ export class Simulation {
           onImpact: (event) => this.recordImpactEffect(event),
         }),
       )
-      .add(createSettleSystem({ heightmap: config.heightmap }))
+      .add(createSettleSystem({ heightmap: config.heightmap, maxHousesPerFaction }))
       .add(
         createHouseUpgradeSystem({
           heightmap: config.heightmap,

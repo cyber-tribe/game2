@@ -260,18 +260,26 @@ export const ARMAGEDDON_POPULATION_RATIO = 1.8;
 /**
  * Seconds since match start before the enemy AI will trigger 最終決戦,
  * however lopsided ARMAGEDDON_POPULATION_RATIO already is — see
- * enemyMiracles.ts and plan/0045-armageddon-timing.md. A match's early
- * population numbers are noisy (a house's in-progress population resets
- * to 0 every time it overflows into a walker) and can swing past the
- * ratio within the first minute or two purely by chance, well before
- * either side has anything like a real civilization — ending the whole
- * match before the "繁栄"/"復興" phases a match is meant to have ever
- * get a chance to happen. 180s (3 minutes) is a floor, not a target
- * length: the AI can still trigger armageddon any time after this once
- * the ratio holds, it just can't end the match in the first three
- * minutes purely because of early noise.
+ * enemyMiracles.ts, plan/0045-armageddon-timing.md, and plan/0053-
+ * match-length-tuning.md. A match's early population numbers are noisy (a
+ * house's in-progress population resets to 0 every time it overflows into
+ * a walker) and can swing past the ratio within the first minute or two
+ * purely by chance, well before either side has anything like a real
+ * civilization — ending the whole match before the "繁栄"/"復興" phases a
+ * match is meant to have ever get a chance to happen. This is a floor, not
+ * a target length: the AI can still trigger armageddon any time after this
+ * once the ratio holds, it just can't end the match before then purely
+ * because of early noise.
+ *
+ * Raised from 180s (3 minutes) to 600s (10 minutes) once the 180s floor
+ * was measured to no longer be the binding constraint — an AI-vs-AI match
+ * (see plan/0053-match-length-tuning.md's measurement method) was already
+ * averaging ~250s on its own by the time ARMAGEDDON_POPULATION_RATIO was
+ * actually reached, well past the old floor. 600s pushes the measured
+ * average to ~680s (~11-12 minutes), inside the 10-15 minute range a
+ * single match is meant to run.
  */
-export const MIN_ARMAGEDDON_TIME = 180;
+export const MIN_ARMAGEDDON_TIME = 600;
 
 /**
  * Population lead at which the enemy AI escalates from earthquake to
