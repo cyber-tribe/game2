@@ -426,7 +426,15 @@ describe("Simulation", () => {
     // cover on their own.
     sim.world.add(playerWalker, Walker, { ...sim.world.get(playerWalker, Walker)!, strength: 999 });
 
-    for (let i = 0; i < 150; i++) sim.update(0.1);
+    // Generous budget: knightTargetingSystem/fightTargetingSystem lock onto
+    // a snapshot of the enemy's position rather than tracking it live, so if
+    // the enemy walker is still wandering when the knight locks on, the
+    // knight can arrive at an already-stale, empty spot and only then
+    // retarget to the walker's real (by now possibly settled) location —
+    // occasionally adding a second full leg of travel plus
+    // KNIGHT_BURN_COOLDOWN on top. 150 ticks (15s) was tight enough to be
+    // flaky in that case; 600 (60s) comfortably covers it.
+    for (let i = 0; i < 600; i++) sim.update(0.1);
 
     const enemyWalkers = sim.world.query(Walker, Owner).filter((e) => sim.world.get(e, Owner)!.faction === "enemy");
     const enemyHouses = sim.world.query(House, Owner).filter((e) => sim.world.get(e, Owner)!.faction === "enemy");
