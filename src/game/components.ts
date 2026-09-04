@@ -43,19 +43,22 @@ export interface House {
 /**
  * The four influence modes from docs/game-system.md, all enforced by
  * dedicated systems: "settle" (the wander/settle systems' implicit
- * default), "gather" (gatherSystem), "fight" (fightTargetingSystem), and
- * "goToShrine" (leaderSystem + goToShrineSystem).
+ * default), "gather" (gatherTargetingSystem + gatherSystem — also the only
+ * mode leaderSystem promotes a leader under), "fight" (fightTargetingSystem),
+ * and "goToShrine" (goToShrineSystem).
  */
 export type BehaviorMode = "settle" | "gather" | "goToShrine" | "fight";
 
 /**
  * One FactionState entity per side. Mana is the only resource spent on
  * miracles; behaviorMode/shrinePosition steer the gather/goToShrine/fight
- * walker systems. leaderId is maintained by leaderSystem, which promotes
- * a live walker of this faction whenever the slot is empty — it isn't set
- * at faction creation. finalBattle is set once by the "最終決戦" miracle
- * and, once true, makes createEnemyAiSystem stop overriding behaviorMode —
- * there is no walking it back.
+ * walker systems. leaderId is maintained by leaderSystem, which — only
+ * while behaviorMode is "gather" — promotes whichever of this faction's
+ * walkers is first to arrive at the shrine; it isn't set at faction
+ * creation and stays unset under every other mode until gather produces
+ * one. finalBattle is set once by the "最終決戦" miracle and, once true,
+ * makes createEnemyAiSystem stop overriding behaviorMode — there is no
+ * walking it back.
  */
 export interface FactionState {
   id: FactionId;

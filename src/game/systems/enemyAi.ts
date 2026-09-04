@@ -22,12 +22,17 @@ export interface EnemyAiConfig {
  * either once its walker count reaches aggressionThreshold, or once an
  * opposing walker is within threatRadius of one of its houses — so the
  * enemy actually defends a house under siege instead of passively
- * "settling" through it just because its total army is still small. This
- * is deliberately simple — a proper AI would also react to mana and
- * territory — but it gives the enemy some autonomy instead of sitting in
- * "settle" forever. Stops making decisions entirely once
- * FactionState.finalBattle is set by the "最終決戦" miracle, so it can't
- * override the goToShrine march to the final battle.
+ * "settling" through it just because its total army is still small.
+ * Otherwise it "gather"s until it has a leader — leaderSystem now only
+ * ever appoints one while a faction is actively gathering (see leader.ts),
+ * and without one the enemy could never knightify (enemyMiracles.ts's
+ * auto-knightify needs a live leader) — then falls back to plain
+ * "settle" once it has one, same as before. This is deliberately simple —
+ * a proper AI would also react to mana and territory — but it gives the
+ * enemy some autonomy instead of sitting in "settle" forever. Stops making
+ * decisions entirely once FactionState.finalBattle is set by the
+ * "最終決戦" miracle, so it can't override the goToShrine march to the
+ * final battle.
  */
 export function createEnemyAiSystem(config: Partial<EnemyAiConfig> = {}): System {
   const factionId = config.factionId ?? "enemy";
@@ -50,7 +55,10 @@ export function createEnemyAiSystem(config: Partial<EnemyAiConfig> = {}): System
 
     const walkerCount = countOwned(world, factionId, Walker);
     const underThreat = isUnderThreat(world, factionId, opponentId, threatRadius);
-    const nextMode: BehaviorMode = walkerCount >= aggressionThreshold || underThreat ? "fight" : "settle";
+    const hasLeader =
+      state.leaderId !== undefined && world.isAlive(state.leaderId) && world.has(state.leaderId, Walker);
+    const nextMode: BehaviorMode =
+      walkerCount >= aggressionThreshold || underThreat ? "fight" : hasLeader ? "settle" : "gather";
 
     if (state.behaviorMode !== nextMode) {
       world.add(factionEntity, FactionState, { ...state, behaviorMode: nextMode });

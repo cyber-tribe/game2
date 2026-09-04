@@ -1,4 +1,4 @@
-import type { System, World } from "../../ecs";
+import type { Entity, System, World } from "../../ecs";
 import { isBuildable, type Heightmap } from "../../world/heightmap";
 import { FactionState, House, MoveTarget, Owner, Position, Walker, type FactionId } from "../components";
 
@@ -35,6 +35,14 @@ export interface SettleConfig {
  * next tick. Skipped entirely once a faction's FactionState.finalBattle is
  * set (the "最終決戦" miracle) — otherwise walkers converging on the
  * shared shrine would just found a peaceful town there instead of fighting.
+ *
+ * Also skipped for whichever walker is currently serving as a "gather"-mode
+ * faction's leader (see leader.ts/gatherTargeting.ts): that walker is
+ * targeted at its own position every tick while it waits at the shrine for
+ * followers to merge into it (gatherTargetingSystem), which — like any
+ * other 0-distance target — clears instantly, so without this exclusion it
+ * would settle into a house the very same tick it's promoted, instead of
+ * ever getting the chance to gather a crowd or become a hero.
  */
 export function createSettleSystem(config: Partial<SettleConfig> = {}): System {
   const heightmap = config.heightmap;
@@ -42,12 +50,14 @@ export function createSettleSystem(config: Partial<SettleConfig> = {}): System {
 
   return (world) => {
     const warringFactions = factionsInFinalBattle(world);
+    const gatheringLeaders = currentGatheringLeaders(world);
     const houseCountByFaction = countHousesByFaction(world);
 
     for (const entity of world.query(Position, Walker, Owner)) {
       const walker = world.get(entity, Walker)!;
       if (walker.state !== "seeking") continue;
       if (world.has(entity, MoveTarget)) continue;
+      if (gatheringLeaders.has(entity)) continue;
 
       const owner = world.get(entity, Owner)!;
       if (warringFactions.has(owner.faction)) continue;
@@ -74,6 +84,15 @@ function factionsInFinalBattle(world: World): Set<FactionId> {
     if (state.finalBattle) factions.add(state.id);
   }
   return factions;
+}
+
+function currentGatheringLeaders(world: World): Set<Entity> {
+  const leaders = new Set<Entity>();
+  for (const entity of world.query(FactionState)) {
+    const state = world.get(entity, FactionState)!;
+    if (state.behaviorMode === "gather" && state.leaderId !== undefined) leaders.add(state.leaderId);
+  }
+  return leaders;
 }
 
 function countHousesByFaction(world: World): Map<FactionId, number> {

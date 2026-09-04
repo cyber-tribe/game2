@@ -11,6 +11,14 @@ import type { Point } from "./systems/geometry";
  * it isn't scoped to the caster's faction: both sides' shrinePosition move
  * to `center` and both are switched to "goToShrine" mode, so the
  * already-implemented leader/goToShrine machinery does the marching.
+ * Since leaderSystem now only ever appoints a leader while a faction is
+ * actively gathering (see leader.ts), a match that never used "gather"
+ * mode would otherwise have no leader for goToShrineSystem to march
+ * toward `center` at all — so this force-appoints one (any surviving
+ * walker) for any faction that doesn't already have one, the same way
+ * the old unconditional leaderSystem used to. Armageddon is a one-way,
+ * no-more-strategy event, so who specifically ends up as that anchor
+ * doesn't matter the way it would during normal play.
  * Whichever faction still has walkers or houses once the dust settles
  * wins, per Simulation.getOutcome() — no separate winner-detection logic
  * is needed. finalBattle is also set so createEnemyAiSystem's periodic
@@ -44,11 +52,18 @@ export function triggerArmageddon(world: World, center: Point): void {
 
   for (const factionEntity of world.query(FactionState)) {
     const state = world.get(factionEntity, FactionState)!;
+    const hasLiveLeader =
+      state.leaderId !== undefined && world.isAlive(state.leaderId) && world.has(state.leaderId, Walker);
+    const leaderId = hasLiveLeader
+      ? state.leaderId
+      : world.query(Walker, Owner).find((entity) => world.get(entity, Owner)!.faction === state.id);
+
     world.add(factionEntity, FactionState, {
       ...state,
       shrinePosition: center,
       behaviorMode: "goToShrine",
       finalBattle: true,
+      leaderId,
     });
   }
 }
