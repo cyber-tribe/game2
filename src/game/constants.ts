@@ -53,6 +53,23 @@ export const HOUSE_LEVELS: Record<HouseLevel, { capacity: number; manaRate: numb
 /** hut < lodge < manor < castle, for comparing/advancing levels. */
 export const HOUSE_LEVEL_ORDER: HouseLevel[] = ["hut", "lodge", "manor", "castle"];
 
+/**
+ * Ceiling on how much of a faction's total mana rate hut-level houses can
+ * contribute, however many of them there are — see manaSystem. Population
+ * growth spawns new hut-level houses automatically (see houseGrowth.ts),
+ * capped only by maxHousesPerFaction (50 on a 20x20 map), so without this
+ * a faction could fund EARTHQUAKE_MANA_COST-tier miracle spam purely by
+ * letting houses pile up, never once flattening land to level any of them
+ * up — the opposite of docs/game-system.md's growth loop. Lodge and above
+ * have no such cap: reaching them already requires real investment
+ * (flattening HOUSE_UPGRADE_FLATNESS_RADIUS's worth of land per house), so
+ * more of them is a genuine achievement worth rewarding in full. Set to 5
+ * huts' worth (5 * HOUSE_LEVELS.hut.manaRate) — enough for a small starting
+ * village to feel normal, but not enough on its own to make earthquake
+ * (cost 20) a repeatable button.
+ */
+export const HUT_MANA_RATE_CAP = 5 * HOUSE_LEVELS.hut.manaRate;
+
 /** How far around a house (in tiles) countFlatNeighbors looks when checking for an upgrade. */
 export const HOUSE_UPGRADE_FLATNESS_RADIUS = 2;
 
