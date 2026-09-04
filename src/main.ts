@@ -217,6 +217,16 @@ async function bootstrap() {
 
   const simulation = new Simulation({ worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT, heightmap, onEnemyAction });
 
+  // The "人口放出" action (see game/populationRelease.ts) — free and
+  // instant like a behaviorMode change, so it's a plain button rather than
+  // a ToolMode requiring a follow-up map tap. Only vibrates when it
+  // actually did something, since a tap while no house has grown enough
+  // yet is a silent no-op.
+  const releasePopulationButton = document.getElementById("release-population");
+  releasePopulationButton?.addEventListener("click", () => {
+    if (simulation.releasePopulation("player") > 0) vibrate(15);
+  });
+
   // Fit the map's height (not width) into the space below the HUD and
   // above the toolbar — portrait phones have more room vertically than
   // horizontally, so this keeps tiles big enough to tap while still

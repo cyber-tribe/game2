@@ -92,6 +92,15 @@
         color: #7cc0ff;
       }
 
+      /* Population release is free like 行動方針, so it shares that green accent. */
+      [data-group="population"] .toolbar-label {
+        color: #7be08a;
+      }
+
+      [data-group="population"] button {
+        border-color: #3fbf5e;
+      }
+
       .toolbar-row {
         display: flex;
         gap: 6px;
@@ -336,6 +345,14 @@
           <button type="button" data-mode="gather">集結</button>
           <button type="button" data-mode="goToShrine">🚩 集結地へ</button>
           <button type="button" data-mode="fight">戦闘</button>
+        </div>
+      </div>
+      <div class="toolbar-section" data-group="population">
+        <div class="toolbar-label">
+          人口 <span class="toolbar-label-note">マナ消費なし・出た民は本来より弱い</span>
+        </div>
+        <div class="toolbar-row">
+          <button type="button" id="release-population">🚶 民を送り出す</button>
         </div>
       </div>
       <div class="toolbar-section" data-group="tool">
