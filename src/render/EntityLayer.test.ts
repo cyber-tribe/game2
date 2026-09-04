@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { swampAffectedTiles, walkCycle } from "./EntityLayer";
+import { impactEffectVisual, swampAffectedTiles, walkCycle } from "./EntityLayer";
 
 describe("walkCycle", () => {
   it("alternates between stepping frames as time advances", () => {
@@ -68,5 +68,46 @@ describe("swampAffectedTiles", () => {
     const large = swampAffectedTiles({ x: 10, y: 10 }, 3, 20, 20);
 
     expect(large.length).toBeGreaterThan(small.length);
+  });
+});
+
+describe("impactEffectVisual", () => {
+  it("starts fully opaque with no radius at age 0", () => {
+    const visual = impactEffectVisual("combatDeath", 0, 1);
+
+    expect(visual.radius).toBe(0);
+    expect(visual.alpha).toBe(1);
+  });
+
+  it("ends fully transparent with the full radius once age reaches duration", () => {
+    const visual = impactEffectVisual("combatDeath", 1, 1);
+
+    expect(visual.alpha).toBe(0);
+    expect(visual.radius).toBeGreaterThan(0);
+  });
+
+  it("expands and fades monotonically in between", () => {
+    const early = impactEffectVisual("drowned", 0.25, 1);
+    const late = impactEffectVisual("drowned", 0.75, 1);
+
+    expect(late.radius).toBeGreaterThan(early.radius);
+    expect(late.alpha).toBeLessThan(early.alpha);
+  });
+
+  it("clamps age beyond the duration instead of overshooting", () => {
+    const overshoot = impactEffectVisual("houseBurned", 5, 1);
+    const atDuration = impactEffectVisual("houseBurned", 1, 1);
+
+    expect(overshoot).toEqual(atDuration);
+  });
+
+  it("picks a distinct color per effect type", () => {
+    const colors = new Set(
+      (["combatDeath", "houseCaptured", "houseBurned", "drowned"] as const).map(
+        (type) => impactEffectVisual(type, 0.5, 1).color,
+      ),
+    );
+
+    expect(colors.size).toBe(4);
   });
 });

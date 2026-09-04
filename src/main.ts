@@ -379,7 +379,7 @@ async function bootstrap() {
       // Global effect — the tap only confirms the cast, its position doesn't matter.
       if (!trySpendMana(simulation.world, "player", FLOOD_MANA_COST)) return;
       applyFlood(heightmap);
-      drownFlood(simulation.world, heightmap);
+      drownFlood(simulation.world, heightmap, (event) => simulation.recordImpactEffect(event));
       renderer.redraw();
       simulation.recordEvent("player", "flood");
       triggerShake(5);
@@ -563,7 +563,7 @@ async function bootstrap() {
     // were invisible until the player's next tap happened to trigger one.
     renderer.update(deltaSeconds);
     renderer.redraw();
-    entityLayer.update(simulation.world, deltaSeconds);
+    entityLayer.update(simulation.world, deltaSeconds, simulation.getImpactEffects());
     const outcome = simulation.getOutcome();
     hud.update(simulation.summarize(), outcome);
     if (outcome.over && !matchRecordShown) {

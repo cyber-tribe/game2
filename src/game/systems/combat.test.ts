@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
 import { House, KnightCooldown, Owner, Position, Walker, type FactionId, type WalkerState } from "../components";
 import { HOUSE_LEVELS, KNIGHT_BURN_COOLDOWN } from "../constants";
-import { createHouseCaptureSystem, walkerCombatSystem } from "./combat";
+import type { ImpactEffectEvent } from "./effects";
+import { createHouseCaptureSystem, createWalkerCombatSystem } from "./combat";
 
 function createWalker(
   world: World,
@@ -25,7 +26,7 @@ describe("walkerCombatSystem", () => {
     const strong = createWalker(world, "player", 0, 0, 5);
     const weak = createWalker(world, "enemy", 0.1, 0, 2);
 
-    walkerCombatSystem(world, 0);
+    createWalkerCombatSystem()(world, 0);
 
     expect(world.isAlive(strong)).toBe(true);
     expect(world.get(strong, Walker)!.strength).toBe(3);
@@ -37,7 +38,7 @@ describe("walkerCombatSystem", () => {
     const a = createWalker(world, "player", 0, 0, 4);
     const b = createWalker(world, "enemy", 0, 0, 4);
 
-    walkerCombatSystem(world, 0);
+    createWalkerCombatSystem()(world, 0);
 
     expect(world.isAlive(a)).toBe(false);
     expect(world.isAlive(b)).toBe(false);
@@ -48,7 +49,7 @@ describe("walkerCombatSystem", () => {
     const a = createWalker(world, "player", 0, 0, 5);
     const b = createWalker(world, "player", 0, 0, 1);
 
-    walkerCombatSystem(world, 0);
+    createWalkerCombatSystem()(world, 0);
 
     expect(world.isAlive(a)).toBe(true);
     expect(world.isAlive(b)).toBe(true);
@@ -59,10 +60,44 @@ describe("walkerCombatSystem", () => {
     const a = createWalker(world, "player", 0, 0, 5);
     const b = createWalker(world, "enemy", 10, 10, 1);
 
-    walkerCombatSystem(world, 0);
+    createWalkerCombatSystem()(world, 0);
 
     expect(world.isAlive(a)).toBe(true);
     expect(world.isAlive(b)).toBe(true);
+  });
+
+  it("reports a combatDeath impact at the loser's position", () => {
+    const world = new World();
+    createWalker(world, "player", 0, 0, 5);
+    createWalker(world, "enemy", 0.1, 0, 2);
+
+    const impacts: ImpactEffectEvent[] = [];
+    createWalkerCombatSystem({ onImpact: (event) => impacts.push(event) })(world, 0);
+
+    expect(impacts).toEqual([{ position: { x: 0.1, y: 0 }, type: "combatDeath" }]);
+  });
+
+  it("reports a combatDeath impact for both walkers on an exact tie", () => {
+    const world = new World();
+    createWalker(world, "player", 0, 0, 4);
+    createWalker(world, "enemy", 0, 0, 4);
+
+    const impacts: ImpactEffectEvent[] = [];
+    createWalkerCombatSystem({ onImpact: (event) => impacts.push(event) })(world, 0);
+
+    expect(impacts).toHaveLength(2);
+    expect(impacts.every((e) => e.type === "combatDeath")).toBe(true);
+  });
+
+  it("does not report an impact when nothing fights", () => {
+    const world = new World();
+    createWalker(world, "player", 0, 0, 5);
+    createWalker(world, "player", 1, 1, 5);
+
+    const impacts: ImpactEffectEvent[] = [];
+    createWalkerCombatSystem({ onImpact: (event) => impacts.push(event) })(world, 0);
+
+    expect(impacts).toHaveLength(0);
   });
 });
 
@@ -161,5 +196,38 @@ describe("houseCaptureSystem", () => {
     createHouseCaptureSystem()(world, 0);
 
     expect(world.get(knight, KnightCooldown)).toEqual({ remaining: KNIGHT_BURN_COOLDOWN });
+  });
+
+  it("reports a houseCaptured impact at the house's position on a successful capture", () => {
+    const world = new World();
+    createHouse(world, "enemy", 3, 4);
+    createWalker(world, "player", 3, 4, HOUSE_LEVELS.hut.defense + 1);
+
+    const impacts: ImpactEffectEvent[] = [];
+    createHouseCaptureSystem({ onImpact: (event) => impacts.push(event) })(world, 0);
+
+    expect(impacts).toEqual([{ position: { x: 3, y: 4 }, type: "houseCaptured" }]);
+  });
+
+  it("reports a combatDeath impact for a walker repelled by a house's defense", () => {
+    const world = new World();
+    createHouse(world, "enemy", 0, 0);
+    createWalker(world, "player", 0, 0, HOUSE_LEVELS.hut.defense - 1);
+
+    const impacts: ImpactEffectEvent[] = [];
+    createHouseCaptureSystem({ onImpact: (event) => impacts.push(event) })(world, 0);
+
+    expect(impacts).toEqual([{ position: { x: 0, y: 0 }, type: "combatDeath" }]);
+  });
+
+  it("reports a houseBurned impact at the house's position when a knight burns it", () => {
+    const world = new World();
+    createHouse(world, "enemy", 1, 2, "castle");
+    createWalker(world, "player", 1, 2, 1, "knight");
+
+    const impacts: ImpactEffectEvent[] = [];
+    createHouseCaptureSystem({ onImpact: (event) => impacts.push(event) })(world, 0);
+
+    expect(impacts).toEqual([{ position: { x: 1, y: 2 }, type: "houseBurned" }]);
   });
 });

@@ -1,8 +1,9 @@
 import { Container, Graphics } from "pixi.js";
 import { FactionState, House, Owner, Position, Swamp, Walker, type FactionId, type HouseLevel } from "../game/components";
 import type { Entity, World } from "../ecs";
-import { HOUSE_LEVEL_FLATNESS_REQUIREMENT, HOUSE_LEVEL_ORDER, HOUSE_UPGRADE_FLATNESS_RADIUS } from "../game/constants";
+import { HOUSE_LEVEL_FLATNESS_REQUIREMENT, HOUSE_LEVEL_ORDER, HOUSE_UPGRADE_FLATNESS_RADIUS, IMPACT_EFFECT_DURATION } from "../game/constants";
 import { distance, type Point } from "../game/systems/geometry";
+import type { ImpactEffectSnapshot, ImpactEffectType } from "../game/systems/effects";
 import { countFlatNeighbors } from "../world/heightmap";
 import { type IsoRenderer } from "./IsoRenderer";
 import { drawHouseSprite, drawWalkerSprite, HOUSE_PATTERN_WIDTH } from "./pixelArt";
@@ -72,6 +73,38 @@ export function swampAffectedTiles(pos: Point, radius: number, mapWidth: number,
   return tiles;
 }
 
+const IMPACT_EFFECT_COLOR: Record<ImpactEffectType, number> = {
+  combatDeath: 0xff3b3b,
+  houseCaptured: 0xffe066,
+  houseBurned: 0xff8c1a,
+  drowned: 0x6a8fd9,
+};
+
+/** Screen-px radius an ImpactEffect's ring has expanded to by the time it fully fades out. */
+const IMPACT_EFFECT_MAX_RADIUS = 16;
+
+/**
+ * The ring an ImpactEffectSnapshot (see game/systems/effects.ts) is drawn
+ * as at a given point in its lifetime: expanding outward while fading, so
+ * a kill/capture/drowning reads as a quick outward "pop" rather than a
+ * static marker. `age`/`duration` are in the same units (seconds);
+ * `progress` beyond [0, 1] is clamped, so a caller doesn't need to
+ * pre-clamp `age`. Pulled out as a pure function so this is unit-testable
+ * without a Graphics/canvas context.
+ */
+export function impactEffectVisual(
+  type: ImpactEffectType,
+  age: number,
+  duration: number = IMPACT_EFFECT_DURATION,
+): { color: number; radius: number; alpha: number } {
+  const progress = Math.max(0, Math.min(1, duration > 0 ? age / duration : 1));
+  return {
+    color: IMPACT_EFFECT_COLOR[type],
+    radius: IMPACT_EFFECT_MAX_RADIUS * progress,
+    alpha: 1 - progress,
+  };
+}
+
 /** Draws every Swamp/Walker/House in the ECS world onto the isometric map. */
 export class EntityLayer {
   readonly view = new Container();
@@ -82,7 +115,7 @@ export class EntityLayer {
     this.view.addChild(this.graphics);
   }
 
-  update(world: World, deltaSeconds = 0): void {
+  update(world: World, deltaSeconds = 0, impactEffects: readonly ImpactEffectSnapshot[] = []): void {
     this.elapsedTime += deltaSeconds;
     const g = this.graphics;
     g.clear();
@@ -146,6 +179,14 @@ export class EntityLayer {
         g.circle(sx, sy - bob - LEADER_HALO_RADIUS, LEADER_HALO_RADIUS).fill({ color: 0xffffff, alpha: 0.35 });
       }
       drawWalkerSprite(g, sx, sy - bob, isKnight ? KNIGHT_COLOR : FACTION_COLOR[owner.faction], pixelSize, stepping);
+    }
+
+    for (const effect of impactEffects) {
+      const { sx, sy } = this.iso.project(effect.position.x, effect.position.y);
+      const { color, radius, alpha } = impactEffectVisual(effect.type, effect.age);
+      if (alpha <= 0 || radius <= 0) continue;
+
+      g.circle(sx, sy, radius).stroke({ width: 2, color, alpha });
     }
   }
 

@@ -121,6 +121,14 @@ export const HOUSE_LEVEL_FLATNESS_REQUIREMENT: Record<HouseLevel, number> = {
 export const COMBAT_RANGE = 0.5;
 
 /**
+ * Seconds an ImpactEffect (see systems/effects.ts) stays on screen before
+ * effectAgingSystem destroys it — a kill/capture/drowning's visible
+ * lifetime is brief on purpose: it's a punctuation mark on the moment it
+ * happened, not a lingering marker of the spot.
+ */
+export const IMPACT_EFFECT_DURATION = 0.5;
+
+/**
  * Placeholder land-scarcity proxy: roughly how many map tiles a faction
  * needs per house it's allowed to build, used to derive
  * HouseGrowthConfig.maxHousesPerFaction from world size until real

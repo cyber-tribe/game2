@@ -2,11 +2,12 @@ import { Scheduler, World } from "../ecs";
 import type { Heightmap } from "../world/heightmap";
 import { triggerArmageddon } from "./armageddon";
 import { FactionState, House, Owner, Position, Walker, type BehaviorMode, type FactionId } from "./components";
-import { DEFAULT_WALKER_SPEED, TILES_PER_HOUSE_CAP } from "./constants";
+import { DEFAULT_WALKER_SPEED, IMPACT_EFFECT_DURATION, TILES_PER_HOUSE_CAP } from "./constants";
 import { createFaction, findFactionEntity, moveShrine } from "./faction";
 import { knightify } from "./knight";
 import { releasePopulation } from "./populationRelease";
-import { createHouseCaptureSystem, walkerCombatSystem } from "./systems/combat";
+import { createHouseCaptureSystem, createWalkerCombatSystem } from "./systems/combat";
+import type { ImpactEffectEvent, ImpactEffectSnapshot } from "./systems/effects";
 import { createEnemyAiSystem } from "./systems/enemyAi";
 import { createEnemyMiracleSystem, type EnemyMiracleEvent } from "./systems/enemyMiracles";
 import { createEnemyTerraformSystem } from "./systems/enemyTerraform";
@@ -20,7 +21,7 @@ import { leaderSystem } from "./systems/leader";
 import { manaSystem } from "./systems/mana";
 import { movementSystem } from "./systems/movement";
 import { createSettleSystem } from "./systems/settle";
-import { swampSystem } from "./systems/swamp";
+import { createSwampSystem } from "./systems/swamp";
 import { createWanderTargetSystem } from "./systems/wanderTarget";
 
 export interface SimulationConfig {
@@ -119,6 +120,16 @@ export class Simulation {
   private readonly matchEvents: MatchEvent[] = [];
   private elapsedTime = 0;
 
+  /**
+   * Brief visual bursts for kills/captures/drownings — see
+   * systems/effects.ts's doc comment on why these are a plain array here
+   * rather than ECS entities. Aged (and pruned once past IMPACT_EFFECT_
+   * DURATION) every update(), the same way matchEvents are timestamped
+   * against elapsedTime but never pruned — these need pruning since
+   * EntityLayer redraws all of them every frame, not just the newest.
+   */
+  private impactEffects: ImpactEffectSnapshot[] = [];
+
   constructor(config: SimulationConfig) {
     const playerShrine = { x: config.worldWidth * 0.25, y: config.worldHeight * 0.75 };
     const enemyShrine = { x: config.worldWidth * 0.75, y: config.worldHeight * 0.25 };
@@ -147,12 +158,13 @@ export class Simulation {
       .add(createWanderTargetSystem({ heightmap: config.heightmap }))
       .add(movementSystem)
       .add(gatherSystem)
-      .add(swampSystem)
-      .add(walkerCombatSystem)
+      .add(createSwampSystem({ onImpact: (event) => this.recordImpactEffect(event) }))
+      .add(createWalkerCombatSystem({ onImpact: (event) => this.recordImpactEffect(event) }))
       .add(
         createHouseCaptureSystem({
           onCapture: (faction) => this.recordEvent(faction, "houseCaptured"),
           onBurn: (faction) => this.recordEvent(faction, "houseBurned"),
+          onImpact: (event) => this.recordImpactEffect(event),
         }),
       )
       .add(createSettleSystem({ heightmap: config.heightmap }))
@@ -182,6 +194,10 @@ export class Simulation {
     if (this.getOutcome().over) return;
     this.elapsedTime += deltaSeconds;
     this.scheduler.update(this.world, deltaSeconds);
+
+    this.impactEffects = this.impactEffects
+      .map((effect) => ({ ...effect, age: effect.age + deltaSeconds }))
+      .filter((effect) => effect.age < IMPACT_EFFECT_DURATION);
   }
 
   /**
@@ -197,6 +213,22 @@ export class Simulation {
   /** The match's full event log so far, oldest first — see MatchEvent. */
   getMatchEvents(): readonly MatchEvent[] {
     return this.matchEvents;
+  }
+
+  /**
+   * Records a brief visual burst at `event.position` — see
+   * systems/effects.ts. Wired automatically into the combat/swamp/house-
+   * capture systems above; main.ts calls this directly for drownFlood
+   * (not itself a scheduled System, so it can't take an onImpact config
+   * the same way).
+   */
+  recordImpactEffect(event: ImpactEffectEvent): void {
+    this.impactEffects.push({ ...event, age: 0 });
+  }
+
+  /** Every ImpactEffect still within its visible lifetime — see EntityLayer. */
+  getImpactEffects(): readonly ImpactEffectSnapshot[] {
+    return this.impactEffects;
   }
 
   /** Switches a faction's influence mode (docs/game-system.md's 行動方針). Free — no mana cost. */
