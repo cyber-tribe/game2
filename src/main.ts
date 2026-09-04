@@ -22,7 +22,7 @@ import { WORLDS, nextWorldId, unlockedCountForPassword, type WorldDefinition } f
 import { EntityLayer } from "./render/EntityLayer";
 import { describeInspectableEntity } from "./render/entityInfoLabel";
 import { Hud } from "./render/Hud";
-import { IsoRenderer, visibleTileBounds, type TileBounds } from "./render/IsoRenderer";
+import { IsoRenderer, isWithinTileBounds, visibleTileBounds, type TileBounds } from "./render/IsoRenderer";
 import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
 import { Minimap } from "./render/Minimap";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
@@ -358,6 +358,35 @@ async function bootstrap(world: WorldDefinition) {
       heightmap.height,
     );
 
+  // docs/game-system.md-inspired original-game rule: the player can only
+  // act with their god-given powers while at least one of their own
+  // walkers/houses/shrine is somewhere within the current camera view —
+  // see plan/0063-visibility-gated-casting.md. Without this, a much
+  // bigger, freely-pannable map (plan/0062-original-scale-map.md) lets a
+  // single tap snipe anywhere on the map instantly, with no need to
+  // actually travel there first. The enemy AI is exempt — it has no
+  // "camera" to speak of, so this only ever constrains the human player.
+  const isOwnFactionVisible = (bounds: TileBounds): boolean => {
+    const shrine = simulation.getShrinePosition("player");
+    if (shrine && isWithinTileBounds(shrine, bounds)) return true;
+    for (const entity of simulation.listInspectableEntities()) {
+      if (entity.faction === "player" && isWithinTileBounds(entity.position, bounds)) return true;
+    }
+    return false;
+  };
+
+  // Every mana-costing action a tap can trigger goes through this instead
+  // of calling trySpendMana directly — see isOwnFactionVisible above. Mana
+  // is left untouched and the "🔍 照会" info panel (reused here rather
+  // than adding a near-identical banner) explains why nothing happened.
+  const trySpendPlayerMana = (cost: number): boolean => {
+    if (!isOwnFactionVisible(visibleBounds())) {
+      showEntityInfo("自分の勢力が画面内に見えていません");
+      return false;
+    }
+    return trySpendMana(simulation.world, "player", cost);
+  };
+
   // Nudges a first-time player toward the core loop — see Hud.ts's
   // comment on why the canvas HUD itself carries no such guidance.
   // Dismissed by the player's first terrain edit, or after a timeout for
@@ -415,7 +444,7 @@ async function bootstrap(world: WorldDefinition) {
     // here too so a stale toolMode can never spend mana for an edit that
     // silently does nothing.
     if (!isTerrainEditAllowed(terrainEditRule, delta)) return;
-    if (!trySpendMana(simulation.world, "player", TERRAIN_EDIT_MANA_COST)) return;
+    if (!trySpendPlayerMana(TERRAIN_EDIT_MANA_COST)) return;
     raiseVertex(heightmap, vertex.x, vertex.y, delta);
     renderer.redraw(visibleBounds());
     dismissTutorialHint();
@@ -434,7 +463,7 @@ async function bootstrap(world: WorldDefinition) {
     if (!vertex) return;
 
     if (toolMode === "shrine") {
-      if (!trySpendMana(simulation.world, "player", SHRINE_MOVE_MANA_COST)) return;
+      if (!trySpendPlayerMana(SHRINE_MOVE_MANA_COST)) return;
       simulation.moveShrine("player", vertex);
       simulation.recordEvent("player", "shrineMove");
       vibrate(15);
@@ -443,7 +472,7 @@ async function bootstrap(world: WorldDefinition) {
     }
 
     if (toolMode === "earthquake") {
-      if (!trySpendMana(simulation.world, "player", EARTHQUAKE_MANA_COST)) return;
+      if (!trySpendPlayerMana(EARTHQUAKE_MANA_COST)) return;
       applyEarthquake(heightmap, vertex.x, vertex.y);
       collapseSwampsNear(simulation.world, vertex.x, vertex.y, DEFAULT_EARTHQUAKE_RADIUS);
       renderer.redraw(visibleBounds());
@@ -455,7 +484,7 @@ async function bootstrap(world: WorldDefinition) {
     }
 
     if (toolMode === "swamp") {
-      if (!trySpendMana(simulation.world, "player", SWAMP_MANA_COST)) return;
+      if (!trySpendPlayerMana(SWAMP_MANA_COST)) return;
       createSwamp(simulation.world, vertex.x, vertex.y);
       simulation.recordEvent("player", "swamp");
       vibrate(25);
@@ -464,7 +493,7 @@ async function bootstrap(world: WorldDefinition) {
     }
 
     if (toolMode === "volcano") {
-      if (!trySpendMana(simulation.world, "player", VOLCANO_MANA_COST)) return;
+      if (!trySpendPlayerMana(VOLCANO_MANA_COST)) return;
       applyVolcano(heightmap, vertex.x, vertex.y);
       eruptVolcano(simulation.world, vertex.x, vertex.y, DEFAULT_VOLCANO_RADIUS);
       renderer.redraw(visibleBounds());
@@ -477,7 +506,7 @@ async function bootstrap(world: WorldDefinition) {
 
     if (toolMode === "knight") {
       // Also a global effect (it acts on the leader, not the tapped spot).
-      if (!trySpendMana(simulation.world, "player", KNIGHT_MANA_COST)) return;
+      if (!trySpendPlayerMana(KNIGHT_MANA_COST)) return;
       simulation.knightify("player");
       simulation.recordEvent("player", "knight");
       vibrate(30);
@@ -487,7 +516,7 @@ async function bootstrap(world: WorldDefinition) {
 
     if (toolMode === "armageddon") {
       // Global effect on both factions at once, unlike every other miracle.
-      if (!trySpendMana(simulation.world, "player", ARMAGEDDON_MANA_COST)) return;
+      if (!trySpendPlayerMana(ARMAGEDDON_MANA_COST)) return;
       simulation.triggerArmageddon();
       simulation.recordEvent("player", "armageddon");
       triggerShake(10);
@@ -498,7 +527,7 @@ async function bootstrap(world: WorldDefinition) {
 
     if (toolMode === "flood") {
       // Global effect — the tap only confirms the cast, its position doesn't matter.
-      if (!trySpendMana(simulation.world, "player", FLOOD_MANA_COST)) return;
+      if (!trySpendPlayerMana(FLOOD_MANA_COST)) return;
       applyFlood(heightmap);
       drownFlood(simulation.world, heightmap, (event) => simulation.recordImpactEffect(event));
       renderer.redraw(visibleBounds());

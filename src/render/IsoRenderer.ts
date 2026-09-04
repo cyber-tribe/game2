@@ -175,6 +175,21 @@ export function visibleTileBounds(
   };
 }
 
+/**
+ * Whether a (fractional, e.g. a walker mid-stride) tile-space point falls
+ * within `bounds` — `bounds` names the tiles a camera view covers (see
+ * visibleTileBounds), each spanning [x, x+1), so a point sitting exactly on
+ * the far vertex of the last visible tile (x = bounds.maxX + 1) still
+ * counts. Used by main.ts's "is any of the player's own walkers/houses/
+ * shrine currently on screen" check — see
+ * plan/0063-visibility-gated-casting.md.
+ */
+export function isWithinTileBounds(point: { x: number; y: number }, bounds: TileBounds): boolean {
+  return (
+    point.x >= bounds.minX && point.x <= bounds.maxX + 1 && point.y >= bounds.minY && point.y <= bounds.maxY + 1
+  );
+}
+
 /** Renders a heightmap as an isometric grid of quads, one per tile. */
 export class IsoRenderer {
   readonly view = new Container();
