@@ -459,9 +459,11 @@ describe("Simulation", () => {
     expect(sim.getBehaviorMode("enemy")).toBe("goToShrine");
 
     // Houses that had spread far from the center before armageddon convert
-    // into walkers that need time to march back in, so this budget is
-    // generous (mirrors the ~30s it took empirically in a worst-case trace).
-    for (let i = 0; i < 400; i++) sim.update(0.1);
+    // into walkers that need time to march back in, at FINAL_BATTLE_WALKER_
+    // SPEED (see plan/0046-final-battle-pacing.md) — a 20x20 map's diagonal
+    // at that speed can take close to 60s to cross alone, so this budget is
+    // generous on top of that.
+    for (let i = 0; i < 1200; i++) sim.update(0.1);
 
     expect(sim.getOutcome().over).toBe(true);
   });
