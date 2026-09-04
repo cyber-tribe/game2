@@ -18,7 +18,7 @@ import { drownFlood } from "./game/flood";
 import { Simulation, type GameOutcome, type InspectableEntity, type MatchEvent } from "./game/simulation";
 import { collapseSwampsNear, createSwamp } from "./game/swamp";
 import { eruptVolcano } from "./game/volcano";
-import { WORLDS, type WorldDefinition } from "./game/worlds";
+import { WORLDS, nextWorldId, unlockedCountForPassword, type WorldDefinition } from "./game/worlds";
 import { EntityLayer } from "./render/EntityLayer";
 import { describeInspectableEntity } from "./render/entityInfoLabel";
 import { Hud } from "./render/Hud";
@@ -220,6 +220,23 @@ async function bootstrap(world: WorldDefinition) {
         return line;
       }),
     );
+
+    // The 征服モード "password" (docs/game-system.md 10節) — only earned
+    // by the player actually winning, not the enemy or a draw. Shown here
+    // rather than auto-carried into the next page load (see worlds.ts's
+    // nextWorldId doc comment): the player writes it down and re-enters it
+    // on #world-select next time, the same manual "code on paper" flow the
+    // doc's own "パスワード" wording implies.
+    if (outcome.winner === "player") {
+      const password = nextWorldId(world.id);
+      const passwordLine = document.createElement("div");
+      passwordLine.id = "match-record-password";
+      passwordLine.textContent = password
+        ? `🔑 次のワールドのパスワード: ${password}`
+        : "🏆 全ワールドを制覇しました！";
+      matchRecordList.appendChild(passwordLine);
+    }
+
     matchRecordPanel.classList.remove("hidden");
   };
 
@@ -728,34 +745,67 @@ async function bootstrap(world: WorldDefinition) {
  * 選ぶまで試合は始まらない。#play-again が window.location.reload() で
  * ページごと作り直す都合上（plan/0038-play-again.md）、この画面も
  * 毎回ここから素通しで出し直せばよく、選択状態を別途持ち回る必要はない。
+ *
+ * 起動直後は最初のワールドしか選べない — worlds.ts の nextWorldId /
+ * unlockedCountForPassword の doc comment の通り、この解禁状態は
+ * わざと永続化しない（localStorageなど不使用）。ページを再読み込みする
+ * たびに、前回クリアした際に表示されたパスワードを改めて打ち込む必要が
+ * ある、昔ながらの「紙に書き写すパスワード」の体験をそのまま再現する。
  */
 function showWorldSelect(): void {
   const panel = document.getElementById("world-select");
   const list = document.getElementById("world-select-list");
+  const passwordInput = document.getElementById("world-select-password") as HTMLInputElement | null;
+  const passwordSubmit = document.getElementById("world-select-password-submit");
+  const passwordError = document.getElementById("world-select-password-error");
   if (!panel || !list) return;
 
-  list.replaceChildren(
-    ...WORLDS.map((world) => {
-      const button = document.createElement("button");
-      button.type = "button";
+  let unlockedCount = 1;
 
-      const name = document.createElement("span");
-      name.className = "world-select-name";
-      name.textContent = world.name;
+  const renderList = () => {
+    list.replaceChildren(
+      ...WORLDS.map((world, index) => {
+        const locked = index >= unlockedCount;
+        const button = document.createElement("button");
+        button.type = "button";
+        button.disabled = locked;
 
-      const detail = document.createElement("span");
-      detail.className = "world-select-detail";
-      const ruleLabel = world.terrainEditRule !== "both" ? `・${TERRAIN_EDIT_RULE_LABELS[world.terrainEditRule]}` : "";
-      detail.textContent = `${TERRAIN_LABELS[world.terrain]}・${world.worldWidth}×${world.worldHeight}${ruleLabel}`;
+        const name = document.createElement("span");
+        name.className = "world-select-name";
+        name.textContent = locked ? `🔒 ${world.name}` : world.name;
 
-      button.append(name, detail);
-      button.addEventListener("click", () => {
-        panel.classList.add("hidden");
-        bootstrap(world);
-      });
-      return button;
-    }),
-  );
+        const detail = document.createElement("span");
+        detail.className = "world-select-detail";
+        const ruleLabel = world.terrainEditRule !== "both" ? `・${TERRAIN_EDIT_RULE_LABELS[world.terrainEditRule]}` : "";
+        detail.textContent = locked
+          ? "パスワードが必要です"
+          : `${TERRAIN_LABELS[world.terrain]}・${world.worldWidth}×${world.worldHeight}${ruleLabel}`;
+
+        button.append(name, detail);
+        if (!locked) {
+          button.addEventListener("click", () => {
+            panel.classList.add("hidden");
+            bootstrap(world);
+          });
+        }
+        return button;
+      }),
+    );
+  };
+  renderList();
+
+  passwordSubmit?.addEventListener("click", () => {
+    if (!passwordInput) return;
+    const count = unlockedCountForPassword(passwordInput.value.trim());
+    if (count === undefined) {
+      passwordError?.classList.remove("hidden");
+      return;
+    }
+    unlockedCount = Math.max(unlockedCount, count);
+    passwordInput.value = "";
+    passwordError?.classList.add("hidden");
+    renderList();
+  });
 }
 
 showWorldSelect();

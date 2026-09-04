@@ -314,6 +314,63 @@
         color: #9db3c8;
       }
 
+      #world-select-list button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      /*
+       * 征服モードのパスワード継続（docs/game-system.md 10節の
+       * 「クリアするとパスワード（ワールド名）が与えられ、そこから
+       * 再開できる」）: 前回クリアした際に表示されたパスワードを打ち込むと、
+       * そこまでのワールドが選択可能になる。ローカルストレージ等での
+       * 自動引き継ぎは行わない — 昔ながらの「紙に書き写して打ち込む」
+       * パスワードそのものの体験を再現している。
+       */
+      #world-select-password-row {
+        flex: none;
+        display: flex;
+        gap: 6px;
+        margin-top: 10px;
+      }
+
+      #world-select-password-row input {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 10px;
+        font-size: 14px;
+        font-family: inherit;
+        border: 1px solid #4fa8ff;
+        border-radius: 8px;
+        background: #0a1a2a;
+        color: #fff;
+        box-sizing: border-box;
+      }
+
+      #world-select-password-row button {
+        flex: none;
+        padding: 10px 16px;
+        font-size: 14px;
+        font-weight: bold;
+        font-family: inherit;
+        border: 1px solid #4fa8ff;
+        border-radius: 8px;
+        background: #4fa8ff;
+        color: #0a1a2a;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      #world-select-password-error {
+        flex: none;
+        margin-top: 6px;
+        font-size: 12px;
+        color: #ff8c8c;
+      }
+
+      #world-select-password-error.hidden {
+        display: none;
+      }
+
       #match-record {
         position: fixed;
         left: 10px;
@@ -430,6 +487,11 @@
     <div id="world-select">
       <div id="world-select-title">ワールドを選択</div>
       <div id="world-select-list"></div>
+      <div id="world-select-password-row">
+        <input type="text" id="world-select-password" placeholder="パスワード" autocomplete="off" />
+        <button type="button" id="world-select-password-submit">進む</button>
+      </div>
+      <div id="world-select-password-error" class="hidden">そのパスワードは無効です</div>
     </div>
 
     <div id="tutorial-hint">
