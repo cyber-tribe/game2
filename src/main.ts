@@ -41,8 +41,20 @@ import {
 // Smaller than a desktop map: on a phone, showing the whole thing at once
 // makes every tile too small to tap precisely, so the map is shown closer
 // to native size and panned instead — see plan/archived/0009-pan-for-vertex-picking.md.
-const WORLD_WIDTH = 20;
-const WORLD_HEIGHT = 20;
+//
+// Raised from 20x20 in plan/0055-map-expansion.md, once measured to still
+// keep IsoRenderer.redraw() (called unconditionally every frame — see the
+// ticker below) comfortably within a 60fps frame budget: at 20x20 it
+// averaged ~0.8ms/frame; at 32x32 (2.56x the tiles) ~1.8ms, still under a
+// tenth of the ~16.6ms budget. 40x40 (4x the tiles) already spiked past
+// 14ms on some frames in that same measurement — a real ceiling on how far
+// this can go without a rendering optimization (e.g. only redrawing static
+// terrain shape on edit, instead of every frame) that's out of this
+// change's scope. See TILES_PER_HOUSE_CAP for how the larger map's
+// maxHousesPerFaction is kept from scaling by the same 2.56x, to limit how
+// much this also grows the O(n²) combat/gather systems' worst case.
+const WORLD_WIDTH = 32;
+const WORLD_HEIGHT = 32;
 
 /**
  * Every match rolls one of these for the whole map, per
