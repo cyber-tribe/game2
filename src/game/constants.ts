@@ -67,6 +67,23 @@ export const HOUSE_LEVELS: Record<HouseLevel, { capacity: number; manaRate: numb
 export const HOUSE_LEVEL_ORDER: HouseLevel[] = ["hut", "lodge", "manor", "castle"];
 
 /**
+ * Minimum house.population / capacity fraction releasePopulation requires
+ * before it'll empty a house early — see that function's doc comment.
+ * Below this, giving up the house's progress toward a real, full-strength
+ * spawn isn't judged worth the walker it would produce.
+ */
+export const POPULATION_RELEASE_MIN_FRACTION = 0.5;
+
+/**
+ * Share of a released walker's population fraction that becomes its
+ * strength — see releasePopulation. Kept below 1 so cashing population out
+ * early is a genuine trade-off (a weaker walker, sooner) against letting a
+ * house grow all the way to capacity on its own (strength 1, per
+ * createHouseGrowthSystem) — not a strictly better way to grow.
+ */
+export const POPULATION_RELEASE_EFFICIENCY = 0.75;
+
+/**
  * Ceiling on how much of a faction's total mana rate hut-level houses can
  * contribute, however many of them there are — see manaSystem. Population
  * growth spawns new hut-level houses automatically (see houseGrowth.ts),

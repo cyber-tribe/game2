@@ -5,6 +5,7 @@ import { FactionState, House, Owner, Position, Walker, type BehaviorMode, type F
 import { DEFAULT_WALKER_SPEED, TILES_PER_HOUSE_CAP } from "./constants";
 import { createFaction, findFactionEntity, moveShrine } from "./faction";
 import { knightify } from "./knight";
+import { releasePopulation } from "./populationRelease";
 import { createHouseCaptureSystem, walkerCombatSystem } from "./systems/combat";
 import { createEnemyAiSystem } from "./systems/enemyAi";
 import { createEnemyMiracleSystem, type EnemyMiracleEvent } from "./systems/enemyMiracles";
@@ -219,6 +220,15 @@ export class Simulation {
   /** The "騎士化" miracle — turns a faction's current leader into a knight. */
   knightify(faction: FactionId): void {
     knightify(this.world, faction);
+  }
+
+  /**
+   * The "人口放出" action — see populationRelease.ts. Free, like
+   * setBehaviorMode; returns how many walkers were actually released so
+   * callers can skip feedback (haptics, etc.) on a no-op tap.
+   */
+  releasePopulation(faction: FactionId): number {
+    return releasePopulation(this.world, faction, this.maxHousesPerFaction);
   }
 
   /**
