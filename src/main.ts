@@ -42,8 +42,20 @@ import {
 // Smaller than a desktop map: on a phone, showing the whole thing at once
 // makes every tile too small to tap precisely, so the map is shown closer
 // to native size and panned instead — see plan/archived/0009-pan-for-vertex-picking.md.
-const WORLD_WIDTH = 20;
-const WORLD_HEIGHT = 20;
+//
+// Raised from 20x20 in plan/0055-map-expansion.md, once measured to still
+// keep IsoRenderer.redraw() (called unconditionally every frame — see the
+// ticker below) comfortably within a 60fps frame budget: at 20x20 it
+// averaged ~0.8ms/frame; at 32x32 (2.56x the tiles) ~1.8ms, still under a
+// tenth of the ~16.6ms budget. 40x40 (4x the tiles) already spiked past
+// 14ms on some frames in that same measurement — a real ceiling on how far
+// this can go without a rendering optimization (e.g. only redrawing static
+// terrain shape on edit, instead of every frame) that's out of this
+// change's scope. See TILES_PER_HOUSE_CAP for how the larger map's
+// maxHousesPerFaction is kept from scaling by the same 2.56x, to limit how
+// much this also grows the O(n²) combat/gather systems' worst case.
+const WORLD_WIDTH = 32;
+const WORLD_HEIGHT = 32;
 
 /**
  * Every match rolls one of these for the whole map, per
@@ -72,6 +84,14 @@ const MIN_ZOOM_FACTOR = 0.5;
 const MAX_ZOOM_FACTOR = 2.5;
 /** A finger-drag shorter than this (px) is treated as a tap, not a pan. */
 const DRAG_THRESHOLD = 10;
+/**
+ * How long (ms) a single-finger press must stay still before it engages
+ * "ブラシ" continuous terraforming — see the pointerdown/pointermove
+ * handlers below. Long enough that an ordinary quick tap or the start of a
+ * pan never accidentally triggers it, short enough that deliberately
+ * holding still doesn't feel like waiting.
+ */
+const LONG_PRESS_DURATION_MS = 350;
 /**
  * How much one mouse-wheel "notch" (deltaY around ±100) zooms the map on
  * PC — see plan/0039-pc-support.md. Chosen so a single notch feels close
@@ -374,6 +394,22 @@ async function bootstrap() {
     return best;
   };
 
+  // Shared by the plain single-tap path (applyTool's own fallback, below)
+  // and by ブラシ continuous painting (see the pointer handlers further
+  // down) — both just need "spend mana, edit this one vertex, redraw".
+  const applyTerrainEditAt = (vertex: { x: number; y: number }): void => {
+    const delta = toolMode === "lower" ? -1 : 1;
+    // Should be unreachable in practice — the toolbar disables whichever
+    // of raise/lower this match's terrainEditRule forbids — but checked
+    // here too so a stale toolMode can never spend mana for an edit that
+    // silently does nothing.
+    if (!isTerrainEditAllowed(terrainEditRule, delta)) return;
+    if (!trySpendMana(simulation.world, "player", TERRAIN_EDIT_MANA_COST)) return;
+    raiseVertex(heightmap, vertex.x, vertex.y, delta);
+    renderer.redraw();
+    dismissTutorialHint();
+  };
+
   const applyTool = (event: FederatedPointerEvent) => {
     const local = renderer.view.toLocal(event.global);
 
@@ -462,16 +498,7 @@ async function bootstrap() {
       return;
     }
 
-    const delta = toolMode === "lower" ? -1 : 1;
-    // Should be unreachable in practice — the toolbar disables whichever
-    // of raise/lower this match's terrainEditRule forbids — but checked
-    // here too so a stale toolMode can never spend mana for an edit that
-    // silently does nothing.
-    if (!isTerrainEditAllowed(terrainEditRule, delta)) return;
-    if (!trySpendMana(simulation.world, "player", TERRAIN_EDIT_MANA_COST)) return;
-    raiseVertex(heightmap, vertex.x, vertex.y, delta);
-    renderer.redraw();
-    dismissTutorialHint();
+    applyTerrainEditAt(vertex);
   };
 
   // A short tap applies the selected tool; dragging beyond DRAG_THRESHOLD
@@ -481,6 +508,30 @@ async function bootstrap() {
   let isDragging = false;
   let dragStart = { x: 0, y: 0 };
   let viewStartPos = { x: 0, y: 0 };
+
+  // "ブラシ" continuous terraforming (see plan/0054-terraform-brush.md):
+  // holding a single press still for LONG_PRESS_DURATION_MS — long enough
+  // that it hasn't already turned into a pan — engages painting, so every
+  // vertex the pointer then passes over gets edited once. Flattening a
+  // wide area becomes one smooth gesture instead of many precise
+  // individual taps. Restricted to the "raise"/"lower" tools (checked at
+  // each call site below): every other toolMode is a single deliberate,
+  // often expensive miracle cast that a drag should never be able to repeat.
+  let longPressTimer: ReturnType<typeof setTimeout> | undefined;
+  let painting = false;
+  let lastPaintedVertex: { x: number; y: number } | undefined;
+
+  const clearLongPressTimer = () => {
+    if (longPressTimer === undefined) return;
+    clearTimeout(longPressTimer);
+    longPressTimer = undefined;
+  };
+
+  const stopPainting = () => {
+    clearLongPressTimer();
+    painting = false;
+    lastPaintedVertex = undefined;
+  };
 
   // A second finger switches to rotating/pinch-zooming the map instead of
   // panning/tapping. Tracked by pointerId (not just a count) since PixiJS's
@@ -561,6 +612,7 @@ async function bootstrap() {
       rotating = true;
       pointerActive = false;
       isDragging = false;
+      stopPainting();
       const points = [...activePointers.values()];
       lastTwoFingerAngle = twoFingerAngle(points);
       lastTwoFingerDistance = twoFingerDistance(points);
@@ -573,6 +625,22 @@ async function bootstrap() {
       isDragging = false;
       dragStart = { x: event.global.x, y: event.global.y };
       viewStartPos = { x: renderer.view.position.x, y: renderer.view.position.y };
+
+      if (toolMode === "raise" || toolMode === "lower") {
+        clearLongPressTimer();
+        longPressTimer = setTimeout(() => {
+          longPressTimer = undefined;
+          if (!pointerActive || isDragging || activePointers.size !== 1) return;
+          painting = true;
+          vibrate(10); // brief confirmation that painting just engaged
+          const local = renderer.view.toLocal(event.global);
+          const vertex = renderer.pickVertex(local.x, local.y);
+          if (vertex) {
+            applyTerrainEditAt(vertex);
+            lastPaintedVertex = vertex;
+          }
+        }, LONG_PRESS_DURATION_MS);
+      }
     }
   });
 
@@ -597,9 +665,27 @@ async function bootstrap() {
     }
 
     if (!pointerActive) return;
+
+    if (painting) {
+      const local = renderer.view.toLocal(event.global);
+      const vertex = renderer.pickVertex(local.x, local.y);
+      // Only edits when the pointer has moved onto a *different* vertex
+      // than the last one painted this stroke — otherwise holding still
+      // would keep re-editing (and re-charging mana for) the same spot
+      // every single pointermove event.
+      if (vertex && (!lastPaintedVertex || vertex.x !== lastPaintedVertex.x || vertex.y !== lastPaintedVertex.y)) {
+        applyTerrainEditAt(vertex);
+        lastPaintedVertex = vertex;
+      }
+      return;
+    }
+
     const dx = event.global.x - dragStart.x;
     const dy = event.global.y - dragStart.y;
-    if (!isDragging && Math.hypot(dx, dy) > DRAG_THRESHOLD) isDragging = true;
+    if (!isDragging && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+      isDragging = true;
+      clearLongPressTimer(); // this turned into a pan before painting engaged
+    }
     if (isDragging) {
       const next = clampPan(viewStartPos.x + dx, viewStartPos.y + dy);
       renderer.view.position.set(next.x, next.y);
@@ -610,8 +696,9 @@ async function bootstrap() {
     activePointers.delete(event.pointerId);
     if (activePointers.size < 2) rotating = false;
 
-    if (pointerActive && !isDragging && !gestureHadTwoFingers) applyTool(event);
+    if (pointerActive && !isDragging && !painting && !gestureHadTwoFingers) applyTool(event);
 
+    stopPainting();
     pointerActive = false;
     isDragging = false;
     if (activePointers.size === 0) gestureHadTwoFingers = false;
@@ -620,6 +707,7 @@ async function bootstrap() {
     activePointers.delete(event.pointerId);
     if (activePointers.size < 2) rotating = false;
 
+    stopPainting();
     pointerActive = false;
     isDragging = false;
     if (activePointers.size === 0) gestureHadTwoFingers = false;

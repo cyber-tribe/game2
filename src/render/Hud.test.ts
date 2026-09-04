@@ -3,8 +3,8 @@ import type { FactionSummary, GameOutcome } from "../game/simulation";
 import { Hud } from "./Hud";
 
 const SUMMARIES: FactionSummary[] = [
-  { id: "player", mana: 12.3, houses: 2, housesCap: 5, walkers: 1, behaviorMode: "settle" },
-  { id: "enemy", mana: 4.5, houses: 1, housesCap: 5, walkers: 3, behaviorMode: "fight" },
+  { id: "player", mana: 12.3, houses: 2, housesCap: 5, walkers: 1, behaviorMode: "settle", population: 12 },
+  { id: "enemy", mana: 4.5, houses: 1, housesCap: 5, walkers: 3, behaviorMode: "fight", population: 8 },
 ];
 
 const ONGOING: GameOutcome = { over: false };
@@ -30,5 +30,40 @@ describe("Hud.update", () => {
     hud.update(SUMMARIES, { over: true });
 
     expect(hud.view.text).toContain("GAME OVER — draw");
+  });
+
+  it("shows a population comparison bar with each faction's total", () => {
+    const hud = new Hud();
+    hud.update(SUMMARIES, ONGOING);
+
+    expect(hud.view.text).toContain("人口");
+    expect(hud.view.text).toContain("player 12");
+    expect(hud.view.text).toContain("enemy 8");
+  });
+
+  it("fills the bar in proportion to each faction's share", () => {
+    const hud = new Hud();
+    hud.update(
+      [
+        { id: "player", mana: 0, houses: 0, housesCap: 5, walkers: 0, behaviorMode: "settle", population: 100 },
+        { id: "enemy", mana: 0, houses: 0, housesCap: 5, walkers: 0, behaviorMode: "settle", population: 0 },
+      ],
+      ONGOING,
+    );
+
+    expect(hud.view.text).toContain("[▓▓▓▓▓▓▓▓▓▓]");
+  });
+
+  it("splits the bar evenly when the two factions are tied", () => {
+    const hud = new Hud();
+    hud.update(
+      [
+        { id: "player", mana: 0, houses: 0, housesCap: 5, walkers: 0, behaviorMode: "settle", population: 5 },
+        { id: "enemy", mana: 0, houses: 0, housesCap: 5, walkers: 0, behaviorMode: "settle", population: 5 },
+      ],
+      ONGOING,
+    );
+
+    expect(hud.view.text).toContain("[▓▓▓▓▓░░░░░]");
   });
 });

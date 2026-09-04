@@ -62,8 +62,8 @@ describe("Simulation", () => {
   });
 
   it("stops spawning new walkers once a faction's house count reaches its cap, past its one stalemate-escape walker", () => {
-    const sim = new Simulation({ worldWidth: 4, worldHeight: 4, initialWalkersPerFaction: 0 });
-    // TILES_PER_HOUSE_CAP=8 over a 4x4=16 tile world caps at 2 houses per faction.
+    const sim = new Simulation({ worldWidth: 5, worldHeight: 5, initialWalkersPerFaction: 0 });
+    // TILES_PER_HOUSE_CAP=12 over a 5x5=25 tile world caps at 2 houses per faction.
     expect(sim.maxHousesPerFaction).toBe(2);
 
     for (const faction of ["player", "enemy"] as const) {
