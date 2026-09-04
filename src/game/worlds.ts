@@ -8,9 +8,10 @@ import type { TerrainEditRule, TerrainType } from "../world/heightmap";
  * per-match before this file existed (terrain type, terrainEditRule, map
  * size — see plan/0052-terrain-edit-rule.md and plan/0055-map-expansion.md)
  * by fixing them per world instead of rolling them randomly every match.
- * World-count progression (500 worlds), a password/continue system, and
- * per-world enemy AI tuning are deliberately out of scope here — see
- * plan/0059-world-select.md.
+ * World-count progression (500 worlds) and per-world enemy AI tuning are
+ * deliberately out of scope here — see plan/0059-world-select.md. A
+ * password/continue system (see nextWorldId/unlockedCountForPassword
+ * below) was added on top in plan/0060-campaign-password.md.
  */
 export interface WorldDefinition {
   id: string;
@@ -39,3 +40,31 @@ export const WORLDS: WorldDefinition[] = [
   { id: "rising-frontier", name: "隆起する辺境", worldWidth: 28, worldHeight: 28, terrain: "desert", terrainEditRule: "raiseOnly" },
   { id: "final-frontline", name: "最終戦線", worldWidth: 32, worldHeight: 32, terrain: "rock", terrainEditRule: "lowerOnly" },
 ];
+
+/**
+ * The "password" (per docs/game-system.md 10節's "クリアするとパスワード
+ * （ワールド名）が与えられ、そこから再開できる") shown to the player after
+ * clearing `worldId` — literally the next world's own id/name, matching
+ * the doc's own parenthetical rather than some derived/hashed code.
+ * Undefined once `worldId` is the last entry in WORLDS (nothing left to
+ * unlock). "勝ち方の内容に応じて数ワールド先へスキップできる" (skipping
+ * further ahead based on how decisively the player won) is deliberately
+ * not modeled here — every clear advances by exactly one world.
+ */
+export function nextWorldId(worldId: string): string | undefined {
+  const index = WORLDS.findIndex((world) => world.id === worldId);
+  if (index === -1 || index === WORLDS.length - 1) return undefined;
+  return WORLDS[index + 1].id;
+}
+
+/**
+ * How many worlds, counting from the start of WORLDS, a given password
+ * unlocks — one past whichever world's id it matches, so entering the
+ * password nextWorldId returned after clearing world i (i.e. WORLDS[i+1]'s
+ * own id) unlocks indices 0..i+1: both the world just cleared and the new
+ * one. Undefined for a password that doesn't match any world's id.
+ */
+export function unlockedCountForPassword(password: string): number | undefined {
+  const index = WORLDS.findIndex((world) => world.id === password);
+  return index === -1 ? undefined : index + 1;
+}
