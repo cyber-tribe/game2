@@ -166,7 +166,7 @@ describe("Simulation", () => {
   it("automatically records a miracle the enemy AI casts on its own, not just the player's own casts", () => {
     // Perfectly flat: createEnemyTerraformSystem also runs this same first
     // tick and would otherwise spend a bit of the enemy's mana flattening
-    // around its house, leaving it just short of affording armageddon below
+    // around its house, leaving it just short of affording the miracle below
     // (MAX_MANA equals ARMAGEDDON_MANA_COST exactly, so there's no "spare"
     // mana to buffer against that with).
     const heightmap = flatHeightmap(10, 10, 5);
@@ -197,7 +197,12 @@ describe("Simulation", () => {
 
     sim.update(0.1); // every decision system runs on its very first tick
 
-    expect(sim.getMatchEvents()).toEqual([{ time: 0.1, faction: "enemy", type: "armageddon" }]);
+    // Not "armageddon": enemyMiracles.ts won't trigger 最終決戦 before
+    // MIN_ARMAGEDDON_TIME has elapsed, however lopsided the population
+    // ratio already is — see plan/0045-armageddon-timing.md. With the
+    // ratio this decisive (20 vs 1) but the match only 0.1s old, the AI
+    // falls through to the next-priciest thing it can afford instead.
+    expect(sim.getMatchEvents()).toEqual([{ time: 0.1, faction: "enemy", type: "volcano" }]);
   });
 
   it("records houseCaptured when a walker takes an enemy house in combat", () => {
@@ -421,7 +426,15 @@ describe("Simulation", () => {
     // cover on their own.
     sim.world.add(playerWalker, Walker, { ...sim.world.get(playerWalker, Walker)!, strength: 999 });
 
-    for (let i = 0; i < 150; i++) sim.update(0.1);
+    // Generous budget: knightTargetingSystem/fightTargetingSystem lock onto
+    // a snapshot of the enemy's position rather than tracking it live, so if
+    // the enemy walker is still wandering when the knight locks on, the
+    // knight can arrive at an already-stale, empty spot and only then
+    // retarget to the walker's real (by now possibly settled) location —
+    // occasionally adding a second full leg of travel plus
+    // KNIGHT_BURN_COOLDOWN on top. 150 ticks (15s) was tight enough to be
+    // flaky in that case; 600 (60s) comfortably covers it.
+    for (let i = 0; i < 600; i++) sim.update(0.1);
 
     const enemyWalkers = sim.world.query(Walker, Owner).filter((e) => sim.world.get(e, Owner)!.faction === "enemy");
     const enemyHouses = sim.world.query(House, Owner).filter((e) => sim.world.get(e, Owner)!.faction === "enemy");

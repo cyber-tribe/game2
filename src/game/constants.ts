@@ -201,6 +201,22 @@ export const MAX_MANA = ARMAGEDDON_MANA_COST;
 export const ARMAGEDDON_POPULATION_RATIO = 1.8;
 
 /**
+ * Seconds since match start before the enemy AI will trigger 最終決戦,
+ * however lopsided ARMAGEDDON_POPULATION_RATIO already is — see
+ * enemyMiracles.ts and plan/0045-armageddon-timing.md. A match's early
+ * population numbers are noisy (a house's in-progress population resets
+ * to 0 every time it overflows into a walker) and can swing past the
+ * ratio within the first minute or two purely by chance, well before
+ * either side has anything like a real civilization — ending the whole
+ * match before the "繁栄"/"復興" phases a match is meant to have ever
+ * get a chance to happen. 180s (3 minutes) is a floor, not a target
+ * length: the AI can still trigger armageddon any time after this once
+ * the ratio holds, it just can't end the match in the first three
+ * minutes purely because of early noise.
+ */
+export const MIN_ARMAGEDDON_TIME = 180;
+
+/**
  * Population lead at which the enemy AI escalates from earthquake to
  * volcano — see enemyMiracles.ts. Sits between "even game" (1.0) and
  * ARMAGEDDON_POPULATION_RATIO: a real but not yet decisive advantage, at

@@ -49,6 +49,7 @@ describe("createEnemyMiracleSystem", () => {
     const events: unknown[] = [];
     const system = createEnemyMiracleSystem({
       decisionInterval: 8,
+      minArmageddonTime: 0, // not testing the elapsed-time floor here — see the dedicated tests below
       heightmap: flatHeightmap(10, 10, 5),
       worldCenter: WORLD_CENTER,
       onAction: (event) => events.push(event),
@@ -58,6 +59,55 @@ describe("createEnemyMiracleSystem", () => {
     expect(world.get(enemy, FactionState)!.finalBattle).toBe(true);
     expect(world.get(enemy, FactionState)!.mana).toBe(0);
     expect(events).toEqual([{ type: "armageddon" }]);
+  });
+
+  it("won't trigger final battle before minArmageddonTime has elapsed, however decisive the lead", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: ARMAGEDDON_MANA_COST });
+    createFaction(world, "player", { x: 9, y: 9 });
+    createHouse(world, "enemy", 5, 5, 20);
+    createHouse(world, "player", 8, 8, 1);
+
+    const events: unknown[] = [];
+    const system = createEnemyMiracleSystem({
+      decisionInterval: 8,
+      minArmageddonTime: 100,
+      heightmap: flatHeightmap(10, 10, 5),
+      worldCenter: WORLD_CENTER,
+      onAction: (event) => events.push(event),
+    });
+    system(world, 8); // only 8s elapsed, well under the 100s floor
+
+    expect(world.get(enemy, FactionState)!.finalBattle).toBeUndefined();
+    expect(events.some((e) => (e as { type: string }).type === "armageddon")).toBe(false);
+  });
+
+  it("triggers final battle once minArmageddonTime has elapsed, across several decision passes", () => {
+    const world = new World();
+    // No mana yet — deliberately can't afford any fallback miracle (knight/
+    // volcano/earthquake) on the first call below, so that call is a total
+    // no-op and this test isolates the elapsed-time gate itself.
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    createFaction(world, "player", { x: 9, y: 9 });
+    createHouse(world, "enemy", 5, 5, 20);
+    createHouse(world, "player", 8, 8, 1);
+
+    const events: unknown[] = [];
+    const system = createEnemyMiracleSystem({
+      decisionInterval: 8,
+      minArmageddonTime: 10,
+      heightmap: flatHeightmap(10, 10, 5),
+      worldCenter: WORLD_CENTER,
+      onAction: (event) => events.push(event),
+    });
+    system(world, 8); // elapsed=8, under the 10s floor, and no mana to afford anything anyway
+
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: ARMAGEDDON_MANA_COST });
+    system(world, 8); // elapsed=16, past the floor: armageddon fires
+
+    expect(world.get(enemy, FactionState)!.finalBattle).toBe(true);
+    expect(events.some((e) => (e as { type: string }).type === "armageddon")).toBe(true);
   });
 
   it("does not trigger final battle without a decisive population lead", () => {
