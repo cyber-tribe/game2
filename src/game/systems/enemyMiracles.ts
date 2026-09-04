@@ -13,6 +13,7 @@ import {
   ARMAGEDDON_POPULATION_RATIO,
   EARTHQUAKE_MANA_COST,
   KNIGHT_MANA_COST,
+  MIN_ARMAGEDDON_TIME,
   VOLCANO_MANA_COST,
   VOLCANO_POPULATION_RATIO,
 } from "../constants";
@@ -41,6 +42,12 @@ export interface EnemyMiracleConfig {
   worldCenter: Point;
   /** Seconds between re-evaluating whether to cast something. */
   decisionInterval: number;
+  /**
+   * Seconds since match start before the AI will even consider 最終決戦,
+   * however lopsided the population ratio already is — see this system's
+   * doc comment on why this exists.
+   */
+  minArmageddonTime: number;
   /** Injectable RNG, in [0, 1), for deterministic tests. */
   rng: () => number;
   /** Called once per miracle actually cast — see EnemyMiracleEvent. */
@@ -75,6 +82,14 @@ export interface EnemyMiracleConfig {
  * through to a cheaper one (or does nothing) rather than acting for
  * free. Skips everything once finalBattle is set, same as
  * createEnemyAiSystem.
+ *
+ * The 最終決戦 branch additionally waits until minArmageddonTime has
+ * elapsed — see plan/0045-armageddon-timing.md. Without it, a match's
+ * early, noisy population swings (a house's in-progress population
+ * resets to 0 every time it overflows into a walker, so totalPopulation
+ * below jitters well before either side has a real economy) could clear
+ * ARMAGEDDON_POPULATION_RATIO within the first minute or two, ending the
+ * whole match before the earlier "繁栄"/"復興" phases had time to happen.
  */
 export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {}): System {
   const factionId = config.factionId ?? "enemy";
@@ -83,11 +98,14 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
   const worldCenter = config.worldCenter;
   if (!heightmap || !worldCenter) return () => {};
   const decisionInterval = config.decisionInterval ?? 8;
+  const minArmageddonTime = config.minArmageddonTime ?? MIN_ARMAGEDDON_TIME;
   const rng = config.rng ?? Math.random;
   const onAction = config.onAction ?? (() => {});
   let timeSincePass = decisionInterval;
+  let elapsed = 0;
 
   return (world, deltaSeconds) => {
+    elapsed += deltaSeconds;
     timeSincePass += deltaSeconds;
     if (timeSincePass < decisionInterval) return;
     timeSincePass = 0;
@@ -101,7 +119,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
     const theirPopulation = totalPopulation(world, opponentId);
     const populationRatio = theirPopulation > 0 ? myPopulation / theirPopulation : 0;
 
-    if (populationRatio >= ARMAGEDDON_POPULATION_RATIO) {
+    if (populationRatio >= ARMAGEDDON_POPULATION_RATIO && elapsed >= minArmageddonTime) {
       if (trySpendMana(world, factionId, ARMAGEDDON_MANA_COST)) {
         triggerArmageddon(world, worldCenter);
         onAction({ type: "armageddon" });

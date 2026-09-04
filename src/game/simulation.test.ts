@@ -166,7 +166,7 @@ describe("Simulation", () => {
   it("automatically records a miracle the enemy AI casts on its own, not just the player's own casts", () => {
     // Perfectly flat: createEnemyTerraformSystem also runs this same first
     // tick and would otherwise spend a bit of the enemy's mana flattening
-    // around its house, leaving it just short of affording armageddon below
+    // around its house, leaving it just short of affording the miracle below
     // (MAX_MANA equals ARMAGEDDON_MANA_COST exactly, so there's no "spare"
     // mana to buffer against that with).
     const heightmap = flatHeightmap(10, 10, 5);
@@ -197,7 +197,12 @@ describe("Simulation", () => {
 
     sim.update(0.1); // every decision system runs on its very first tick
 
-    expect(sim.getMatchEvents()).toEqual([{ time: 0.1, faction: "enemy", type: "armageddon" }]);
+    // Not "armageddon": enemyMiracles.ts won't trigger 最終決戦 before
+    // MIN_ARMAGEDDON_TIME has elapsed, however lopsided the population
+    // ratio already is — see plan/0045-armageddon-timing.md. With the
+    // ratio this decisive (20 vs 1) but the match only 0.1s old, the AI
+    // falls through to the next-priciest thing it can afford instead.
+    expect(sim.getMatchEvents()).toEqual([{ time: 0.1, faction: "enemy", type: "volcano" }]);
   });
 
   it("records houseCaptured when a walker takes an enemy house in combat", () => {
