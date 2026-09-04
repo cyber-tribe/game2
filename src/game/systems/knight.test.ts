@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
-import { House, MoveTarget, Owner, Position, Walker, type FactionId, type WalkerState } from "../components";
+import { House, KnightCooldown, MoveTarget, Owner, Position, Walker, type FactionId, type WalkerState } from "../components";
 import { createFaction } from "../faction";
-import { knightTargetingSystem } from "./knight";
+import { knightCooldownSystem, knightTargetingSystem } from "./knight";
 
 function createWalker(world: World, faction: FactionId, x: number, y: number, state: WalkerState = "seeking") {
   const entity = world.createEntity();
@@ -71,5 +71,46 @@ describe("knightTargetingSystem", () => {
     knightTargetingSystem(world, 0);
 
     expect(world.has(knight, MoveTarget)).toBe(false);
+  });
+
+  it("does not retarget a knight that's still resting under KnightCooldown", () => {
+    const world = new World();
+    const knight = createWalker(world, "player", 0, 0, "knight");
+    world.add(knight, KnightCooldown, { remaining: 3 });
+    createWalker(world, "enemy", 5, 0);
+
+    knightTargetingSystem(world, 0);
+
+    expect(world.has(knight, MoveTarget)).toBe(false);
+  });
+});
+
+describe("knightCooldownSystem", () => {
+  it("counts down remaining time without removing the component early", () => {
+    const world = new World();
+    const knight = createWalker(world, "player", 0, 0, "knight");
+    world.add(knight, KnightCooldown, { remaining: 3 });
+
+    knightCooldownSystem(world, 1);
+
+    expect(world.get(knight, KnightCooldown)).toEqual({ remaining: 2 });
+  });
+
+  it("removes KnightCooldown once it counts down to zero or below", () => {
+    const world = new World();
+    const knight = createWalker(world, "player", 0, 0, "knight");
+    world.add(knight, KnightCooldown, { remaining: 1 });
+
+    knightCooldownSystem(world, 2.5);
+
+    expect(world.has(knight, KnightCooldown)).toBe(false);
+  });
+
+  it("leaves entities without KnightCooldown untouched", () => {
+    const world = new World();
+    const knight = createWalker(world, "player", 0, 0, "knight");
+
+    expect(() => knightCooldownSystem(world, 1)).not.toThrow();
+    expect(world.has(knight, KnightCooldown)).toBe(false);
   });
 });
