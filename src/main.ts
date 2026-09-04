@@ -1,4 +1,5 @@
 import { Application, Container, Rectangle, type FederatedPointerEvent } from "pixi.js";
+import { playMiracleSound } from "./audio/miracleSounds";
 import {
   ARMAGEDDON_MANA_COST,
   EARTHQUAKE_MANA_COST,
@@ -7,6 +8,8 @@ import {
   SHRINE_MOVE_MANA_COST,
   SWAMP_MANA_COST,
   TERRAIN_EDIT_MANA_COST,
+  TERRAIN_EDIT_RULE_LABELS,
+  TERRAIN_EDIT_RULE_WEIGHTS,
   TERRAIN_LABELS,
   VOLCANO_MANA_COST,
 } from "./game/constants";
@@ -14,7 +17,7 @@ import type { EnemyMiracleEvent } from "./game/systems/enemyMiracles";
 import { trySpendMana } from "./game/faction";
 import { drownFlood } from "./game/flood";
 import { Simulation, type GameOutcome, type MatchEvent } from "./game/simulation";
-import { createSwamp } from "./game/swamp";
+import { collapseSwampsNear, createSwamp } from "./game/swamp";
 import { eruptVolcano } from "./game/volcano";
 import { EntityLayer } from "./render/EntityLayer";
 import { Hud } from "./render/Hud";
@@ -23,11 +26,14 @@ import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
 import { Minimap } from "./render/Minimap";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
 import {
+  DEFAULT_EARTHQUAKE_RADIUS,
   DEFAULT_VOLCANO_RADIUS,
   applyEarthquake,
   applyFlood,
   applyVolcano,
   createHeightmap,
+  isTerrainEditAllowed,
+  pickTerrainEditRule,
   raiseVertex,
   type TerrainType,
 } from "./world/heightmap";
@@ -133,6 +139,13 @@ async function bootstrap() {
   const heightmap = createHeightmap(WORLD_WIDTH, WORLD_HEIGHT, pickRandomTerrain());
   const renderer = new IsoRenderer(heightmap);
 
+  // Per docs/game-system.md's "各ワールドは...使用可能な奇跡の制限などが
+  // 異なり" — most matches allow raise/lower freely (today's only
+  // behavior), but a minority restrict terraforming to one direction. See
+  // TerrainEditRule's doc comment for why this doesn't take away the
+  // player's ability to flatten land, just which direction does it.
+  const terrainEditRule = pickTerrainEditRule(TERRAIN_EDIT_RULE_WEIGHTS);
+
   // A wrapper around renderer.view purely for screen shake (see
   // triggerShake below): renderer.view.position is the "real" camera
   // state that pan/zoom/rotate all read and write, so shake is kept as a
@@ -158,6 +171,7 @@ async function bootstrap() {
 
   const hud = new Hud();
   hud.setTerrain(TERRAIN_LABELS[heightmap.terrain]);
+  if (terrainEditRule !== "both") hud.setTerrainEditRule(TERRAIN_EDIT_RULE_LABELS[terrainEditRule]);
   app.stage.addChild(hud.view);
 
   const minimap = new Minimap(heightmap, MINIMAP_SIZE);
@@ -190,6 +204,7 @@ async function bootstrap() {
   const onEnemyAction = (event: EnemyMiracleEvent) => {
     showEnemyEventToast(describeMatchEvent(event.type, "enemy"));
     triggerShake(ENEMY_SHAKE_MAGNITUDE[event.type]);
+    playMiracleSound(event.type);
   };
 
   const matchRecordPanel = document.getElementById("match-record");
@@ -223,7 +238,13 @@ async function bootstrap() {
     matchRecordPanel.classList.remove("hidden");
   };
 
-  const simulation = new Simulation({ worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT, heightmap, onEnemyAction });
+  const simulation = new Simulation({
+    worldWidth: WORLD_WIDTH,
+    worldHeight: WORLD_HEIGHT,
+    heightmap,
+    terrainEditRule,
+    onEnemyAction,
+  });
 
   // The "人口放出" action (see game/populationRelease.ts) — free and
   // instant like a behaviorMode change, so it's a plain button rather than
@@ -318,14 +339,23 @@ async function bootstrap() {
     centerViewOn(target.x, target.y);
   });
 
-  let toolMode: ToolMode = "raise";
+  // Defaults to whichever direction terrainEditRule actually allows —
+  // defaulting to the disabled "raise" under lowerOnly would otherwise
+  // leave the player's very first tap doing nothing.
+  let toolMode: ToolMode = terrainEditRule === "lowerOnly" ? "lower" : "raise";
 
   // Shared by the plain single-tap path (applyTool's own fallback, below)
   // and by ブラシ continuous painting (see the pointer handlers further
   // down) — both just need "spend mana, edit this one vertex, redraw".
   const applyTerrainEditAt = (vertex: { x: number; y: number }): void => {
+    const delta = toolMode === "lower" ? -1 : 1;
+    // Should be unreachable in practice — the toolbar disables whichever
+    // of raise/lower this match's terrainEditRule forbids — but checked
+    // here too so a stale toolMode can never spend mana for an edit that
+    // silently does nothing.
+    if (!isTerrainEditAllowed(terrainEditRule, delta)) return;
     if (!trySpendMana(simulation.world, "player", TERRAIN_EDIT_MANA_COST)) return;
-    raiseVertex(heightmap, vertex.x, vertex.y, toolMode === "lower" ? -1 : 1);
+    raiseVertex(heightmap, vertex.x, vertex.y, delta);
     renderer.redraw();
     dismissTutorialHint();
   };
@@ -340,16 +370,19 @@ async function bootstrap() {
       simulation.moveShrine("player", vertex);
       simulation.recordEvent("player", "shrineMove");
       vibrate(15);
+      playMiracleSound("shrineMove");
       return;
     }
 
     if (toolMode === "earthquake") {
       if (!trySpendMana(simulation.world, "player", EARTHQUAKE_MANA_COST)) return;
       applyEarthquake(heightmap, vertex.x, vertex.y);
+      collapseSwampsNear(simulation.world, vertex.x, vertex.y, DEFAULT_EARTHQUAKE_RADIUS);
       renderer.redraw();
       simulation.recordEvent("player", "earthquake");
       triggerShake(6);
       vibrate(40);
+      playMiracleSound("earthquake");
       return;
     }
 
@@ -358,6 +391,7 @@ async function bootstrap() {
       createSwamp(simulation.world, vertex.x, vertex.y);
       simulation.recordEvent("player", "swamp");
       vibrate(25);
+      playMiracleSound("swamp");
       return;
     }
 
@@ -369,6 +403,7 @@ async function bootstrap() {
       simulation.recordEvent("player", "volcano");
       triggerShake(8);
       vibrate([40, 30, 60]);
+      playMiracleSound("volcano");
       return;
     }
 
@@ -378,6 +413,7 @@ async function bootstrap() {
       simulation.knightify("player");
       simulation.recordEvent("player", "knight");
       vibrate(30);
+      playMiracleSound("knight");
       return;
     }
 
@@ -388,6 +424,7 @@ async function bootstrap() {
       simulation.recordEvent("player", "armageddon");
       triggerShake(10);
       vibrate([60, 40, 60, 40, 100]);
+      playMiracleSound("armageddon");
       return;
     }
 
@@ -395,11 +432,12 @@ async function bootstrap() {
       // Global effect — the tap only confirms the cast, its position doesn't matter.
       if (!trySpendMana(simulation.world, "player", FLOOD_MANA_COST)) return;
       applyFlood(heightmap);
-      drownFlood(simulation.world, heightmap);
+      drownFlood(simulation.world, heightmap, (event) => simulation.recordImpactEffect(event));
       renderer.redraw();
       simulation.recordEvent("player", "flood");
       triggerShake(5);
       vibrate(50);
+      playMiracleSound("flood");
       return;
     }
 
@@ -625,6 +663,20 @@ async function bootstrap() {
     },
   });
 
+  // Reflects terrainEditRule in the toolbar itself: a player should never
+  // be able to select the forbidden direction in the first place, rather
+  // than tapping it and having nothing happen.
+  if (terrainEditRule !== "both") {
+    const forbidden: ToolMode = terrainEditRule === "raiseOnly" ? "lower" : "raise";
+    document.querySelector<HTMLButtonElement>(`#toolbar [data-tool="${forbidden}"]`)?.setAttribute("disabled", "true");
+  }
+  // Syncs the toolbar's visual "pressed" state with toolMode's actual
+  // default set above — index.html hardcodes "raise" as pressed, which is
+  // wrong whenever terrainEditRule forced the default to "lower" instead.
+  document
+    .querySelectorAll<HTMLButtonElement>('#toolbar [data-tool="raise"], #toolbar [data-tool="lower"]')
+    .forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.tool === toolMode)));
+
   app.ticker.add((ticker) => {
     const deltaSeconds = ticker.deltaMS / 1000;
     simulation.update(deltaSeconds);
@@ -637,7 +689,7 @@ async function bootstrap() {
     // were invisible until the player's next tap happened to trigger one.
     renderer.update(deltaSeconds);
     renderer.redraw();
-    entityLayer.update(simulation.world, deltaSeconds);
+    entityLayer.update(simulation.world, deltaSeconds, simulation.getImpactEffects());
     const outcome = simulation.getOutcome();
     hud.update(simulation.summarize(), outcome);
     if (outcome.over && !matchRecordShown) {

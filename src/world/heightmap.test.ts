@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { HOUSE_LEVEL_FLATNESS_REQUIREMENT, HOUSE_UPGRADE_FLATNESS_RADIUS } from "../game/constants";
 import {
+  FLOOD_ROCK_COOLING,
   MAX_ELEVATION,
   MIN_ELEVATION,
   VOLCANO_ROCK_HARDNESS,
@@ -12,9 +13,12 @@ import {
   findLeastFlatVertex,
   isBuildable,
   isRock,
+  isTerrainEditAllowed,
+  pickTerrainEditRule,
   raiseVertex,
   sampleElevation,
   type Heightmap,
+  type TerrainEditRule,
 } from "./heightmap";
 
 function flatHeightmap(
@@ -388,5 +392,72 @@ describe("applyFlood", () => {
     applyFlood(heightmap, 3);
 
     expect(heightmap.vertices[2][2]).toBe(5);
+  });
+
+  it("cools every existing volcanic rock vertex by FLOOD_ROCK_COOLING", () => {
+    const heightmap = flatHeightmap(4, 4, 5);
+    applyVolcano(heightmap, 1, 1, 0);
+    const before = heightmap.rockHardness[1][1];
+
+    applyFlood(heightmap);
+
+    expect(heightmap.rockHardness[1][1]).toBe(before - FLOOD_ROCK_COOLING);
+  });
+
+  it("never cools rock hardness below zero", () => {
+    const heightmap = flatHeightmap(4, 4, 5);
+    applyVolcano(heightmap, 1, 1, 0, FLOOD_ROCK_COOLING - 0.5);
+
+    applyFlood(heightmap);
+
+    expect(heightmap.rockHardness[1][1]).toBe(0);
+  });
+
+  it("leaves ordinary (non-rock) vertices untouched", () => {
+    const heightmap = flatHeightmap(4, 4, 5);
+
+    applyFlood(heightmap);
+
+    expect(heightmap.rockHardness[2][2]).toBe(0);
+  });
+});
+
+describe("isTerrainEditAllowed", () => {
+  it("allows both directions under 'both'", () => {
+    expect(isTerrainEditAllowed("both", 1)).toBe(true);
+    expect(isTerrainEditAllowed("both", -1)).toBe(true);
+  });
+
+  it("allows only positive deltas under 'raiseOnly'", () => {
+    expect(isTerrainEditAllowed("raiseOnly", 1)).toBe(true);
+    expect(isTerrainEditAllowed("raiseOnly", -1)).toBe(false);
+  });
+
+  it("allows only negative deltas under 'lowerOnly'", () => {
+    expect(isTerrainEditAllowed("lowerOnly", -1)).toBe(true);
+    expect(isTerrainEditAllowed("lowerOnly", 1)).toBe(false);
+  });
+});
+
+describe("pickTerrainEditRule", () => {
+  const weights: Record<TerrainEditRule, number> = { both: 2, raiseOnly: 1, lowerOnly: 1 };
+
+  it("picks the rule whose weighted slice the roll lands in", () => {
+    // Slices in Object.entries order: both=[0,2), raiseOnly=[2,3), lowerOnly=[3,4).
+    expect(pickTerrainEditRule(weights, () => 0)).toBe("both");
+    expect(pickTerrainEditRule(weights, () => 0.49)).toBe("both");
+    expect(pickTerrainEditRule(weights, () => 0.51)).toBe("raiseOnly");
+    expect(pickTerrainEditRule(weights, () => 0.99)).toBe("lowerOnly");
+  });
+
+  it("never picks a rule with zero weight", () => {
+    const onlyBoth: Record<TerrainEditRule, number> = { both: 1, raiseOnly: 0, lowerOnly: 0 };
+    for (let roll = 0; roll < 1; roll += 0.1) {
+      expect(pickTerrainEditRule(onlyBoth, () => roll)).toBe("both");
+    }
+  });
+
+  it("defaults to Math.random when no rng is given", () => {
+    expect(["both", "raiseOnly", "lowerOnly"]).toContain(pickTerrainEditRule(weights));
   });
 });

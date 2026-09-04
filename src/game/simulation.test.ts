@@ -35,7 +35,7 @@ describe("Simulation", () => {
     }
   });
 
-  it("stops spawning new walkers once a faction's house count reaches its cap", () => {
+  it("stops spawning new walkers once a faction's house count reaches its cap, past its one stalemate-escape walker", () => {
     const sim = new Simulation({ worldWidth: 4, worldHeight: 4, initialWalkersPerFaction: 0 });
     // TILES_PER_HOUSE_CAP=8 over a 4x4=16 tile world caps at 2 houses per faction.
     expect(sim.maxHousesPerFaction).toBe(2);
@@ -51,9 +51,51 @@ describe("Simulation", () => {
 
     for (let i = 0; i < 100; i++) sim.update(1); // plenty of time/mana to spawn if the cap didn't hold
 
+    // Not asserting an exact walker count here: both factions start with
+    // zero walkers, so houseGrowth's stalemate-escape valve (see its doc
+    // comment) lets each spawn exactly one regardless of the cap —
+    // otherwise a faction already at the cap could never again produce a
+    // walker, risking a permanent deadlock if both sides land there with
+    // nothing left to fight with. With both factions' houses at the same
+    // (1, 1) here, those two escape-valve walkers can end up fighting (and
+    // destroying each other) depending on which way they wander first —
+    // real, but not deterministic enough to assert on at this level; see
+    // houseGrowth.test.ts's own escape-valve tests for that. What's worth
+    // asserting here is that the house cap itself still held throughout.
     for (const summary of sim.summarize()) {
       expect(summary.houses).toBe(summary.housesCap);
-      expect(summary.walkers).toBe(0);
+    }
+  });
+
+  it("recovers from both factions being at the house cap with zero walkers, instead of deadlocking forever", () => {
+    // The scenario houseGrowth.ts's stalemate-escape valve exists to
+    // prevent: with no walkers left and every house already at the cap,
+    // neither the ordinary population-overflow spawn (houseGrowth.ts) nor
+    // settling into a new house (settle.ts) can ever create a walker again
+    // for either side — and with nothing left able to fight, capture, or
+    // shift the population ratio, ARMAGEDDON_POPULATION_RATIO could never
+    // be reached and the match would never end (see plan/0053-match-
+    // length-tuning.md). Far-apart positions here (unlike the same-(1,1)
+    // test above) keep this deterministic: the two escape-valve walkers
+    // shouldn't wander into combat range of each other in just a few ticks.
+    const sim = new Simulation({ worldWidth: 20, worldHeight: 20, initialWalkersPerFaction: 0 });
+
+    for (const [faction, x, y] of [
+      ["player", 2, 2],
+      ["enemy", 17, 17],
+    ] as const) {
+      for (let i = 0; i < sim.maxHousesPerFaction; i++) {
+        const house = sim.world.createEntity();
+        sim.world.add(house, Position, { x, y });
+        sim.world.add(house, Owner, { faction });
+        sim.world.add(house, House, { level: "hut", population: HOUSE_LEVELS.hut.capacity });
+      }
+    }
+
+    for (let i = 0; i < 10; i++) sim.update(1);
+
+    for (const summary of sim.summarize()) {
+      expect(summary.walkers).toBeGreaterThan(0);
     }
   });
 

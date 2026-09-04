@@ -17,6 +17,9 @@ export interface HouseGrowthConfig {
    * A house at the cap keeps accumulating population but stops spawning;
    * growth resumes automatically if the faction loses a house (e.g. to
    * capture) and drops back under the cap.
+   *
+   * The one exception is a faction that currently has zero live walkers —
+   * see the stalemate-prevention note below.
    */
   maxHousesPerFaction: number;
 }
@@ -28,6 +31,7 @@ export function createHouseGrowthSystem(config: Partial<HouseGrowthConfig> = {})
 
   return (world, deltaSeconds) => {
     const houseCountByFaction = countHousesByFaction(world);
+    const walkerCountByFaction = countWalkersByFaction(world);
 
     for (const entity of world.query(House, Position, Owner)) {
       const house = world.get(entity, House)!;
@@ -39,11 +43,26 @@ export function createHouseGrowthSystem(config: Partial<HouseGrowthConfig> = {})
 
       while (
         population >= capacity &&
-        (houseCountByFaction.get(owner.faction) ?? 0) < maxHousesPerFaction
+        ((houseCountByFaction.get(owner.faction) ?? 0) < maxHousesPerFaction ||
+          // Stalemate escape valve: a faction sitting at (or, from before
+          // settle.ts also enforced this cap, even over) maxHousesPerFaction
+          // with zero live walkers can never lose a house (nothing left to
+          // attack with) and never gain one either (every path to a new
+          // House — this loop and settle.ts — is capped), so it's stuck at
+          // this exact population/house count forever. If BOTH factions
+          // land in that state at once, nothing can ever change either
+          // side's population again, so ARMAGEDDON_POPULATION_RATIO can
+          // never be crossed and the match can never end — a real
+          // "引き分け" that docs/game-system.md says shouldn't be possible.
+          // Letting a walkerless faction spawn its first walker regardless
+          // of the cap breaks that fixed point: the new walker can wander,
+          // fight, or gather, none of which are blocked by the house cap.
+          (walkerCountByFaction.get(owner.faction) ?? 0) === 0)
       ) {
         population -= capacity;
         spawnWalker(world, pos, owner.faction);
         houseCountByFaction.set(owner.faction, (houseCountByFaction.get(owner.faction) ?? 0) + 1);
+        walkerCountByFaction.set(owner.faction, (walkerCountByFaction.get(owner.faction) ?? 0) + 1);
       }
 
       // At the cap, population stalls at capacity rather than climbing forever.
@@ -57,6 +76,15 @@ export function createHouseGrowthSystem(config: Partial<HouseGrowthConfig> = {})
 function countHousesByFaction(world: World): Map<FactionId, number> {
   const counts = new Map<FactionId, number>();
   for (const entity of world.query(House, Owner)) {
+    const faction = world.get(entity, Owner)!.faction;
+    counts.set(faction, (counts.get(faction) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function countWalkersByFaction(world: World): Map<FactionId, number> {
+  const counts = new Map<FactionId, number>();
+  for (const entity of world.query(Walker, Owner)) {
     const faction = world.get(entity, Owner)!.faction;
     counts.set(faction, (counts.get(faction) ?? 0) + 1);
   }

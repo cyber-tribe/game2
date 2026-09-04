@@ -124,6 +124,16 @@
         font-weight: bold;
       }
 
+      /*
+       * A terrain-edit direction this match's TerrainEditRule forbids
+       * (see world/heightmap.ts) — main.ts disables that button outright
+       * rather than letting a tap silently do nothing.
+       */
+      .toolbar-row button:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+
       /* Behavior-mode buttons get the green accent instead of the default miracle blue. */
       [data-group="behavior"] button {
         border-color: #3fbf5e;
