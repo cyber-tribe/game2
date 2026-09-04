@@ -273,12 +273,36 @@ export function applyVolcano(
 export const DEFAULT_FLOOD_AMOUNT = 1;
 
 /**
+ * How much a single flood cast cools every existing volcanic rock vertex
+ * on the map, map-wide — see applyFlood's doc comment on why this exists.
+ * Matches what one raiseVertex hit chips off a single vertex, so a flood
+ * is worth roughly "one terraforming click on every rock tile at once".
+ */
+export const FLOOD_ROCK_COOLING = 1;
+
+/**
  * Permanently raises the sea level — docs/game-system.md's 洪水,
  * "海面を1段上昇させる". Cumulative: casting it again raises it further.
  * Clamped to MAX_ELEVATION (an all-water map). Doesn't touch `vertices`
  * or evict anyone standing on newly-submerged ground itself — see
  * game/flood.ts's drownFlood for that.
+ *
+ * Also a combo with 火山: every existing rockHardness vertex cools by
+ * FLOOD_ROCK_COOLING, map-wide. A literal "lava submerged by the rising
+ * sea" trigger would almost never fire in practice — volcano vertices sit
+ * at MAX_ELEVATION (see applyVolcano) while a single flood only raises
+ * water by DEFAULT_FLOOD_AMOUNT, so actually drowning a peak would take
+ * dozens of casts — so this instead treats the whole rising water table
+ * as giving every raging volcano on the map a meaningful shove toward
+ * recovering (see raiseVertex's own rockHardness chipping), rather than
+ * being a mechanic nobody can ever actually trigger.
  */
 export function applyFlood(heightmap: Heightmap, amount: number = DEFAULT_FLOOD_AMOUNT): void {
   heightmap.waterLevel = Math.min(MAX_ELEVATION, heightmap.waterLevel + amount);
+
+  for (const row of heightmap.rockHardness) {
+    for (let x = 0; x < row.length; x++) {
+      if (row[x] > 0) row[x] = Math.max(0, row[x] - FLOOD_ROCK_COOLING);
+    }
+  }
 }
