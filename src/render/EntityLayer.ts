@@ -1,7 +1,13 @@
 import { Container, Graphics } from "pixi.js";
 import { FactionState, House, Owner, Position, Swamp, Walker, type FactionId, type HouseLevel } from "../game/components";
 import type { Entity, World } from "../ecs";
-import { HOUSE_LEVEL_FLATNESS_REQUIREMENT, HOUSE_LEVEL_ORDER, HOUSE_UPGRADE_FLATNESS_RADIUS, IMPACT_EFFECT_DURATION } from "../game/constants";
+import {
+  FARMLAND_RADIUS,
+  HOUSE_LEVEL_FLATNESS_REQUIREMENT,
+  HOUSE_LEVEL_ORDER,
+  HOUSE_UPGRADE_FLATNESS_RADIUS,
+  IMPACT_EFFECT_DURATION,
+} from "../game/constants";
 import { distance, type Point } from "../game/systems/geometry";
 import type { ImpactEffectSnapshot, ImpactEffectType } from "../game/systems/effects";
 import { countFlatNeighbors } from "../world/heightmap";
@@ -20,6 +26,8 @@ const LEADER_PIXEL_SIZE = WALKER_PIXEL_SIZE * 1.8;
 const LEADER_HALO_RADIUS = 7;
 const KNIGHT_COLOR = 0xffcc00;
 const SWAMP_COLOR = 0x6a3fa0;
+/** Alpha of the farmland tint — subtle, so it reads as ground coloring, not a bold overlay like a swamp hazard. */
+const FARMLAND_ALPHA = 0.16;
 const SHRINE_POLE_HEIGHT = 18;
 const SHRINE_FLAG_WIDTH = 10;
 const FLATNESS_BAR_HEIGHT = 3;
@@ -120,6 +128,31 @@ export class EntityLayer {
     const g = this.graphics;
     g.clear();
 
+    // Farmland (see docs/game-system.md 5節's "家の周囲は農地になり、視覚的に
+    // 勢力圏を示す") drawn first, under everything else, so it reads as
+    // ground coloring rather than obscuring the shrine/houses/walkers drawn
+    // on top of it. Reuses swampAffectedTiles' generic "tiles within radius
+    // of a point" selection — the same grid-tinting shape, just a different
+    // radius/color/alpha.
+    const { width: mapWidth, height: mapHeight } = this.iso.heightmap;
+    for (const entity of world.query(Position, House, Owner)) {
+      const pos = world.get(entity, Position)!;
+      const owner = world.get(entity, Owner)!;
+      const house = world.get(entity, House)!;
+
+      for (const tile of swampAffectedTiles(pos, FARMLAND_RADIUS[house.level], mapWidth, mapHeight)) {
+        const p0 = this.iso.project(tile.x, tile.y);
+        const p1 = this.iso.project(tile.x + 1, tile.y);
+        const p2 = this.iso.project(tile.x + 1, tile.y + 1);
+        const p3 = this.iso.project(tile.x, tile.y + 1);
+
+        g.poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy]).fill({
+          color: FACTION_COLOR[owner.faction],
+          alpha: FARMLAND_ALPHA,
+        });
+      }
+    }
+
     const leaderIds = new Set<Entity>();
     for (const entity of world.query(FactionState)) {
       const state = world.get(entity, FactionState)!;
@@ -140,7 +173,6 @@ export class EntityLayer {
     for (const entity of world.query(Position, Swamp)) {
       const pos = world.get(entity, Position)!;
       const swamp = world.get(entity, Swamp)!;
-      const { width: mapWidth, height: mapHeight } = this.iso.heightmap;
 
       for (const tile of swampAffectedTiles(pos, swamp.radius, mapWidth, mapHeight)) {
         const p0 = this.iso.project(tile.x, tile.y);
