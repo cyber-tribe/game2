@@ -17,6 +17,23 @@ function flatHeightmap(width: number, height: number, elevation: number): Height
   return { width, height, terrain: "grass", vertices, rockHardness, waterLevel: 0 };
 }
 
+/**
+ * The rendered fill/stroke/etc instructions Pixi's Graphics recorded for
+ * this renderer's current redraw() — the only way to inspect the terraced
+ * geometry (top faces + cliff walls) without a real canvas. See
+ * plan/0064-terraced-terrain.md for why redraw() renders this way.
+ */
+function drawInstructions(renderer: IsoRenderer) {
+  // @ts-expect-error -- graphics is a private implementation detail; reached
+  // into here specifically because Pixi's Graphics builds real instruction
+  // data even without a canvas (see the module-level comment in this file).
+  return renderer.graphics.context.instructions as { action: string; data: { style?: { color: number } } }[];
+}
+
+function channels(color: number): [number, number, number] {
+  return [(color >> 16) & 0xff, (color >> 8) & 0xff, color & 0xff];
+}
+
 describe("IsoRenderer.update", () => {
   it("eases the displayed terrain height toward the real height gradually instead of snapping", () => {
     const heightmap = flatHeightmap(4, 4, 5);
@@ -102,15 +119,18 @@ describe("IsoRenderer.redraw with bounds", () => {
     const polySpy = vi.spyOn(Graphics.prototype, "poly");
 
     polySpy.mockClear();
-    renderer.redraw(); // whole map: 40*40 = 1600 tile quads
+    renderer.redraw(); // whole map: 40*40 = 1600 tile-top quads, plus a
+    // perimeter of cliff-wall quads down to the map's off-edge sea level
+    // (see IsoRenderer's terraced rendering — plan/0064-terraced-terrain.md)
     const fullMapCalls = polySpy.mock.calls.length;
 
     polySpy.mockClear();
-    renderer.redraw({ minX: 10, maxX: 14, minY: 10, maxY: 14 }); // 5*5 = 25 tile quads
+    renderer.redraw({ minX: 10, maxX: 14, minY: 10, maxY: 14 }); // 5*5 = 25 tile-top quads, no walls (flat, interior)
     const boundedCalls = polySpy.mock.calls.length;
 
-    expect(fullMapCalls).toBe(1600);
+    expect(fullMapCalls).toBeGreaterThan(1600);
     expect(boundedCalls).toBe(25);
+    expect(boundedCalls).toBeLessThan(fullMapCalls);
     polySpy.mockRestore();
   });
 });
@@ -169,6 +189,91 @@ describe("isWithinTileBounds", () => {
   it("is false just before minX/minY", () => {
     expect(isWithinTileBounds({ x: 4.99, y: 7 }, bounds)).toBe(false);
     expect(isWithinTileBounds({ x: 7, y: 4.99 }, bounds)).toBe(false);
+  });
+});
+
+describe("IsoRenderer.redraw (terraced blocks)", () => {
+  it("draws each tile as a top fill + stroke and no cliff walls when everything is at sea level", () => {
+    // Elevation 0 matches heightAt's off-the-map default (see redraw()'s
+    // heightAt), so even the map's true edges see no height difference.
+    const heightmap = flatHeightmap(4, 4, 0);
+    const renderer = new IsoRenderer(heightmap);
+    const instructions = drawInstructions(renderer);
+    expect(instructions).toHaveLength(4 * 4 * 2);
+    expect(instructions.filter((i) => i.action === "fill")).toHaveLength(4 * 4);
+    expect(instructions.filter((i) => i.action === "stroke")).toHaveLength(4 * 4);
+  });
+
+  it("draws extra cliff-wall fills once part of the map sits higher than the rest", () => {
+    const heightmap = flatHeightmap(5, 5, 0);
+    const flatFillCount = drawInstructions(new IsoRenderer(heightmap)).filter((i) => i.action === "fill").length;
+
+    // Raising every corner of the interior tile (2,2) also partially lifts
+    // its neighbors' averaged heights (see redraw()'s tileElevation —
+    // corners are shared, so a single tile's bump ripples into how flat
+    // its neighbors read too), so this isn't just 4 clean new walls — but
+    // it must be strictly more than the perfectly flat baseline above.
+    heightmap.vertices[2][2] = 4;
+    heightmap.vertices[2][3] = 4;
+    heightmap.vertices[3][2] = 4;
+    heightmap.vertices[3][3] = 4;
+    const raisedFillCount = drawInstructions(new IsoRenderer(heightmap)).filter((i) => i.action === "fill").length;
+
+    expect(raisedFillCount).toBeGreaterThan(flatFillCount);
+  });
+
+  it("shades a cliff wall darker than the top it descends from", () => {
+    const heightmap = flatHeightmap(3, 3, 5);
+    heightmap.vertices[1][1] = 9;
+    heightmap.vertices[1][2] = 9;
+    heightmap.vertices[2][1] = 9;
+    heightmap.vertices[2][2] = 9;
+    const renderer = new IsoRenderer(heightmap);
+    const instructions = drawInstructions(renderer);
+    const colors = new Set(instructions.filter((i) => i.action === "fill").map((i) => i.data.style!.color));
+
+    // Every tile here is plain grass (elevation is above waterLevel 0 and
+    // none of it is volcano rock), so every top — raised or not — fills
+    // with TERRAIN_COLOR.grass, and every wall (the raised tile's own,
+    // and the sea-level ring's walls down to the map's off-edge default)
+    // shades that same color the same way: exactly 2 distinct colors.
+    const GRASS = 0x4a8c3f;
+    expect(colors.has(GRASS)).toBe(true);
+    expect(colors.size).toBe(2);
+
+    const wallColor = [...colors].find((c) => c !== GRASS)!;
+    const [tr, tg, tb] = channels(GRASS);
+    const [wr, wg, wb] = channels(wallColor);
+    expect(wr).toBeLessThan(tr);
+    expect(wg).toBeLessThan(tg);
+    expect(wb).toBeLessThan(tb);
+  });
+
+  it("does not draw a wall for a sub-threshold height difference (easing noise)", () => {
+    const heightmap = flatHeightmap(3, 3, 0);
+    // Just under CLIFF_MIN_STEP, and above sea level itself — should read
+    // as flat, not a tiny cliff.
+    heightmap.vertices[1][1] = 0.02;
+    heightmap.vertices[1][2] = 0.02;
+    heightmap.vertices[2][1] = 0.02;
+    heightmap.vertices[2][2] = 0.02;
+    const renderer = new IsoRenderer(heightmap);
+    const instructions = drawInstructions(renderer);
+    expect(instructions.filter((i) => i.action === "fill")).toHaveLength(3 * 3);
+  });
+
+  it("still draws a cliff wall down to sea level at the edge of the map", () => {
+    // A tile at the very corner of the map has no real neighbor on 2 of
+    // its sides — those should still get a wall down to height 0, like
+    // the edge of a diorama base, rather than nothing.
+    const heightmap = flatHeightmap(2, 2, 8);
+    const renderer = new IsoRenderer(heightmap);
+    const instructions = drawInstructions(renderer);
+    // Every one of the 4 tiles borders the map edge on at least 2 sides
+    // and none of them differ from each other, so all their walls come
+    // from those map-edge sides: 4 tops + 4*2 edge walls.
+    const fills = instructions.filter((i) => i.action === "fill");
+    expect(fills.length).toBeGreaterThan(2 * 2);
   });
 });
 
