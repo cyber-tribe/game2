@@ -57,6 +57,17 @@ export interface SimulationConfig {
    */
   terrainEditRule?: TerrainEditRule;
   /**
+   * Per-world enemy AI tuning (docs/game-system.md 10節's "攻撃性"／
+   * "介入速度" — see game/worlds.ts's WorldDefinition doc comment for why
+   * "賢さ" itself isn't touched here). Feeds both createEnemyAiSystem's
+   * and createEnemyMiracleSystem's decisionInterval, so a harder world's
+   * enemy re-evaluates both its behaviorMode and its miracle choices more
+   * often. Defaults to each system's own constant when omitted, which is
+   * fine for tests that don't care about it.
+   */
+  enemyDecisionInterval?: number;
+  enemyAggressionThreshold?: number;
+  /**
    * Called whenever the enemy actually casts a miracle (see
    * enemyMiracles.ts's EnemyMiracleEvent) — lets main.ts surface it
    * (screen shake, a toast) even when it happens off the player's
@@ -183,7 +194,12 @@ export class Simulation {
     this.maxHousesPerFaction = maxHousesPerFaction;
 
     this.scheduler
-      .add(createEnemyAiSystem())
+      .add(
+        createEnemyAiSystem({
+          decisionInterval: config.enemyDecisionInterval,
+          aggressionThreshold: config.enemyAggressionThreshold,
+        }),
+      )
       .add(leaderSystem)
       .add(fightTargetingSystem)
       .add(goToShrineSystem)
@@ -215,6 +231,7 @@ export class Simulation {
         createEnemyMiracleSystem({
           heightmap: config.heightmap,
           worldCenter: this.worldCenter,
+          decisionInterval: config.enemyDecisionInterval,
           onAction: (event) => {
             this.recordEvent("enemy", event.type);
             config.onEnemyAction?.(event);

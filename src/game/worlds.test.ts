@@ -19,6 +19,20 @@ describe("WORLDS", () => {
       expect(world.worldHeight).toBeGreaterThan(0);
     }
   });
+
+  it("never eases the enemy AI's speed or aggression as the list goes on", () => {
+    for (let i = 1; i < WORLDS.length; i++) {
+      expect(WORLDS[i].enemyDecisionInterval).toBeLessThanOrEqual(WORLDS[i - 1].enemyDecisionInterval);
+      expect(WORLDS[i].enemyAggressionThreshold).toBeLessThanOrEqual(WORLDS[i - 1].enemyAggressionThreshold);
+    }
+  });
+
+  it("keeps enemyDecisionInterval and enemyAggressionThreshold positive", () => {
+    for (const world of WORLDS) {
+      expect(world.enemyDecisionInterval).toBeGreaterThan(0);
+      expect(world.enemyAggressionThreshold).toBeGreaterThan(0);
+    }
+  });
 });
 
 describe("nextWorldId", () => {
