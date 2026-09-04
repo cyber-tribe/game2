@@ -28,6 +28,18 @@ export const MAX_ELEVATION = 20;
 /**
  * Simple smooth pseudo-random heightmap for prototyping the renderer.
  * Real terrain generation belongs to a later worldgen step.
+ *
+ * The wave's frequencies are deliberately high relative to
+ * HOUSE_UPGRADE_FLATNESS_RADIUS's 5x5 window: at the original, much lower
+ * frequencies (0.35/0.3/0.15), the terrain changed so slowly from vertex to
+ * vertex that rounding alone left large naturally-flat plateaus — on a
+ * fresh 20x20 map, about 15% of vertices already qualified for a "castle"
+ * house's flatness requirement and 95%+ for "lodge", with zero player
+ * terraforming. That let a match's population/mana explode within under a
+ * minute (see plan/0043-terrain-roughness.md) since the core "flatten your
+ * land to grow a house" loop was already done by worldgen. At these
+ * frequencies a fresh map has ~0% castle-ready and ~2-3% manor-ready
+ * vertices — reaching those tiers again requires actually terraforming.
  */
 export function createHeightmap(
   width: number,
@@ -40,9 +52,9 @@ export function createHeightmap(
     const row: number[] = [];
     for (let x = 0; x <= width; x++) {
       const wave =
-        Math.sin(x * 0.35) * 1.5 +
-        Math.cos(y * 0.3) * 1.5 +
-        Math.sin((x + y) * 0.15) * 2;
+        Math.sin(x * 1.3) * 1.5 +
+        Math.cos(y * 1.1) * 1.5 +
+        Math.sin((x - y) * 0.9) * 2;
       row.push(Math.max(0, Math.round(wave + 3)));
     }
     vertices.push(row);

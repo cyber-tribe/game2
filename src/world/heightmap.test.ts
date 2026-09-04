@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { HOUSE_LEVEL_FLATNESS_REQUIREMENT, HOUSE_UPGRADE_FLATNESS_RADIUS } from "../game/constants";
 import {
   MAX_ELEVATION,
   MIN_ELEVATION,
@@ -38,6 +39,27 @@ describe("createHeightmap", () => {
         expect(value).toBeGreaterThanOrEqual(0);
       }
     }
+  });
+
+  it("doesn't hand a house a castle's worth of flatness for free", () => {
+    // Regression guard for plan/0043-terrain-roughness.md: a too-smooth
+    // wave let rounding alone produce large naturally-flat plateaus, so a
+    // freshly settled house could already qualify for the top house level
+    // (and often most of the way to it) before any terraforming — the
+    // "flatten your land to grow a house" loop was already done by
+    // worldgen. On a realistically-sized map, essentially no vertex should
+    // start out already castle-flat.
+    const heightmap = createHeightmap(20, 20, "grass");
+    let castleReady = 0;
+
+    for (let y = 0; y <= 20; y++) {
+      for (let x = 0; x <= 20; x++) {
+        const flat = countFlatNeighbors(heightmap, x, y, HOUSE_UPGRADE_FLATNESS_RADIUS);
+        if (flat >= HOUSE_LEVEL_FLATNESS_REQUIREMENT.castle) castleReady++;
+      }
+    }
+
+    expect(castleReady).toBe(0);
   });
 });
 
