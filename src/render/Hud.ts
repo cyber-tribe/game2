@@ -78,6 +78,7 @@ export class Hud {
         const houseText = s.houses >= s.housesCap ? `house ${s.houses}/${s.housesCap}（上限）` : `house ${s.houses}`;
         return `${s.id}: mana ${s.mana.toFixed(1)} ${houseText} walker ${s.walkers} (${s.behaviorMode})`;
       }),
+      ...populationComparisonLines(summaries),
     ];
 
     if (outcome.over) {
@@ -86,4 +87,35 @@ export class Hud {
 
     this.view.text = lines.join("\n");
   }
+}
+
+/** Width (in characters) of the population-comparison bar below. */
+const POPULATION_BAR_WIDTH = 10;
+
+/**
+ * A compact "who's ahead" bar — docs/game-system.md's 情報パネル describes
+ * a "両陣営の総人口の比較表示". Hud is a single PIXI.Text with one fill
+ * color, so the two factions' shares are shown as filled vs. empty blocks
+ * rather than two colors.
+ */
+function populationBar(player: number, enemy: number): string {
+  const total = player + enemy;
+  if (total <= 0) return "░".repeat(POPULATION_BAR_WIDTH);
+  const filled = Math.round((player / total) * POPULATION_BAR_WIDTH);
+  return "▓".repeat(filled) + "░".repeat(POPULATION_BAR_WIDTH - filled);
+}
+
+/**
+ * Omitted entirely if either faction is missing from the summary (should
+ * only happen in tests that pass a partial fixture) — this game always
+ * has exactly a "player" and an "enemy" faction (see FactionId), each
+ * still summarized after losing (see Simulation.summarize).
+ */
+function populationComparisonLines(summaries: FactionSummary[]): string[] {
+  const player = summaries.find((s) => s.id === "player");
+  const enemy = summaries.find((s) => s.id === "enemy");
+  if (!player || !enemy) return [];
+
+  const bar = populationBar(player.population, enemy.population);
+  return [`人口 [${bar}] player ${Math.round(player.population)} : enemy ${Math.round(enemy.population)}`];
 }
