@@ -257,9 +257,11 @@
 
       /*
        * A secondary action below the primary "もう一度遊ぶ" button — see
-       * plan/0040-post-game-feedback.md. Styled as an outline rather than
-       * a solid button so it doesn't compete with the rematch button for
-       * attention; opens this repo's GitHub issue form in a new tab.
+       * plan/0040-post-game-feedback.md / plan/0042-feedback-google-form.md.
+       * Styled as an outline rather than a solid button so it doesn't
+       * compete with the rematch button for attention; opens a Google Form
+       * in a new tab (switched from a GitHub Issue — no account needed to
+       * fill it out, unlike GitHub).
        */
       #feedback-link {
         flex: none;
@@ -315,7 +317,13 @@
       <div id="match-record-title"></div>
       <div id="match-record-list"></div>
       <button type="button" id="play-again">もう一度遊ぶ</button>
-      <a id="feedback-link" href="#" target="_blank" rel="noopener">📝 フィードバックを送る（GitHub Issue）</a>
+      <a
+        id="feedback-link"
+        href="https://docs.google.com/forms/d/e/1FAIpQLSeGDJIs11gUB318xUwt69QTIg9ddeeMeETtxvnw9RgPRn0Mmg/viewform"
+        target="_blank"
+        rel="noopener"
+        >📝 フィードバックを送る</a
+      >
     </div>
 
     <div id="toolbar">
