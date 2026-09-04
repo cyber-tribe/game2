@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { VOLCANO_ROCK_HARDNESS, type Heightmap } from "../world/heightmap";
-import { IsoRenderer, volcanoTileColor } from "./IsoRenderer";
+import { IsoRenderer, volcanoGlowIntensity } from "./IsoRenderer";
 
 function flatHeightmap(width: number, height: number, elevation: number): Heightmap {
   const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
@@ -32,27 +32,44 @@ describe("IsoRenderer.update", () => {
   });
 });
 
-describe("volcanoTileColor", () => {
-  it("is fully magma-colored at full hardness and fully cooled-rock-colored at zero", () => {
-    const hot = volcanoTileColor(VOLCANO_ROCK_HARDNESS, VOLCANO_ROCK_HARDNESS);
-    const cold = volcanoTileColor(0, VOLCANO_ROCK_HARDNESS);
-
-    // Magma is the warmer (redder, less blue) of the two ends of the gradient.
-    expect((hot >> 16) & 0xff).toBeGreaterThan((cold >> 16) & 0xff);
-    expect(hot & 0xff).toBeLessThan(cold & 0xff);
+describe("volcanoGlowIntensity", () => {
+  it("is zero once rockHardness has fully cooled, regardless of the pulse phase", () => {
+    for (let t = 0; t < 3; t += 0.3) {
+      expect(volcanoGlowIntensity(0, VOLCANO_ROCK_HARDNESS, t, 0.5)).toBe(0);
+    }
   });
 
-  it("cools down gradually as hardness decreases, not all at once", () => {
-    const full = volcanoTileColor(VOLCANO_ROCK_HARDNESS, VOLCANO_ROCK_HARDNESS);
-    const half = volcanoTileColor(VOLCANO_ROCK_HARDNESS / 2, VOLCANO_ROCK_HARDNESS);
-    const none = volcanoTileColor(0, VOLCANO_ROCK_HARDNESS);
+  it("glows brighter, on average, the more rockHardness is left", () => {
+    // Average over a full pulse cycle to compare base brightness levels
+    // without the pulse itself (see LAVA_PULSE_SPEED) muddying the comparison.
+    const averageOver = (hardness: number) => {
+      let sum = 0;
+      const samples = 20;
+      for (let i = 0; i < samples; i++) {
+        sum += volcanoGlowIntensity(hardness, VOLCANO_ROCK_HARDNESS, (i / samples) * (2 * Math.PI), 0);
+      }
+      return sum / samples;
+    };
 
-    const redOf = (c: number) => (c >> 16) & 0xff;
-    expect(redOf(half)).toBeLessThan(redOf(full));
-    expect(redOf(half)).toBeGreaterThan(redOf(none));
+    expect(averageOver(VOLCANO_ROCK_HARDNESS)).toBeGreaterThan(averageOver(VOLCANO_ROCK_HARDNESS / 2));
+    expect(averageOver(VOLCANO_ROCK_HARDNESS / 2)).toBeGreaterThan(averageOver(0));
   });
 
-  it("gives the same hardness the same color regardless of call order (pure function)", () => {
-    expect(volcanoTileColor(9, 20)).toBe(volcanoTileColor(9, 20));
+  it("pulses over time rather than sitting at a flat brightness", () => {
+    const seen = new Set<number>();
+    for (let t = 0; t < 3; t += 0.1) {
+      seen.add(Math.round(volcanoGlowIntensity(VOLCANO_ROCK_HARDNESS, VOLCANO_ROCK_HARDNESS, t, 0) * 100));
+    }
+    expect(seen.size).toBeGreaterThan(1);
+  });
+
+  it("gives two tiles different pulse phases so they don't flicker in unison", () => {
+    const a = volcanoGlowIntensity(VOLCANO_ROCK_HARDNESS, VOLCANO_ROCK_HARDNESS, 1.23, 0.1);
+    const b = volcanoGlowIntensity(VOLCANO_ROCK_HARDNESS, VOLCANO_ROCK_HARDNESS, 1.23, 0.7);
+    expect(a).not.toBeCloseTo(b, 5);
+  });
+
+  it("gives the same inputs the same result (deterministic, not tied to draw order)", () => {
+    expect(volcanoGlowIntensity(9, 20, 1.5, 0.3)).toBe(volcanoGlowIntensity(9, 20, 1.5, 0.3));
   });
 });
