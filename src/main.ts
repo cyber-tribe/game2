@@ -19,7 +19,6 @@ import { eruptVolcano } from "./game/volcano";
 import { EntityLayer } from "./render/EntityLayer";
 import { Hud } from "./render/Hud";
 import { IsoRenderer } from "./render/IsoRenderer";
-import { buildFeedbackIssueUrl } from "./feedback";
 import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
 import { Minimap } from "./render/Minimap";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
@@ -189,7 +188,6 @@ async function bootstrap() {
   const matchRecordTitle = document.getElementById("match-record-title");
   const matchRecordList = document.getElementById("match-record-list");
   const playAgainButton = document.getElementById("play-again");
-  const feedbackLink = document.getElementById("feedback-link") as HTMLAnchorElement | null;
   let matchRecordShown = false;
 
   // Simplest possible reset: reload the page for a fresh heightmap/Simulation
@@ -215,9 +213,6 @@ async function bootstrap() {
       }),
     );
     matchRecordPanel.classList.remove("hidden");
-    // See plan/0040-post-game-feedback.md — prefilled with this match's own
-    // result/duration so a report is more than just a one-line vibe.
-    if (feedbackLink) feedbackLink.href = buildFeedbackIssueUrl(outcome, events);
   };
 
   const simulation = new Simulation({ worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT, heightmap, onEnemyAction });
