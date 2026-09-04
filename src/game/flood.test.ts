@@ -3,6 +3,7 @@ import { World } from "../ecs";
 import { createHeightmap, type Heightmap } from "../world/heightmap";
 import { House, Owner, Position, Walker } from "./components";
 import { drownFlood } from "./flood";
+import type { ImpactEffectEvent } from "./systems/effects";
 
 function flatHeightmap(width: number, height: number, elevation: number, waterLevel = 0): Heightmap {
   const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
@@ -78,5 +79,29 @@ describe("drownFlood", () => {
 
     expect(() => drownFlood(world, heightmap)).not.toThrow();
     expect(world.isAlive(house)).toBe(true);
+  });
+
+  it("reports a drowned impact at each submerged house/walker's position", () => {
+    const world = new World();
+    const heightmap = flatHeightmap(10, 10, 1, 1);
+    createHouse(world, 5, 5);
+    createWalker(world, 8, 8);
+
+    const impacts: ImpactEffectEvent[] = [];
+    drownFlood(world, heightmap, (event) => impacts.push(event));
+
+    expect(impacts).toHaveLength(2);
+    expect(impacts.every((e) => e.type === "drowned")).toBe(true);
+  });
+
+  it("does not report an impact for entities left untouched on high ground", () => {
+    const world = new World();
+    const heightmap = flatHeightmap(10, 10, 5, 1);
+    createHouse(world, 5, 5);
+
+    const impacts: ImpactEffectEvent[] = [];
+    drownFlood(world, heightmap, (event) => impacts.push(event));
+
+    expect(impacts).toHaveLength(0);
   });
 });

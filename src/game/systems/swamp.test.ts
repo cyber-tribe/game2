@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
 import { Owner, Position, Swamp, Walker } from "../components";
 import { createSwamp } from "../swamp";
-import { swampSystem } from "./swamp";
+import type { ImpactEffectEvent } from "./effects";
+import { createSwampSystem } from "./swamp";
 
 function createWalker(world: World, x: number, y: number, state: "seeking" | "knight" = "seeking") {
   const entity = world.createEntity();
@@ -18,7 +19,7 @@ describe("swampSystem", () => {
     const swamp = createSwamp(world, 5, 5, 1, 3);
     const walker = createWalker(world, 5.2, 5);
 
-    swampSystem(world, 0);
+    createSwampSystem()(world, 0);
 
     expect(world.isAlive(walker)).toBe(false);
     expect(world.isAlive(swamp)).toBe(true);
@@ -30,7 +31,7 @@ describe("swampSystem", () => {
     createSwamp(world, 5, 5, 1, 3);
     const walker = createWalker(world, 20, 20);
 
-    swampSystem(world, 0);
+    createSwampSystem()(world, 0);
 
     expect(world.isAlive(walker)).toBe(true);
   });
@@ -42,7 +43,7 @@ describe("swampSystem", () => {
     createWalker(world, 5.1, 5);
     createWalker(world, 20, 20); // outside radius, should survive
 
-    swampSystem(world, 0);
+    createSwampSystem()(world, 0);
 
     expect(world.isAlive(swamp)).toBe(false);
     expect(world.query(Walker)).toHaveLength(1);
@@ -52,7 +53,7 @@ describe("swampSystem", () => {
     const world = new World();
     const walker = createWalker(world, 5, 5);
 
-    expect(() => swampSystem(world, 0)).not.toThrow();
+    expect(() => createSwampSystem()(world, 0)).not.toThrow();
     expect(world.isAlive(walker)).toBe(true);
   });
 
@@ -61,9 +62,31 @@ describe("swampSystem", () => {
     const swamp = createSwamp(world, 5, 5, 1, 3);
     const knight = createWalker(world, 5, 5, "knight");
 
-    swampSystem(world, 0);
+    createSwampSystem()(world, 0);
 
     expect(world.isAlive(knight)).toBe(true);
     expect(world.get(swamp, Swamp)!.remainingCapacity).toBe(3);
+  });
+
+  it("reports a drowned impact at the walker's position", () => {
+    const world = new World();
+    createSwamp(world, 5, 5, 1, 3);
+    createWalker(world, 5.2, 5);
+
+    const impacts: ImpactEffectEvent[] = [];
+    createSwampSystem({ onImpact: (event) => impacts.push(event) })(world, 0);
+
+    expect(impacts).toEqual([{ position: { x: 5.2, y: 5 }, type: "drowned" }]);
+  });
+
+  it("does not report an impact for a knight passing through", () => {
+    const world = new World();
+    createSwamp(world, 5, 5, 1, 3);
+    createWalker(world, 5, 5, "knight");
+
+    const impacts: ImpactEffectEvent[] = [];
+    createSwampSystem({ onImpact: (event) => impacts.push(event) })(world, 0);
+
+    expect(impacts).toHaveLength(0);
   });
 });
