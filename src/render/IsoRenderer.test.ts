@@ -1,7 +1,15 @@
 import { Graphics } from "pixi.js";
 import { describe, expect, it, vi } from "vitest";
 import { VOLCANO_ROCK_HARDNESS, type Heightmap } from "../world/heightmap";
-import { IsoRenderer, TILE_HEIGHT, TILE_WIDTH, visibleTileBounds, volcanoGlowIntensity, type TileBounds } from "./IsoRenderer";
+import {
+  IsoRenderer,
+  TILE_HEIGHT,
+  TILE_WIDTH,
+  isWithinTileBounds,
+  visibleTileBounds,
+  volcanoGlowIntensity,
+  type TileBounds,
+} from "./IsoRenderer";
 
 function flatHeightmap(width: number, height: number, elevation: number): Heightmap {
   const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
@@ -135,6 +143,32 @@ describe("visibleTileBounds", () => {
 
     const farCorner = visibleTileBounds([toScreenFlat(19, 19)], 20, 20, 5);
     expect(farCorner).toEqual({ minX: 14, maxX: 19, minY: 14, maxY: 19 });
+  });
+});
+
+describe("isWithinTileBounds", () => {
+  const bounds: TileBounds = { minX: 5, maxX: 10, minY: 5, maxY: 10 };
+
+  it("is true for a point in the middle of the bounds", () => {
+    expect(isWithinTileBounds({ x: 7.5, y: 7.5 }, bounds)).toBe(true);
+  });
+
+  it("is true right at minX/minY", () => {
+    expect(isWithinTileBounds({ x: 5, y: 5 }, bounds)).toBe(true);
+  });
+
+  it("is true on the far vertex of the last visible tile (maxX + 1 / maxY + 1)", () => {
+    expect(isWithinTileBounds({ x: 11, y: 11 }, bounds)).toBe(true);
+  });
+
+  it("is false just past the far vertex", () => {
+    expect(isWithinTileBounds({ x: 11.01, y: 7 }, bounds)).toBe(false);
+    expect(isWithinTileBounds({ x: 7, y: 11.01 }, bounds)).toBe(false);
+  });
+
+  it("is false just before minX/minY", () => {
+    expect(isWithinTileBounds({ x: 4.99, y: 7 }, bounds)).toBe(false);
+    expect(isWithinTileBounds({ x: 7, y: 4.99 }, bounds)).toBe(false);
   });
 });
 
