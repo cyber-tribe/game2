@@ -85,6 +85,14 @@ export const HOUSE_LEVELS: Record<HouseLevel, { capacity: number; manaRate: numb
 /** hut < lodge < manor < castle, for comparing/advancing levels. */
 export const HOUSE_LEVEL_ORDER: HouseLevel[] = ["hut", "lodge", "manor", "castle"];
 
+/** Japanese display name for each house level, per docs/game-system.md's own wording (5節). */
+export const HOUSE_LEVEL_LABELS: Record<HouseLevel, string> = {
+  hut: "小屋",
+  lodge: "中規模の家",
+  manor: "大きな家",
+  castle: "城砦",
+};
+
 /**
  * Minimum house.population / capacity fraction releasePopulation requires
  * before it'll empty a house early — see that function's doc comment.

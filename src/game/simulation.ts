@@ -1,8 +1,18 @@
 import { Scheduler, World } from "../ecs";
 import type { Heightmap, TerrainEditRule } from "../world/heightmap";
 import { triggerArmageddon } from "./armageddon";
-import { FactionState, House, Owner, Position, Walker, type BehaviorMode, type FactionId } from "./components";
-import { DEFAULT_WALKER_SPEED, IMPACT_EFFECT_DURATION, TILES_PER_HOUSE_CAP } from "./constants";
+import {
+  FactionState,
+  House,
+  Owner,
+  Position,
+  Walker,
+  type BehaviorMode,
+  type FactionId,
+  type HouseLevel,
+  type WalkerState,
+} from "./components";
+import { DEFAULT_WALKER_SPEED, HOUSE_LEVELS, IMPACT_EFFECT_DURATION, TILES_PER_HOUSE_CAP } from "./constants";
 import { createFaction, findFactionEntity, moveShrine } from "./faction";
 import { knightify } from "./knight";
 import { totalPopulation } from "./population";
@@ -67,6 +77,18 @@ export interface FactionSummary {
   /** See population.ts's totalPopulation — houses' accumulated population plus one per walker. */
   population: number;
 }
+
+/**
+ * A single walker or house's own detail — docs/game-system.md 11節's
+ * "任意のウォーカー・家を照会して人数／強さ／発達段階を確認できる"
+ * 情報パネル. Deliberately plain data (no rendering concerns): main.ts
+ * does its own screen-space hit-testing against `position` via
+ * IsoRenderer.project, and render/entityInfoLabel.ts turns the result
+ * into the Japanese text actually shown.
+ */
+export type InspectableEntity =
+  | { kind: "walker"; faction: FactionId; position: Position; strength: number; state: WalkerState }
+  | { kind: "house"; faction: FactionId; position: Position; level: HouseLevel; population: number; capacity: number };
 
 export interface GameOutcome {
   over: boolean;
@@ -323,6 +345,36 @@ export class Simulation {
     }
 
     return summaries;
+  }
+
+  /** Every walker/house on the map, for the "🔍 照会" 情報パネル (see InspectableEntity). */
+  listInspectableEntities(): InspectableEntity[] {
+    const entities: InspectableEntity[] = [];
+
+    for (const entity of this.world.query(Walker, Position, Owner)) {
+      const walker = this.world.get(entity, Walker)!;
+      entities.push({
+        kind: "walker",
+        faction: this.world.get(entity, Owner)!.faction,
+        position: this.world.get(entity, Position)!,
+        strength: walker.strength,
+        state: walker.state,
+      });
+    }
+
+    for (const entity of this.world.query(House, Position, Owner)) {
+      const house = this.world.get(entity, House)!;
+      entities.push({
+        kind: "house",
+        faction: this.world.get(entity, Owner)!.faction,
+        position: this.world.get(entity, Position)!,
+        level: house.level,
+        population: house.population,
+        capacity: HOUSE_LEVELS[house.level].capacity,
+      });
+    }
+
+    return entities;
   }
 
   private spawnWalkers(faction: FactionId, origin: { x: number; y: number }, count: number): void {

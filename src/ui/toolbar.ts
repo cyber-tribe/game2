@@ -9,7 +9,8 @@ export type ToolMode =
   | "knight"
   | "volcano"
   | "flood"
-  | "armageddon";
+  | "armageddon"
+  | "inspect";
 
 export interface ToolbarCallbacks {
   onBehaviorMode: (mode: BehaviorMode) => void;
