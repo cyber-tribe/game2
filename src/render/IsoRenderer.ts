@@ -26,6 +26,22 @@ const TERRAIN_COLOR: Record<Heightmap["terrain"], number> = {
 const WATER_COLOR = 0x2a5f8c;
 
 /**
+ * How much darker a cliff wall is than the ground color of the tile it
+ * belongs to — see drawCliffWalls. Picked to read clearly as a shaded
+ * vertical face against the flat-shaded top colors above without going
+ * fully black (which made tall cliffs look like silhouette cutouts).
+ */
+const CLIFF_SHADE_AMOUNT = 0.35;
+
+/**
+ * Minimum height difference (in elevation units) between a tile and its
+ * neighbor before a cliff wall is drawn — filters out floating-point noise
+ * from the easing animation (see update()) so a wall doesn't flicker in
+ * and out for a difference of a few hundredths of a unit.
+ */
+const CLIFF_MIN_STEP = 0.05;
+
+/**
  * Volcano rock (see applyVolcano/rockHardness) used to just render as
  * plain TERRAIN_COLOR.rock — indistinguishable from an ordinary rocky
  * hillside, with nothing to say "this used to be lava". Two rounds of
@@ -127,7 +143,10 @@ export interface TileBounds {
  * farmland tint just past the exact edge never pops in/out as the camera
  * pans. (`diff` — sx/(TILE_WIDTH/2) — has no elevation term at all, so it
  * never needs padding; padding every side the same is just simpler than
- * tracking that asymmetry.)
+ * tracking that asymmetry.) The same margin also covers a cliff wall (see
+ * drawCliffWalls) belonging to a tile just past the edge of `bounds` — a
+ * wall is at most this tall too, since it's just the gap between two
+ * tiles' own elevations.
  */
 const TILE_BOUNDS_MARGIN = Math.ceil(MAX_ELEVATION / 2) + 2;
 
@@ -190,7 +209,16 @@ export function isWithinTileBounds(point: { x: number; y: number }, bounds: Tile
   );
 }
 
-/** Renders a heightmap as an isometric grid of quads, one per tile. */
+/**
+ * Renders a heightmap as terraced isometric blocks, one flat-topped block
+ * per tile with a shaded vertical cliff face wherever it sits higher than
+ * a neighboring tile — see redraw(). Deliberately not a smooth per-vertex
+ * mesh (each tile's 4 corners individually at their own height, producing
+ * continuous slopes): the original game's stepped, plateau-and-cliff look
+ * reads far better at this game's low tile-per-screen zoom level than a
+ * smooth ramp does, and matches the reference art the terracing was
+ * modeled on. See plan/0064-terraced-terrain.md.
+ */
 export class IsoRenderer {
   readonly view = new Container();
   readonly heightmap: Heightmap;
@@ -327,7 +355,7 @@ export class IsoRenderer {
   }
 
   /**
-   * Rebuilds the terrain mesh from the current display heights (see
+   * Rebuilds the terrain from the current display heights (see
    * displayVertices) — call after editing the heightmap, and every frame
    * update() runs, so an in-progress ease keeps redrawing until it settles.
    *
@@ -348,6 +376,20 @@ export class IsoRenderer {
     const maxY = bounds?.maxY ?? height - 1;
     const boundsWidth = maxX - minX + 1;
     const boundsHeight = maxY - minY + 1;
+
+    // A tile's flat-topped block height (see the class doc comment) is the
+    // average of its 4 (possibly uneven) corner vertices. Not just a
+    // lookup into a precomputed grid: drawCliffWalls needs this for a
+    // tile's neighbors too, which can sit just outside `bounds` — reading
+    // straight from `vertices` (the true, unbounded map) instead keeps
+    // that correct without needing to pad a bounded grid. Off the edge of
+    // the map reads as sea level, so an elevated tile at the map's border
+    // still gets a cliff wall down to it instead of just stopping bare —
+    // like the edge of a diorama base.
+    const tileElevation = (x: number, y: number): number =>
+      x < 0 || y < 0 || x >= width || y >= height
+        ? 0
+        : (vertices[y][x] + vertices[y][x + 1] + vertices[y + 1][x + 1] + vertices[y + 1][x]) / 4;
 
     // Precomputed once so the lava-flow pass (below) can look at each rock
     // tile's neighbors without recomputing isRockTile for them repeatedly.
@@ -377,20 +419,28 @@ export class IsoRenderer {
     }
     this.hasActiveLava = isRockTile.some((row) => row.some(Boolean));
 
-    // Pass 1: every tile's ground fill. Kept separate from the lava-flow
-    // pass below so a flow can never end up hidden underneath a
-    // later-drawn neighboring tile — flows always paint on top, regardless
-    // of which tile happens to iterate first.
-    for (let y = minY; y <= maxY; y++) {
-      for (let x = minX; x <= maxX; x++) {
-        const avgHeight = (vertices[y][x] + vertices[y][x + 1] + vertices[y + 1][x + 1] + vertices[y + 1][x]) / 4;
-        const p0 = this.toScreen(x, y, vertices[y][x]);
-        const p1 = this.toScreen(x + 1, y, vertices[y][x + 1]);
-        const p2 = this.toScreen(x + 1, y + 1, vertices[y + 1][x + 1]);
-        const p3 = this.toScreen(x, y + 1, vertices[y + 1][x]);
+    // Pass 1: every tile's flat top plus its own cliff walls. Walked in
+    // back-to-front diagonal (x+y) order over `bounds` — not the simpler
+    // row-major order the old smooth mesh used — because a tall cliff wall
+    // (up to MAX_ELEVATION*ELEVATION_STEP px) can reach far enough up the
+    // screen to overlap tiles several rows behind it; only strict
+    // painter's-algorithm order draws those correctly. A wall never
+    // overlaps its own tile's top or its neighbor's top (it fills exactly
+    // the elevation gap between them), so within a single tile, top-then-
+    // walls order doesn't matter — only the across-tile order does.
+    for (let d = minX + minY; d <= maxX + maxY; d++) {
+      const yStart = Math.max(minY, d - maxX);
+      const yEnd = Math.min(maxY, d - minX);
+      for (let y = yStart; y <= yEnd; y++) {
+        const x = d - y;
+        const elevation = tileElevation(x, y);
+        const p0 = this.toScreen(x, y, elevation);
+        const p1 = this.toScreen(x + 1, y, elevation);
+        const p2 = this.toScreen(x + 1, y + 1, elevation);
+        const p3 = this.toScreen(x, y + 1, elevation);
 
         const color =
-          avgHeight <= waterLevel
+          elevation <= waterLevel
             ? WATER_COLOR
             : isRockTile[y - minY][x - minX]
               ? VOLCANO_ROCK_COLOR
@@ -400,20 +450,25 @@ export class IsoRenderer {
           .poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy])
           .fill(color)
           .stroke({ width: 1, color: 0x000000, alpha: 0.15 });
+
+        this.drawCliffWalls(graphics, x, y, elevation, color, tileElevation);
       }
     }
 
     // Pass 2: lava flows, rim tiles only (see VOLCANO_ROCK_COLOR's doc comment).
+    // Kept separate so a flow can never end up hidden underneath a
+    // later-drawn neighboring tile — flows always paint on top, regardless
+    // of draw order.
     for (let y = minY; y <= maxY; y++) {
       for (let x = minX; x <= maxX; x++) {
         if (!isRockTile[y - minY][x - minX]) continue;
-        const avgHeight = (vertices[y][x] + vertices[y][x + 1] + vertices[y + 1][x + 1] + vertices[y + 1][x]) / 4;
-        if (avgHeight <= waterLevel) continue;
+        const elevation = tileElevation(x, y);
+        if (elevation <= waterLevel) continue;
 
-        const p0 = this.toScreen(x, y, vertices[y][x]);
-        const p1 = this.toScreen(x + 1, y, vertices[y][x + 1]);
-        const p2 = this.toScreen(x + 1, y + 1, vertices[y + 1][x + 1]);
-        const p3 = this.toScreen(x, y + 1, vertices[y + 1][x]);
+        const p0 = this.toScreen(x, y, elevation);
+        const p1 = this.toScreen(x + 1, y, elevation);
+        const p2 = this.toScreen(x + 1, y + 1, elevation);
+        const p3 = this.toScreen(x, y + 1, elevation);
         this.drawLavaFlow(
           graphics,
           x,
@@ -431,6 +486,45 @@ export class IsoRenderer {
         );
       }
     }
+  }
+
+  /**
+   * Draws a shaded vertical wall on each of this tile's 4 edges where a
+   * neighboring tile sits lower — the "cliff face" that makes the terrain
+   * read as stepped plateaus rather than a continuous ramp. A tile with no
+   * lower neighbors (flat ground, or the low side of a slope) draws none.
+   */
+  private drawCliffWalls(
+    graphics: Graphics,
+    x: number,
+    y: number,
+    elevation: number,
+    color: number,
+    tileElevation: (x: number, y: number) => number,
+  ): void {
+    const wallColor = lerpColor(color, 0x000000, CLIFF_SHADE_AMOUNT);
+
+    const addWall = (
+      neighborX: number,
+      neighborY: number,
+      edgeA: { x: number; y: number },
+      edgeB: { x: number; y: number },
+    ) => {
+      const neighborElevation = tileElevation(neighborX, neighborY);
+      if (elevation - neighborElevation <= CLIFF_MIN_STEP) return;
+
+      const topA = this.toScreen(edgeA.x, edgeA.y, elevation);
+      const topB = this.toScreen(edgeB.x, edgeB.y, elevation);
+      const bottomB = this.toScreen(edgeB.x, edgeB.y, neighborElevation);
+      const bottomA = this.toScreen(edgeA.x, edgeA.y, neighborElevation);
+
+      graphics.poly([topA.sx, topA.sy, topB.sx, topB.sy, bottomB.sx, bottomB.sy, bottomA.sx, bottomA.sy]).fill(wallColor);
+    };
+
+    addWall(x, y - 1, { x, y }, { x: x + 1, y });
+    addWall(x + 1, y, { x: x + 1, y }, { x: x + 1, y: y + 1 });
+    addWall(x, y + 1, { x: x + 1, y: y + 1 }, { x, y: y + 1 });
+    addWall(x - 1, y, { x, y: y + 1 }, { x, y });
   }
 
   /**
