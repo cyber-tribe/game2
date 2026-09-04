@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { walkCycle } from "./EntityLayer";
+import { swampAffectedTiles, walkCycle } from "./EntityLayer";
 
 describe("walkCycle", () => {
   it("alternates between stepping frames as time advances", () => {
@@ -37,5 +37,36 @@ describe("walkCycle", () => {
   it("gives the same walker the same result for the same instant (deterministic, not tied to draw order)", () => {
     const pos = { x: 4, y: 7 };
     expect(walkCycle(2.5, pos)).toEqual(walkCycle(2.5, pos));
+  });
+});
+
+describe("swampAffectedTiles", () => {
+  it("covers just the four tiles touching the swamp's vertex, for a radius barely past their centers", () => {
+    // Distance from a vertex to any of its four surrounding tile centers is
+    // sqrt(0.5) ≈ 0.707; 1.2 clears that but not the next ring out (≈1.58).
+    const tiles = swampAffectedTiles({ x: 5, y: 5 }, 1.2, 20, 20);
+
+    expect(tiles).toEqual(
+      expect.arrayContaining([
+        { x: 4, y: 4 },
+        { x: 4, y: 5 },
+        { x: 5, y: 4 },
+        { x: 5, y: 5 },
+      ]),
+    );
+    expect(tiles).toHaveLength(4);
+  });
+
+  it("clamps to the map bounds instead of returning negative or out-of-range tiles", () => {
+    const tiles = swampAffectedTiles({ x: 0, y: 0 }, 1.2, 20, 20);
+
+    expect(tiles).toEqual([{ x: 0, y: 0 }]);
+  });
+
+  it("covers more tiles as the radius grows", () => {
+    const small = swampAffectedTiles({ x: 10, y: 10 }, 1.2, 20, 20);
+    const large = swampAffectedTiles({ x: 10, y: 10 }, 3, 20, 20);
+
+    expect(large.length).toBeGreaterThan(small.length);
   });
 });

@@ -2,8 +2,9 @@ import { Container, Graphics } from "pixi.js";
 import { FactionState, House, Owner, Position, Swamp, Walker, type FactionId, type HouseLevel } from "../game/components";
 import type { Entity, World } from "../ecs";
 import { HOUSE_LEVEL_FLATNESS_REQUIREMENT, HOUSE_LEVEL_ORDER, HOUSE_UPGRADE_FLATNESS_RADIUS } from "../game/constants";
+import { distance, type Point } from "../game/systems/geometry";
 import { countFlatNeighbors } from "../world/heightmap";
-import { TILE_WIDTH, type IsoRenderer } from "./IsoRenderer";
+import { type IsoRenderer } from "./IsoRenderer";
 import { drawHouseSprite, drawWalkerSprite, HOUSE_PATTERN_WIDTH } from "./pixelArt";
 
 const FACTION_COLOR: Record<FactionId, number> = {
@@ -43,6 +44,34 @@ export function walkCycle(
   return { stepping: Math.sin(phase) > 0, bob: Math.abs(Math.sin(phase)) * WALK_BOB_AMPLITUDE };
 }
 
+/**
+ * Which tile cells (identified by their (x, y) top-left corner) a swamp
+ * visually covers — every cell whose center lies within `radius` of the
+ * swamp's own position, clamped to the map's bounds. A screen-space circle
+ * (the previous rendering) doesn't correspond to anything on an isometric
+ * grid — its edge cuts across tiles at an angle that tells a player
+ * nothing about which specific squares are actually dangerous. Tinting
+ * whole tiles instead mirrors swampSystem's own Euclidean-distance check
+ * (against a walker's exact position) as closely as a discrete grid can,
+ * so the highlighted cells match what actually drowns. Pulled out as a
+ * pure function so the tile selection is unit-testable without needing a
+ * Graphics/canvas context.
+ */
+export function swampAffectedTiles(pos: Point, radius: number, mapWidth: number, mapHeight: number): Point[] {
+  const minX = Math.max(0, Math.floor(pos.x - radius));
+  const maxX = Math.min(mapWidth - 1, Math.ceil(pos.x + radius) - 1);
+  const minY = Math.max(0, Math.floor(pos.y - radius));
+  const maxY = Math.min(mapHeight - 1, Math.ceil(pos.y + radius) - 1);
+
+  const tiles: Point[] = [];
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      if (distance(pos, { x: x + 0.5, y: y + 0.5 }) <= radius) tiles.push({ x, y });
+    }
+  }
+  return tiles;
+}
+
 /** Draws every Swamp/Walker/House in the ECS world onto the isometric map. */
 export class EntityLayer {
   readonly view = new Container();
@@ -78,12 +107,18 @@ export class EntityLayer {
     for (const entity of world.query(Position, Swamp)) {
       const pos = world.get(entity, Position)!;
       const swamp = world.get(entity, Swamp)!;
-      const { sx, sy } = this.iso.project(pos.x, pos.y);
-      const screenRadius = swamp.radius * (TILE_WIDTH / 2);
+      const { width: mapWidth, height: mapHeight } = this.iso.heightmap;
 
-      g.circle(sx, sy, screenRadius)
-        .fill({ color: SWAMP_COLOR, alpha: 0.55 })
-        .stroke({ width: 1, color: 0x2a1a3a, alpha: 0.6 });
+      for (const tile of swampAffectedTiles(pos, swamp.radius, mapWidth, mapHeight)) {
+        const p0 = this.iso.project(tile.x, tile.y);
+        const p1 = this.iso.project(tile.x + 1, tile.y);
+        const p2 = this.iso.project(tile.x + 1, tile.y + 1);
+        const p3 = this.iso.project(tile.x, tile.y + 1);
+
+        g.poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy])
+          .fill({ color: SWAMP_COLOR, alpha: 0.55 })
+          .stroke({ width: 1, color: 0x2a1a3a, alpha: 0.6 });
+      }
     }
 
     for (const entity of world.query(Position, House, Owner)) {

@@ -1,5 +1,5 @@
 import { Container, Graphics } from "pixi.js";
-import { sampleElevation, type Heightmap } from "../world/heightmap";
+import { sampleElevation, VOLCANO_ROCK_HARDNESS, type Heightmap } from "../world/heightmap";
 
 // Sized for finger taps rather than mouse clicks: at scale 1 adjacent
 // vertices sit 32px/16px apart on screen, which pickVertex's default
@@ -24,6 +24,41 @@ const TERRAIN_COLOR: Record<Heightmap["terrain"], number> = {
 };
 
 const WATER_COLOR = 0x2a5f8c;
+
+/**
+ * Volcano rock (see applyVolcano/rockHardness) used to just render as
+ * plain TERRAIN_COLOR.rock — indistinguishable from an ordinary rocky
+ * hillside, with nothing to say "this used to be lava". These two colors
+ * are the ends of a gradient (see volcanoTileColor) driven by how much
+ * rockHardness is left: freshly erupted rock glows hot magma-orange, and
+ * cools toward dark obsidian as raiseVertex chips its hardness down —
+ * "頑張れば平地に戻せる" (see heightmap.ts's rockHardness doc comment)
+ * becomes visible as the glow fading, not just a number.
+ */
+const VOLCANO_MAGMA_COLOR = 0xff5a1f;
+const VOLCANO_COOLED_ROCK_COLOR = 0x352a24;
+
+/** Linearly interpolates each RGB channel between two 0xRRGGBB colors. */
+function lerpColor(from: number, to: number, t: number): number {
+  const clamped = Math.max(0, Math.min(1, t));
+  const channel = (shift: number) => {
+    const a = (from >> shift) & 0xff;
+    const b = (to >> shift) & 0xff;
+    return Math.round(a + (b - a) * clamped);
+  };
+  return (channel(16) << 16) | (channel(8) << 8) | channel(0);
+}
+
+/**
+ * The fill color for a volcano rock tile, hottest (VOLCANO_MAGMA_COLOR) at
+ * full rockHardness and coolest (VOLCANO_COOLED_ROCK_COLOR) as it
+ * approaches 0. Pulled out as a pure function so the gradient itself is
+ * unit-testable without needing a Graphics/canvas context.
+ */
+export function volcanoTileColor(hardness: number, maxHardness: number = VOLCANO_ROCK_HARDNESS): number {
+  const t = maxHardness > 0 ? hardness / maxHardness : 0;
+  return lerpColor(VOLCANO_COOLED_ROCK_COLOR, VOLCANO_MAGMA_COLOR, t);
+}
 
 /** Renders a heightmap as an isometric grid of quads, one per tile. */
 export class IsoRenderer {
@@ -138,11 +173,14 @@ export class IsoRenderer {
         const se = vertices[y + 1][x + 1];
         const sw = vertices[y + 1][x];
         const avgHeight = (nw + ne + se + sw) / 4;
-        const isRockTile =
-          rockHardness[y][x] > 0 ||
-          rockHardness[y][x + 1] > 0 ||
-          rockHardness[y + 1][x + 1] > 0 ||
-          rockHardness[y + 1][x] > 0;
+        const cornerHardness = [
+          rockHardness[y][x],
+          rockHardness[y][x + 1],
+          rockHardness[y + 1][x + 1],
+          rockHardness[y + 1][x],
+        ];
+        const isRockTile = cornerHardness.some((h) => h > 0);
+        const avgHardness = cornerHardness.reduce((sum, h) => sum + h, 0) / 4;
 
         const p0 = this.toScreen(x, y, nw);
         const p1 = this.toScreen(x + 1, y, ne);
@@ -150,12 +188,16 @@ export class IsoRenderer {
         const p3 = this.toScreen(x, y + 1, sw);
 
         const color =
-          avgHeight <= waterLevel ? WATER_COLOR : isRockTile ? TERRAIN_COLOR.rock : TERRAIN_COLOR[terrain];
+          avgHeight <= waterLevel ? WATER_COLOR : isRockTile ? volcanoTileColor(avgHardness) : TERRAIN_COLOR[terrain];
+        // A warm glow along a fresh volcano tile's edges reads as heat;
+        // ordinary tiles keep the plain, subtle grid outline.
+        const strokeColor = isRockTile ? lerpColor(0x000000, VOLCANO_MAGMA_COLOR, avgHardness / VOLCANO_ROCK_HARDNESS) : 0x000000;
+        const strokeAlpha = isRockTile ? 0.15 + 0.5 * (avgHardness / VOLCANO_ROCK_HARDNESS) : 0.15;
 
         graphics
           .poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy])
           .fill(color)
-          .stroke({ width: 1, color: 0x000000, alpha: 0.15 });
+          .stroke({ width: 1, color: strokeColor, alpha: strokeAlpha });
       }
     }
   }
