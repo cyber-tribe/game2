@@ -14,7 +14,7 @@ import type { EnemyMiracleEvent } from "./game/systems/enemyMiracles";
 import { trySpendMana } from "./game/faction";
 import { drownFlood } from "./game/flood";
 import { Simulation, type GameOutcome, type MatchEvent } from "./game/simulation";
-import { createSwamp } from "./game/swamp";
+import { collapseSwampsNear, createSwamp } from "./game/swamp";
 import { eruptVolcano } from "./game/volcano";
 import { EntityLayer } from "./render/EntityLayer";
 import { Hud } from "./render/Hud";
@@ -23,6 +23,7 @@ import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
 import { Minimap } from "./render/Minimap";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
 import {
+  DEFAULT_EARTHQUAKE_RADIUS,
   DEFAULT_VOLCANO_RADIUS,
   applyEarthquake,
   applyFlood,
@@ -328,6 +329,7 @@ async function bootstrap() {
     if (toolMode === "earthquake") {
       if (!trySpendMana(simulation.world, "player", EARTHQUAKE_MANA_COST)) return;
       applyEarthquake(heightmap, vertex.x, vertex.y);
+      collapseSwampsNear(simulation.world, vertex.x, vertex.y, DEFAULT_EARTHQUAKE_RADIUS);
       renderer.redraw();
       simulation.recordEvent("player", "earthquake");
       triggerShake(6);

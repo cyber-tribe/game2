@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { HOUSE_LEVEL_FLATNESS_REQUIREMENT, HOUSE_UPGRADE_FLATNESS_RADIUS } from "../game/constants";
 import {
+  FLOOD_ROCK_COOLING,
   MAX_ELEVATION,
   MIN_ELEVATION,
   VOLCANO_ROCK_HARDNESS,
@@ -388,5 +389,32 @@ describe("applyFlood", () => {
     applyFlood(heightmap, 3);
 
     expect(heightmap.vertices[2][2]).toBe(5);
+  });
+
+  it("cools every existing volcanic rock vertex by FLOOD_ROCK_COOLING", () => {
+    const heightmap = flatHeightmap(4, 4, 5);
+    applyVolcano(heightmap, 1, 1, 0);
+    const before = heightmap.rockHardness[1][1];
+
+    applyFlood(heightmap);
+
+    expect(heightmap.rockHardness[1][1]).toBe(before - FLOOD_ROCK_COOLING);
+  });
+
+  it("never cools rock hardness below zero", () => {
+    const heightmap = flatHeightmap(4, 4, 5);
+    applyVolcano(heightmap, 1, 1, 0, FLOOD_ROCK_COOLING - 0.5);
+
+    applyFlood(heightmap);
+
+    expect(heightmap.rockHardness[1][1]).toBe(0);
+  });
+
+  it("leaves ordinary (non-rock) vertices untouched", () => {
+    const heightmap = flatHeightmap(4, 4, 5);
+
+    applyFlood(heightmap);
+
+    expect(heightmap.rockHardness[2][2]).toBe(0);
   });
 });

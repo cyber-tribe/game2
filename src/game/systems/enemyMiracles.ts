@@ -19,6 +19,7 @@ import {
 } from "../constants";
 import { findFactionEntity, trySpendMana } from "../faction";
 import { knightify } from "../knight";
+import { collapseSwampsNear } from "../swamp";
 import { eruptVolcano } from "../volcano";
 import { distance, type Point } from "./geometry";
 
@@ -149,6 +150,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
     const target = densestOpponentCluster(world, opponentId, DEFAULT_EARTHQUAKE_RADIUS, rng);
     if (target && trySpendMana(world, factionId, EARTHQUAKE_MANA_COST)) {
       applyEarthquake(heightmap, target.x, target.y, undefined, undefined, rng);
+      collapseSwampsNear(world, target.x, target.y, DEFAULT_EARTHQUAKE_RADIUS);
       onAction({ type: "earthquake", position: target });
     }
   };
