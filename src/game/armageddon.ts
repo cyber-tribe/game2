@@ -1,6 +1,6 @@
 import type { World } from "../ecs";
 import { FactionState, House, Owner, Position, Walker } from "./components";
-import { DEFAULT_WALKER_SPEED, HOUSE_LEVELS } from "./constants";
+import { FINAL_BATTLE_WALKER_SPEED, HOUSE_LEVELS } from "./constants";
 import type { Point } from "./systems/geometry";
 
 /**
@@ -29,8 +29,17 @@ export function triggerArmageddon(world: World, center: Point): void {
     world.add(walker, Walker, {
       strength: HOUSE_LEVELS[house.level].defense,
       state: "seeking",
-      speed: DEFAULT_WALKER_SPEED,
+      speed: FINAL_BATTLE_WALKER_SPEED,
     });
+  }
+
+  // Every walker marches at FINAL_BATTLE_WALKER_SPEED for this battle —
+  // including ones that already existed before armageddon was cast, not
+  // just the ones just converted above — see FINAL_BATTLE_WALKER_SPEED's
+  // doc comment for why.
+  for (const entity of world.query(Walker)) {
+    const walker = world.get(entity, Walker)!;
+    world.add(entity, Walker, { ...walker, speed: FINAL_BATTLE_WALKER_SPEED });
   }
 
   for (const factionEntity of world.query(FactionState)) {

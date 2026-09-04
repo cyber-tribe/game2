@@ -4,6 +4,19 @@ import type { HouseLevel } from "./components";
 /** Tiles per second for a freshly spawned walker. */
 export const DEFAULT_WALKER_SPEED = 1.5;
 
+/**
+ * Tiles per second for every walker once 最終決戦 has been triggered —
+ * see armageddon.ts and plan/0046-final-battle-pacing.md. Slower than
+ * DEFAULT_WALKER_SPEED: measured with the mana/pacing fixes in plan/0043-
+ * 0045 already in place, the final battle itself (armageddon → game over)
+ * still only took ~22s on average, mostly spent marching to the center —
+ * once everyone arrived, combat resolved in a couple of ticks. Applies to
+ * every walker on both sides, including ones that already existed before
+ * armageddon was cast, so the whole climax — not just the newly-converted
+ * houses — takes long enough to feel like the finale it's meant to be.
+ */
+export const FINAL_BATTLE_WALKER_SPEED = 0.5;
+
 /** Radius (in tiles) a "seeking" walker without a target wanders within. */
 export const DEFAULT_WANDER_RADIUS = 6;
 

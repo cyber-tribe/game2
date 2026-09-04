@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { World } from "../ecs";
 import { triggerArmageddon } from "./armageddon";
 import { FactionState, House, Owner, Position, Walker, type FactionId } from "./components";
-import { HOUSE_LEVELS } from "./constants";
+import { FINAL_BATTLE_WALKER_SPEED, HOUSE_LEVELS } from "./constants";
 import { createFaction } from "./faction";
 
 function createHouse(world: World, faction: FactionId, x: number, y: number, level: keyof typeof HOUSE_LEVELS = "hut") {
@@ -36,7 +36,7 @@ describe("triggerArmageddon", () => {
     expect(world.get(enemyWalker, Walker)!.strength).toBe(HOUSE_LEVELS.castle.defense);
   });
 
-  it("leaves existing walkers untouched", () => {
+  it("leaves an existing walker's strength/state untouched but slows it to the final-battle march speed", () => {
     const world = new World();
     const walker = world.createEntity();
     world.add(walker, Position, { x: 1, y: 1 });
@@ -45,7 +45,7 @@ describe("triggerArmageddon", () => {
 
     triggerArmageddon(world, { x: 5, y: 5 });
 
-    expect(world.get(walker, Walker)).toEqual({ strength: 42, state: "knight", speed: 1 });
+    expect(world.get(walker, Walker)).toEqual({ strength: 42, state: "knight", speed: FINAL_BATTLE_WALKER_SPEED });
   });
 
   it("moves both factions' shrinePosition to the given center and switches both to goToShrine", () => {
