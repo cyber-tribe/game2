@@ -5,14 +5,21 @@ import type { TerrainEditRule, TerrainType } from "../world/heightmap";
  * — see docs/game-system.md 10節's "各ワールドは地形タイプ・初期配置・
  * 敵AIの攻撃性／賢さ・使用可能な奇跡の制限などが異なり、徐々に難しく
  * なる". This first step covers the axes that were already plumbed
- * per-match before this file existed (terrain type, terrainEditRule, map
- * size — see plan/0052-terrain-edit-rule.md and plan/0055-map-expansion.md),
- * plus the enemy AI's "攻撃性"（enemyAggressionThreshold）と"介入速度"
- * （enemyDecisionInterval）— see plan/0061-per-world-ai-difficulty.md.
- * "賢さ" (the AI's actual decision *logic*, not just how eagerly/often it
- * acts) is deliberately not touched here — per the same doc's own "高難度
- * では敵の介入頻度が上がるが、行動パターン自体は比較的予測可能", a
- * harder world should still play by recognizable rules, just press harder.
+ * per-match before this file existed (terrain type, terrainEditRule — see
+ * plan/0052-terrain-edit-rule.md), plus the enemy AI's "攻撃性"
+ * （enemyAggressionThreshold）と"介入速度"（enemyDecisionInterval）— see
+ * plan/0061-per-world-ai-difficulty.md. "賢さ" (the AI's actual decision
+ * *logic*, not just how eagerly/often it acts) is deliberately not touched
+ * here — per the same doc's own "高難度では敵の介入頻度が上がるが、行動
+ * パターン自体は比較的予測可能", a harder world should still play by
+ * recognizable rules, just press harder.
+ *
+ * Map size is a fixed 64x64 for every world (see WORLDS below), not a
+ * difficulty axis of its own — per plan/0062-original-scale-map.md's move
+ * to one original-scale world every match pans across (like the original),
+ * rather than a whole map shrunk to fit one screen and so, per-world,
+ * differently sized.
+ *
  * World-count progression (500 worlds) is still out of scope — see
  * plan/0059-world-select.md. A password/continue system (see nextWorldId/
  * unlockedCountForPassword below) was added on top in
@@ -43,22 +50,23 @@ export interface WorldDefinition {
 }
 
 /**
- * Ordered roughly by difficulty: map size only grows (more houses, longer
- * matches to manage), terrain only gets harsher (TERRAIN_GROWTH_
- * MULTIPLIER: grass 1 > snow 0.75 > desert 0.6 > rock 0.4) or more
- * terraforming-restricted (raiseOnly/lowerOnly makes flattening land
- * harder than "both"), and the enemy AI only gets faster/more aggressive
- * as the list goes on — never any axis relaxing at once. Sizes stay at or
- * under 32, the largest map size performance-measured safe so far (see
- * plan/0055-map-expansion.md); nothing here exceeds that ceiling.
+ * Every world is a fixed 64x64 (see WorldDefinition's doc comment) — only
+ * terrain, terrainEditRule, and the enemy AI's speed/aggression vary and
+ * grow harder as the list goes on: terrain gets harsher (TERRAIN_GROWTH_
+ * MULTIPLIER: grass 1 > snow 0.75 > desert 0.6 > rock 0.4), terraforming
+ * gets restricted to one direction (raiseOnly/lowerOnly, harder than
+ * "both"), and the enemy AI gets faster/more aggressive — never any axis
+ * relaxing at once.
  */
+const WORLD_SIZE = 64;
+
 export const WORLDS: WorldDefinition[] = [
-  { id: "quiet-plain", name: "静かな草原", worldWidth: 20, worldHeight: 20, terrain: "grass", terrainEditRule: "both", enemyDecisionInterval: 6, enemyAggressionThreshold: 6 },
-  { id: "dry-highland", name: "乾いた高地", worldWidth: 24, worldHeight: 24, terrain: "desert", terrainEditRule: "both", enemyDecisionInterval: 5, enemyAggressionThreshold: 5 },
-  { id: "frozen-border", name: "凍てつく国境", worldWidth: 24, worldHeight: 24, terrain: "snow", terrainEditRule: "raiseOnly", enemyDecisionInterval: 5, enemyAggressionThreshold: 4 },
-  { id: "ashen-waste", name: "灰の荒野", worldWidth: 28, worldHeight: 28, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 4, enemyAggressionThreshold: 3 },
-  { id: "rising-frontier", name: "隆起する辺境", worldWidth: 28, worldHeight: 28, terrain: "desert", terrainEditRule: "raiseOnly", enemyDecisionInterval: 3, enemyAggressionThreshold: 3 },
-  { id: "final-frontline", name: "最終戦線", worldWidth: 32, worldHeight: 32, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 2, enemyAggressionThreshold: 2 },
+  { id: "quiet-plain", name: "静かな草原", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "grass", terrainEditRule: "both", enemyDecisionInterval: 6, enemyAggressionThreshold: 6 },
+  { id: "dry-highland", name: "乾いた高地", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "desert", terrainEditRule: "both", enemyDecisionInterval: 5, enemyAggressionThreshold: 5 },
+  { id: "frozen-border", name: "凍てつく国境", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "snow", terrainEditRule: "raiseOnly", enemyDecisionInterval: 5, enemyAggressionThreshold: 4 },
+  { id: "ashen-waste", name: "灰の荒野", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 4, enemyAggressionThreshold: 3 },
+  { id: "rising-frontier", name: "隆起する辺境", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "desert", terrainEditRule: "raiseOnly", enemyDecisionInterval: 3, enemyAggressionThreshold: 3 },
+  { id: "final-frontline", name: "最終戦線", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 2, enemyAggressionThreshold: 2 },
 ];
 
 /**

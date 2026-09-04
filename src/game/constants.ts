@@ -175,17 +175,19 @@ export const IMPACT_EFFECT_DURATION = 0.5;
  * HouseGrowthConfig.maxHousesPerFaction from world size until real
  * terrain-based flat-land scarcity is implemented.
  *
- * Raised from 8 alongside main.ts's WORLD_WIDTH/WORLD_HEIGHT going from
- * 20x20 to 32x32 (plan/0055-map-expansion.md) — deliberately not scaled by
- * the same 2.56x (which 8 unchanged would have given, 50 → 128 houses per
- * faction). A bigger map is meant to buy more geographic space (room for
- * front lines, distance between shrines, terrain features) per
+ * Raised from 8 to 12 alongside the map going from 20x20 to 32x32
+ * (plan/0055-map-expansion.md), then to 48 when every world became a fixed
+ * 64x64 (plan/0062-original-scale-map.md) — in both cases deliberately
+ * scaled right along with the tile count (so maxHousesPerFaction itself
+ * stays roughly flat, ~85, across all three sizes) rather than growing
+ * with it. A bigger map is meant to buy more geographic space (room for
+ * front lines, travel distance between shrines, terrain features) per
  * docs/game-system.md's own framing of what a larger world is for, not a
  * proportionally larger army: maxHousesPerFaction (and so, indirectly, how
  * many walkers can ever exist at once) drives the cost of the O(n²)
- * combat/gather systems, so it's kept to a modest 1.7x (50 → 85) instead.
+ * combat/gather systems.
  */
-export const TILES_PER_HOUSE_CAP = 12;
+export const TILES_PER_HOUSE_CAP = 48;
 
 /** Mana cost of raising or lowering one terrain vertex by one step. */
 export const TERRAIN_EDIT_MANA_COST = 1;

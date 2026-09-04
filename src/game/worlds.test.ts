@@ -11,12 +11,10 @@ describe("WORLDS", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("keeps every world's map size at or under the measured-safe 32x32 ceiling (see plan/0055-map-expansion.md)", () => {
+  it("gives every world the same fixed 64x64 map size (see plan/0062-original-scale-map.md)", () => {
     for (const world of WORLDS) {
-      expect(world.worldWidth).toBeLessThanOrEqual(32);
-      expect(world.worldHeight).toBeLessThanOrEqual(32);
-      expect(world.worldWidth).toBeGreaterThan(0);
-      expect(world.worldHeight).toBeGreaterThan(0);
+      expect(world.worldWidth).toBe(64);
+      expect(world.worldHeight).toBe(64);
     }
   });
 

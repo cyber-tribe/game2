@@ -300,6 +300,17 @@ export class Simulation {
     moveShrine(this.world, faction, position);
   }
 
+  /**
+   * Where a faction's shrine currently is — main.ts uses this to center
+   * the initial camera on the player's own starting village, since the
+   * map is otherwise far bigger than any one screen (see
+   * plan/0062-original-scale-map.md).
+   */
+  getShrinePosition(faction: FactionId): Position | undefined {
+    const entity = findFactionEntity(this.world, faction);
+    return entity === undefined ? undefined : this.world.get(entity, FactionState)!.shrinePosition;
+  }
+
   /** The "騎士化" miracle — turns a faction's current leader into a knight. */
   knightify(faction: FactionId): void {
     knightify(this.world, faction);
