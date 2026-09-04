@@ -28,21 +28,29 @@ const WATER_COLOR = 0x2a5f8c;
 /**
  * Volcano rock (see applyVolcano/rockHardness) used to just render as
  * plain TERRAIN_COLOR.rock — indistinguishable from an ordinary rocky
- * hillside, with nothing to say "this used to be lava". Real volcano
- * depictions (Terraria's Underworld, Stardew Valley's Volcano Dungeon,
- * SimCity/RCT's disaster volcanoes, Minecraft's lava) consistently use the
- * same pattern: the rock itself stays dark and solid — obsidian, ash,
- * charcoal — and the "fire" reads entirely from small, bright, separately
- * colored lava glowing in cracks/pools against that dark base, not from
- * tinting the whole mass orange. A single hardness→orange gradient across
- * the *entire* tile (the previous approach here) just reads as a brown or
- * orange mountain, because nothing in it looks dark enough to contrast
- * against. So the base fill here is always dark rock; the lava is drawn
- * separately in redraw() as glowing cracks radiating from each tile's
- * center, sized/brightened by rockHardness and gently pulsing over time
- * (see volcanoGlowIntensity/drawLavaCracks) — cooling toward nothing as
- * raiseVertex chips rockHardness down, per "頑張れば平地に戻せる"
- * (heightmap.ts's rockHardness doc comment).
+ * hillside, with nothing to say "this used to be lava". Two rounds of
+ * feedback narrowed this down:
+ *
+ * 1. A single hardness→orange gradient across the *entire* tile just read
+ *    as a brown/orange mountain — nothing in it looked dark enough to
+ *    contrast against. Real depictions (Terraria's Underworld, Stardew
+ *    Valley's Volcano Dungeon, Minecraft's lava) keep the rock itself dark
+ *    (obsidian/ash/charcoal) and show lava as a small, separately colored
+ *    bright element against that dark base.
+ * 2. Glowing cracks scattered across *every* rock tile still wasn't it —
+ *    ordinary volcano art (see the reference image) shows magma only near
+ *    the top, flowing down the slope in a few distinct streams, with the
+ *    rest of the cone plain dark rock. applyVolcano raises its whole
+ *    footprint to a flat MAX_ELEVATION plateau (no gradual cone slope to
+ *    speak of), so the closest equivalent of "the slope" is the rim where
+ *    that plateau meets ordinary lower ground. So lava is drawn only on
+ *    rim tiles (isRockTile with a non-rock/out-of-bounds neighbor) as a
+ *    streak spilling from that shared edge toward the lower ground;
+ *    interior tiles (surrounded by other rock tiles on all sides) stay
+ *    plain dark rock, same as the cone body in the reference image.
+ *
+ * Cools toward nothing as raiseVertex chips rockHardness down, per
+ * "頑張れば平地に戻せる" (heightmap.ts's rockHardness doc comment).
  */
 const VOLCANO_ROCK_COLOR = 0x1a120f;
 const LAVA_CORE_COLOR = 0xfff4c2;
@@ -52,12 +60,12 @@ const LAVA_PULSE_SPEED = 3;
 /** How much the pulse swings the glow up/down around its hardness-driven base level. */
 const LAVA_PULSE_DEPTH = 0.25;
 /**
- * Floor under a crack's opacity once there's any glow at all, so it still
+ * Floor under a flow's opacity once there's any glow at all, so it still
  * reads as visibly lit rather than fading to near-invisible thin lines —
- * only the count/length of cracks should really telegraph "almost cooled",
+ * only the length/count of flows should really telegraph "almost cooled",
  * not their opacity dropping to nothing.
  */
-const LAVA_MIN_ALPHA = 0.45;
+const LAVA_MIN_ALPHA = 0.7;
 
 /** Linearly interpolates each RGB channel between two 0xRRGGBB colors. */
 function lerpColor(from: number, to: number, t: number): number {
@@ -210,50 +218,73 @@ export class IsoRenderer {
     const graphics = this.graphics;
     graphics.clear();
 
+    // Precomputed once so the lava-flow pass (below) can look at each rock
+    // tile's neighbors without recomputing isRockTile for them repeatedly.
+    const isRockTile: boolean[][] = [];
+    const avgHardnessGrid: number[][] = [];
     for (let y = 0; y < height; y++) {
+      isRockTile.push([]);
+      avgHardnessGrid.push([]);
       for (let x = 0; x < width; x++) {
-        const nw = vertices[y][x];
-        const ne = vertices[y][x + 1];
-        const se = vertices[y + 1][x + 1];
-        const sw = vertices[y + 1][x];
-        const avgHeight = (nw + ne + se + sw) / 4;
         const cornerHardness = [
           rockHardness[y][x],
           rockHardness[y][x + 1],
           rockHardness[y + 1][x + 1],
           rockHardness[y + 1][x],
         ];
-        const isRockTile = cornerHardness.some((h) => h > 0);
-        const avgHardness = cornerHardness.reduce((sum, h) => sum + h, 0) / 4;
+        isRockTile[y].push(cornerHardness.some((h) => h > 0));
+        avgHardnessGrid[y].push(cornerHardness.reduce((sum, h) => sum + h, 0) / 4);
+      }
+    }
 
-        const p0 = this.toScreen(x, y, nw);
-        const p1 = this.toScreen(x + 1, y, ne);
-        const p2 = this.toScreen(x + 1, y + 1, se);
-        const p3 = this.toScreen(x, y + 1, sw);
+    // Pass 1: every tile's ground fill. Kept separate from the lava-flow
+    // pass below so a flow can never end up hidden underneath a
+    // later-drawn neighboring tile — flows always paint on top, regardless
+    // of which tile happens to iterate first.
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const avgHeight = (vertices[y][x] + vertices[y][x + 1] + vertices[y + 1][x + 1] + vertices[y + 1][x]) / 4;
+        const p0 = this.toScreen(x, y, vertices[y][x]);
+        const p1 = this.toScreen(x + 1, y, vertices[y][x + 1]);
+        const p2 = this.toScreen(x + 1, y + 1, vertices[y + 1][x + 1]);
+        const p3 = this.toScreen(x, y + 1, vertices[y + 1][x]);
 
-        const color = avgHeight <= waterLevel ? WATER_COLOR : isRockTile ? VOLCANO_ROCK_COLOR : TERRAIN_COLOR[terrain];
+        const color =
+          avgHeight <= waterLevel ? WATER_COLOR : isRockTile[y][x] ? VOLCANO_ROCK_COLOR : TERRAIN_COLOR[terrain];
 
         graphics
           .poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy])
           .fill(color)
           .stroke({ width: 1, color: 0x000000, alpha: 0.15 });
+      }
+    }
 
-        if (isRockTile && avgHeight > waterLevel) {
-          this.drawLavaCracks(graphics, x, y, p0, p1, p2, p3, avgHardness);
-        }
+    // Pass 2: lava flows, rim tiles only (see VOLCANO_ROCK_COLOR's doc comment).
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (!isRockTile[y][x]) continue;
+        const avgHeight = (vertices[y][x] + vertices[y][x + 1] + vertices[y + 1][x + 1] + vertices[y + 1][x]) / 4;
+        if (avgHeight <= waterLevel) continue;
+
+        const p0 = this.toScreen(x, y, vertices[y][x]);
+        const p1 = this.toScreen(x + 1, y, vertices[y][x + 1]);
+        const p2 = this.toScreen(x + 1, y + 1, vertices[y + 1][x + 1]);
+        const p3 = this.toScreen(x, y + 1, vertices[y + 1][x]);
+        this.drawLavaFlow(graphics, x, y, p0, p1, p2, p3, avgHardnessGrid[y][x], isRockTile, width, height);
       }
     }
   }
 
   /**
-   * Glowing cracks radiating from a volcano tile's center — see
-   * VOLCANO_ROCK_COLOR's doc comment for why lava is drawn separately from
-   * the (always-dark) rock fill instead of tinting it. Two or three short
-   * strokes, angled and phased by tileHash(x, y) so a given tile's cracks
-   * hold their shape frame to frame and don't sync up with its neighbors,
-   * fading out together with rockHardness as the tile cools.
+   * A rock tile is "rim" if at least one of its 4 neighboring tiles isn't
+   * rock (or is off the edge of the map) — the boundary where applyVolcano's
+   * flat-topped plateau drops back to ordinary ground. Only rim tiles get a
+   * lava flow, one per such neighboring edge, spilling from that shared
+   * edge toward the lower ground on the other side — see VOLCANO_ROCK_
+   * COLOR's doc comment. An interior tile (rock on all 4 sides) stays plain
+   * dark rock, same as a real cone's solid body away from its rim.
    */
-  private drawLavaCracks(
+  private drawLavaFlow(
     graphics: Graphics,
     x: number,
     y: number,
@@ -262,34 +293,41 @@ export class IsoRenderer {
     p2: { sx: number; sy: number },
     p3: { sx: number; sy: number },
     avgHardness: number,
+    isRockTile: boolean[][],
+    gridWidth: number,
+    gridHeight: number,
   ): void {
     const intensity = volcanoGlowIntensity(avgHardness, VOLCANO_ROCK_HARDNESS, this.elapsedTime, tileHash(x, y));
     if (intensity <= 0.02) return;
 
-    const centerX = (p0.sx + p1.sx + p2.sx + p3.sx) / 4;
-    const centerY = (p0.sy + p1.sy + p2.sy + p3.sy) / 4;
+    const isRim = (nx: number, ny: number) =>
+      nx < 0 || ny < 0 || nx >= gridWidth || ny >= gridHeight || !isRockTile[ny][nx];
+
+    // Each tile edge here is named by the neighbor it borders — see toScreen:
+    // north (y-1) and west (x-1) sit higher on screen than south/east.
+    const edges: [{ sx: number; sy: number }, { sx: number; sy: number }][] = [];
+    if (isRim(x, y - 1)) edges.push([p0, p1]);
+    if (isRim(x + 1, y)) edges.push([p1, p2]);
+    if (isRim(x, y + 1)) edges.push([p2, p3]);
+    if (isRim(x - 1, y)) edges.push([p3, p0]);
+    if (edges.length === 0) return;
+
     const alpha = LAVA_MIN_ALPHA + (1 - LAVA_MIN_ALPHA) * intensity;
-    const crackColor = lerpColor(LAVA_GLOW_COLOR, LAVA_CORE_COLOR, intensity);
+    const flowColor = lerpColor(LAVA_GLOW_COLOR, LAVA_CORE_COLOR, intensity);
+    const flowLength = 8 + 16 * intensity;
 
-    // A soft halo (a big, faint disc under everything else) reads as light
-    // spilling off the lava, rather than the crack lines just floating on
-    // bare rock — real screens don't have additive blending here, so this
-    // fakes it with plain alpha instead.
-    graphics.circle(centerX, centerY, 9 + 10 * intensity).fill({ color: LAVA_GLOW_COLOR, alpha: 0.12 + 0.18 * intensity });
-
-    const crackCount = 1 + Math.round(intensity * 2);
-    for (let i = 0; i < crackCount; i++) {
-      const angle = tileHash(x * 3 + i * 17, y * 5 + i * 11) * Math.PI * 2;
-      const len = (TILE_WIDTH / 2.4) * (0.6 + 0.4 * intensity);
-      const dx = Math.cos(angle) * len;
-      const dy = Math.sin(angle) * len * (TILE_HEIGHT / TILE_WIDTH);
+    for (const [a, b] of edges) {
+      const midX = (a.sx + b.sx) / 2;
+      const midY = (a.sy + b.sy) / 2;
+      // A teardrop spilling from the rim edge down-screen toward the lower
+      // ground on the other side of it — wide at the edge, tapering to a
+      // point, like magma dribbling over a rim rather than a hard-edged bar.
       graphics
-        .moveTo(centerX - dx, centerY - dy)
-        .lineTo(centerX + dx, centerY + dy)
-        .stroke({ width: 3, color: crackColor, alpha });
+        .poly([a.sx, a.sy, b.sx, b.sy, midX, midY + flowLength])
+        .fill({ color: flowColor, alpha });
+      // A bright vent glow where the flow spills over the rim.
+      graphics.circle(midX, midY, 2 + 2 * intensity).fill({ color: LAVA_CORE_COLOR, alpha });
     }
-
-    graphics.circle(centerX, centerY, 4 + 5 * intensity).fill({ color: LAVA_CORE_COLOR, alpha });
   }
 
   private toScreen(x: number, y: number, elevation: number) {
