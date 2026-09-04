@@ -87,6 +87,51 @@ describe("createEnemyTerraformSystem", () => {
     expect(heightmap.vertices[5][6]).toBe(8);
   });
 
+  it("skips an edit that would lower ground under 'raiseOnly', spending no mana", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: 10 });
+    createHouse(world, "enemy", 5, 5);
+
+    const heightmap = flatHeightmap(10, 10, 5);
+    heightmap.vertices[5][6] = 8; // needs lowering (delta -1) to flatten — forbidden under raiseOnly
+
+    createEnemyTerraformSystem({ decisionInterval: 5, heightmap, terrainEditRule: "raiseOnly" })(world, 5);
+
+    expect(heightmap.vertices[5][6]).toBe(8);
+    expect(world.get(enemy, FactionState)!.mana).toBe(10);
+  });
+
+  it("still raises ground under 'raiseOnly' when that's the flattening direction needed", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: 10 });
+    createHouse(world, "enemy", 5, 5);
+
+    const heightmap = flatHeightmap(10, 10, 5);
+    heightmap.vertices[5][6] = 2; // needs raising (delta +1) to flatten — allowed under raiseOnly
+
+    createEnemyTerraformSystem({ decisionInterval: 5, heightmap, terrainEditRule: "raiseOnly" })(world, 5);
+
+    expect(heightmap.vertices[5][6]).toBe(3);
+    expect(world.get(enemy, FactionState)!.mana).toBe(10 - TERRAIN_EDIT_MANA_COST);
+  });
+
+  it("skips an edit that would raise ground under 'lowerOnly', spending no mana", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: 10 });
+    createHouse(world, "enemy", 5, 5);
+
+    const heightmap = flatHeightmap(10, 10, 5);
+    heightmap.vertices[5][6] = 2; // needs raising (delta +1) — forbidden under lowerOnly
+
+    createEnemyTerraformSystem({ decisionInterval: 5, heightmap, terrainEditRule: "lowerOnly" })(world, 5);
+
+    expect(heightmap.vertices[5][6]).toBe(2);
+    expect(world.get(enemy, FactionState)!.mana).toBe(10);
+  });
+
   it("does not run again until a full interval has elapsed since the last pass", () => {
     const world = new World();
     const enemy = createFaction(world, "enemy", { x: 0, y: 0 });

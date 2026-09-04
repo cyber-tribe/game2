@@ -7,6 +7,8 @@ import {
   SHRINE_MOVE_MANA_COST,
   SWAMP_MANA_COST,
   TERRAIN_EDIT_MANA_COST,
+  TERRAIN_EDIT_RULE_LABELS,
+  TERRAIN_EDIT_RULE_WEIGHTS,
   TERRAIN_LABELS,
   VOLCANO_MANA_COST,
 } from "./game/constants";
@@ -28,6 +30,8 @@ import {
   applyFlood,
   applyVolcano,
   createHeightmap,
+  isTerrainEditAllowed,
+  pickTerrainEditRule,
   raiseVertex,
   type TerrainType,
 } from "./world/heightmap";
@@ -125,6 +129,13 @@ async function bootstrap() {
   const heightmap = createHeightmap(WORLD_WIDTH, WORLD_HEIGHT, pickRandomTerrain());
   const renderer = new IsoRenderer(heightmap);
 
+  // Per docs/game-system.md's "各ワールドは...使用可能な奇跡の制限などが
+  // 異なり" — most matches allow raise/lower freely (today's only
+  // behavior), but a minority restrict terraforming to one direction. See
+  // TerrainEditRule's doc comment for why this doesn't take away the
+  // player's ability to flatten land, just which direction does it.
+  const terrainEditRule = pickTerrainEditRule(TERRAIN_EDIT_RULE_WEIGHTS);
+
   // A wrapper around renderer.view purely for screen shake (see
   // triggerShake below): renderer.view.position is the "real" camera
   // state that pan/zoom/rotate all read and write, so shake is kept as a
@@ -150,6 +161,7 @@ async function bootstrap() {
 
   const hud = new Hud();
   hud.setTerrain(TERRAIN_LABELS[heightmap.terrain]);
+  if (terrainEditRule !== "both") hud.setTerrainEditRule(TERRAIN_EDIT_RULE_LABELS[terrainEditRule]);
   app.stage.addChild(hud.view);
 
   const minimap = new Minimap(heightmap, MINIMAP_SIZE);
@@ -215,7 +227,13 @@ async function bootstrap() {
     matchRecordPanel.classList.remove("hidden");
   };
 
-  const simulation = new Simulation({ worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT, heightmap, onEnemyAction });
+  const simulation = new Simulation({
+    worldWidth: WORLD_WIDTH,
+    worldHeight: WORLD_HEIGHT,
+    heightmap,
+    terrainEditRule,
+    onEnemyAction,
+  });
 
   // The "人口放出" action (see game/populationRelease.ts) — free and
   // instant like a behaviorMode change, so it's a plain button rather than
@@ -310,7 +328,10 @@ async function bootstrap() {
     centerViewOn(target.x, target.y);
   });
 
-  let toolMode: ToolMode = "raise";
+  // Defaults to whichever direction terrainEditRule actually allows —
+  // defaulting to the disabled "raise" under lowerOnly would otherwise
+  // leave the player's very first tap doing nothing.
+  let toolMode: ToolMode = terrainEditRule === "lowerOnly" ? "lower" : "raise";
 
   const applyTool = (event: FederatedPointerEvent) => {
     const local = renderer.view.toLocal(event.global);
@@ -385,8 +406,14 @@ async function bootstrap() {
       return;
     }
 
+    const delta = toolMode === "lower" ? -1 : 1;
+    // Should be unreachable in practice — the toolbar disables whichever
+    // of raise/lower this match's terrainEditRule forbids — but checked
+    // here too so a stale toolMode can never spend mana for an edit that
+    // silently does nothing.
+    if (!isTerrainEditAllowed(terrainEditRule, delta)) return;
     if (!trySpendMana(simulation.world, "player", TERRAIN_EDIT_MANA_COST)) return;
-    raiseVertex(heightmap, vertex.x, vertex.y, toolMode === "lower" ? -1 : 1);
+    raiseVertex(heightmap, vertex.x, vertex.y, delta);
     renderer.redraw();
     dismissTutorialHint();
   };
@@ -548,6 +575,20 @@ async function bootstrap() {
       toolMode = mode;
     },
   });
+
+  // Reflects terrainEditRule in the toolbar itself: a player should never
+  // be able to select the forbidden direction in the first place, rather
+  // than tapping it and having nothing happen.
+  if (terrainEditRule !== "both") {
+    const forbidden: ToolMode = terrainEditRule === "raiseOnly" ? "lower" : "raise";
+    document.querySelector<HTMLButtonElement>(`#toolbar [data-tool="${forbidden}"]`)?.setAttribute("disabled", "true");
+  }
+  // Syncs the toolbar's visual "pressed" state with toolMode's actual
+  // default set above — index.html hardcodes "raise" as pressed, which is
+  // wrong whenever terrainEditRule forced the default to "lower" instead.
+  document
+    .querySelectorAll<HTMLButtonElement>('#toolbar [data-tool="raise"], #toolbar [data-tool="lower"]')
+    .forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.tool === toolMode)));
 
   app.ticker.add((ticker) => {
     const deltaSeconds = ticker.deltaMS / 1000;

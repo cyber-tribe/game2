@@ -1,5 +1,5 @@
 import { Scheduler, World } from "../ecs";
-import type { Heightmap } from "../world/heightmap";
+import type { Heightmap, TerrainEditRule } from "../world/heightmap";
 import { triggerArmageddon } from "./armageddon";
 import { FactionState, House, Owner, Position, Walker, type BehaviorMode, type FactionId } from "./components";
 import { DEFAULT_WALKER_SPEED, TILES_PER_HOUSE_CAP } from "./constants";
@@ -35,6 +35,15 @@ export interface SimulationConfig {
    * care about terrain.
    */
   heightmap?: Heightmap;
+  /**
+   * Same per-match restriction on raise/lower the player's own taps are
+   * gated by (see world/heightmap.ts's TerrainEditRule) — passed through
+   * to the enemy's own terraforming so it plays by the same rule ("敵の神
+   * はプレイヤーと同じルールで介入する"). Defaults to "both" (today's
+   * unrestricted behavior) when omitted, which is fine for tests that
+   * don't care about it.
+   */
+  terrainEditRule?: TerrainEditRule;
   /**
    * Called whenever the enemy actually casts a miracle (see
    * enemyMiracles.ts's EnemyMiracleEvent) — lets main.ts surface it
@@ -164,7 +173,7 @@ export class Simulation {
       )
       .add(createHouseGrowthSystem({ maxHousesPerFaction, heightmap: config.heightmap }))
       .add(manaSystem)
-      .add(createEnemyTerraformSystem({ heightmap: config.heightmap }))
+      .add(createEnemyTerraformSystem({ heightmap: config.heightmap, terrainEditRule: config.terrainEditRule }))
       .add(
         createEnemyMiracleSystem({
           heightmap: config.heightmap,

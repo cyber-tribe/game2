@@ -64,10 +64,56 @@ export function createHeightmap(
 }
 
 /**
+ * A per-match restriction on which direction raiseVertex may be called in —
+ * per docs/game-system.md's "各ワールドは地形タイプ・初期配置...使用可能
+ * な奇跡の制限などが異なり": a stage-shaped rule variation on top of the
+ * random terrain type, rather than every match offering the exact same
+ * "raise or lower, your choice" terraforming. "both" is the ordinary case;
+ * "raiseOnly"/"lowerOnly" force a match to only ever level land by raising
+ * the lower ground up (or lowering the higher ground down) to match its
+ * surroundings — still fully capable of flattening land (docs/game-
+ * system.md's core loop), just constrained to one direction. See
+ * isTerrainEditAllowed, which both the player's own taps and
+ * enemyTerraform.ts's AI are gated through equally ("敵の神はプレイヤーと
+ * 同じルールで介入する").
+ */
+export type TerrainEditRule = "both" | "raiseOnly" | "lowerOnly";
+
+/** Whether raiseVertex(..., delta) is permitted under `rule` — see TerrainEditRule. */
+export function isTerrainEditAllowed(rule: TerrainEditRule, delta: number): boolean {
+  if (rule === "raiseOnly") return delta > 0;
+  if (rule === "lowerOnly") return delta < 0;
+  return true;
+}
+
+/**
+ * Weighted-random pick of one TerrainEditRule for a fresh match — see
+ * game/constants.ts's TERRAIN_EDIT_RULE_WEIGHTS, main.ts's only caller.
+ * `rng` is injectable (in [0, 1), defaults to Math.random) for
+ * deterministic tests.
+ */
+export function pickTerrainEditRule(
+  weights: Record<TerrainEditRule, number>,
+  rng: () => number = Math.random,
+): TerrainEditRule {
+  const entries = Object.entries(weights) as [TerrainEditRule, number][];
+  const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
+
+  let roll = rng() * total;
+  for (const [rule, weight] of entries) {
+    if (roll < weight) return rule;
+    roll -= weight;
+  }
+  return entries[entries.length - 1][0];
+}
+
+/**
  * Raises (positive delta) or lowers (negative delta) a single vertex,
  * clamped to [MIN_ELEVATION, MAX_ELEVATION]. Mutates the heightmap in
  * place — per docs/game-system.md this is the most basic divine power,
- * meant to be called once per player click, not per frame.
+ * meant to be called once per player click, not per frame. Does not itself
+ * check TerrainEditRule — callers (main.ts's applyTool, enemyTerraform.ts)
+ * are expected to have already gated the call through isTerrainEditAllowed.
  */
 export function raiseVertex(heightmap: Heightmap, x: number, y: number, delta: number): void {
   const row = heightmap.vertices[y];
