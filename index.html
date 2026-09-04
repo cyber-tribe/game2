@@ -244,6 +244,76 @@
        * once, when the match ends; there's no way to dismiss it since
        * the match is over and nothing else happens after this.
        */
+      /*
+       * 征服モードの簡易版（docs/game-system.md 10節）: 500ワールドの
+       * 進行やパスワード継続はまだ実装しないが、地形タイプ・マップサイズ・
+       * 地形操作制限が異なる固定の少数ワールドから選ぶ最初の一歩として、
+       * 起動直後に必ずこの画面を経由する。#match-recordと同じ
+       * 「中央固定のスクロール可能パネル」構造を流用している。
+       */
+      #world-select {
+        position: fixed;
+        left: 10px;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        max-height: 80vh;
+        display: flex;
+        flex-direction: column;
+        background: rgba(10, 26, 42, 0.95);
+        border: 1px solid #4fa8ff;
+        border-radius: 10px;
+        padding: 14px;
+        box-sizing: border-box;
+        color: #fff;
+        z-index: 9;
+      }
+
+      #world-select.hidden {
+        display: none;
+      }
+
+      #world-select-title {
+        flex: none;
+        font-size: 15px;
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+
+      #world-select-list {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-y;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      #world-select-list button {
+        padding: 12px;
+        font-size: 14px;
+        font-family: inherit;
+        text-align: left;
+        border: 1px solid #4fa8ff;
+        border-radius: 8px;
+        background: #123049;
+        color: #fff;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      #world-select-list button .world-select-name {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 2px;
+      }
+
+      #world-select-list button .world-select-detail {
+        display: block;
+        font-size: 12px;
+        color: #9db3c8;
+      }
+
       #match-record {
         position: fixed;
         left: 10px;
@@ -356,6 +426,11 @@
   </head>
   <body>
     <div id="app"></div>
+
+    <div id="world-select">
+      <div id="world-select-title">ワールドを選択</div>
+      <div id="world-select-list"></div>
+    </div>
 
     <div id="tutorial-hint">
       🙏 まずは自分の民（丸いマーク）の周りをタップして地形を平らにしよう。家が育ち、人口とマナが増えていく。長押ししてなぞると、まとめて地形を編集できる。

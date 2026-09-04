@@ -9,7 +9,6 @@ import {
   SWAMP_MANA_COST,
   TERRAIN_EDIT_MANA_COST,
   TERRAIN_EDIT_RULE_LABELS,
-  TERRAIN_EDIT_RULE_WEIGHTS,
   TERRAIN_LABELS,
   VOLCANO_MANA_COST,
 } from "./game/constants";
@@ -19,6 +18,7 @@ import { drownFlood } from "./game/flood";
 import { Simulation, type GameOutcome, type InspectableEntity, type MatchEvent } from "./game/simulation";
 import { collapseSwampsNear, createSwamp } from "./game/swamp";
 import { eruptVolcano } from "./game/volcano";
+import { WORLDS, type WorldDefinition } from "./game/worlds";
 import { EntityLayer } from "./render/EntityLayer";
 import { describeInspectableEntity } from "./render/entityInfoLabel";
 import { Hud } from "./render/Hud";
@@ -26,49 +26,7 @@ import { IsoRenderer } from "./render/IsoRenderer";
 import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
 import { Minimap } from "./render/Minimap";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
-import {
-  DEFAULT_EARTHQUAKE_RADIUS,
-  DEFAULT_VOLCANO_RADIUS,
-  applyEarthquake,
-  applyFlood,
-  applyVolcano,
-  createHeightmap,
-  isTerrainEditAllowed,
-  pickTerrainEditRule,
-  raiseVertex,
-  type TerrainType,
-} from "./world/heightmap";
-
-// Smaller than a desktop map: on a phone, showing the whole thing at once
-// makes every tile too small to tap precisely, so the map is shown closer
-// to native size and panned instead — see plan/archived/0009-pan-for-vertex-picking.md.
-//
-// Raised from 20x20 in plan/0055-map-expansion.md, once measured to still
-// keep IsoRenderer.redraw() (called unconditionally every frame — see the
-// ticker below) comfortably within a 60fps frame budget: at 20x20 it
-// averaged ~0.8ms/frame; at 32x32 (2.56x the tiles) ~1.8ms, still under a
-// tenth of the ~16.6ms budget. 40x40 (4x the tiles) already spiked past
-// 14ms on some frames in that same measurement — a real ceiling on how far
-// this can go without a rendering optimization (e.g. only redrawing static
-// terrain shape on edit, instead of every frame) that's out of this
-// change's scope. See TILES_PER_HOUSE_CAP for how the larger map's
-// maxHousesPerFaction is kept from scaling by the same 2.56x, to limit how
-// much this also grows the O(n²) combat/gather systems' worst case.
-const WORLD_WIDTH = 32;
-const WORLD_HEIGHT = 32;
-
-/**
- * Every match rolls one of these for the whole map, per
- * docs/game-system.md's "地形タイプが複数あり...民の成長速度などに
- * 影響する". Until 征服モード (per-world terrain assignment) exists,
- * this is the only way a player ever sees TERRAIN_GROWTH_MULTIPLIER's
- * effect or the non-grass IsoRenderer colors at all.
- */
-const TERRAIN_TYPES: TerrainType[] = ["grass", "desert", "snow", "rock"];
-
-function pickRandomTerrain(): TerrainType {
-  return TERRAIN_TYPES[Math.floor(Math.random() * TERRAIN_TYPES.length)];
-}
+import { DEFAULT_EARTHQUAKE_RADIUS, DEFAULT_VOLCANO_RADIUS, applyEarthquake, applyFlood, applyVolcano, createHeightmap, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
 
 /** Reserved space (screen px) above the map for the HUD text. */
 const HUD_MARGIN = 90;
@@ -137,7 +95,7 @@ function vibrate(pattern: number | number[]): void {
   navigator.vibrate?.(pattern);
 }
 
-async function bootstrap() {
+async function bootstrap(world: WorldDefinition) {
   const app = new Application();
   await app.init({
     resizeTo: window,
@@ -149,15 +107,15 @@ async function bootstrap() {
   if (!container) throw new Error("#app element not found");
   container.appendChild(app.canvas);
 
-  const heightmap = createHeightmap(WORLD_WIDTH, WORLD_HEIGHT, pickRandomTerrain());
+  const heightmap = createHeightmap(world.worldWidth, world.worldHeight, world.terrain);
   const renderer = new IsoRenderer(heightmap);
 
   // Per docs/game-system.md's "各ワールドは...使用可能な奇跡の制限などが
-  // 異なり" — most matches allow raise/lower freely (today's only
-  // behavior), but a minority restrict terraforming to one direction. See
+  // 異なり" — most worlds allow raise/lower freely, but a minority (see
+  // WORLDS in game/worlds.ts) restrict terraforming to one direction. See
   // TerrainEditRule's doc comment for why this doesn't take away the
   // player's ability to flatten land, just which direction does it.
-  const terrainEditRule = pickTerrainEditRule(TERRAIN_EDIT_RULE_WEIGHTS);
+  const terrainEditRule = world.terrainEditRule;
 
   // A wrapper around renderer.view purely for screen shake (see
   // triggerShake below): renderer.view.position is the "real" camera
@@ -266,8 +224,8 @@ async function bootstrap() {
   };
 
   const simulation = new Simulation({
-    worldWidth: WORLD_WIDTH,
-    worldHeight: WORLD_HEIGHT,
+    worldWidth: world.worldWidth,
+    worldHeight: world.worldHeight,
     heightmap,
     terrainEditRule,
     onEnemyAction,
@@ -765,4 +723,39 @@ async function bootstrap() {
   });
 }
 
-bootstrap();
+/**
+ * 征服モードの入り口（docs/game-system.md 10節）: プレイヤーがワールドを
+ * 選ぶまで試合は始まらない。#play-again が window.location.reload() で
+ * ページごと作り直す都合上（plan/0038-play-again.md）、この画面も
+ * 毎回ここから素通しで出し直せばよく、選択状態を別途持ち回る必要はない。
+ */
+function showWorldSelect(): void {
+  const panel = document.getElementById("world-select");
+  const list = document.getElementById("world-select-list");
+  if (!panel || !list) return;
+
+  list.replaceChildren(
+    ...WORLDS.map((world) => {
+      const button = document.createElement("button");
+      button.type = "button";
+
+      const name = document.createElement("span");
+      name.className = "world-select-name";
+      name.textContent = world.name;
+
+      const detail = document.createElement("span");
+      detail.className = "world-select-detail";
+      const ruleLabel = world.terrainEditRule !== "both" ? `・${TERRAIN_EDIT_RULE_LABELS[world.terrainEditRule]}` : "";
+      detail.textContent = `${TERRAIN_LABELS[world.terrain]}・${world.worldWidth}×${world.worldHeight}${ruleLabel}`;
+
+      button.append(name, detail);
+      button.addEventListener("click", () => {
+        panel.classList.add("hidden");
+        bootstrap(world);
+      });
+      return button;
+    }),
+  );
+}
+
+showWorldSelect();
