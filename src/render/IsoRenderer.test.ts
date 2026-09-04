@@ -1,4 +1,4 @@
-import { Graphics } from "pixi.js";
+import { Graphics, Texture } from "pixi.js";
 import { describe, expect, it, vi } from "vitest";
 import { VOLCANO_ROCK_HARDNESS, type Heightmap } from "../world/heightmap";
 import {
@@ -27,7 +27,10 @@ function drawInstructions(renderer: IsoRenderer) {
   // @ts-expect-error -- graphics is a private implementation detail; reached
   // into here specifically because Pixi's Graphics builds real instruction
   // data even without a canvas (see the module-level comment in this file).
-  return renderer.graphics.context.instructions as { action: string; data: { style?: { color: number } } }[];
+  return renderer.graphics.context.instructions as {
+    action: string;
+    data: { style?: { color: number; texture?: Texture } };
+  }[];
 }
 
 function channels(color: number): [number, number, number] {
@@ -223,7 +226,11 @@ describe("IsoRenderer.redraw (terraced blocks)", () => {
   });
 
   it("shades a cliff wall darker than the top it descends from", () => {
+    // Desert, not grass: grass tops are dithered (see GRASS_FILL) rather
+    // than a plain color, which this test isn't about — wall shading
+    // itself is the same darkening regardless of which terrain it's on.
     const heightmap = flatHeightmap(3, 3, 5);
+    heightmap.terrain = "desert";
     heightmap.vertices[1][1] = 9;
     heightmap.vertices[1][2] = 9;
     heightmap.vertices[2][1] = 9;
@@ -232,21 +239,39 @@ describe("IsoRenderer.redraw (terraced blocks)", () => {
     const instructions = drawInstructions(renderer);
     const colors = new Set(instructions.filter((i) => i.action === "fill").map((i) => i.data.style!.color));
 
-    // Every tile here is plain grass (elevation is above waterLevel 0 and
+    // Every tile here is plain desert (elevation is above waterLevel 0 and
     // none of it is volcano rock), so every top — raised or not — fills
-    // with TERRAIN_COLOR.grass, and every wall (the raised tile's own,
+    // with TERRAIN_COLOR.desert, and every wall (the raised tile's own,
     // and the sea-level ring's walls down to the map's off-edge default)
     // shades that same color the same way: exactly 2 distinct colors.
-    const GRASS = 0x4a8c3f;
-    expect(colors.has(GRASS)).toBe(true);
+    const DESERT = 0xd6b25e;
+    expect(colors.has(DESERT)).toBe(true);
     expect(colors.size).toBe(2);
 
-    const wallColor = [...colors].find((c) => c !== GRASS)!;
-    const [tr, tg, tb] = channels(GRASS);
+    const wallColor = [...colors].find((c) => c !== DESERT)!;
+    const [tr, tg, tb] = channels(DESERT);
     const [wr, wg, wb] = channels(wallColor);
     expect(wr).toBeLessThan(tr);
     expect(wg).toBeLessThan(tg);
     expect(wb).toBeLessThan(tb);
+  });
+
+  it("dithers grass tops with the speckled texture instead of a flat color", () => {
+    // Elevation 0 matches heightAt's off-the-map default, so no cliff
+    // walls appear at the map's true edges — every fill here is a tile top.
+    const heightmap = flatHeightmap(3, 3, 0); // flatHeightmap defaults to grass terrain
+    heightmap.waterLevel = -1; // land despite elevation 0 — see isBuildable's own use of waterLevel
+    const renderer = new IsoRenderer(heightmap);
+    const instructions = drawInstructions(renderer);
+    const tops = instructions.filter((i) => i.action === "fill");
+
+    expect(tops).toHaveLength(3 * 3);
+    for (const top of tops) {
+      // A plain color fill (drawCliffWalls' walls, or a non-grass terrain's
+      // top) still carries Pixi's own default 1x1 white texture — real
+      // texture fills are the only ones that replace it with something else.
+      expect(top.data.style!.texture).not.toBe(Texture.WHITE);
+    }
   });
 
   it("does not draw a wall for a sub-threshold height difference (easing noise)", () => {

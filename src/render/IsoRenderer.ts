@@ -1,4 +1,4 @@
-import { Container, Graphics } from "pixi.js";
+import { BufferImageSource, Container, Graphics, Texture } from "pixi.js";
 import { MAX_ELEVATION, sampleElevation, VOLCANO_ROCK_HARDNESS, type Heightmap } from "../world/heightmap";
 
 // Sized for finger taps rather than mouse clicks: at scale 1 adjacent
@@ -24,6 +24,24 @@ const TERRAIN_COLOR: Record<Heightmap["terrain"], number> = {
 };
 
 const WATER_COLOR = 0x2a5f8c;
+
+/**
+ * A single flat solid color read as "のっぺり" (flat, lifeless) next to the
+ * original game's turf, which dithers between two greens in a fine speckle
+ * rather than one uniform fill — see createDitherTexture. Only grass gets
+ * this treatment for now, since that's specifically what was flagged;
+ * desert/snow/rock stay plain TERRAIN_COLOR fills.
+ */
+const GRASS_SPECKLE_COLOR = lerpColor(TERRAIN_COLOR.grass, 0x000000, 0.3);
+/**
+ * Size (px, at scale 1) of one repeat of the grass dither texture — see
+ * createDitherTexture. Small relative to a tile (64x32px) so it tiles
+ * several times across each tile, reading as a fine even stipple like the
+ * reference art rather than a few large blotches.
+ */
+const GRASS_DITHER_SIZE = 8;
+/** Fraction of the dither texture's pixels that get GRASS_SPECKLE_COLOR rather than the plain grass color. */
+const GRASS_SPECKLE_DENSITY = 0.35;
 
 /**
  * How much darker a cliff wall is than the ground color of the tile it
@@ -104,6 +122,50 @@ function tileHash(x: number, y: number): number {
   const v = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
   return v - Math.floor(v);
 }
+
+/**
+ * Builds a small tileable two-tone speckled texture, one pixel decided at
+ * a time by the same deterministic tileHash trick used for volcano cracks
+ * — mimics the original game's dithered ground instead of this renderer's
+ * flat single-color fills. `size` is kept small (see GRASS_DITHER_SIZE) so
+ * `addressMode: "repeat"` tiles it several times across one map tile;
+ * `scaleMode: "nearest"` keeps the speckles crisp pixels rather than
+ * blurring them into a smooth gradient. Works without a live GL context —
+ * BufferImageSource takes raw pixel bytes directly, so this runs the same
+ * in a headless test as in the browser.
+ */
+function createDitherTexture(size: number, baseColor: number, speckleColor: number, density: number): Texture {
+  const pixels = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const color = tileHash(x, y) < density ? speckleColor : baseColor;
+      const i = (y * size + x) * 4;
+      pixels[i] = (color >> 16) & 0xff;
+      pixels[i + 1] = (color >> 8) & 0xff;
+      pixels[i + 2] = color & 0xff;
+      pixels[i + 3] = 255;
+    }
+  }
+  const source = new BufferImageSource({
+    resource: pixels,
+    width: size,
+    height: size,
+    addressMode: "repeat",
+    scaleMode: "nearest",
+  });
+  return new Texture({ source });
+}
+
+/**
+ * Filled with textureSpace: "global" wherever it's used (see redraw()) so
+ * the speckles stay fixed to the ground and pan/zoom/rotate along with the
+ * terrain, like a texture actually painted onto it, rather than sliding
+ * around as if it were laid over the screen.
+ */
+const GRASS_FILL = {
+  texture: createDitherTexture(GRASS_DITHER_SIZE, TERRAIN_COLOR.grass, GRASS_SPECKLE_COLOR, GRASS_SPECKLE_DENSITY),
+  textureSpace: "global" as const,
+};
 
 /**
  * How brightly a volcano tile's lava should glow right now: a base level
@@ -472,16 +534,19 @@ export class IsoRenderer {
         const p2 = this.toScreen(x + 1, y + 1, elevation);
         const p3 = this.toScreen(x, y + 1, elevation);
 
-        const color =
-          elevation <= waterLevel
-            ? WATER_COLOR
-            : isRockTile[y - minY][x - minX]
-              ? VOLCANO_ROCK_COLOR
-              : TERRAIN_COLOR[terrain];
+        const isWater = elevation <= waterLevel;
+        const isRock = isRockTile[y - minY][x - minX];
+        // Always the plain flat color, even for grass — drawCliffWalls
+        // shades a wall by darkening this, and a dithered wall face isn't
+        // worth the complexity the top face's texture already solves.
+        const color = isWater ? WATER_COLOR : isRock ? VOLCANO_ROCK_COLOR : TERRAIN_COLOR[terrain];
+        // Grass ground alone gets the dithered look (see GRASS_FILL) —
+        // water and rock already read fine as flat colors.
+        const topFill = !isWater && !isRock && terrain === "grass" ? GRASS_FILL : color;
 
         graphics
           .poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy])
-          .fill(color)
+          .fill(topFill)
           .stroke({ width: 1, color: 0x000000, alpha: 0.15 });
 
         this.drawCliffWalls(graphics, x, y, elevation, color, tileElevation);
