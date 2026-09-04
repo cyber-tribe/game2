@@ -19,6 +19,7 @@ import {
 } from "../constants";
 import { findFactionEntity, trySpendMana } from "../faction";
 import { knightify } from "../knight";
+import { totalPopulation } from "../population";
 import { collapseSwampsNear } from "../swamp";
 import { eruptVolcano } from "../volcano";
 import { distance, type Point } from "./geometry";
@@ -154,17 +155,6 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
       onAction({ type: "earthquake", position: target });
     }
   };
-}
-
-function totalPopulation(world: World, faction: FactionId): number {
-  let total = 0;
-  for (const entity of world.query(House, Owner)) {
-    if (world.get(entity, Owner)!.faction === faction) total += world.get(entity, House)!.population;
-  }
-  for (const entity of world.query(Walker, Owner)) {
-    if (world.get(entity, Owner)!.faction === faction) total += 1;
-  }
-  return total;
 }
 
 /**

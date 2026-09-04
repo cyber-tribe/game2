@@ -5,6 +5,7 @@ import { FactionState, House, Owner, Position, Walker, type BehaviorMode, type F
 import { DEFAULT_WALKER_SPEED, IMPACT_EFFECT_DURATION, TILES_PER_HOUSE_CAP } from "./constants";
 import { createFaction, findFactionEntity, moveShrine } from "./faction";
 import { knightify } from "./knight";
+import { totalPopulation } from "./population";
 import { releasePopulation } from "./populationRelease";
 import { createHouseCaptureSystem, createWalkerCombatSystem } from "./systems/combat";
 import type { ImpactEffectEvent, ImpactEffectSnapshot } from "./systems/effects";
@@ -63,6 +64,8 @@ export interface FactionSummary {
   housesCap: number;
   walkers: number;
   behaviorMode: BehaviorMode;
+  /** See population.ts's totalPopulation — houses' accumulated population plus one per walker. */
+  population: number;
 }
 
 export interface GameOutcome {
@@ -315,6 +318,7 @@ export class Simulation {
         housesCap: this.maxHousesPerFaction,
         walkers,
         behaviorMode: state.behaviorMode,
+        population: totalPopulation(this.world, state.id),
       });
     }
 
