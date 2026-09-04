@@ -1,4 +1,4 @@
-import type { TerrainType } from "../world/heightmap";
+import type { TerrainEditRule, TerrainType } from "../world/heightmap";
 import type { HouseLevel } from "./components";
 
 /** Tiles per second for a freshly spawned walker. */
@@ -44,6 +44,25 @@ export const TERRAIN_LABELS: Record<TerrainType, string> = {
   desert: "砂漠",
   snow: "雪原",
   rock: "溶岩地帯",
+};
+
+/**
+ * How often each TerrainEditRule (see world/heightmap.ts) is picked for a
+ * fresh match — weighted so most matches play like today (unrestricted),
+ * while a real minority give the terraforming loop a one-directional twist.
+ * Consumed by main.ts's pickRandomTerrainEditRule.
+ */
+export const TERRAIN_EDIT_RULE_WEIGHTS: Record<TerrainEditRule, number> = {
+  both: 2,
+  raiseOnly: 1,
+  lowerOnly: 1,
+};
+
+/** Japanese display name for each terrain-edit rule, shown in the HUD so a restriction is never a silent mystery. */
+export const TERRAIN_EDIT_RULE_LABELS: Record<TerrainEditRule, string> = {
+  both: "隆起・沈降とも可",
+  raiseOnly: "隆起のみ可",
+  lowerOnly: "沈降のみ可",
 };
 
 /**

@@ -12,6 +12,7 @@ import type { FactionSummary, GameOutcome } from "../game/simulation";
 export class Hud {
   readonly view: Text;
   private terrainLabel = "";
+  private terrainEditRuleLabel = "";
 
   constructor() {
     this.view = new Text({
@@ -55,9 +56,24 @@ export class Hud {
     this.terrainLabel = label;
   }
 
+  /**
+   * Sets the match's terrain-edit-rule label (e.g. "隆起のみ可"), shown
+   * right below the terrain line — but only when given a non-empty label.
+   * main.ts only calls this for a restrictive TerrainEditRule (see
+   * world/heightmap.ts): the ordinary "both directions allowed" case is
+   * left unset so most matches' HUD looks exactly as it did before this
+   * existed. Without this line, a restricted match would look identical
+   * to a normal one right up until a raise/lower tap mysteriously does
+   * nothing — this is what tells the player *why*.
+   */
+  setTerrainEditRule(label: string): void {
+    this.terrainEditRuleLabel = label;
+  }
+
   update(summaries: FactionSummary[], outcome: GameOutcome): void {
     const lines = [
       `地形: ${this.terrainLabel}`,
+      ...(this.terrainEditRuleLabel ? [`地形操作: ${this.terrainEditRuleLabel}`] : []),
       ...summaries.map((s) => {
         const houseText = s.houses >= s.housesCap ? `house ${s.houses}/${s.housesCap}（上限）` : `house ${s.houses}`;
         return `${s.id}: mana ${s.mana.toFixed(1)} ${houseText} walker ${s.walkers} (${s.behaviorMode})`;
