@@ -99,4 +99,59 @@ describe("createSettleSystem", () => {
     expect(world.isAlive(walker)).toBe(true);
     expect(world.query(House)).toHaveLength(0);
   });
+
+  function createHouse(world: World, faction: "player" | "enemy", x: number, y: number) {
+    const entity = world.createEntity();
+    world.add(entity, Position, { x, y });
+    world.add(entity, Owner, { faction });
+    world.add(entity, House, { level: "hut", population: 0 });
+    return entity;
+  }
+
+  it("does not settle a walker once its faction is already at maxHousesPerFaction", () => {
+    const world = new World();
+    createHouse(world, "player", 0, 0);
+    const walker = world.createEntity();
+    world.add(walker, Position, { x: 3, y: 4 });
+    world.add(walker, Owner, { faction: "player" });
+    world.add(walker, Walker, { strength: 1, state: "seeking", speed: 1 });
+
+    // This is exactly what the stalemate-escape valve in houseGrowth.ts
+    // guards against on the other side of house creation: without this
+    // cap check here too, a walker already in flight when the faction hit
+    // its cap could still settle and quietly push the house count past it
+    // — see this system's own SettleConfig.maxHousesPerFaction doc comment.
+    createSettleSystem({ maxHousesPerFaction: 1 })(world, 0);
+
+    expect(world.isAlive(walker)).toBe(true);
+    expect(world.query(House)).toHaveLength(1); // still just the pre-existing one
+  });
+
+  it("still settles a walker from a faction under the cap, even when another faction is already at it", () => {
+    const world = new World();
+    createHouse(world, "enemy", 0, 0);
+    const walker = world.createEntity();
+    world.add(walker, Position, { x: 3, y: 4 });
+    world.add(walker, Owner, { faction: "player" });
+    world.add(walker, Walker, { strength: 1, state: "seeking", speed: 1 });
+
+    createSettleSystem({ maxHousesPerFaction: 1 })(world, 0);
+
+    expect(world.isAlive(walker)).toBe(false);
+    expect(world.query(House, Owner)).toHaveLength(2);
+  });
+
+  it("treats maxHousesPerFaction as unlimited when omitted", () => {
+    const world = new World();
+    createHouse(world, "player", 0, 0);
+    const walker = world.createEntity();
+    world.add(walker, Position, { x: 3, y: 4 });
+    world.add(walker, Owner, { faction: "player" });
+    world.add(walker, Walker, { strength: 1, state: "seeking", speed: 1 });
+
+    createSettleSystem()(world, 0);
+
+    expect(world.isAlive(walker)).toBe(false);
+    expect(world.query(House)).toHaveLength(2);
+  });
 });
