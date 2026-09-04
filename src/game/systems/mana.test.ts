@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
 import { FactionState, House, Owner, Position } from "../components";
-import { HOUSE_LEVELS, MAX_MANA } from "../constants";
+import { HOUSE_LEVELS, HUT_MANA_RATE_CAP, MAX_MANA } from "../constants";
 import { createFaction } from "../faction";
 import { manaSystem } from "./mana";
 
@@ -82,5 +82,41 @@ describe("manaSystem", () => {
     manaSystem(world, 1);
 
     expect(world.get(player, FactionState)!.mana).toBe(MAX_MANA);
+  });
+
+  it("caps how much mana rate hut-level houses contribute, however many there are", () => {
+    const world = new World();
+    const player = createFaction(world, "player", { x: 0, y: 0 });
+    // Comfortably more huts than it'd take to exceed HUT_MANA_RATE_CAP if
+    // hut contribution were uncapped (as it was before this test existed).
+    for (let i = 0; i < 50; i++) createHouse(world, "player", "hut");
+
+    manaSystem(world, 1);
+
+    expect(world.get(player, FactionState)!.mana).toBe(HUT_MANA_RATE_CAP);
+  });
+
+  it("doesn't cap a hut count that's already under the cap on its own", () => {
+    const world = new World();
+    const player = createFaction(world, "player", { x: 0, y: 0 });
+    createHouse(world, "player", "hut");
+
+    manaSystem(world, 1);
+
+    expect(world.get(player, FactionState)!.mana).toBe(HOUSE_LEVELS.hut.manaRate);
+    expect(HOUSE_LEVELS.hut.manaRate).toBeLessThan(HUT_MANA_RATE_CAP);
+  });
+
+  it("lets lodge-and-above houses add on top of the hut cap, uncapped", () => {
+    const world = new World();
+    const player = createFaction(world, "player", { x: 0, y: 0 });
+    for (let i = 0; i < 50; i++) createHouse(world, "player", "hut");
+    createHouse(world, "player", "lodge");
+    createHouse(world, "player", "castle");
+
+    manaSystem(world, 1);
+
+    const expectedRate = HUT_MANA_RATE_CAP + HOUSE_LEVELS.lodge.manaRate + HOUSE_LEVELS.castle.manaRate;
+    expect(world.get(player, FactionState)!.mana).toBe(expectedRate);
   });
 });
