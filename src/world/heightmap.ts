@@ -125,6 +125,22 @@ export function raiseVertex(heightmap: Heightmap, x: number, y: number, delta: n
 }
 
 /**
+ * Raises/lowers an entire tile (all 4 corner vertices) by the same delta —
+ * the player's basic terraforming tool now edits a whole tile face at once
+ * rather than a single corner point, per the original game's tile-based
+ * land-raising (see plan/0065-tile-based-terraform.md). Each corner is
+ * still clamped and chips rockHardness independently via raiseVertex, so a
+ * tile straddling MAX_ELEVATION or partly-cooled volcano rock behaves the
+ * same as 4 individual taps would.
+ */
+export function raiseTile(heightmap: Heightmap, tileX: number, tileY: number, delta: number): void {
+  raiseVertex(heightmap, tileX, tileY, delta);
+  raiseVertex(heightmap, tileX + 1, tileY, delta);
+  raiseVertex(heightmap, tileX + 1, tileY + 1, delta);
+  raiseVertex(heightmap, tileX, tileY + 1, delta);
+}
+
+/**
  * Bilinearly interpolated elevation at a fractional tile-space point,
  * clamped to the grid. Shared by the renderer (to place things on the
  * surface) and by game logic (to decide what's dry land).

@@ -26,7 +26,7 @@ import { IsoRenderer, isWithinTileBounds, visibleTileBounds, type TileBounds } f
 import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
 import { Minimap } from "./render/Minimap";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
-import { DEFAULT_EARTHQUAKE_RADIUS, DEFAULT_VOLCANO_RADIUS, applyEarthquake, applyFlood, applyVolcano, createHeightmap, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
+import { DEFAULT_EARTHQUAKE_RADIUS, DEFAULT_VOLCANO_RADIUS, applyEarthquake, applyFlood, applyVolcano, createHeightmap, isTerrainEditAllowed, raiseTile } from "./world/heightmap";
 
 /**
  * The camera's fixed base scale — see layout()'s doc comment for why this
@@ -434,10 +434,13 @@ async function bootstrap(world: WorldDefinition) {
     return best;
   };
 
-  // Shared by the plain single-tap path (applyTool's own fallback, below)
-  // and by ブラシ continuous painting (see the pointer handlers further
-  // down) — both just need "spend mana, edit this one vertex, redraw".
-  const applyTerrainEditAt = (vertex: { x: number; y: number }): void => {
+  // Shared by the plain single-tap path (applyTool, below) and by ブラシ
+  // continuous painting (see the pointer handlers further down) — both
+  // just need "spend mana, edit this one tile, redraw". Edits a whole tile
+  // face (all 4 corner vertices) at once rather than a single corner
+  // point, matching the original game's tile-based terraforming — see
+  // plan/0065-tile-based-terraform.md.
+  const applyTerrainEditAt = (tile: { x: number; y: number }): void => {
     const delta = toolMode === "lower" ? -1 : 1;
     // Should be unreachable in practice — the toolbar disables whichever
     // of raise/lower this match's terrainEditRule forbids — but checked
@@ -445,7 +448,7 @@ async function bootstrap(world: WorldDefinition) {
     // silently does nothing.
     if (!isTerrainEditAllowed(terrainEditRule, delta)) return;
     if (!trySpendPlayerMana(TERRAIN_EDIT_MANA_COST)) return;
-    raiseVertex(heightmap, vertex.x, vertex.y, delta);
+    raiseTile(heightmap, tile.x, tile.y, delta);
     renderer.redraw(visibleBounds());
     dismissTutorialHint();
   };
@@ -456,6 +459,12 @@ async function bootstrap(world: WorldDefinition) {
     if (toolMode === "inspect") {
       const entity = pickInspectableEntity(local.x, local.y);
       if (entity) showEntityInfo(describeInspectableEntity(entity));
+      return;
+    }
+
+    if (toolMode === "raise" || toolMode === "lower") {
+      const tile = renderer.pickTile(local.x, local.y);
+      if (tile) applyTerrainEditAt(tile);
       return;
     }
 
@@ -537,8 +546,6 @@ async function bootstrap(world: WorldDefinition) {
       playMiracleSound("flood");
       return;
     }
-
-    applyTerrainEditAt(vertex);
   };
 
   // A short tap applies the selected tool; dragging beyond DRAG_THRESHOLD
@@ -552,14 +559,14 @@ async function bootstrap(world: WorldDefinition) {
   // "ブラシ" continuous terraforming (see plan/0054-terraform-brush.md):
   // holding a single press still for LONG_PRESS_DURATION_MS — long enough
   // that it hasn't already turned into a pan — engages painting, so every
-  // vertex the pointer then passes over gets edited once. Flattening a
+  // tile the pointer then passes over gets edited once. Flattening a
   // wide area becomes one smooth gesture instead of many precise
   // individual taps. Restricted to the "raise"/"lower" tools (checked at
   // each call site below): every other toolMode is a single deliberate,
   // often expensive miracle cast that a drag should never be able to repeat.
   let longPressTimer: ReturnType<typeof setTimeout> | undefined;
   let painting = false;
-  let lastPaintedVertex: { x: number; y: number } | undefined;
+  let lastPaintedTile: { x: number; y: number } | undefined;
 
   const clearLongPressTimer = () => {
     if (longPressTimer === undefined) return;
@@ -570,7 +577,7 @@ async function bootstrap(world: WorldDefinition) {
   const stopPainting = () => {
     clearLongPressTimer();
     painting = false;
-    lastPaintedVertex = undefined;
+    lastPaintedTile = undefined;
   };
 
   // A second finger switches to rotating/pinch-zooming the map instead of
@@ -674,10 +681,10 @@ async function bootstrap(world: WorldDefinition) {
           painting = true;
           vibrate(10); // brief confirmation that painting just engaged
           const local = renderer.view.toLocal(event.global);
-          const vertex = renderer.pickVertex(local.x, local.y);
-          if (vertex) {
-            applyTerrainEditAt(vertex);
-            lastPaintedVertex = vertex;
+          const tile = renderer.pickTile(local.x, local.y);
+          if (tile) {
+            applyTerrainEditAt(tile);
+            lastPaintedTile = tile;
           }
         }, LONG_PRESS_DURATION_MS);
       }
@@ -708,14 +715,14 @@ async function bootstrap(world: WorldDefinition) {
 
     if (painting) {
       const local = renderer.view.toLocal(event.global);
-      const vertex = renderer.pickVertex(local.x, local.y);
-      // Only edits when the pointer has moved onto a *different* vertex
+      const tile = renderer.pickTile(local.x, local.y);
+      // Only edits when the pointer has moved onto a *different* tile
       // than the last one painted this stroke — otherwise holding still
       // would keep re-editing (and re-charging mana for) the same spot
       // every single pointermove event.
-      if (vertex && (!lastPaintedVertex || vertex.x !== lastPaintedVertex.x || vertex.y !== lastPaintedVertex.y)) {
-        applyTerrainEditAt(vertex);
-        lastPaintedVertex = vertex;
+      if (tile && (!lastPaintedTile || tile.x !== lastPaintedTile.x || tile.y !== lastPaintedTile.y)) {
+        applyTerrainEditAt(tile);
+        lastPaintedTile = tile;
       }
       return;
     }

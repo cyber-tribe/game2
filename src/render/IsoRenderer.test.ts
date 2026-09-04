@@ -277,6 +277,48 @@ describe("IsoRenderer.redraw (terraced blocks)", () => {
   });
 });
 
+describe("IsoRenderer.pickTile", () => {
+  it("picks the tile whose center is closest to the tapped point", () => {
+    const heightmap = flatHeightmap(4, 4, 5);
+    const renderer = new IsoRenderer(heightmap);
+    const center = renderer.project(2.5, 2.5); // exact center of tile (2, 2)
+
+    expect(renderer.pickTile(center.sx, center.sy)).toEqual({ x: 2, y: 2 });
+  });
+
+  it("returns a whole tile even when the tap lands off-center within it", () => {
+    const heightmap = flatHeightmap(4, 4, 5);
+    const renderer = new IsoRenderer(heightmap);
+    const center = renderer.project(2.5, 2.5);
+
+    // A few screen px off the exact center — still well within tile (2, 2),
+    // nowhere near tile (1, 1) or (3, 3)'s own centers.
+    expect(renderer.pickTile(center.sx + 5, center.sy + 3)).toEqual({ x: 2, y: 2 });
+  });
+
+  it("returns null past maxDistance from every tile center", () => {
+    const heightmap = flatHeightmap(4, 4, 5);
+    const renderer = new IsoRenderer(heightmap);
+
+    expect(renderer.pickTile(10_000, 10_000)).toBeNull();
+  });
+
+  it("follows a raised tile's own elevation, not the flat (elevation-0) projection", () => {
+    const heightmap = flatHeightmap(4, 4, 0);
+    heightmap.vertices[2][2] = 10;
+    heightmap.vertices[2][3] = 10;
+    heightmap.vertices[3][2] = 10;
+    heightmap.vertices[3][3] = 10;
+    const renderer = new IsoRenderer(heightmap);
+
+    // toScreen(2.5, 2.5, 0) would land well below where the raised tile's
+    // face (toScreen(2.5, 2.5, 10)) actually renders on screen — picking
+    // must follow the real elevation, not assume everything is flat.
+    const raisedCenter = renderer.project(2.5, 2.5);
+    expect(renderer.pickTile(raisedCenter.sx, raisedCenter.sy)).toEqual({ x: 2, y: 2 });
+  });
+});
+
 describe("volcanoGlowIntensity", () => {
   it("is zero once rockHardness has fully cooled, regardless of the pulse phase", () => {
     for (let t = 0; t < 3; t += 0.3) {
