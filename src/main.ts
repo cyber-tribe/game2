@@ -1,4 +1,5 @@
 import { Application, Container, Rectangle, type FederatedPointerEvent } from "pixi.js";
+import { playMiracleSound } from "./audio/miracleSounds";
 import {
   ARMAGEDDON_MANA_COST,
   EARTHQUAKE_MANA_COST,
@@ -182,6 +183,7 @@ async function bootstrap() {
   const onEnemyAction = (event: EnemyMiracleEvent) => {
     showEnemyEventToast(describeMatchEvent(event.type, "enemy"));
     triggerShake(ENEMY_SHAKE_MAGNITUDE[event.type]);
+    playMiracleSound(event.type);
   };
 
   const matchRecordPanel = document.getElementById("match-record");
@@ -322,6 +324,7 @@ async function bootstrap() {
       simulation.moveShrine("player", vertex);
       simulation.recordEvent("player", "shrineMove");
       vibrate(15);
+      playMiracleSound("shrineMove");
       return;
     }
 
@@ -332,6 +335,7 @@ async function bootstrap() {
       simulation.recordEvent("player", "earthquake");
       triggerShake(6);
       vibrate(40);
+      playMiracleSound("earthquake");
       return;
     }
 
@@ -340,6 +344,7 @@ async function bootstrap() {
       createSwamp(simulation.world, vertex.x, vertex.y);
       simulation.recordEvent("player", "swamp");
       vibrate(25);
+      playMiracleSound("swamp");
       return;
     }
 
@@ -351,6 +356,7 @@ async function bootstrap() {
       simulation.recordEvent("player", "volcano");
       triggerShake(8);
       vibrate([40, 30, 60]);
+      playMiracleSound("volcano");
       return;
     }
 
@@ -360,6 +366,7 @@ async function bootstrap() {
       simulation.knightify("player");
       simulation.recordEvent("player", "knight");
       vibrate(30);
+      playMiracleSound("knight");
       return;
     }
 
@@ -370,6 +377,7 @@ async function bootstrap() {
       simulation.recordEvent("player", "armageddon");
       triggerShake(10);
       vibrate([60, 40, 60, 40, 100]);
+      playMiracleSound("armageddon");
       return;
     }
 
@@ -382,6 +390,7 @@ async function bootstrap() {
       simulation.recordEvent("player", "flood");
       triggerShake(5);
       vibrate(50);
+      playMiracleSound("flood");
       return;
     }
 
