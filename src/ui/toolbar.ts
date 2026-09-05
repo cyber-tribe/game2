@@ -3,6 +3,7 @@ import type { BehaviorMode } from "../game/components";
 export type ToolMode =
   | "raise"
   | "lower"
+  | "flatten"
   | "shrine"
   | "earthquake"
   | "swamp"
