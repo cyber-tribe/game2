@@ -189,7 +189,7 @@ describe("Simulation", () => {
         const house = sim.world.createEntity();
         sim.world.add(house, Position, { x: 1, y: 1 });
         sim.world.add(house, Owner, { faction });
-        sim.world.add(house, House, { level: "castle", population: 0 }); // capacity 60, high manaRate
+        sim.world.add(house, House, { level: "castle", population: 0 }); // capacity 60
       }
     }
 

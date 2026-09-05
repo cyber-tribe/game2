@@ -5,11 +5,20 @@ import { HOUSE_LEVELS, HUT_MANA_RATE_CAP, MAX_MANA } from "../constants";
 import { createFaction } from "../faction";
 import { manaSystem } from "./mana";
 
-function createHouse(world: World, faction: "player" | "enemy", level: keyof typeof HOUSE_LEVELS) {
+// Defaults to full population (capacity) so a plain createHouse(...) call
+// reads as "a fully-grown house at this level", matching the manaRate it
+// contributes at steady state — see manaSystem's own doc comment. Tests
+// that care about partial population pass it explicitly.
+function createHouse(
+  world: World,
+  faction: "player" | "enemy",
+  level: keyof typeof HOUSE_LEVELS,
+  population: number = HOUSE_LEVELS[level].capacity,
+) {
   const entity = world.createEntity();
   world.add(entity, Position, { x: 0, y: 0 });
   world.add(entity, Owner, { faction });
-  world.add(entity, House, { level, population: 0 });
+  world.add(entity, House, { level, population });
   return entity;
 }
 
@@ -118,5 +127,25 @@ describe("manaSystem", () => {
 
     const expectedRate = HUT_MANA_RATE_CAP + HOUSE_LEVELS.lodge.manaRate + HOUSE_LEVELS.castle.manaRate;
     expect(world.get(player, FactionState)!.mana).toBe(expectedRate);
+  });
+
+  it("produces no mana from a freshly settled house with nobody in it yet", () => {
+    const world = new World();
+    const player = createFaction(world, "player", { x: 0, y: 0 });
+    createHouse(world, "player", "castle", 0);
+
+    manaSystem(world, 10);
+
+    expect(world.get(player, FactionState)!.mana).toBe(0);
+  });
+
+  it("scales a house's mana contribution by its population fraction of capacity", () => {
+    const world = new World();
+    const player = createFaction(world, "player", { x: 0, y: 0 });
+    createHouse(world, "player", "manor", HOUSE_LEVELS.manor.capacity / 2);
+
+    manaSystem(world, 1);
+
+    expect(world.get(player, FactionState)!.mana).toBe(HOUSE_LEVELS.manor.manaRate / 2);
   });
 });
