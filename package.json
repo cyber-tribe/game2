@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "palette": "python3 tools/generate_palette.py",
-    "palette:check": "python3 tools/generate_palette.py --check"
+    "palette:check": "python3 tools/generate_palette.py --check",
+    "sprites": "python3 tools/generate_sprites.py",
+    "sprites:check": "python3 tools/generate_sprites.py --check"
   },
   "dependencies": {
     "pixi.js": "^8.6.6"

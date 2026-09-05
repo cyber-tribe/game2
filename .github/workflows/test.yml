@@ -26,6 +26,12 @@ jobs:
       # fail here instead.
       - name: Check generated palette is current
         run: npm run palette:check
+      # The walker sprite atlas is generated from tools/sprites/ (see
+      # plan/0090). A PNG is opaque in a diff, so the reviewable artifact is
+      # the Python that draws it — this check is what makes trusting the
+      # committed binary safe.
+      - name: Check generated sprite atlas is current
+        run: npm run sprites:check
       - name: Typecheck
         run: npm run typecheck
       - name: Test

@@ -2,3 +2,7 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# Python bytecode from tools/ (see plan/0089, 0090)
+__pycache__/
+*.py[cod]

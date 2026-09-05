@@ -5,136 +5,18 @@ import { GAME_PALETTE } from "./palette";
 const P = GAME_PALETTE;
 
 /**
- * A pixel-art pattern: one string per row, one character per column.
- * '.' is transparent; any other character is a palette key resolved via
- * the `palette` passed to drawPixelPattern. Rows need not be equal
- * length short of the widest row (shorter rows are just padded on read).
- */
-type Pattern = readonly string[];
-type Palette = Record<string, number>;
-
-/**
  * The 4 isometric movement directions a walker's own tile-space heading
  * quantizes to — see facingFor() in EntityLayer.ts. These match the 4
  * screen-space diagonals a 2:1 iso projection produces from the 4
  * tile-axis directions (±x, ±y), which is also why they're named the same
  * way as the terrain/camera's own compass directions rather than
  * "up/down/left/right".
+ *
+ * "S*" faces toward the camera (front/eyes visible), "N*" away; "*W" is the
+ * horizontal mirror of its "*E" counterpart. The walker art itself lives in
+ * tools/sprites/walkers.py now, which reads the name the same way.
  */
 export type Facing = "NE" | "NW" | "SE" | "SW";
-
-/**
- * "S*" directions face toward the camera (their front/eyes are visible);
- * "N*" face away (their back is to the camera) — see FRONT/BACK patterns
- * below. "*W" directions are the horizontal mirror of their "*E"
- * counterpart (see the `mirror` param on drawPixelPattern).
- */
-function facingParts(facing: Facing): { towardCamera: boolean; mirror: boolean } {
-  return { towardCamera: facing[0] === "S", mirror: facing[1] === "W" };
-}
-
-// Front (toward camera) has a small dark eye-pixel; back doesn't. Only the
-// stepping frame's arm is asymmetric (poking out to one side), so a
-// mirrored "*W" step reads as a genuinely different pose from its "*E"
-// counterpart, not just a recolor — the arm is what actually sells the
-// walking direction; a standing person can look symmetric either way.
-const WALKER_FRONT_STAND: Pattern = [".HHH.", ".HEH.", ".CCC.", ".CCC.", ".CCC.", ".T.T.", ".T.T."];
-const WALKER_FRONT_STEP: Pattern = [".HHH.", ".HEH.", "ACCC.", ".CCC.", ".CCC.", "T...T", ".T.T."];
-const WALKER_BACK_STAND: Pattern = [".HHH.", ".HHH.", ".CCC.", ".CCC.", ".CCC.", ".T.T.", ".T.T."];
-const WALKER_BACK_STEP: Pattern = [".HHH.", ".HHH.", "ACCC.", ".CCC.", ".CCC.", "T...T", ".T.T."];
-
-/**
- * Draws a Pattern as a grid of filled squares ("pixels"), anchored so the
- * pattern's horizontal center sits at `centerX` and its bottom row sits
- * at `bottomY` — the same anchor EntityLayer already projects walkers/
- * houses onto (their ground point). `pixelSize` is derived by the caller
- * from the pattern's own width so every house level keeps roughly its
- * existing on-screen footprint regardless of how many columns its
- * pattern has. `mirror` flips the pattern horizontally (see Facing).
- */
-function drawPixelPattern(
-  g: Graphics,
-  pattern: Pattern,
-  palette: Palette,
-  centerX: number,
-  bottomY: number,
-  pixelSize: number,
-  mirror = false,
-): void {
-  const cols = Math.max(...pattern.map((row) => row.length));
-  const rows = pattern.length;
-  const left = centerX - (cols * pixelSize) / 2;
-  const top = bottomY - rows * pixelSize;
-
-  for (let y = 0; y < rows; y++) {
-    const row = pattern[y];
-    for (let x = 0; x < cols; x++) {
-      const key = row[x];
-      if (!key || key === ".") continue;
-      const color = palette[key];
-      if (color === undefined) continue;
-      const col = mirror ? cols - 1 - x : x;
-      g.rect(left + col * pixelSize, top + y * pixelSize, pixelSize, pixelSize).fill(color);
-    }
-  }
-}
-
-/** A walker's own fixed skin/boot tones — only its clothing (`bodyColor`) varies by faction/hero. */
-const WALKER_SKIN_COLOR = 0xe0b88a;
-const WALKER_BOOT_COLOR = P.ink;
-
-export interface WalkerAppearance {
-  facing: Facing;
-  stepping: boolean;
-  /** Faction color, or a hero color (KNIGHT_COLOR/GUARDIAN_COLOR) for a promoted walker. */
-  bodyColor: number;
-  /** A slightly bigger silhouette plus a small plume — see plan/0086, replacing the old white halo. */
-  isLeader?: boolean;
-  /**
-   * Changes the walker's own silhouette (a small blade or shield mark),
-   * not just its color — per plan/0086's "Heroを単なるWalkerの色替えとして
-   * 扱わない".
-   */
-  heroKind?: "knight" | "guardian";
-}
-
-/**
- * Draws a pixel-art walker (a small person) instead of a plain circle or
- * (before plan/0086) a single always-front-facing pattern. `stepping`
- * picks between the walk-cycle frames; `facing` picks a front/back pose
- * and its mirror (see Facing) so the sprite visibly turns to face where
- * it's actually walking.
- */
-export function drawWalkerSprite(g: Graphics, centerX: number, groundY: number, scale: number, appearance: WalkerAppearance): void {
-  const { towardCamera, mirror } = facingParts(appearance.facing);
-  const pattern = towardCamera
-    ? appearance.stepping
-      ? WALKER_FRONT_STEP
-      : WALKER_FRONT_STAND
-    : appearance.stepping
-      ? WALKER_BACK_STEP
-      : WALKER_BACK_STAND;
-  const palette: Palette = { H: WALKER_SKIN_COLOR, E: P.ink, C: appearance.bodyColor, A: appearance.bodyColor, T: WALKER_BOOT_COLOR };
-
-  drawPixelPattern(g, pattern, palette, centerX, groundY, scale, mirror);
-
-  if (appearance.isLeader) {
-    // A small plume above the head — per plan/0086, replacing the old
-    // world-space halo circle so a leader is recognizable from its own
-    // sprite alone.
-    g.rect(centerX - scale * 0.5, groundY - scale * 8.5, scale, scale * 1.5).fill(appearance.bodyColor);
-  }
-
-  if (appearance.heroKind === "knight") {
-    // A small blade held up on the (unmirrored) right side.
-    const x = mirror ? centerX - scale * 2.5 : centerX + scale * 1.5;
-    g.rect(x, groundY - scale * 6.5, scale * 0.6, scale * 4).fill(P.stoneLight);
-  } else if (appearance.heroKind === "guardian") {
-    // A small shield block on the same side.
-    const x = mirror ? centerX - scale * 2.8 : centerX + scale * 1.8;
-    g.rect(x, groundY - scale * 4.5, scale * 1.2, scale * 2).fill(P.bronzeMid);
-  }
-}
 
 /** A screen-space point, local to a building's own (centerX, groundY) anchor. */
 interface Pt {

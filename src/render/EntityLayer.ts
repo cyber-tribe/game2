@@ -1,4 +1,4 @@
-import { Container, Graphics } from "pixi.js";
+import { Container, Graphics, Sprite } from "pixi.js";
 import { FactionState, House, MoveTarget, Owner, Position, Swamp, Walker, type FactionId } from "../game/components";
 import type { Entity, World } from "../ecs";
 import { FARMLAND_RADIUS, IMPACT_EFFECT_DURATION } from "../game/constants";
@@ -7,7 +7,8 @@ import type { ImpactEffectSnapshot, ImpactEffectType } from "../game/systems/eff
 import { GAME_PALETTE } from "./palette";
 import { type IsoRenderer } from "./IsoRenderer";
 import { createDitherTexture } from "./patternTexture";
-import { drawHouseSprite, drawWalkerSprite, type Facing } from "./pixelArt";
+import { drawHouseSprite, type Facing } from "./pixelArt";
+import { loadWalkerSprites, walkerFrameKey, walkerPose, walkerTexture } from "./walkerSprites";
 
 /**
  * Deterministic pseudo-random value in [0, 1) for a tile's (x, y) — fixes
@@ -37,14 +38,22 @@ export function facingFor(dx: number, dy: number): Facing {
   return dy >= 0 ? "SW" : "NE";
 }
 
+/**
+ * Houses and their flags. These were a brighter, uncalibrated pair of
+ * literals until the palette became single-sourced (plan/archived/0089):
+ * the accents below are sampled from the original, and its blue is the
+ * original's own faction blue. Walkers read the same two colors, but bake
+ * them into their sprite atlas rather than tinting at runtime — see
+ * tools/sprites/walkers.py's FACTIONS.
+ */
 const FACTION_COLOR: Record<FactionId, number> = {
-  player: 0x4fa8ff,
-  enemy: 0xd94f4f,
+  player: GAME_PALETTE.playerAccent,
+  enemy: GAME_PALETTE.enemyAccent,
 };
 
-/** Pixel size of one "pixel" in a walker's sprite (see pixelArt.ts's WALKER_PATTERN, 5 cols wide). */
+/** On-screen size of one art pixel of a walker's sprite (the atlas is authored 5x9 — see tools/sprites/walkers.py). */
 const WALKER_PIXEL_SIZE = 1.3;
-/** A leader's own sprite renders bigger, plus a small plume (see drawWalkerSprite) — replaces the old halo circle. */
+/** A leader's own sprite renders bigger, plus a small plume baked into its frames — replaces the old halo circle. */
 const LEADER_PIXEL_SIZE = WALKER_PIXEL_SIZE * 1.8;
 /**
  * Swamp used to be a translucent purple overlay (a hazard-radius marker,
@@ -155,7 +164,24 @@ export function impactEffectVisual(
 /** Draws every Swamp/Walker/House in the ECS world onto the isometric map. */
 export class EntityLayer {
   readonly view = new Container();
+  /** Farmland, swamp and houses — everything drawn *under* the walkers. */
   private readonly graphics = new Graphics();
+  /**
+   * Walkers, as textured quads from the sprite atlas rather than the
+   * immediate-mode rects they used to be (plan/0090). A separate Container
+   * between the two Graphics keeps the old draw order intact: ground and
+   * buildings below, impact effects above.
+   */
+  private readonly walkerLayer = new Container();
+  /** Impact effects — drawn *over* the walkers, as they were before. */
+  private readonly effects = new Graphics();
+  /**
+   * Reused Sprite instances, one per walker drawn this frame. Pooled by
+   * index rather than keyed by entity: walkers are created and destroyed
+   * constantly (settling, drowning, combat), and an entity-keyed map would
+   * need its own eviction pass to avoid leaking a Sprite per dead walker.
+   */
+  private readonly walkerPool: Sprite[] = [];
   private elapsedTime = 0;
   /**
    * Each walker's last-known facing, kept across frames — a walker with no
@@ -166,13 +192,23 @@ export class EntityLayer {
   private readonly lastFacing = new Map<Entity, Facing>();
 
   constructor(private readonly iso: IsoRenderer) {
-    this.view.addChild(this.graphics);
+    this.view.addChild(this.graphics, this.walkerLayer, this.effects);
+  }
+
+  /**
+   * Parses the walker sprite atlas. Awaited during startup (see main.ts) so
+   * the first frame already has textures; update() renders walkers as soon
+   * as it resolves and simply skips them before that.
+   */
+  static loadAssets(): Promise<void> {
+    return loadWalkerSprites();
   }
 
   update(world: World, deltaSeconds = 0, impactEffects: readonly ImpactEffectSnapshot[] = []): void {
     this.elapsedTime += deltaSeconds;
     const g = this.graphics;
     g.clear();
+    this.effects.clear();
 
     // Farmland (see docs/game-system.md 5節's "家の周囲は農地になり、視覚的に
     // 勢力圏を示す") drawn first, under everything else, so it reads as
@@ -274,6 +310,7 @@ export class EntityLayer {
       drawHouseSprite(g, sx, sy, house.level, FACTION_COLOR[owner.faction]);
     }
 
+    let drawnWalkers = 0;
     for (const entity of world.query(Position, Walker, Owner)) {
       const pos = world.get(entity, Position)!;
       const owner = world.get(entity, Owner)!;
@@ -289,21 +326,48 @@ export class EntityLayer {
       const facing = target ? facingFor(target.x - pos.x, target.y - pos.y) : (this.lastFacing.get(entity) ?? "SE");
       this.lastFacing.set(entity, facing);
 
-      drawWalkerSprite(g, sx, sy - bob, pixelSize, {
-        facing,
-        stepping,
-        bodyColor: FACTION_COLOR[owner.faction],
-        isLeader,
-        heroKind,
-      });
+      const texture = walkerTexture(walkerFrameKey(owner.faction, walkerPose(isLeader, heroKind), facing, stepping));
+      if (!texture) continue;
+
+      const sprite = this.walkerSprite(drawnWalkers++);
+      sprite.texture = texture;
+      // Anchored bottom-center: (sx, sy) is the walker's ground point, the
+      // same anchor drawWalkerSprite used before, and every atlas frame puts
+      // the feet on its bottom row (see tools/sprites/walkers.py).
+      sprite.position.set(sx, sy - bob);
+      sprite.scale.set(pixelSize);
     }
 
+    // Pooled sprites past the walker count belong to walkers that have since
+    // died or left; hide rather than destroy them, since the count churns
+    // every few frames and the objects are cheap to keep.
+    for (let i = drawnWalkers; i < this.walkerPool.length; i++) this.walkerPool[i].visible = false;
+
+    const fx = this.effects;
     for (const effect of impactEffects) {
       const { sx, sy } = this.iso.project(effect.position.x, effect.position.y);
       const { color, radius, alpha } = impactEffectVisual(effect.type, effect.age);
       if (alpha <= 0 || radius <= 0) continue;
 
-      g.circle(sx, sy, radius).stroke({ width: 2, color, alpha });
+      fx.circle(sx, sy, radius).stroke({ width: 2, color, alpha });
     }
   }
+
+  /**
+   * The pooled Sprite for the nth walker drawn this frame, created on first
+   * use. Anchor and parent are set once here rather than per frame, since a
+   * pooled sprite keeps them for its whole life.
+   */
+  private walkerSprite(index: number): Sprite {
+    let sprite = this.walkerPool[index];
+    if (!sprite) {
+      sprite = new Sprite();
+      sprite.anchor.set(0.5, 1);
+      this.walkerPool[index] = sprite;
+      this.walkerLayer.addChild(sprite);
+    }
+    sprite.visible = true;
+    return sprite;
+  }
+
 }
