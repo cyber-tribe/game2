@@ -181,8 +181,8 @@ Walker
 House
   ├ faction, pos
   ├ level              … 小屋〜城砦
-  ├ population         … 蓄積人口 (満杯でウォーカー輩出)
-  └ manaRate           … レベル依存のマナ供給量
+  └ population         … 蓄積人口 (満杯でウォーカー輩出、マナ供給量はレベル別
+                          上限値にpopulation/capacityを掛けた分だけ発生)
 
 Simulation (tick駆動)
   ├ ウォーカーAI (探索/建築/合流/戦闘)
