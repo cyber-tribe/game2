@@ -63,10 +63,23 @@ describe("createEnemyAiSystem", () => {
     expect(world.get(enemy, FactionState)!.behaviorMode).toBe("fight");
   });
 
-  it("stays in settle mode below the aggression threshold", () => {
+  it("gathers (to build a leader) below the aggression threshold when it has no leader yet", () => {
     const world = new World();
     const enemy = createFaction(world, "enemy", { x: 0, y: 0 }, "fight");
     addWalkers(world, 1);
+
+    const system = createEnemyAiSystem({ decisionInterval: 5, aggressionThreshold: 4 });
+    system(world, 5);
+
+    expect(world.get(enemy, FactionState)!.behaviorMode).toBe("gather");
+  });
+
+  it("settles instead of gathering below the aggression threshold once it already has a leader", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 }, "fight");
+    addWalkers(world, 1);
+    const [leader] = world.query(Walker, Owner);
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, leaderId: leader });
 
     const system = createEnemyAiSystem({ decisionInterval: 5, aggressionThreshold: 4 });
     system(world, 5);
@@ -88,8 +101,8 @@ describe("createEnemyAiSystem", () => {
     system(world, 4); // not yet due
     expect(world.get(enemy, FactionState)!.behaviorMode).toBe("fight");
 
-    system(world, 1); // now due, walker count is 0
-    expect(world.get(enemy, FactionState)!.behaviorMode).toBe("settle");
+    system(world, 1); // now due, walker count is 0, and it never had a leader
+    expect(world.get(enemy, FactionState)!.behaviorMode).toBe("gather");
   });
 
   it("does nothing when the target faction doesn't exist", () => {
@@ -112,7 +125,7 @@ describe("createEnemyAiSystem", () => {
     expect(world.get(enemy, FactionState)!.behaviorMode).toBe("fight");
   });
 
-  it("stays in settle mode when an opponent walker is far from every house", () => {
+  it("gathers instead of fighting when an opponent walker is far from every house", () => {
     const world = new World();
     const enemy = createFaction(world, "enemy", { x: 0, y: 0 }, "fight");
     addWalkers(world, 1);
@@ -122,7 +135,7 @@ describe("createEnemyAiSystem", () => {
     const system = createEnemyAiSystem({ decisionInterval: 5, aggressionThreshold: 4, threatRadius: 4 });
     system(world, 5);
 
-    expect(world.get(enemy, FactionState)!.behaviorMode).toBe("settle");
+    expect(world.get(enemy, FactionState)!.behaviorMode).toBe("gather");
   });
 
   it("never overrides behaviorMode once finalBattle is set, even past the aggression threshold", () => {

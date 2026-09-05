@@ -45,7 +45,9 @@ describe("Simulation", () => {
       enemyDecisionInterval: 1,
     });
     passive.update(0.1);
-    expect(passive.summarize().find((s) => s.id === "enemy")!.behaviorMode).toBe("settle");
+    // Not aggressive enough to fight, and it has no leader yet either — see
+    // enemyAi.ts's own gather-until-a-leader-exists step.
+    expect(passive.summarize().find((s) => s.id === "enemy")!.behaviorMode).toBe("gather");
   });
 
   it("lists every walker as an InspectableEntity with its faction/strength/state", () => {
@@ -476,8 +478,24 @@ describe("Simulation", () => {
     expect(isRock(heightmap, pos.x, pos.y)).toBe(true);
   });
 
-  it("assigns a leader to each faction on the first tick", () => {
+  it("assigns the player no leader under the default settle mode, even after several ticks", () => {
+    // Scoped to the player only: the enemy's own AI proactively gathers a
+    // leader for itself once it isn't aggressive enough to fight (see
+    // enemyAi.ts) — only the player's behaviorMode is purely manual here.
     const sim = new Simulation({ worldWidth: 20, worldHeight: 20 });
+    for (let i = 0; i < 10; i++) sim.update(0.1);
+
+    const [playerState] = sim.world.query(FactionState).filter((e) => sim.world.get(e, FactionState)!.id === "player");
+    expect(sim.world.get(playerState, FactionState)!.leaderId).toBeUndefined();
+  });
+
+  it("assigns a leader to each faction once gather mode is selected", () => {
+    const sim = new Simulation({ worldWidth: 20, worldHeight: 20 });
+    sim.setBehaviorMode("player", "gather");
+    sim.setBehaviorMode("enemy", "gather");
+    // Initial walkers spawn right at their own faction's shrine, so gather
+    // mode should grab one as leader almost immediately — same as a
+    // Populous villager already standing by the flag when it's raised.
     sim.update(0.001);
 
     const leaderIds = sim.world.query(FactionState).map((entity) => sim.world.get(entity, FactionState)!.leaderId);
@@ -487,6 +505,10 @@ describe("Simulation", () => {
 
   it("under goToShrine mode, walks a lone leader to a relocated shrine and settles it there", () => {
     const sim = new Simulation({ worldWidth: 20, worldHeight: 20, initialWalkersPerFaction: 1 });
+    // The lone walker starts right at the (not yet relocated) shrine, so a
+    // brief gather pass promotes it to leader before goToShrine needs one.
+    sim.setBehaviorMode("player", "gather");
+    sim.update(0.001);
     sim.setBehaviorMode("player", "goToShrine");
     const shrine = { x: 5, y: 5 };
     sim.moveShrine("player", shrine);
@@ -504,7 +526,10 @@ describe("Simulation", () => {
 
   it("a knighted leader hunts down the enemy regardless of behaviorMode, and survives the kill", () => {
     const sim = new Simulation({ worldWidth: 4, worldHeight: 4, initialWalkersPerFaction: 1 });
-    sim.update(0.001); // let leaderSystem assign a leader to each faction first
+    // The lone walker starts right at its own faction's shrine, so a brief
+    // gather pass promotes it to leader before knightify needs one.
+    sim.setBehaviorMode("player", "gather");
+    sim.update(0.001);
     sim.knightify("player");
 
     const [playerWalker] = sim.world.query(Walker, Owner).filter((e) => sim.world.get(e, Owner)!.faction === "player");
@@ -537,7 +562,15 @@ describe("Simulation", () => {
   });
 
   it("armageddon abandons every house, sends both factions to the center, and forces the game to a conclusion", () => {
-    const sim = new Simulation({ worldWidth: 20, worldHeight: 20, initialWalkersPerFaction: 1 });
+    // A heightmap keeps createWanderTargetSystem's pre-armageddon wandering
+    // clamped to the map's own bounds (see wanderTarget.ts's clampToBounds,
+    // which only runs when a heightmap is given) — without one, a walker
+    // can occasionally drift arbitrarily far during the 150-tick warmup
+    // below, making its march back to the center at FINAL_BATTLE_WALKER_
+    // SPEED unpredictably (and, rarely, unreachably) long within this
+    // test's fixed tick budget.
+    const heightmap = flatHeightmap(20, 20, 5);
+    const sim = new Simulation({ worldWidth: 20, worldHeight: 20, initialWalkersPerFaction: 1, heightmap });
 
     for (let i = 0; i < 150; i++) sim.update(0.1); // let each faction's lone walker settle into a house
     expect(sim.world.query(House).length).toBeGreaterThan(0);

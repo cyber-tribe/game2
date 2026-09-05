@@ -24,6 +24,7 @@ import { createEnemyMiracleSystem, type EnemyMiracleEvent } from "./systems/enem
 import { createEnemyTerraformSystem } from "./systems/enemyTerraform";
 import { fightTargetingSystem } from "./systems/fightTargeting";
 import { gatherSystem } from "./systems/gather";
+import { gatherTargetingSystem } from "./systems/gatherTargeting";
 import { goToShrineSystem } from "./systems/goToShrine";
 import { createHouseGrowthSystem } from "./systems/houseGrowth";
 import { createHouseUpgradeSystem } from "./systems/houseUpgrade";
@@ -203,6 +204,7 @@ export class Simulation {
       .add(leaderSystem)
       .add(fightTargetingSystem)
       .add(goToShrineSystem)
+      .add(gatherTargetingSystem)
       .add(knightTargetingSystem)
       .add(knightCooldownSystem)
       .add(createWanderTargetSystem({ heightmap: config.heightmap }))

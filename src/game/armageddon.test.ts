@@ -67,4 +67,33 @@ describe("triggerArmageddon", () => {
 
     expect(() => triggerArmageddon(world, { x: 5, y: 5 })).not.toThrow();
   });
+
+  it("force-appoints a leader for a faction that never gathered one, so goToShrine has someone to march", () => {
+    const world = new World();
+    createFaction(world, "player", { x: 1, y: 1 }, "settle"); // never gathered — no leaderId yet
+    const walker = world.createEntity();
+    world.add(walker, Position, { x: 1, y: 1 });
+    world.add(walker, Owner, { faction: "player" });
+    world.add(walker, Walker, { strength: 1, state: "seeking", speed: 1 });
+
+    triggerArmageddon(world, { x: 5, y: 5 });
+
+    const [faction] = world.query(FactionState);
+    expect(world.get(faction, FactionState)!.leaderId).toBe(walker);
+  });
+
+  it("leaves an already-appointed, still-alive leader in place", () => {
+    const world = new World();
+    const leader = world.createEntity();
+    world.add(leader, Position, { x: 1, y: 1 });
+    world.add(leader, Owner, { faction: "player" });
+    world.add(leader, Walker, { strength: 1, state: "seeking", speed: 1 });
+    const faction = createFaction(world, "player", { x: 1, y: 1 }, "gather");
+    world.add(faction, FactionState, { ...world.get(faction, FactionState)!, leaderId: leader });
+    world.add(world.createEntity(), Owner, { faction: "player" }); // a decoy, unrelated entity
+
+    triggerArmageddon(world, { x: 5, y: 5 });
+
+    expect(world.get(faction, FactionState)!.leaderId).toBe(leader);
+  });
 });
