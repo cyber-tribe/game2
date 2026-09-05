@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
 import type { Heightmap } from "../../world/heightmap";
 import { FactionState, House, Owner, Position, Walker } from "../components";
-import { ARMAGEDDON_MANA_COST, EARTHQUAKE_MANA_COST, GUARDIAN_MANA_COST, KNIGHT_MANA_COST, VOLCANO_MANA_COST } from "../constants";
+import {
+  ARMAGEDDON_MANA_COST,
+  ARMAGEDDON_POPULATION_RATIO,
+  EARTHQUAKE_MANA_COST,
+  GUARDIAN_MANA_COST,
+  KNIGHT_MANA_COST,
+  VOLCANO_MANA_COST,
+  VOLCANO_POPULATION_RATIO,
+} from "../constants";
 import { createFaction } from "../faction";
 import { createEnemyMiracleSystem } from "./enemyMiracles";
 
@@ -437,5 +445,132 @@ describe("createEnemyMiracleSystem", () => {
     system(world, 4); // interval not yet elapsed
 
     expect(world.get(enemy, FactionState)!.mana).toBe(EARTHQUAKE_MANA_COST);
+  });
+});
+
+describe("createEnemyMiracleSystem personality tuning", () => {
+  it("an aggressive personality escalates to volcano with a smaller lead than balanced would require", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: VOLCANO_MANA_COST });
+    createFaction(world, "player", { x: 9, y: 9 });
+    createHouse(world, "enemy", 0, 0, 12);
+    createHouse(world, "player", 5, 5, 10); // ratio 1.2 -> below VOLCANO_POPULATION_RATIO (1.3), but above aggressive's 1.3*0.85=1.105
+
+    const events: unknown[] = [];
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap: flatHeightmap(10, 10, 5),
+      worldCenter: WORLD_CENTER,
+      rng: () => 0,
+      personality: "aggressive",
+      onAction: (event) => events.push(event),
+    })(world, 8);
+
+    expect(events).toEqual([{ type: "volcano", position: { x: 5, y: 5 } }]);
+  });
+
+  it("a defensive personality holds off on volcano at a lead balanced would already act on", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: VOLCANO_MANA_COST });
+    createFaction(world, "player", { x: 9, y: 9 });
+    createHouse(world, "enemy", 0, 0, 13);
+    const target = createHouse(world, "player", 5, 5, 10); // ratio 1.3 -> meets VOLCANO_POPULATION_RATIO, short of defensive's 1.3*1.3=1.69
+
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap: flatHeightmap(10, 10, 5),
+      worldCenter: WORLD_CENTER,
+      rng: () => 0,
+      personality: "defensive",
+    })(world, 8);
+
+    expect(world.isAlive(target)).toBe(true); // no volcano landed on it
+    // Falls through to the cheaper earthquake instead.
+    expect(world.get(enemy, FactionState)!.mana).toBe(VOLCANO_MANA_COST - EARTHQUAKE_MANA_COST);
+  });
+
+  it("an aggressive personality knights its leader where balanced would prefer guardian", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 }, "fight");
+    const leader = createWalker(world, "enemy");
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: KNIGHT_MANA_COST, leaderId: leader });
+    createHouse(world, "enemy", 0, 0, 8);
+    createFaction(world, "player", { x: 9, y: 9 });
+    createHouse(world, "player", 9, 9, 10); // ratio (8+1 leader)/10 = 0.9 -> "behind" under balanced (<1), but not under aggressive's <0.7
+
+    const events: unknown[] = [];
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap: flatHeightmap(10, 10, 5),
+      worldCenter: WORLD_CENTER,
+      personality: "aggressive",
+      onAction: (event) => events.push(event),
+    })(world, 8);
+
+    expect(world.get(leader, Walker)!.state).toBe("knight");
+    expect(events).toEqual([{ type: "knight" }]);
+  });
+
+  it("a defensive personality guardians its leader where balanced would prefer knight", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 }, "fight");
+    const leader = createWalker(world, "enemy");
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: GUARDIAN_MANA_COST, leaderId: leader });
+    createHouse(world, "enemy", 0, 0, 10);
+    createFaction(world, "player", { x: 9, y: 9 });
+    createHouse(world, "player", 9, 9, 9); // ratio (10+1 leader)/9 ~= 1.22 -> "ahead" under balanced (>=1), but not under defensive's <1.3
+
+    const events: unknown[] = [];
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap: flatHeightmap(10, 10, 5),
+      worldCenter: WORLD_CENTER,
+      personality: "defensive",
+      onAction: (event) => events.push(event),
+    })(world, 8);
+
+    expect(world.get(leader, Walker)!.state).toBe("guardian");
+    expect(events).toEqual([{ type: "guardian" }]);
+  });
+
+  it("an aggressive personality triggers armageddon with a smaller lead than balanced would require", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: ARMAGEDDON_MANA_COST });
+    createFaction(world, "player", { x: 9, y: 9 });
+    createHouse(world, "enemy", 5, 5, 16);
+    createHouse(world, "player", 8, 8, 10); // ratio 1.6 -> below ARMAGEDDON_POPULATION_RATIO (1.8), above aggressive's 1.8*0.85=1.53
+
+    const events: unknown[] = [];
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      minArmageddonTime: 0,
+      heightmap: flatHeightmap(10, 10, 5),
+      worldCenter: WORLD_CENTER,
+      personality: "aggressive",
+      onAction: (event) => events.push(event),
+    })(world, 8);
+
+    expect(world.get(enemy, FactionState)!.finalBattle).toBe(true);
+    expect(events).toEqual([{ type: "armageddon" }]);
+  });
+
+  it("defaults to balanced (today's original, unbiased thresholds) when personality is omitted", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: VOLCANO_MANA_COST });
+    createFaction(world, "player", { x: 9, y: 9 });
+    createHouse(world, "enemy", 0, 0, 12);
+    const target = createHouse(world, "player", 5, 5, 10); // ratio 1.2 -> below VOLCANO_POPULATION_RATIO
+
+    createEnemyMiracleSystem({ decisionInterval: 8, heightmap: flatHeightmap(10, 10, 5), worldCenter: WORLD_CENTER, rng: () => 0 })(
+      world,
+      8,
+    );
+
+    expect(world.isAlive(target)).toBe(true); // unbiased threshold not met, no volcano
+    expect(ARMAGEDDON_POPULATION_RATIO).toBeGreaterThan(VOLCANO_POPULATION_RATIO); // sanity check on the fixtures above
   });
 });

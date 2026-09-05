@@ -3,6 +3,7 @@ import { playMiracleSound } from "./audio/miracleSounds";
 import {
   ARMAGEDDON_MANA_COST,
   EARTHQUAKE_MANA_COST,
+  ENEMY_PERSONALITY_LABELS,
   FLOOD_MANA_COST,
   GUARDIAN_MANA_COST,
   KNIGHT_MANA_COST,
@@ -264,6 +265,7 @@ async function bootstrap(world: WorldDefinition) {
     enemyDecisionInterval: world.enemyDecisionInterval,
     enemyAggressionThreshold: world.enemyAggressionThreshold,
     allowedMiracles: world.allowedMiracles,
+    enemyPersonality: world.enemyPersonality,
     onEnemyAction,
   });
 
@@ -900,6 +902,12 @@ function showWorldSelect(): void {
         const detail = document.createElement("span");
         detail.className = "world-select-detail";
         const ruleLabel = world.terrainEditRule !== "both" ? `・${TERRAIN_EDIT_RULE_LABELS[world.terrainEditRule]}` : "";
+        // Only called out when it deviates from "balanced" — like ruleLabel
+        // above, a personality that matches today's original, unbiased
+        // thresholds isn't worth a label of its own (see EnemyPersonality's
+        // doc comment in game/worlds.ts).
+        const personalityLabel =
+          world.enemyPersonality !== "balanced" ? `・敵の気質: ${ENEMY_PERSONALITY_LABELS[world.enemyPersonality]}` : "";
         // WORLDS is itself ordered by difficulty (see its own doc comment),
         // so the world's own position in the list doubles as a simple
         // difficulty indicator — no separate derived score needed. Map
@@ -907,7 +915,7 @@ function showWorldSelect(): void {
         // fixed 64x64 (see plan/0062-original-scale-map.md).
         detail.textContent = locked
           ? "パスワードが必要です"
-          : `${TERRAIN_LABELS[world.terrain]}${ruleLabel}・難易度${index + 1}/${WORLDS.length}`;
+          : `${TERRAIN_LABELS[world.terrain]}${ruleLabel}${personalityLabel}・難易度${index + 1}/${WORLDS.length}`;
 
         button.append(name, detail);
         if (!locked) {

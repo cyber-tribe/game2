@@ -93,6 +93,57 @@ describe("Simulation", () => {
     expect(unrestricted.getMatchEvents()).toContainEqual({ time: 1, faction: "enemy", type: "earthquake" });
   });
 
+  it("passes enemyPersonality through to the enemy's own hero-kind choice (see game/worlds.ts's EnemyPersonality)", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    const setUpBehindEnemy = (sim: Simulation): number => {
+      const [enemyState] = sim.world.query(FactionState).filter((e) => sim.world.get(e, FactionState)!.id === "enemy");
+      const leader = sim.world.createEntity();
+      sim.world.add(leader, Position, { x: 5, y: 5 });
+      sim.world.add(leader, Owner, { faction: "enemy" });
+      sim.world.add(leader, Walker, { strength: 1, state: "seeking", speed: 1 });
+      const enemyHouse = sim.world.createEntity();
+      sim.world.add(enemyHouse, Position, { x: 4, y: 4 });
+      sim.world.add(enemyHouse, Owner, { faction: "enemy" });
+      sim.world.add(enemyHouse, House, { level: "hut", population: 7 }); // + leader's own +1 = myPopulation 8
+      const playerHouse = sim.world.createEntity();
+      sim.world.add(playerHouse, Position, { x: 15, y: 15 });
+      sim.world.add(playerHouse, Owner, { faction: "player" });
+      sim.world.add(playerHouse, House, { level: "hut", population: 10 }); // ratio 8/10 = 0.8
+      sim.world.add(enemyState, FactionState, {
+        ...sim.world.get(enemyState, FactionState)!,
+        mana: 999,
+        behaviorMode: "fight",
+        leaderId: leader,
+      });
+      return leader;
+    };
+
+    const balanced = new Simulation({
+      worldWidth: 20,
+      worldHeight: 20,
+      heightmap,
+      initialWalkersPerFaction: 0,
+      enemyDecisionInterval: 1,
+      enemyAggressionThreshold: 1, // keeps createEnemyAiSystem's own read of "fight" from overriding the behaviorMode set below
+    });
+    const balancedLeader = setUpBehindEnemy(balanced);
+    balanced.update(1);
+    expect(balanced.world.get(balancedLeader, Walker)!.state).toBe("guardian"); // ratio 0.8 < 1 -> balanced already turtles
+
+    const aggressive = new Simulation({
+      worldWidth: 20,
+      worldHeight: 20,
+      heightmap,
+      initialWalkersPerFaction: 0,
+      enemyDecisionInterval: 1,
+      enemyAggressionThreshold: 1,
+      enemyPersonality: "aggressive",
+    });
+    const aggressiveLeader = setUpBehindEnemy(aggressive);
+    aggressive.update(1);
+    expect(aggressive.world.get(aggressiveLeader, Walker)!.state).toBe("knight"); // aggressive only turtles below ratio 0.7
+  });
+
   it("lists every walker as an InspectableEntity with its faction/strength/state", () => {
     const sim = new Simulation({ worldWidth: 20, worldHeight: 20, initialWalkersPerFaction: 2 });
 
