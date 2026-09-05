@@ -137,7 +137,7 @@ function shadeColor(color: number, brightness: number): number {
 /**
  * Sourced from GAME_PALETTE rather than its own hex literals, per the
  *改修指示's "ゲーム全体を限定された共通paletteで描画する" — and, since
- * plan/0088-palette-calibration.md, those values are sampled off the
+ * plan/archived/0088-palette-calibration.md, those values are sampled off the
  * original's own screenshots. Grass in particular is an olive/khaki, not
  * the spring green this renderer used to draw. Snow has no reference
  * screenshot to sample from (none of the 11 shows a snow map), so it stays
@@ -156,7 +156,7 @@ const WATER_COLOR = GAME_PALETTE.waterMid;
  * A single flat solid color read as "のっぺり" (flat, lifeless) next to the
  * original game's turf, which dithers between two tones in a fine speckle
  * rather than one uniform fill — see createDitherTexture. Originally only
- * grass got this treatment; plan/0087-terrain-texture-unification.md gives
+ * grass got this treatment; plan/archived/0087-terrain-texture-unification.md gives
  * every terrain its own dithered pattern instead of a flat fill, per
  * "全terrainに固有pixel patternを持たせる". Grass dithers between the
  * palette's own sampled mid and dark olive rather than an arbitrary

@@ -8,7 +8,9 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "palette": "python3 tools/generate_palette.py",
+    "palette:check": "python3 tools/generate_palette.py --check"
   },
   "dependencies": {
     "pixi.js": "^8.6.6"

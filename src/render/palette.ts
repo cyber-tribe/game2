@@ -10,7 +10,7 @@
  * this environment can't reach the reference screenshots online), the
  * stone/water/accent values are **sampled from original screenshots the
  * user pasted into the conversation**, quantized per-region and
- * cross-checked across all of them — see plan/0088-palette-calibration.md.
+ * cross-checked across all of them — see plan/archived/0088-palette-calibration.md.
  *
  * 1. The UI stone is a khaki sandstone ramp — #4d3c34 / #7f6f4d / #a1916f /
  *    #c4c492 — where #7f6f4d is by far the dominant tone (12% of the border
@@ -27,6 +27,8 @@
  * washed out by JPEG compression). Those olive tones live on as the desert
  * family below instead. Don't "recalibrate" grass back toward olive off a
  * dry-stage screenshot.
+ *
+ * @generated Do not edit by hand — edit tools/palette.json and run `npm run palette`.
  */
 export const GAME_PALETTE = {
   // Sandstone/limestone — the command panel's frame, background and bevels.
@@ -53,7 +55,7 @@ export const GAME_PALETTE = {
 
   // Ordinary turf — a fresh green, nudged very slightly toward the moss
   // hue the green-stage references show (~95°) rather than a pure spring
-  // green. See the note above before changing these.
+  // green. See the note at the top of this file before changing these.
   grassLight: 0x86b95a,
   grassMid: 0x4f8a35,
   grassDark: 0x35601f,
@@ -63,8 +65,8 @@ export const GAME_PALETTE = {
   waterDark: 0x004b63,
 
   /**
-   * Sampled off the original's dry/desert stages — the olive-khaki family
-   * an early pass mistook for ordinary grass. Also the farmland soil tone.
+   * Sampled off the original's dry/desert stages — the olive-khaki family an early pass mistook
+   * for ordinary grass. Also the farmland soil tone.
    */
   soilLight: 0x9f8c6d,
   soilMid: 0x7e683e,
@@ -78,7 +80,7 @@ export const GAME_PALETTE = {
   lavaDark: 0x8c2a12,
 
   // Faction accents — deliberately kept out of building/terrain fills (see
-  // plan/0085-isometric-house-sprites.md): used only for flags/banners/small
+  // plan/archived/0085-isometric-house-sprites.md): used only for flags/banners/small
   // UI swatches, never to tint whole structures or areas. The blue is the
   // original's own walker blue.
   playerAccent: 0x235ebc,

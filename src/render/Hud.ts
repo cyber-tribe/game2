@@ -5,7 +5,7 @@ import { Text } from "pixi.js";
  * active terrain-edit restriction. Controls live in the HTML command panel
  * (see src/ui/toolbar.ts), and per-faction mana/population now live in that
  * same panel's status row (see src/ui/statusPanel.ts) rather than here —
- * moved out per plan/0084-original-ui-foundation.md's "内部名称
+ * moved out per plan/archived/0084-original-ui-foundation.md's "内部名称
  * （player/enemy/walker/house）をプレイヤー画面に出さない": this used to
  * render a raw "player: mana 12.3 house 4 walker 2 (settle)" debug-style
  * line, which is exactly what that effort targets. The post-game "GAME

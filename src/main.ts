@@ -111,7 +111,7 @@ async function bootstrap(world: WorldDefinition) {
     // The off-map void. Deliberately the palette's darkest ink rather than
     // the navy this project started with: a blue void behind a sandstone UI
     // and green land reads as a modern web canvas, where the original's
-    // out-of-bounds area is near-black (see plan/0088-palette-calibration.md).
+    // out-of-bounds area is near-black (see plan/archived/0088-palette-calibration.md).
     background: GAME_PALETTE.ink,
     // Off, not on: MSAA roughly doubled full-screen frame cost in testing
     // (see plan/0062-original-scale-map.md) once the map — and so the
@@ -177,7 +177,7 @@ async function bootstrap(world: WorldDefinition) {
 
   // The command panel's single message line (see index.html's
   // #panel-message) — replaces the old floating pill toasts
-  // (#enemy-event-toast/#entity-info-panel) per plan/0084-original-ui-
+  // (#enemy-event-toast/#entity-info-panel) per plan/archived/0084-original-ui-
   // foundation.md's "画面中央に現代的なfloating toastを出す方式を減らす".
   // Only one message shows at a time; a new one simply pre-empts whatever
   // was showing (both are short-lived, low-frequency notices in practice).

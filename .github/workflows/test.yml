@@ -20,6 +20,12 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      # The colors in src/render/palette.ts and index.html are generated from
+      # tools/palette.json (see plan/0089). Committing a hand-edit to either
+      # generated file would silently be undone by the next regeneration, so
+      # fail here instead.
+      - name: Check generated palette is current
+        run: npm run palette:check
       - name: Typecheck
         run: npm run typecheck
       - name: Test
