@@ -28,7 +28,7 @@ import { IsoRenderer, isWithinTileBounds, visibleTileBounds, type TileBounds } f
 import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
 import { Minimap } from "./render/Minimap";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
-import { DEFAULT_EARTHQUAKE_RADIUS, DEFAULT_VOLCANO_RADIUS, applyEarthquake, applyFlood, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseTile } from "./world/heightmap";
+import { DEFAULT_EARTHQUAKE_RADIUS, DEFAULT_VOLCANO_RADIUS, applyEarthquake, applyFlood, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
 
 /**
  * The camera's fixed base scale — see layout()'s doc comment for why this
@@ -471,41 +471,65 @@ async function bootstrap(world: WorldDefinition) {
   // see stopPainting and the pointerdown handler further down.
   let flattenTargetElevation: number | undefined;
 
-  // Shared by the plain single-tap path (applyTool, below) and by ブラシ
-  // continuous painting (see the pointer handlers further down) — both
-  // just need "spend mana, edit this one tile, redraw". Edits a whole tile
-  // face (all 4 corner vertices) at once rather than a single corner
-  // point, matching the original game's tile-based terraforming — see
-  // plan/0065-tile-based-terraform.md.
-  const applyTerrainEditAt = (tile: { x: number; y: number }): void => {
-    if (toolMode === "flatten") {
-      if (flattenTargetElevation === undefined) {
-        // The tile's own corners decide the target, biased by direction
-        // when this match restricts one — per TerrainEditRule's own doc
-        // comment, a restricted match must still be able to fully level an
-        // ordinary tile using only its permitted direction: raiseOnly
-        // levels up to the tile's own highest corner, lowerOnly down to its
-        // lowest, "both" simply averages them.
-        const corners = [
-          heightmap.vertices[tile.y][tile.x],
-          heightmap.vertices[tile.y][tile.x + 1],
-          heightmap.vertices[tile.y + 1][tile.x + 1],
-          heightmap.vertices[tile.y + 1][tile.x],
-        ];
-        flattenTargetElevation =
-          terrainEditRule === "raiseOnly"
-            ? Math.max(...corners)
-            : terrainEditRule === "lowerOnly"
-              ? Math.min(...corners)
-              : corners.reduce((sum, h) => sum + h, 0) / corners.length;
-      }
-      if (!trySpendPlayerMana(TERRAIN_EDIT_MANA_COST)) return;
-      flattenTile(heightmap, tile.x, tile.y, flattenTargetElevation, terrainEditRule);
-      renderer.redraw(visibleBounds());
-      dismissTutorialHint();
+  // "平坦化" stays tile/area-based (see flattenTile's own doc comment on
+  // why leveling a plot is inherently about an area, not a point) — picks
+  // via pickTile, unlike applyRaiseEditAt below.
+  const applyFlattenEditAt = (tile: { x: number; y: number }): void => {
+    // Some worlds forbid reshaping land inside the enemy's own territory —
+    // see WorldDefinition's enemyTerritoryEditable — checked (and reported)
+    // before touching flattenTargetElevation or spending any mana, same as
+    // isOwnFactionVisible above. Checked first, before flattenTargetElevation
+    // is computed below: an enemy-territory tile blocked here must never get
+    // the chance to seed that gesture-wide cached target in the first place.
+    if (!world.enemyTerritoryEditable && simulation.isEnemyTerritory("player", tile)) {
+      showEntityInfo("この面では敵の陣地を直接操作できません");
       return;
     }
+    if (flattenTargetElevation === undefined) {
+      // The tile's own corners decide the target, biased by direction
+      // when this match restricts one — per TerrainEditRule's own doc
+      // comment, a restricted match must still be able to fully level an
+      // ordinary tile using only its permitted direction: raiseOnly
+      // levels up to the tile's own highest corner, lowerOnly down to its
+      // lowest, "both" simply averages them.
+      const corners = [
+        heightmap.vertices[tile.y][tile.x],
+        heightmap.vertices[tile.y][tile.x + 1],
+        heightmap.vertices[tile.y + 1][tile.x + 1],
+        heightmap.vertices[tile.y + 1][tile.x],
+      ];
+      flattenTargetElevation =
+        terrainEditRule === "raiseOnly"
+          ? Math.max(...corners)
+          : terrainEditRule === "lowerOnly"
+            ? Math.min(...corners)
+            : corners.reduce((sum, h) => sum + h, 0) / corners.length;
+    }
+    if (!trySpendPlayerMana(TERRAIN_EDIT_MANA_COST)) return;
+    flattenTile(heightmap, tile.x, tile.y, flattenTargetElevation, terrainEditRule);
+    renderer.redraw(visibleBounds());
+    dismissTutorialHint();
+  };
 
+  // Raises/lowers a single grid vertex — picked via pickVertex, not
+  // pickTile. This used to edit a whole tile's 4 corners (raiseTile) at
+  // once, matching plan/0065-tile-based-terraform.md's original request to
+  // mirror the original game's tile-based terraforming — but every corner
+  // is shared with up to 3 *other* tiles, so a single tap visibly tilted
+  // every neighboring tile touching that tile's corners too, reading as
+  // "tapping moves the surroundings along with it" (per feedback:
+  // "操作するのは1面ずつにしてください、今はタップすると周りがまとめて
+  // 動きます" — confirmed by the reporter to mean exactly this, not the
+  // brush painting too wide an area). raiseTile's own rationale (raiseVertex
+  // alone left the old flat-averaged-per-tile renderer with jagged block
+  // boundaries — plan/0064-terraced-terrain.md) no longer applies: the
+  // renderer hasn't averaged tiles into flat blocks since plan/0073's
+  // per-vertex sloped mesh, so a single vertex nudge just tilts the (at
+  // most 4, half of raiseTile's up-to-8) neighboring tiles smoothly, with
+  // no jagged edge to speak of. "平坦化" keeps the tile-based raiseTile
+  // pattern (see applyFlattenEditAt) since leveling a whole plot is
+  // inherently area-shaped, unlike a plain raise/lower nudge.
+  const applyRaiseEditAt = (vertex: { x: number; y: number }): void => {
     const delta = toolMode === "lower" ? -1 : 1;
     // Should be unreachable in practice — the toolbar disables whichever
     // of raise/lower this match's terrainEditRule forbids — but checked
@@ -515,14 +539,32 @@ async function bootstrap(world: WorldDefinition) {
     // Some worlds forbid reshaping land inside the enemy's own territory —
     // see WorldDefinition's enemyTerritoryEditable — checked (and reported)
     // before spending any mana, same as isOwnFactionVisible above.
-    if (!world.enemyTerritoryEditable && simulation.isEnemyTerritory("player", tile)) {
+    if (!world.enemyTerritoryEditable && simulation.isEnemyTerritory("player", vertex)) {
       showEntityInfo("この面では敵の陣地を直接操作できません");
       return;
     }
     if (!trySpendPlayerMana(TERRAIN_EDIT_MANA_COST)) return;
-    raiseTile(heightmap, tile.x, tile.y, delta);
+    raiseVertex(heightmap, vertex.x, vertex.y, delta);
     renderer.redraw(visibleBounds());
     dismissTutorialHint();
+  };
+
+  // Dispatches to whichever of the two above the current toolMode needs —
+  // shared by the plain single-tap path (applyTool, below) and by ブラシ
+  // continuous painting (see the pointer handlers further down).
+  const applyTerrainEditAt = (point: { x: number; y: number }): void => {
+    if (toolMode === "flatten") applyFlattenEditAt(point);
+    else applyRaiseEditAt(point);
+  };
+
+  // The point a raise/lower/flatten tap or brush stroke should edit —
+  // a vertex for raise/lower, a tile for flatten (see applyRaiseEditAt's
+  // own doc comment on why they differ). Returns null for every other
+  // toolMode.
+  const pickTerrainEditPoint = (localX: number, localY: number): { x: number; y: number } | null => {
+    if (toolMode === "flatten") return renderer.pickTile(localX, localY);
+    if (toolMode === "raise" || toolMode === "lower") return renderer.pickVertex(localX, localY);
+    return null;
   };
 
   const applyTool = (event: FederatedPointerEvent) => {
@@ -540,8 +582,8 @@ async function bootstrap(world: WorldDefinition) {
     }
 
     if (toolMode === "raise" || toolMode === "lower" || toolMode === "flatten") {
-      const tile = renderer.pickTile(local.x, local.y);
-      if (tile) applyTerrainEditAt(tile);
+      const point = pickTerrainEditPoint(local.x, local.y);
+      if (point) applyTerrainEditAt(point);
       return;
     }
 
@@ -653,7 +695,8 @@ async function bootstrap(world: WorldDefinition) {
   // often expensive miracle cast that a drag should never be able to repeat.
   let longPressTimer: ReturnType<typeof setTimeout> | undefined;
   let painting = false;
-  let lastPaintedTile: { x: number; y: number } | undefined;
+  // A vertex for raise/lower, a tile for flatten — see pickTerrainEditPoint.
+  let lastPaintedPoint: { x: number; y: number } | undefined;
 
   const clearLongPressTimer = () => {
     if (longPressTimer === undefined) return;
@@ -664,7 +707,7 @@ async function bootstrap(world: WorldDefinition) {
   const stopPainting = () => {
     clearLongPressTimer();
     painting = false;
-    lastPaintedTile = undefined;
+    lastPaintedPoint = undefined;
     flattenTargetElevation = undefined;
   };
 
@@ -770,10 +813,10 @@ async function bootstrap(world: WorldDefinition) {
           painting = true;
           vibrate(10); // brief confirmation that painting just engaged
           const local = renderer.view.toLocal(event.global);
-          const tile = renderer.pickTile(local.x, local.y);
-          if (tile) {
-            applyTerrainEditAt(tile);
-            lastPaintedTile = tile;
+          const point = pickTerrainEditPoint(local.x, local.y);
+          if (point) {
+            applyTerrainEditAt(point);
+            lastPaintedPoint = point;
           }
         }, LONG_PRESS_DURATION_MS);
       }
@@ -804,14 +847,14 @@ async function bootstrap(world: WorldDefinition) {
 
     if (painting) {
       const local = renderer.view.toLocal(event.global);
-      const tile = renderer.pickTile(local.x, local.y);
-      // Only edits when the pointer has moved onto a *different* tile
+      const point = pickTerrainEditPoint(local.x, local.y);
+      // Only edits when the pointer has moved onto a *different* point
       // than the last one painted this stroke — otherwise holding still
       // would keep re-editing (and re-charging mana for) the same spot
       // every single pointermove event.
-      if (tile && (!lastPaintedTile || tile.x !== lastPaintedTile.x || tile.y !== lastPaintedTile.y)) {
-        applyTerrainEditAt(tile);
-        lastPaintedTile = tile;
+      if (point && (!lastPaintedPoint || point.x !== lastPaintedPoint.x || point.y !== lastPaintedPoint.y)) {
+        applyTerrainEditAt(point);
+        lastPaintedPoint = point;
       }
       return;
     }
