@@ -30,7 +30,7 @@ const TOOL_ICON: Record<ToolMode, IconKind> = {
  * Injects a pixel-art icon into every command button in the panel (see
  * index.html's #toolbar), ahead of its existing text label — replacing the
  * OS emoji this project used to prefix labels with (🚩💥🐸⚔️🛡️🌋🌊☠️🚶), per
- * plan/0084-original-ui-foundation.md. Safe to call once at startup: the
+ * plan/archived/0084-original-ui-foundation.md. Safe to call once at startup: the
  * icon canvases are static per button, never re-painted per frame.
  */
 export function mountCommandIcons(): void {

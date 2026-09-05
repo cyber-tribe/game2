@@ -5,7 +5,7 @@ import { paintIcon } from "./pixelIcons";
  * The command panel's status row — a pixel meter+icon+number combo for
  * mana, and a two-color pixel bar for the population comparison — replacing
  * the plain-text HUD line this project used to render ("player: mana 12.3
- * house 4 walker 2 (settle)"), per plan/0084-original-ui-foundation.md.
+ * house 4 walker 2 (settle)"), per plan/archived/0084-original-ui-foundation.md.
  * Only the player's own mana is shown: the original doesn't expose the
  * opponent's exact mana reserve, and showing it here was this prototype's
  * own debug convenience, not something to preserve for fidelity. Internal

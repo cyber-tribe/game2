@@ -4,7 +4,7 @@ import { GAME_PALETTE } from "../render/palette";
  * Every command the toolbar needs an icon for — replaces the emoji this
  * project used to lean on (🌋🌊⚔️☠️🔍💥🚩🐸🛡️🚶), which read as OS-native
  * glyphs sitting on top of a pixel-art world rather than part of it (see
- * plan/0084-original-ui-foundation.md).
+ * plan/archived/0084-original-ui-foundation.md).
  */
 export type IconKind =
   | "raise"

@@ -147,7 +147,7 @@ interface Pt {
  * their wall-top counterparts, in the same 2:1 (TILE_WIDTH:TILE_HEIGHT)
  * ratio IsoRenderer's own terrain projection uses — so a house's footprint
  * reads at the same isometric angle as the ground it stands on, per
- * plan/0085-isometric-house-sprites.md's "地面と同じisometric perspective
+ * plan/archived/0085-isometric-house-sprites.md's "地面と同じisometric perspective
  * になっている" completion condition. `front` is the corner nearest the
  * camera (where the ground anchor point sits); `left`/`right` are the two
  * faces actually rendered (the far/`back` corner and both far faces are
@@ -328,7 +328,7 @@ const HOUSE_HALF_WIDTH: Record<HouseLevel, number> = { hut: 6, lodge: 8, manor: 
  * of the previous flat front-facing pixel-pattern square. `factionColor`
  * is used ONLY for the roof-top flag (see drawFlag) — the building
  * material itself (stone/wood tones) never changes with ownership, per
- * plan/0085-isometric-house-sprites.md.
+ * plan/archived/0085-isometric-house-sprites.md.
  */
 export function drawHouseSprite(g: Graphics, centerX: number, groundY: number, level: HouseLevel, factionColor: number): void {
   if (level === "castle") {

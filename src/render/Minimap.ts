@@ -14,7 +14,7 @@ const FACTION_COLOR: Record<FactionId, number> = {
  * quantizes elevation into brightness bands on top of these (see
  * terrainColorAt), so its base tone has to leave headroom for the
  * brightest band without washing out. Hues follow the calibrated
- * GAME_PALETTE (see plan/0088-palette-calibration.md) so the overview map
+ * GAME_PALETTE (see plan/archived/0088-palette-calibration.md) so the overview map
  * reads as the same world, just smaller.
  */
 const TERRAIN_COLOR: Record<Heightmap["terrain"], number> = {

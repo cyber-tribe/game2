@@ -23,7 +23,7 @@ const MATCH_EVENT_TEMPLATE: Record<MatchEventType, string> = {
  * Formats a MatchEvent for display — shared by main.ts's enemy-action
  * message and Hud's post-game "戦いの記録" recap, so the two always
  * describe the same action the same way instead of drifting apart as
- * separate copies. No emoji prefix (see plan/0084-original-ui-foundation.md
+ * separate copies. No emoji prefix (see plan/archived/0084-original-ui-foundation.md
  * — this project's OS-native emoji don't belong in a pixel-art world), and
  * "城砦" rather than the internal HouseLevel identifier "castle".
  *

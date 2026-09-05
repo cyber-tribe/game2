@@ -17,13 +17,14 @@
       /*
        * Shared color vocabulary — mirrors src/render/palette.ts's
        * GAME_PALETTE (kept in sync by hand since CSS can't import a TS
-       * module). See plan/0084-original-ui-foundation.md: this replaces
+       * module). See plan/archived/0084-original-ui-foundation.md: this replaces
        * the project's original navy/blue "modern web app" look with a
        * stone/bronze temple-relief one, per the SFC Populous 2 fidelity
        * effort — border-radius, rgba glass panels, and gradients are
        * deliberately avoided in favor of hard-edged 3-4 step bevels.
        */
       :root {
+        /* BEGIN GENERATED PALETTE — edit tools/palette.json, then run `npm run palette` */
         --stone-highlight: #c4c492;
         --stone-light: #a1916f;
         --stone-mid: #7f6f4d;
@@ -37,8 +38,9 @@
         --ink-faded: #4d3c34;
         --player-accent: #235ebc;
         --enemy-accent: #b5352f;
-        --warning: #b5352f;
         --mana-accent: #6a4fc0;
+        --warning: #b5352f;
+        /* END GENERATED PALETTE */
 
         /* Read in main.ts to keep the HUD/map clear of the status bar —
            installed standalone (viewport-fit=cover) it's the notch/status

@@ -178,7 +178,7 @@ export class EntityLayer {
     // 勢力圏を示す") drawn first, under everything else, so it reads as
     // ground coloring rather than obscuring the shrine/houses/walkers drawn
     // on top of it. Reuses swampAffectedTiles' generic "tiles within radius
-    // of a point" selection. Per plan/0085-isometric-house-sprites.md, this
+    // of a point" selection. Per plan/archived/0085-isometric-house-sprites.md, this
     // is a real soil/furrow texture now, not a faction-colored overlay —
     // ownership reads from the house's own flag (see pixelArt.ts's
     // drawFlag), not from tinting the ground a whole faction's color.
