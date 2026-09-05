@@ -74,6 +74,16 @@ describe("WORLDS", () => {
   it("gives at least one world a personality other than balanced", () => {
     expect(WORLDS.some((world) => world.enemyPersonality !== "balanced")).toBe(true);
   });
+
+  it("only sets instantDrowning on rock (溶岩地帯) terrain — not a monotonic difficulty axis, tied to the terrain's own lava theming", () => {
+    for (const world of WORLDS) {
+      expect(world.instantDrowning).toBe(world.terrain === "rock");
+    }
+  });
+
+  it("gives at least one world instantDrowning", () => {
+    expect(WORLDS.some((world) => world.instantDrowning)).toBe(true);
+  });
 });
 
 describe("nextWorldId", () => {

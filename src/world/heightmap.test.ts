@@ -13,6 +13,7 @@ import {
   findLeastFlatVertex,
   flattenTile,
   isBuildable,
+  isInWaterPool,
   isRock,
   isTerrainEditAllowed,
   pickTerrainEditRule,
@@ -292,6 +293,40 @@ describe("isBuildable", () => {
   it("is true when land still stands above a raised water level", () => {
     const heightmap = flatHeightmap(2, 2, 5, 1);
     expect(isBuildable(heightmap, 1, 1)).toBe(true);
+  });
+});
+
+describe("isInWaterPool", () => {
+  it("is true everywhere on a map that's entirely water", () => {
+    const heightmap = flatHeightmap(4, 4, 0); // elevation 0 == waterLevel 0
+    expect(isInWaterPool(heightmap, 1.5, 1.5)).toBe(true);
+  });
+
+  it("is false everywhere on dry land", () => {
+    const heightmap = flatHeightmap(4, 4, 5);
+    expect(isInWaterPool(heightmap, 1.5, 1.5)).toBe(false);
+  });
+
+  it("is false for a single isolated water tile — a lone wet corner isn't a real pool", () => {
+    const heightmap = flatHeightmap(5, 5, 5);
+    // Dig just tile (2,2) down to sea level — every neighboring tile stays dry.
+    heightmap.vertices[2][2] = 0;
+    heightmap.vertices[2][3] = 0;
+    heightmap.vertices[3][2] = 0;
+    heightmap.vertices[3][3] = 0;
+
+    expect(isInWaterPool(heightmap, 2.5, 2.5)).toBe(false);
+  });
+
+  it("is true once 4 tiles form an actual 2x2 square of water", () => {
+    const heightmap = flatHeightmap(5, 5, 5);
+    // Dig tiles (1,1), (2,1), (1,2), (2,2) — a real 2x2 pool.
+    for (let y = 1; y <= 3; y++) {
+      for (let x = 1; x <= 3; x++) heightmap.vertices[y][x] = 0;
+    }
+
+    expect(isInWaterPool(heightmap, 1.5, 1.5)).toBe(true); // inside the pool
+    expect(isInWaterPool(heightmap, 0.5, 0.5)).toBe(false); // dry, no adjoining water block
   });
 });
 
