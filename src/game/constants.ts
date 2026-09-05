@@ -241,16 +241,39 @@ export const SWAMP_CAPACITY = 5;
 export const KNIGHT_MANA_COST = 35;
 
 /**
- * Seconds a knight rests after burning a house before knightTargetingSystem
- * sends it after its next target — see that system's doc comment. Without
- * this, a knight instantly retargets and marches on arrival every tick, so
- * a single knight could burn through a whole undefended settlement in
- * seconds, collapsing the "小競り合い→復興/逆転" phases a match is meant to
- * have into a single instant (see plan/0044-knight-cooldown.md). Matches
- * the scale of other AI decision intervals in this file (ENEMY_AI_
- * DECISION_INTERVAL etc.) rather than being a much larger, separate design.
+ * Mana cost of turning the leader into a guardian — "中〜大" tier, cheaper
+ * than knight since its usefulness is situational (see GUARDIAN_DEFENSE_
+ * RADIUS): it only fights back when the enemy actually comes to it, rather
+ * than knighting's unconditional, go-anywhere aggression. See hero.ts's
+ * guardianify/systems/hero.ts's guardianTargetingSystem.
  */
-export const KNIGHT_BURN_COOLDOWN = 6;
+export const GUARDIAN_MANA_COST = 25;
+
+/**
+ * Distance (in tiles) from any of a faction's own houses within which a
+ * guardian will engage an enemy walker/house — see systems/hero.ts's
+ * guardianTargetingSystem. Beyond this, a guardian stands its ground rather
+ * than chasing, unlike a knight (see knightTargetingSystem), which always
+ * hunts the nearest enemy anywhere on the map — this is the whole
+ * behavioral difference between the two hero kinds. Matches ENEMY_AI_
+ * THREAT_RADIUS's scale, since both describe "close enough to a house to
+ * count as a threat to it".
+ */
+export const GUARDIAN_DEFENSE_RADIUS = 4;
+
+/**
+ * Seconds a hero rests after resolving a house (a knight burning it, or a
+ * guardian capturing one) before its targeting system sends it after its
+ * next target — see knightTargetingSystem/guardianTargetingSystem's doc
+ * comments. Without this, a hero instantly retargets and marches on arrival
+ * every tick, so a single one could burn/capture through a whole
+ * undefended settlement in seconds, collapsing the "小競り合い→復興/逆転"
+ * phases a match is meant to have into a single instant (see
+ * plan/0044-knight-cooldown.md). Matches the scale of other AI decision
+ * intervals in this file (ENEMY_AI_DECISION_INTERVAL etc.) rather than
+ * being a much larger, separate design.
+ */
+export const HERO_ACTION_COOLDOWN = 6;
 
 /**
  * Mana cost of a volcano — "大" tier, pricier than earthquake/swamp since

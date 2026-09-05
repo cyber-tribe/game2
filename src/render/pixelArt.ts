@@ -23,7 +23,8 @@ type Palette = Record<string, number>;
 /**
  * Simple front-facing pixel person: a "W" (walker) pattern reusing a
  * single palette key, since — unlike a house — the whole body is one
- * color (faction, or KNIGHT_COLOR for a knighted leader).
+ * color (faction, or a hero color like KNIGHT_COLOR/GUARDIAN_COLOR for a
+ * promoted leader).
  *
  * Two frames — feet together vs. feet apart — give a minimal walk cycle
  * (see EntityLayer's per-walker phase animation) instead of a single
@@ -107,9 +108,10 @@ function drawPixelPattern(
 
 /**
  * Draws a pixel-art walker (a small person) instead of a plain circle.
- * `color` is the faction color, or KNIGHT_COLOR for a knighted walker —
- * the whole body is one color, so ownership/state reads the same way a
- * flat circle did, just shaped like a person now. `stepping` picks
+ * `color` is the faction color, or a hero color (KNIGHT_COLOR/GUARDIAN_
+ * COLOR) for a promoted walker — the whole body is one color, so
+ * ownership/state reads the same way a flat circle did, just shaped like a
+ * person now. `stepping` picks
  * between the two walk-cycle frames (see WALKER_PATTERN_STAND/_STEP);
  * EntityLayer alternates it over time so the sprite is never frozen.
  */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
-import { House, KnightCooldown, Owner, Position, Walker, type FactionId, type WalkerState } from "../components";
-import { HOUSE_LEVELS, KNIGHT_BURN_COOLDOWN } from "../constants";
+import { HeroCooldown, House, Owner, Position, Walker, type FactionId, type WalkerState } from "../components";
+import { HERO_ACTION_COOLDOWN, HOUSE_LEVELS } from "../constants";
 import type { ImpactEffectEvent } from "./effects";
 import { createHouseCaptureSystem, createWalkerCombatSystem } from "./combat";
 
@@ -188,14 +188,63 @@ describe("houseCaptureSystem", () => {
     expect(world.isAlive(knight)).toBe(true);
   });
 
-  it("puts a knight on KnightCooldown after it burns a house, so it can't instantly march on", () => {
+  it("puts a knight on HeroCooldown after it burns a house, so it can't instantly march on", () => {
     const world = new World();
     createHouse(world, "enemy", 0, 0);
     const knight = createWalker(world, "player", 0, 0, 1, "knight");
 
     createHouseCaptureSystem()(world, 0);
 
-    expect(world.get(knight, KnightCooldown)).toEqual({ remaining: KNIGHT_BURN_COOLDOWN });
+    expect(world.get(knight, HeroCooldown)).toEqual({ remaining: HERO_ACTION_COOLDOWN });
+  });
+
+  it("a guardian captures an enemy house normally, checked against its defense like any walker", () => {
+    const world = new World();
+    const house = createHouse(world, "enemy", 0, 0);
+    createWalker(world, "player", 0, 0, HOUSE_LEVELS.hut.defense + 1, "guardian");
+
+    const captured: FactionId[] = [];
+    const burned: FactionId[] = [];
+    createHouseCaptureSystem({
+      onCapture: (faction) => captured.push(faction),
+      onBurn: (faction) => burned.push(faction),
+    })(world, 0);
+
+    expect(world.get(house, Owner)).toEqual({ faction: "player" });
+    expect(world.get(house, House)).toEqual({ level: "hut", population: 0 });
+    expect(captured).toEqual(["player"]);
+    expect(burned).toEqual([]); // a guardian captures, it doesn't burn
+  });
+
+  it("a guardian survives after capturing a house and can keep defending", () => {
+    const world = new World();
+    createHouse(world, "enemy", 0, 0);
+    const guardian = createWalker(world, "player", 0, 0, HOUSE_LEVELS.hut.defense + 1, "guardian");
+
+    createHouseCaptureSystem()(world, 0);
+
+    expect(world.isAlive(guardian)).toBe(true);
+  });
+
+  it("puts a guardian on HeroCooldown after it captures a house, so it can't instantly march on", () => {
+    const world = new World();
+    createHouse(world, "enemy", 0, 0);
+    const guardian = createWalker(world, "player", 0, 0, HOUSE_LEVELS.hut.defense + 1, "guardian");
+
+    createHouseCaptureSystem()(world, 0);
+
+    expect(world.get(guardian, HeroCooldown)).toEqual({ remaining: HERO_ACTION_COOLDOWN });
+  });
+
+  it("a guardian too weak to beat a house's defense is repelled and destroyed, same as a regular walker", () => {
+    const world = new World();
+    const house = createHouse(world, "enemy", 0, 0, "castle");
+    const guardian = createWalker(world, "player", 0, 0, 1, "guardian");
+
+    createHouseCaptureSystem()(world, 0);
+
+    expect(world.get(house, Owner)).toEqual({ faction: "enemy" });
+    expect(world.isAlive(guardian)).toBe(false);
   });
 
   it("reports a houseCaptured impact at the house's position on a successful capture", () => {

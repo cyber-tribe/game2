@@ -8,6 +8,7 @@ const WALKER_STATE_LABELS: Record<WalkerState, string> = {
   traveling: "移動中",
   fighting: "交戦中",
   knight: "騎士化済み",
+  guardian: "守護者化済み",
 };
 
 /**

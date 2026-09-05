@@ -12,11 +12,28 @@ export interface Owner {
 }
 
 /**
- * "seeking" and "knight" are driven by systems in this slice ("knight" via
- * knightTargetingSystem, plus special-cased handling in swampSystem/
- * houseCaptureSystem). "traveling" and "fighting" remain placeholders.
+ * "seeking", "knight", and "guardian" are driven by systems in this slice:
+ * "knight" via knightTargetingSystem (hunts anywhere, burns houses),
+ * "guardian" via guardianTargetingSystem (only engages threats near its own
+ * faction's houses, captures normally) — both also get special-cased
+ * handling in swampSystem/houseCaptureSystem, see isHeroState below.
+ * "traveling" and "fighting" remain placeholders.
  */
-export type WalkerState = "seeking" | "traveling" | "fighting" | "knight";
+export type WalkerState = "seeking" | "traveling" | "fighting" | "knight" | "guardian";
+
+/** Every WalkerState that promoteHero (hero.ts) can produce — see isHeroState. */
+const HERO_WALKER_STATES: readonly WalkerState[] = ["knight", "guardian"];
+
+/**
+ * Whether `state` is one of the hero states (see HERO_WALKER_STATES) —
+ * shared by swampSystem (hero swamp immunity) and houseCaptureSystem
+ * (hero-specific capture/burn rules) so both stay in sync with whatever
+ * hero kinds promoteHero actually produces, rather than each hardcoding
+ * its own "knight" check.
+ */
+export function isHeroState(state: WalkerState): boolean {
+  return HERO_WALKER_STATES.includes(state);
+}
 
 export interface Walker {
   /** Internal head-count / combat power this walker represents. */
@@ -81,12 +98,14 @@ export interface Swamp {
 }
 
 /**
- * A brief rest a knight takes right after burning a house, before
- * knightTargetingSystem will send it marching after its next target — see
- * that system's doc comment for why this exists. Only ever attached to a
- * "knight"-state Walker; removed once `remaining` counts down to 0.
+ * A brief rest a hero takes right after resolving a house — a knight
+ * burning it, or a guardian capturing one — before its targeting system
+ * will send it marching after its next target. See knightTargetingSystem/
+ * guardianTargetingSystem's doc comments for why this exists. Only ever
+ * attached to a hero-state Walker (see isHeroState); removed once
+ * `remaining` counts down to 0.
  */
-export interface KnightCooldown {
+export interface HeroCooldown {
   remaining: number;
 }
 
@@ -97,4 +116,4 @@ export const MoveTarget = defineComponent<MoveTarget>("MoveTarget");
 export const House = defineComponent<House>("House");
 export const FactionState = defineComponent<FactionState>("FactionState");
 export const Swamp = defineComponent<Swamp>("Swamp");
-export const KnightCooldown = defineComponent<KnightCooldown>("KnightCooldown");
+export const HeroCooldown = defineComponent<HeroCooldown>("HeroCooldown");

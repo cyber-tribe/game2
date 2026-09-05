@@ -12,13 +12,14 @@ import {
   ARMAGEDDON_MANA_COST,
   ARMAGEDDON_POPULATION_RATIO,
   EARTHQUAKE_MANA_COST,
+  GUARDIAN_MANA_COST,
   KNIGHT_MANA_COST,
   MIN_ARMAGEDDON_TIME,
   VOLCANO_MANA_COST,
   VOLCANO_POPULATION_RATIO,
 } from "../constants";
 import { findFactionEntity, trySpendMana } from "../faction";
-import { knightify } from "../knight";
+import { guardianify, knightify } from "../hero";
 import { totalPopulation } from "../population";
 import { collapseSwampsNear } from "../swamp";
 import { eruptVolcano } from "../volcano";
@@ -36,6 +37,7 @@ export type EnemyMiracleEvent =
   | { type: "earthquake"; position: Point }
   | { type: "volcano"; position: Point }
   | { type: "knight" }
+  | { type: "guardian" }
   | { type: "armageddon" };
 
 export interface EnemyMiracleConfig {
@@ -74,9 +76,12 @@ export interface EnemyMiracleConfig {
  * 1. Population lead of ARMAGEDDON_POPULATION_RATIO or more over the
  *    opponent → go for the win with 最終決戦, per docs/game-system.md's
  *    "人口で明確に勝っているときの「決着ボタン」".
- * 2. Already aggressive (behaviorMode "fight") with a leader who isn't a
- *    knight yet → knight them, turning the leader into a self-sufficient
- *    attacker.
+ * 2. Already aggressive (behaviorMode "fight") with a leader who isn't
+ *    already the right hero kind → promote them. Behind on population
+ *    (a real, measurable deficit — see preferredHeroKind below) picks
+ *    guardian, so a losing enemy digs in and defends its own houses
+ *    instead of marching its one hero off the map; otherwise (ahead, even,
+ *    or too early to tell) picks knight, the unconditional attacker.
  * 3. A real but not-yet-decisive population lead (VOLCANO_POPULATION_
  *    RATIO or more) → escalate to a volcano, permanently denying the
  *    opponent's most valuable target rather than just disrupting it.
@@ -141,16 +146,19 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
       }
     }
 
-    if (
-      allowedMiracles.includes("knight") &&
-      state.behaviorMode === "fight" &&
-      state.leaderId !== undefined &&
-      world.isAlive(state.leaderId)
-    ) {
+    if (state.behaviorMode === "fight" && state.leaderId !== undefined && world.isAlive(state.leaderId)) {
+      // A real, measurable population deficit (not just "no opponent
+      // population recorded yet", which populationRatio also reads as 0)
+      // means the enemy is actually losing — dig in with a guardian rather
+      // than sending its one hero off to hunt while its own houses burn.
+      const preferredHeroKind = theirPopulation > 0 && populationRatio < 1 ? "guardian" : "knight";
+      const heroCost = preferredHeroKind === "guardian" ? GUARDIAN_MANA_COST : KNIGHT_MANA_COST;
       const leader = world.get(state.leaderId, Walker);
-      if (leader && leader.state !== "knight" && trySpendMana(world, factionId, KNIGHT_MANA_COST)) {
-        knightify(world, factionId);
-        onAction({ type: "knight" });
+
+      if (allowedMiracles.includes(preferredHeroKind) && leader && leader.state !== preferredHeroKind && trySpendMana(world, factionId, heroCost)) {
+        if (preferredHeroKind === "guardian") guardianify(world, factionId);
+        else knightify(world, factionId);
+        onAction({ type: preferredHeroKind });
         return;
       }
     }
