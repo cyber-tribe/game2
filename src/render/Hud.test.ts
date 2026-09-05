@@ -1,69 +1,23 @@
 import { describe, expect, it } from "vitest";
-import type { FactionSummary, GameOutcome } from "../game/simulation";
 import { Hud } from "./Hud";
 
-const SUMMARIES: FactionSummary[] = [
-  { id: "player", mana: 12.3, houses: 2, housesCap: 5, walkers: 1, behaviorMode: "settle", population: 12 },
-  { id: "enemy", mana: 4.5, houses: 1, housesCap: 5, walkers: 3, behaviorMode: "fight", population: 8 },
-];
-
-const ONGOING: GameOutcome = { over: false };
-const OVER: GameOutcome = { over: true, winner: "enemy" };
-
 describe("Hud.update", () => {
-  it("shows no GAME OVER line while the game is still ongoing", () => {
+  it("shows only the terrain label when no terrain-edit rule is set", () => {
     const hud = new Hud();
-    hud.update(SUMMARIES, ONGOING);
+    hud.setTerrain("草原");
 
-    expect(hud.view.text).not.toContain("GAME OVER");
+    hud.update();
+
+    expect(hud.view.text).toBe("地形: 草原");
   });
 
-  it("shows the GAME OVER line with the winner once the game is over", () => {
+  it("shows the terrain-edit-rule line right below the terrain label when set", () => {
     const hud = new Hud();
-    hud.update(SUMMARIES, OVER);
+    hud.setTerrain("岩地");
+    hud.setTerrainEditRule("隆起のみ可");
 
-    expect(hud.view.text).toContain("GAME OVER — enemy wins");
-  });
+    hud.update();
 
-  it("shows a draw when the outcome has no winner", () => {
-    const hud = new Hud();
-    hud.update(SUMMARIES, { over: true });
-
-    expect(hud.view.text).toContain("GAME OVER — draw");
-  });
-
-  it("shows a population comparison bar with each faction's total", () => {
-    const hud = new Hud();
-    hud.update(SUMMARIES, ONGOING);
-
-    expect(hud.view.text).toContain("人口");
-    expect(hud.view.text).toContain("player 12");
-    expect(hud.view.text).toContain("enemy 8");
-  });
-
-  it("fills the bar in proportion to each faction's share", () => {
-    const hud = new Hud();
-    hud.update(
-      [
-        { id: "player", mana: 0, houses: 0, housesCap: 5, walkers: 0, behaviorMode: "settle", population: 100 },
-        { id: "enemy", mana: 0, houses: 0, housesCap: 5, walkers: 0, behaviorMode: "settle", population: 0 },
-      ],
-      ONGOING,
-    );
-
-    expect(hud.view.text).toContain("[▓▓▓▓▓▓▓▓▓▓]");
-  });
-
-  it("splits the bar evenly when the two factions are tied", () => {
-    const hud = new Hud();
-    hud.update(
-      [
-        { id: "player", mana: 0, houses: 0, housesCap: 5, walkers: 0, behaviorMode: "settle", population: 5 },
-        { id: "enemy", mana: 0, houses: 0, housesCap: 5, walkers: 0, behaviorMode: "settle", population: 5 },
-      ],
-      ONGOING,
-    );
-
-    expect(hud.view.text).toContain("[▓▓▓▓▓░░░░░]");
+    expect(hud.view.text).toBe("地形: 岩地\n地形操作: 隆起のみ可");
   });
 });

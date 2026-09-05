@@ -454,7 +454,7 @@ export class Simulation {
     return summaries;
   }
 
-  /** Every walker/house on the map, for the "🔍 照会" 情報パネル (see InspectableEntity). */
+  /** Every walker/house on the map, for the "照会" 情報パネル (see InspectableEntity). */
   listInspectableEntities(): InspectableEntity[] {
     const entities: InspectableEntity[] = [];
 

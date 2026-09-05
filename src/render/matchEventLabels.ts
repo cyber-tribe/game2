@@ -1,21 +1,6 @@
 import type { FactionId } from "../game/components";
 import type { MatchEventType } from "../game/simulation";
 
-/** Icon shown before each event's description, shared by the toast and the recap (see describeMatchEvent). */
-const MATCH_EVENT_EMOJI: Record<MatchEventType, string> = {
-  shrineMove: "🚩",
-  earthquake: "💥",
-  swamp: "🐸",
-  volcano: "🌋",
-  knight: "⚔️",
-  guardian: "🛡️",
-  armageddon: "☠️",
-  flood: "🌊",
-  houseCaptured: "🏠",
-  houseBurned: "🔥",
-  houseReachedCastle: "🏰",
-};
-
 // "{subject}" is the faction that caused the event ("あなた"/"敵");
 // "{opponent}" (only used by the house-vs-house events) is the other one —
 // houseCaptured/houseBurned always name the other faction's house,
@@ -31,23 +16,24 @@ const MATCH_EVENT_TEMPLATE: Record<MatchEventType, string> = {
   flood: "{subject}が洪水を起こした",
   houseCaptured: "{subject}が{opponent}の家を奪った",
   houseBurned: "{subject}が{opponent}の家を焼き払った",
-  houseReachedCastle: "{subject}の家がcastleまで発展した",
+  houseReachedCastle: "{subject}の家が城砦まで発展した",
 };
 
 /**
  * Formats a MatchEvent for display — shared by main.ts's enemy-action
- * toast and Hud's post-game "戦いの記録" recap, so the two always describe
- * the same action the same way instead of drifting apart as separate
- * copies.
+ * message and Hud's post-game "戦いの記録" recap, so the two always
+ * describe the same action the same way instead of drifting apart as
+ * separate copies. No emoji prefix (see plan/0084-original-ui-foundation.md
+ * — this project's OS-native emoji don't belong in a pixel-art world), and
+ * "城砦" rather than the internal HouseLevel identifier "castle".
  *
- * e.g. describeMatchEvent("earthquake", "player") -> "💥 あなたが地震を起こした",
- * describeMatchEvent("houseCaptured", "enemy") -> "🏠 敵があなたの家を奪った".
+ * e.g. describeMatchEvent("earthquake", "player") -> "あなたが地震を起こした",
+ * describeMatchEvent("houseCaptured", "enemy") -> "敵があなたの家を奪った".
  */
 export function describeMatchEvent(type: MatchEventType, faction: FactionId): string {
   const subject = faction === "player" ? "あなた" : "敵";
   const opponent = faction === "player" ? "敵" : "あなた";
-  const text = MATCH_EVENT_TEMPLATE[type].replace("{subject}", subject).replace("{opponent}", opponent);
-  return `${MATCH_EVENT_EMOJI[type]} ${text}`;
+  return MATCH_EVENT_TEMPLATE[type].replace("{subject}", subject).replace("{opponent}", opponent);
 }
 
 /** e.g. 75.3 -> "1:15". */

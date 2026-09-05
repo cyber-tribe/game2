@@ -83,11 +83,16 @@ game2/
 │       │                    逆引き(pickVertex)・編集後の再描画(redraw)を提供
 │       ├── EntityLayer.ts … ECS World上のSwamp/Walker/Houseを描画
 │       │                    （Walker/Houseは勢力の色分け、Swampは半透明の紫の円）
-│       └── Hud.ts         … 勢力ごとのマナ/家数/ウォーカー数と決着表示のテキストHUD
-│                            （操作方法の案内は持たず、状態表示のみ）
+│       ├── palette.ts     … GAME_PALETTE — UI・pixel icon・(今後の)地形/建物スプライトが
+│       │                    共有する唯一の色定義（SFC版原作寄りの石灰岩/青銅系配色）
+│       └── Hud.ts         … 地形名・地形操作制限のみを表示する最小限のテキストHUD
+│                            （マナ/人口はui/statusPanel.tsへ移設済み）
 │   └── ui/
-│       └── toolbar.ts     … index.html の#toolbarボタンをSimulation/toolModeに
-│                            橋渡しするwireToolbar()
+│       ├── toolbar.ts     … index.html の#toolbarボタンをSimulation/toolModeに
+│       │                    橋渡しするwireToolbar()
+│       ├── pixelIcons.ts  … 各コマンド用の16x16 pixel iconをcanvasに描画（emoji代替）
+│       ├── commandIcons.ts… 上記iconを#toolbarの各ボタンへ差し込むmountCommandIcons()
+│       └── statusPanel.ts … コマンドパネル内のマナ計/人口比較バー（pixel meter）
 ├── plan/
 │   ├── README.md        … タスクごとの実装記録の運用ルール
 │   └── archived/         … 完了済みタスクの実装記録（1タスク1ファイル）

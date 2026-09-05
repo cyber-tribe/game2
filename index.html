@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#0a1a2a" />
+    <meta name="theme-color" content="#362d1e" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -14,7 +14,31 @@
     <link rel="icon" href="/icons/icon-192.png" />
     <title>game2</title>
     <style>
-      html {
+      /*
+       * Shared color vocabulary — mirrors src/render/palette.ts's
+       * GAME_PALETTE (kept in sync by hand since CSS can't import a TS
+       * module). See plan/0084-original-ui-foundation.md: this replaces
+       * the project's original navy/blue "modern web app" look with a
+       * stone/bronze temple-relief one, per the SFC Populous 2 fidelity
+       * effort — border-radius, rgba glass panels, and gradients are
+       * deliberately avoided in favor of hard-edged 3-4 step bevels.
+       */
+      :root {
+        --stone-light: #d8cdb0;
+        --stone-mid: #a89878;
+        --stone-dark: #6e6048;
+        --stone-shadow: #362d1e;
+        --bronze-light: #c9a24a;
+        --bronze-mid: #8c6a2c;
+        --bronze-dark: #5a4318;
+        --parchment: #ede0bf;
+        --ink: #2a2114;
+        --ink-faded: #5a4f3c;
+        --player-accent: #3a6fd0;
+        --enemy-accent: #b5352f;
+        --warning: #b5352f;
+        --mana-accent: #6a4fc0;
+
         /* Read in main.ts to keep the HUD/map clear of the status bar —
            installed standalone (viewport-fit=cover) it's the notch/status
            bar height; in an ordinary browser tab it's 0, since the
@@ -27,13 +51,13 @@
         padding: 0;
         width: 100%;
         height: 100%;
-        background: #0a1a2a;
+        background: var(--stone-shadow);
         overflow: hidden;
         overscroll-behavior: none;
         touch-action: none;
         -webkit-user-select: none;
         user-select: none;
-        font-family: system-ui, -apple-system, sans-serif;
+        font-family: "Courier New", ui-monospace, monospace;
       }
 
       #app {
@@ -42,99 +66,172 @@
       }
 
       /*
-       * Capped height + its own scroll (rather than growing to fit every
-       * row): the toolbar has picked up more sections over time (平坦化,
-       * 敵地干渉 messaging, etc.) and, left unbounded, ate more and more of
-       * the screen at the map's expense — per feedback: "メニューボタンが
-       * 増えすぎて操作するマップ画面が小さいです". touch-action: pan-y
-       * overrides the page-wide touch-action: none (see html, body above)
-       * just for this element, so a vertical drag inside the toolbar
-       * scrolls it instead of being swallowed as a map gesture.
+       * A single fixed-size stone command panel replacing the old
+       * scrollable HTML toolbar — per feedback: "メニューボタンが増えすぎて
+       * 操作するマップ画面が小さいです" led to a scrolling toolbar before,
+       * but scrolling itself reads as a "settings screen", not a game
+       * command bar (see plan/0084). This sizes to its own content instead
+       * of capping+scrolling: the icon grid below is deliberately dense
+       * enough (small icons, no per-button subtitle text) to fit a phone
+       * screen without needing to scroll.
        */
-      #toolbar {
+      #command-panel {
         position: fixed;
         left: 0;
         right: 0;
         bottom: 0;
         display: flex;
         flex-direction: column;
-        gap: 10px;
-        padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
-        background: rgba(10, 26, 42, 0.88);
+        gap: 5px;
+        padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+        background: var(--stone-mid);
+        border-top: 3px solid var(--bronze-dark);
+        box-shadow: inset 0 2px 0 var(--stone-light);
         box-sizing: border-box;
-        max-height: 46vh;
-        overflow-y: auto;
-        overscroll-behavior: contain;
-        touch-action: pan-y;
       }
 
       /*
-       * Two visually distinct button genres, per docs/game-system.md:
-       * "行動方針" (behaviorMode) is a free, always-on standing order —
-       * green. "奇跡" (miracles) are one-shot, mana-gated effects — blue.
-       * First-time players otherwise have no way to tell the two apart,
-       * since every button used to share one look.
+       * The single in-panel line messages appear on — replaces the old
+       * floating pill toasts (#enemy-event-toast/#entity-info-panel), per
+       * "画面中央に現代的なfloating toastを出す方式を減らす". Height is
+       * always reserved (visibility, not display) so a message appearing/
+       * disappearing never reflows the icon grid beneath it.
        */
-      .toolbar-section {
+      #panel-message {
+        min-height: 16px;
+        padding: 3px 8px;
+        background: var(--parchment);
+        border: 2px solid var(--bronze-dark);
+        box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.35), inset -1px -1px 0 var(--stone-shadow);
+        color: var(--ink);
+        font-size: 12px;
+        text-align: center;
+        box-sizing: border-box;
+        visibility: hidden;
+      }
+
+      #panel-message.visible {
+        visibility: visible;
+      }
+
+      #panel-message.warning {
+        color: var(--warning);
+        font-weight: bold;
+      }
+
+      #status-row {
+        display: flex;
+        gap: 6px;
+      }
+
+      .status-item {
+        flex: 1 1 0;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        min-width: 0;
+        padding: 3px 5px;
+        background: var(--stone-dark);
+        border: 2px solid var(--bronze-dark);
+        box-shadow: inset 1px 1px 0 var(--stone-mid);
+        box-sizing: border-box;
+      }
+
+      .status-icon {
+        flex: none;
+        width: 16px;
+        height: 16px;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+
+      .status-bar-track {
+        flex: 1 1 auto;
+        min-width: 0;
+        height: 10px;
+        display: flex;
+        background: var(--stone-shadow);
+        border: 1px solid var(--bronze-dark);
+        overflow: hidden;
+      }
+
+      #mana-bar-fill {
+        height: 100%;
+        background: var(--mana-accent);
+      }
+
+      #population-bar-player {
+        height: 100%;
+        background: var(--player-accent);
+      }
+
+      #population-bar-enemy {
+        height: 100%;
+        background: var(--enemy-accent);
+      }
+
+      .status-value {
+        flex: none;
+        font-size: 11px;
+        color: var(--parchment);
+        min-width: 2.2em;
+        text-align: right;
+      }
+
+      /*
+       * The command icon grid itself. auto-fill + a fixed minmax keeps
+       * every button the same size and wraps to as many rows as needed —
+       * dense rather than the old one-row-per-category layout with its own
+       * label/subtitle line, per "情報密度" and "スクロールを基本的に
+       * 使用しない".
+       */
+      #toolbar {
         display: flex;
         flex-direction: column;
-        gap: 6px;
       }
 
-      .toolbar-label {
+      .command-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+        gap: 4px;
+      }
+
+      /* A thin bronze rule separates "常時発動できる方針" from "奇跡" without needing a labeled section header. */
+      .command-row.tool-group {
+        margin-top: 4px;
+        padding-top: 5px;
+        border-top: 2px solid var(--bronze-dark);
+      }
+
+      .command-button {
         display: flex;
-        align-items: baseline;
-        gap: 6px;
-        font-size: 11px;
-        font-weight: bold;
-        letter-spacing: 0.05em;
-        padding: 0 2px;
-      }
-
-      .toolbar-label .toolbar-label-note {
-        font-size: 10px;
-        font-weight: normal;
-        letter-spacing: normal;
-        color: #9db3c8;
-      }
-
-      [data-group="behavior"] .toolbar-label {
-        color: #7be08a;
-      }
-
-      [data-group="tool"] .toolbar-label {
-        color: #7cc0ff;
-      }
-
-      /* Population release is free like 行動方針, so it shares that green accent. */
-      [data-group="population"] .toolbar-label {
-        color: #7be08a;
-      }
-
-      [data-group="population"] button {
-        border-color: #3fbf5e;
-      }
-
-      .toolbar-row {
-        display: flex;
-        gap: 6px;
-      }
-
-      .toolbar-row button {
-        flex: 1;
-        padding: 12px 4px;
-        font-size: 14px;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        min-height: 44px;
+        padding: 3px 2px;
         font-family: inherit;
-        border: 1px solid #4fa8ff;
-        border-radius: 8px;
-        background: #123049;
-        color: #fff;
+        font-size: 9px;
+        line-height: 1.15;
+        background: var(--stone-mid);
+        border: 2px solid var(--bronze-dark);
+        box-shadow: inset 1px 1px 0 var(--stone-light), inset -1px -1px 0 var(--stone-shadow);
+        color: var(--ink);
         -webkit-tap-highlight-color: transparent;
       }
 
-      .toolbar-row button[aria-pressed="true"] {
-        background: #4fa8ff;
-        color: #0a1a2a;
+      .command-button canvas.pixel-icon {
+        width: 22px;
+        height: 22px;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+
+      .command-button[aria-pressed="true"] {
+        background: var(--bronze-mid);
+        box-shadow: inset 1px 1px 0 var(--bronze-light), inset -1px -1px 0 var(--stone-shadow);
+        color: var(--parchment);
         font-weight: bold;
       }
 
@@ -143,51 +240,46 @@
        * (see world/heightmap.ts) — main.ts disables that button outright
        * rather than letting a tap silently do nothing.
        */
-      .toolbar-row button:disabled {
+      .command-button:disabled {
         opacity: 0.35;
-        cursor: not-allowed;
       }
 
       /*
        * The player's current mana can't cover this button's cost right now
        * (main.ts's updateToolbarAffordability, re-evaluated every frame as
        * mana rises/falls) — dimmed but, unlike :disabled above, still
-       * tappable: a tap still gives the clearer "マナが足りません" message,
+       * tappable: a tap still gives the clearer message in #panel-message,
        * and raise/lower must stay selectable even while unaffordable.
        */
-      .toolbar-row button.mana-low {
+      .command-button.mana-low {
         opacity: 0.55;
       }
 
-      /* Behavior-mode buttons get the green accent instead of the default miracle blue. */
-      [data-group="behavior"] button {
-        border-color: #3fbf5e;
-      }
-
-      [data-group="behavior"] button[aria-pressed="true"] {
-        background: #3fbf5e;
-        color: #06210f;
+      /* A themed focus ring (bronze, not the browser's default blue) rather than none — keeps keyboard/PC focus visible without clashing with the stone palette. */
+      .command-button:focus-visible {
+        outline: 2px solid var(--bronze-light);
+        outline-offset: 1px;
       }
 
       /*
        * A one-time nudge toward the game's core loop — flatten the land
        * right around your own walkers/houses to grow them — since the
-       * PIXI-canvas HUD is deliberately status-only (see Hud.ts) and
-       * otherwise a first-time player has no in-game explanation of what
-       * to do first. Positioned just above the toolbar; main.ts sets its
-       * `bottom` alongside the map's own layout() so it never overlaps
-       * the toolbar regardless of how many rows it wraps to.
+       * PIXI-canvas HUD is deliberately status-only and otherwise a
+       * first-time player has no in-game explanation of what to do first.
+       * Positioned just above the command panel; main.ts sets its `bottom`
+       * alongside the map's own layout() so it never overlaps the panel
+       * regardless of how many rows the icon grid wraps to.
        */
       #tutorial-hint {
         position: fixed;
         left: 10px;
         right: 10px;
         bottom: 320px;
-        padding: 10px 14px;
-        background: rgba(10, 26, 42, 0.92);
-        border: 1px solid #4fa8ff;
-        border-radius: 10px;
-        color: #fff;
+        padding: 8px 12px;
+        background: var(--parchment);
+        border: 2px solid var(--bronze-dark);
+        box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.35), inset -1px -1px 0 var(--stone-shadow);
+        color: var(--ink);
         font-size: 13px;
         line-height: 1.5;
         box-sizing: border-box;
@@ -202,71 +294,12 @@
       }
 
       /*
-       * A brief banner for enemy-cast miracles (see enemyMiracles.ts).
-       * Once the enemy AI started acting on its own, anything it did
-       * outside the player's current pan/zoom was otherwise completely
-       * invisible — this at least says something happened, even if the
-       * player has to check the minimap or pan over to see where.
-       */
-      #enemy-event-toast {
-        position: fixed;
-        top: calc(74px + env(safe-area-inset-top));
-        left: 50%;
-        transform: translateX(-50%);
-        padding: 8px 16px;
-        background: rgba(153, 32, 32, 0.92);
-        border-radius: 999px;
-        color: #fff;
-        font-size: 13px;
-        font-weight: bold;
-        white-space: nowrap;
-        pointer-events: none;
-        opacity: 1;
-        transition: opacity 0.5s ease;
-        z-index: 6;
-      }
-
-      #enemy-event-toast.hidden {
-        opacity: 0;
-      }
-
-      /*
-       * 情報パネル (see docs/game-system.md 11節): tapping a walker/house
-       * while the "🔍 照会" tool is selected (see main.ts's applyTool)
-       * shows its population/strength/level here. Positioned like
-       * #enemy-event-toast (a transient banner, not a persistent panel)
-       * since it's meant to answer one question at a time, not stay
-       * docked on screen.
-       */
-      #entity-info-panel {
-        position: fixed;
-        top: calc(74px + 40px + env(safe-area-inset-top));
-        left: 50%;
-        transform: translateX(-50%);
-        padding: 8px 16px;
-        background: rgba(10, 26, 42, 0.92);
-        border: 1px solid #4fa8ff;
-        border-radius: 999px;
-        color: #fff;
-        font-size: 13px;
-        font-weight: bold;
-        white-space: nowrap;
-        pointer-events: none;
-        opacity: 1;
-        transition: opacity 0.5s ease;
-        z-index: 6;
-      }
-
-      #entity-info-panel.hidden {
-        opacity: 0;
-      }
-
-      /*
-       * The post-game "戦いの記録" recap (see main.ts's showMatchRecord).
-       * A PixiJS Text object (used for the rest of the HUD) can't scroll,
-       * and a long match can produce more event lines than fit on
-       * screen — an HTML overlay gets real scrolling for free. Shown
-       * once, when the match ends; there's no way to dismiss it since
+       * 情報パネル (see docs/game-system.md 11節: タップしたウォーカー・家を
+       * 照会). The post-game "戦いの記録" recap (see main.ts's
+       * showMatchRecord). A PixiJS Text object (used for the rest of the
+       * HUD) can't scroll, and a long match can produce more event lines
+       * than fit on screen — an HTML overlay gets real scrolling for free.
+       * Shown once, when the match ends; there's no way to dismiss it since
        * the match is over and nothing else happens after this.
        */
       /*
@@ -285,12 +318,12 @@
         max-height: 80vh;
         display: flex;
         flex-direction: column;
-        background: rgba(10, 26, 42, 0.95);
-        border: 1px solid #4fa8ff;
-        border-radius: 10px;
+        background: var(--stone-mid);
+        border: 3px solid var(--bronze-dark);
+        box-shadow: inset 0 2px 0 var(--stone-light);
         padding: 14px;
         box-sizing: border-box;
-        color: #fff;
+        color: var(--ink);
         z-index: 9;
       }
 
@@ -320,10 +353,9 @@
         font-size: 14px;
         font-family: inherit;
         text-align: left;
-        border: 1px solid #4fa8ff;
-        border-radius: 8px;
-        background: #123049;
-        color: #fff;
+        border: 2px solid var(--bronze-dark);
+        background: var(--parchment);
+        color: var(--ink);
         -webkit-tap-highlight-color: transparent;
       }
 
@@ -336,7 +368,7 @@
       #world-select-list button .world-select-detail {
         display: block;
         font-size: 12px;
-        color: #9db3c8;
+        color: var(--ink-faded);
       }
 
       #world-select-list button:disabled {
@@ -365,10 +397,9 @@
         padding: 10px;
         font-size: 14px;
         font-family: inherit;
-        border: 1px solid #4fa8ff;
-        border-radius: 8px;
-        background: #0a1a2a;
-        color: #fff;
+        border: 2px solid var(--bronze-dark);
+        background: var(--parchment);
+        color: var(--ink);
         box-sizing: border-box;
       }
 
@@ -378,10 +409,9 @@
         font-size: 14px;
         font-weight: bold;
         font-family: inherit;
-        border: 1px solid #4fa8ff;
-        border-radius: 8px;
-        background: #4fa8ff;
-        color: #0a1a2a;
+        border: 2px solid var(--bronze-dark);
+        background: var(--bronze-mid);
+        color: var(--parchment);
         -webkit-tap-highlight-color: transparent;
       }
 
@@ -389,7 +419,7 @@
         flex: none;
         margin-top: 6px;
         font-size: 12px;
-        color: #ff8c8c;
+        color: var(--warning);
       }
 
       #world-select-password-error.hidden {
@@ -405,12 +435,12 @@
         max-height: 70vh;
         display: flex;
         flex-direction: column;
-        background: rgba(10, 26, 42, 0.95);
-        border: 1px solid #4fa8ff;
-        border-radius: 10px;
+        background: var(--stone-mid);
+        border: 3px solid var(--bronze-dark);
+        box-shadow: inset 0 2px 0 var(--stone-light);
         padding: 14px;
         box-sizing: border-box;
-        color: #fff;
+        color: var(--ink);
         z-index: 8;
       }
 
@@ -450,10 +480,9 @@
         font-size: 15px;
         font-weight: bold;
         font-family: inherit;
-        border: 1px solid #4fa8ff;
-        border-radius: 8px;
-        background: #4fa8ff;
-        color: #0a1a2a;
+        border: 2px solid var(--bronze-dark);
+        background: var(--bronze-mid);
+        color: var(--parchment);
         -webkit-tap-highlight-color: transparent;
       }
 
@@ -471,9 +500,8 @@
         padding: 10px;
         font-size: 13px;
         text-align: center;
-        border: 1px solid #4fa8ff;
-        border-radius: 8px;
-        color: #7cc0ff;
+        border: 2px solid var(--bronze-dark);
+        color: var(--ink);
         text-decoration: none;
         -webkit-tap-highlight-color: transparent;
       }
@@ -483,8 +511,8 @@
         position: fixed;
         inset: 0;
         z-index: 10;
-        background: #0a1a2a;
-        color: #fff;
+        background: var(--stone-shadow);
+        color: var(--parchment);
         align-items: center;
         justify-content: center;
         text-align: center;
@@ -520,11 +548,8 @@
     </div>
 
     <div id="tutorial-hint">
-      🙏 まずは自分の民（丸いマーク）の周りをタップして地形を平らにしよう。家が育ち、人口とマナが増えていく。長押ししてなぞると、まとめて地形を編集できる。
+      まずは自分の民（丸いマーク）の周りをタップして地形を平らにしよう。家が育ち、人口とマナが増えていく。長押ししてなぞると、まとめて地形を編集できる。
     </div>
-
-    <div id="enemy-event-toast" class="hidden"></div>
-    <div id="entity-info-panel" class="hidden"></div>
 
     <div id="match-record" class="hidden">
       <div id="match-record-title"></div>
@@ -535,58 +560,47 @@
         href="https://docs.google.com/forms/d/e/1FAIpQLSeGDJIs11gUB318xUwt69QTIg9ddeeMeETtxvnw9RgPRn0Mmg/viewform"
         target="_blank"
         rel="noopener"
-        >📝 フィードバックを送る</a
+        >フィードバックを送る</a
       >
     </div>
 
-    <div id="toolbar">
-      <div class="toolbar-section" data-group="behavior">
-        <div class="toolbar-label">
-          行動方針 <span class="toolbar-label-note">常に有効・マナ消費なし</span>
+    <div id="command-panel">
+      <div id="panel-message"></div>
+      <div id="status-row">
+        <div class="status-item">
+          <canvas class="status-icon" id="mana-status-icon"></canvas>
+          <div class="status-bar-track"><div id="mana-bar-fill" style="width: 0%"></div></div>
+          <span class="status-value" id="mana-value">0</span>
         </div>
-        <div class="toolbar-row">
-          <button type="button" data-mode="settle" aria-pressed="true">定住</button>
-          <button type="button" data-mode="gather">集結</button>
-          <button type="button" data-mode="goToShrine">🚩 集結地へ</button>
-          <button type="button" data-mode="fight">戦闘</button>
-        </div>
-      </div>
-      <div class="toolbar-section" data-group="population">
-        <div class="toolbar-label">
-          人口 <span class="toolbar-label-note">マナ消費なし・出た民は本来より弱い</span>
-        </div>
-        <div class="toolbar-row">
-          <button type="button" id="release-population">🚶 民を送り出す</button>
+        <div class="status-item">
+          <canvas class="status-icon" id="population-status-icon"></canvas>
+          <div class="status-bar-track">
+            <div id="population-bar-player" style="width: 50%"></div>
+            <div id="population-bar-enemy" style="width: 50%"></div>
+          </div>
         </div>
       </div>
-      <div class="toolbar-section" data-group="inspect">
-        <div class="toolbar-label">
-          情報 <span class="toolbar-label-note">タップしたウォーカー・家を照会・マナ消費なし</span>
+      <div id="toolbar">
+        <div class="command-row">
+          <button type="button" class="command-button" data-mode="settle" aria-pressed="true">定住</button>
+          <button type="button" class="command-button" data-mode="gather">集結</button>
+          <button type="button" class="command-button" data-mode="goToShrine">集結地へ</button>
+          <button type="button" class="command-button" data-mode="fight">戦闘</button>
+          <button type="button" class="command-button" id="release-population">送出</button>
+          <button type="button" class="command-button" data-tool="inspect">照会</button>
         </div>
-        <div class="toolbar-row">
-          <button type="button" data-tool="inspect">🔍 照会</button>
-        </div>
-      </div>
-      <div class="toolbar-section" data-group="tool">
-        <div class="toolbar-label">
-          奇跡 <span class="toolbar-label-note">タップで発動・マナを消費</span>
-        </div>
-        <div class="toolbar-row">
-          <button type="button" data-tool="raise" aria-pressed="true">▲ 隆起</button>
-          <button type="button" data-tool="lower">▼ 沈降</button>
-          <button type="button" data-tool="flatten">◼ 平坦化</button>
-          <button type="button" data-tool="shrine">🚩 集結地移動</button>
-          <button type="button" data-tool="earthquake">💥 地震</button>
-        </div>
-        <div class="toolbar-row">
-          <button type="button" data-tool="swamp">🐸 沼</button>
-          <button type="button" data-tool="knight">⚔️ 騎士化</button>
-          <button type="button" data-tool="guardian">🛡️ 守護者化</button>
-          <button type="button" data-tool="volcano">🌋 火山</button>
-          <button type="button" data-tool="flood">🌊 洪水</button>
-        </div>
-        <div class="toolbar-row">
-          <button type="button" data-tool="armageddon">☠️ 最終決戦</button>
+        <div class="command-row tool-group">
+          <button type="button" class="command-button" data-tool="raise" aria-pressed="true">隆起</button>
+          <button type="button" class="command-button" data-tool="lower">沈降</button>
+          <button type="button" class="command-button" data-tool="flatten">平坦化</button>
+          <button type="button" class="command-button" data-tool="shrine">集結地移動</button>
+          <button type="button" class="command-button" data-tool="earthquake">地震</button>
+          <button type="button" class="command-button" data-tool="swamp">沼</button>
+          <button type="button" class="command-button" data-tool="knight">騎士化</button>
+          <button type="button" class="command-button" data-tool="guardian">守護者化</button>
+          <button type="button" class="command-button" data-tool="volcano">火山</button>
+          <button type="button" class="command-button" data-tool="flood">洪水</button>
+          <button type="button" class="command-button" data-tool="armageddon">最終決戦</button>
         </div>
       </div>
     </div>

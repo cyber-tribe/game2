@@ -1,13 +1,18 @@
 import { Text } from "pixi.js";
-import type { FactionSummary, GameOutcome } from "../game/simulation";
 
 /**
- * Compact top status readout: each faction's mana/houses/walkers/mode,
- * plus the game-over banner. Controls themselves live in the HTML
- * toolbar (see src/ui/toolbar.ts) — this is read-only. The post-game
- * "戦いの記録" recap lives in an HTML overlay instead (see main.ts's
- * #match-record), not here — it needs to scroll for a long match, which
- * a PixiJS Text object can't do on its own.
+ * The world-info readout in the corner of the map — terrain type and any
+ * active terrain-edit restriction. Controls live in the HTML command panel
+ * (see src/ui/toolbar.ts), and per-faction mana/population now live in that
+ * same panel's status row (see src/ui/statusPanel.ts) rather than here —
+ * moved out per plan/0084-original-ui-foundation.md's "内部名称
+ * （player/enemy/walker/house）をプレイヤー画面に出さない": this used to
+ * render a raw "player: mana 12.3 house 4 walker 2 (settle)" debug-style
+ * line, which is exactly what that effort targets. The post-game "GAME
+ * OVER" banner moved out too — the #match-record HTML overlay already
+ * announces the winner (in Japanese, with the full event recap) the same
+ * frame the match ends, so this line was a redundant, debug-flavored
+ * duplicate of that dialog rather than something a player needed here.
  */
 export class Hud {
   readonly view: Text;
@@ -37,7 +42,7 @@ export class Hud {
   /**
    * Pushes the HUD down by the device's top safe-area inset (notch/status
    * bar), so an installed standalone PWA — which draws edge-to-edge under
-   * `viewport-fit=cover` — doesn't render mana/house/walker text under the
+   * `viewport-fit=cover` — doesn't render the terrain label under the
    * status bar. A plain browser tab has no inset to speak of (its own
    * chrome already occupies that space), so this is a no-op there.
    */
@@ -47,10 +52,10 @@ export class Hud {
 
   /**
    * Sets the world's terrain type label (e.g. "草原"), shown once above
-   * the per-faction lines. Terrain doesn't change mid-match, so this is
-   * called once at startup rather than every update() like the rest of
-   * the HUD — without it, TERRAIN_GROWTH_MULTIPLIER's effect on growth
-   * speed is invisible to the player.
+   * the terrain-edit-rule line. Terrain doesn't change mid-match, so this
+   * is called once at startup rather than every update() — without it,
+   * TERRAIN_GROWTH_MULTIPLIER's effect on growth speed is invisible to
+   * the player.
    */
   setTerrain(label: string): void {
     this.terrainLabel = label;
@@ -70,52 +75,7 @@ export class Hud {
     this.terrainEditRuleLabel = label;
   }
 
-  update(summaries: FactionSummary[], outcome: GameOutcome): void {
-    const lines = [
-      `地形: ${this.terrainLabel}`,
-      ...(this.terrainEditRuleLabel ? [`地形操作: ${this.terrainEditRuleLabel}`] : []),
-      ...summaries.map((s) => {
-        const houseText = s.houses >= s.housesCap ? `house ${s.houses}/${s.housesCap}（上限）` : `house ${s.houses}`;
-        return `${s.id}: mana ${s.mana.toFixed(1)} ${houseText} walker ${s.walkers} (${s.behaviorMode})`;
-      }),
-      ...populationComparisonLines(summaries),
-    ];
-
-    if (outcome.over) {
-      lines.push("", outcome.winner ? `GAME OVER — ${outcome.winner} wins` : "GAME OVER — draw");
-    }
-
-    this.view.text = lines.join("\n");
+  update(): void {
+    this.view.text = [`地形: ${this.terrainLabel}`, ...(this.terrainEditRuleLabel ? [`地形操作: ${this.terrainEditRuleLabel}`] : [])].join("\n");
   }
-}
-
-/** Width (in characters) of the population-comparison bar below. */
-const POPULATION_BAR_WIDTH = 10;
-
-/**
- * A compact "who's ahead" bar — docs/game-system.md's 情報パネル describes
- * a "両陣営の総人口の比較表示". Hud is a single PIXI.Text with one fill
- * color, so the two factions' shares are shown as filled vs. empty blocks
- * rather than two colors.
- */
-function populationBar(player: number, enemy: number): string {
-  const total = player + enemy;
-  if (total <= 0) return "░".repeat(POPULATION_BAR_WIDTH);
-  const filled = Math.round((player / total) * POPULATION_BAR_WIDTH);
-  return "▓".repeat(filled) + "░".repeat(POPULATION_BAR_WIDTH - filled);
-}
-
-/**
- * Omitted entirely if either faction is missing from the summary (should
- * only happen in tests that pass a partial fixture) — this game always
- * has exactly a "player" and an "enemy" faction (see FactionId), each
- * still summarized after losing (see Simulation.summarize).
- */
-function populationComparisonLines(summaries: FactionSummary[]): string[] {
-  const player = summaries.find((s) => s.id === "player");
-  const enemy = summaries.find((s) => s.id === "enemy");
-  if (!player || !enemy) return [];
-
-  const bar = populationBar(player.population, enemy.population);
-  return [`人口 [${bar}] player ${Math.round(player.population)} : enemy ${Math.round(enemy.population)}`];
 }
