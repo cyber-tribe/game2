@@ -1,6 +1,7 @@
 import type { Entity, System, World } from "../../ecs";
 import { isBuildable, type Heightmap } from "../../world/heightmap";
 import { FactionState, House, MoveTarget, Owner, Position, Walker, type FactionId } from "../components";
+import { hasOtherSeekingWalkers } from "./gatherTargeting";
 
 export interface SettleConfig {
   /** When given, a walker only settles on buildable (above sea level) land. */
@@ -37,12 +38,18 @@ export interface SettleConfig {
  * shared shrine would just found a peaceful town there instead of fighting.
  *
  * Also skipped for whichever walker is currently serving as a "gather"-mode
- * faction's leader (see leader.ts/gatherTargeting.ts): that walker is
+ * faction's leader, but only while there's still someone left to gather
+ * (see gatherTargeting.ts's hasOtherSeekingWalkers): that walker is
  * targeted at its own position every tick while it waits at the shrine for
  * followers to merge into it (gatherTargetingSystem), which — like any
  * other 0-distance target — clears instantly, so without this exclusion it
  * would settle into a house the very same tick it's promoted, instead of
- * ever getting the chance to gather a crowd or become a hero.
+ * ever getting the chance to gather a crowd or become a hero. Once nobody
+ * else of that faction is still "seeking" (everyone left is already
+ * merged in, dead, fighting, knighted, or settled), the exclusion lifts —
+ * per docs/game-system.md's "合体対象がいない場合は定住" — and this
+ * leader settles down like any other idle walker instead of standing at
+ * the flag forever with nothing left to gain from waiting.
  */
 export function createSettleSystem(config: Partial<SettleConfig> = {}): System {
   const heightmap = config.heightmap;
@@ -90,7 +97,9 @@ function currentGatheringLeaders(world: World): Set<Entity> {
   const leaders = new Set<Entity>();
   for (const entity of world.query(FactionState)) {
     const state = world.get(entity, FactionState)!;
-    if (state.behaviorMode === "gather" && state.leaderId !== undefined) leaders.add(state.leaderId);
+    if (state.behaviorMode !== "gather" || state.leaderId === undefined) continue;
+    if (!world.isAlive(state.leaderId) || !world.has(state.leaderId, Walker)) continue;
+    if (hasOtherSeekingWalkers(world, state.id, state.leaderId)) leaders.add(state.leaderId);
   }
   return leaders;
 }

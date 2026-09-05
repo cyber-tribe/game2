@@ -154,4 +154,37 @@ describe("createSettleSystem", () => {
     expect(world.isAlive(walker)).toBe(false);
     expect(world.query(House)).toHaveLength(2);
   });
+
+  it("never settles a gather-mode leader while someone else is still gathering", () => {
+    const world = new World();
+    const leader = world.createEntity();
+    world.add(leader, Position, { x: 3, y: 4 });
+    world.add(leader, Owner, { faction: "player" });
+    world.add(leader, Walker, { strength: 1, state: "seeking", speed: 1 });
+    const follower = world.createEntity(); // still on its way — see gatherTargeting.ts
+    world.add(follower, Owner, { faction: "player" });
+    world.add(follower, Walker, { strength: 1, state: "seeking", speed: 1 });
+    const faction = createFaction(world, "player", { x: 0, y: 0 }, "gather");
+    world.add(faction, FactionState, { ...world.get(faction, FactionState)!, leaderId: leader });
+
+    createSettleSystem()(world, 0);
+
+    expect(world.isAlive(leader)).toBe(true);
+    expect(world.query(House)).toHaveLength(0);
+  });
+
+  it("settles a gather-mode leader once nobody else is left to gather", () => {
+    const world = new World();
+    const leader = world.createEntity();
+    world.add(leader, Position, { x: 3, y: 4 });
+    world.add(leader, Owner, { faction: "player" });
+    world.add(leader, Walker, { strength: 1, state: "seeking", speed: 1 });
+    const faction = createFaction(world, "player", { x: 0, y: 0 }, "gather");
+    world.add(faction, FactionState, { ...world.get(faction, FactionState)!, leaderId: leader });
+
+    createSettleSystem()(world, 0);
+
+    expect(world.isAlive(leader)).toBe(false);
+    expect(world.query(House)).toHaveLength(1);
+  });
 });
