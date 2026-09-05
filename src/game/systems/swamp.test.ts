@@ -57,26 +57,26 @@ describe("swampSystem", () => {
     expect(world.isAlive(walker)).toBe(true);
   });
 
-  it("lets a knight walk through a swamp unharmed", () => {
+  it("drowns a knight in a swamp just like any other walker", () => {
     const world = new World();
     const swamp = createSwamp(world, 5, 5, 1, 3);
     const knight = createWalker(world, 5, 5, "knight");
 
     createSwampSystem()(world, 0);
 
-    expect(world.isAlive(knight)).toBe(true);
-    expect(world.get(swamp, Swamp)!.remainingCapacity).toBe(3);
+    expect(world.isAlive(knight)).toBe(false);
+    expect(world.get(swamp, Swamp)!.remainingCapacity).toBe(2);
   });
 
-  it("lets a guardian walk through a swamp unharmed too", () => {
+  it("drowns a guardian in a swamp too", () => {
     const world = new World();
     const swamp = createSwamp(world, 5, 5, 1, 3);
     const guardian = createWalker(world, 5, 5, "guardian");
 
     createSwampSystem()(world, 0);
 
-    expect(world.isAlive(guardian)).toBe(true);
-    expect(world.get(swamp, Swamp)!.remainingCapacity).toBe(3);
+    expect(world.isAlive(guardian)).toBe(false);
+    expect(world.get(swamp, Swamp)!.remainingCapacity).toBe(2);
   });
 
   it("reports a drowned impact at the walker's position", () => {
@@ -90,7 +90,7 @@ describe("swampSystem", () => {
     expect(impacts).toEqual([{ position: { x: 5.2, y: 5 }, type: "drowned" }]);
   });
 
-  it("does not report an impact for a knight passing through", () => {
+  it("reports a drowned impact for a knight caught in a swamp too", () => {
     const world = new World();
     createSwamp(world, 5, 5, 1, 3);
     createWalker(world, 5, 5, "knight");
@@ -98,6 +98,6 @@ describe("swampSystem", () => {
     const impacts: ImpactEffectEvent[] = [];
     createSwampSystem({ onImpact: (event) => impacts.push(event) })(world, 0);
 
-    expect(impacts).toHaveLength(0);
+    expect(impacts).toEqual([{ position: { x: 5, y: 5 }, type: "drowned" }]);
   });
 });

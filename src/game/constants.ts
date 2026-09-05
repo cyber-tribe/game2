@@ -247,8 +247,9 @@ export const SWAMP_CAPACITY = 5;
 
 /**
  * Mana cost of knighting the leader — "大" tier, on par with a volcano:
- * a single relentless, swamp-immune attacker that keeps destroying enemy
- * walkers and houses without further mana until it's killed.
+ * a single relentless attacker that keeps destroying enemy walkers and
+ * houses without further mana until it's killed (though, like anyone
+ * else, it can still drown in a swamp — see systems/swamp.ts).
  */
 export const KNIGHT_MANA_COST = 35;
 

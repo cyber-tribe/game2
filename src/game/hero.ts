@@ -10,10 +10,11 @@ import { findFactionEntity } from "./faction";
  * kind — per docs/game-system.md, "自軍リーダーを騎士に変える". Re-casting
  * a different hero miracle on an already-hero leader re-specializes it
  * (e.g. a knight can become a guardian), which is a deliberate mana sink,
- * not a bug. What each kind actually does (ignoring behaviorMode and
- * swamps, how it resolves enemy houses) is enforced by knightTargetingSystem/
- * guardianTargetingSystem/swampSystem/houseCaptureSystem reacting to
- * Walker.state, not by anything here.
+ * not a bug. What each kind actually does (ignoring behaviorMode, how it
+ * resolves enemy houses) is enforced by knightTargetingSystem/
+ * guardianTargetingSystem/houseCaptureSystem reacting to Walker.state, not
+ * by anything here. Neither kind is special-cased by swampSystem — a hero
+ * who steps into a swamp drowns like anyone else.
  */
 function promoteHero(world: World, faction: FactionId, kind: WalkerState): void {
   const factionEntity = findFactionEntity(world, faction);

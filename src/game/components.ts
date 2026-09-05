@@ -16,8 +16,8 @@ export interface Owner {
  * "knight" via knightTargetingSystem (hunts anywhere, burns houses),
  * "guardian" via guardianTargetingSystem (only engages threats near its own
  * faction's houses, captures normally) — both also get special-cased
- * handling in swampSystem/houseCaptureSystem, see isHeroState below.
- * "traveling" and "fighting" remain placeholders.
+ * handling in houseCaptureSystem and drowning.ts's open-water immunity,
+ * see isHeroState below. "traveling" and "fighting" remain placeholders.
  */
 export type WalkerState = "seeking" | "traveling" | "fighting" | "knight" | "guardian";
 
@@ -26,10 +26,11 @@ const HERO_WALKER_STATES: readonly WalkerState[] = ["knight", "guardian"];
 
 /**
  * Whether `state` is one of the hero states (see HERO_WALKER_STATES) —
- * shared by swampSystem (hero swamp immunity) and houseCaptureSystem
- * (hero-specific capture/burn rules) so both stay in sync with whatever
+ * shared by houseCaptureSystem (hero-specific capture/burn rules) and
+ * drowning.ts (open-water immunity) so both stay in sync with whatever
  * hero kinds promoteHero actually produces, rather than each hardcoding
- * its own "knight" check.
+ * its own "knight" check. Notably NOT used by swampSystem: heroes drown
+ * in swamps just like anyone else.
  */
 export function isHeroState(state: WalkerState): boolean {
   return HERO_WALKER_STATES.includes(state);

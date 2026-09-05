@@ -1,5 +1,5 @@
 import type { System } from "../../ecs";
-import { isHeroState, Position, Swamp, Walker } from "../components";
+import { Position, Swamp, Walker } from "../components";
 import type { OnImpactEffect } from "./effects";
 import { distance } from "./geometry";
 
@@ -9,12 +9,13 @@ export interface SwampConfig {
 }
 
 /**
- * Any walker within a swamp's radius drowns — per docs/game-system.md,
- * "踏み込んだ通常の民は沈んで死ぬ". Each drowning consumes one unit of
- * the swamp's remainingCapacity; once it hits zero the swamp itself
- * dries up and is removed. Heroes are the exception ("騎士は...沼を
- * 避ける" — extended to every hero kind, see isHeroState) and walk through
- * unharmed.
+ * Any walker within a swamp's radius drowns, heroes included — per
+ * docs/game-system.md, "踏み込んだ通常の民は沈んで死ぬ". A knight or
+ * guardian steps into the same swamp as anyone else; nothing here
+ * special-cases isHeroState (unlike drowning.ts's open-water immunity
+ * or houseCaptureSystem's burn/capture split, which stay as they are).
+ * Each drowning consumes one unit of the swamp's remainingCapacity;
+ * once it hits zero the swamp itself dries up and is removed.
  */
 export function createSwampSystem(config: Partial<SwampConfig> = {}): System {
   const onImpact = config.onImpact ?? (() => {});
@@ -25,7 +26,6 @@ export function createSwampSystem(config: Partial<SwampConfig> = {}): System {
 
       for (const walkerEntity of world.query(Walker, Position)) {
         if (!world.isAlive(swampEntity)) break;
-        if (isHeroState(world.get(walkerEntity, Walker)!.state)) continue;
 
         const walkerPos = world.get(walkerEntity, Position)!;
         const swamp = world.get(swampEntity, Swamp)!;

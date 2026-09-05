@@ -127,7 +127,7 @@ describe("createDrowningSystem", () => {
     expect(world.isAlive(walker)).toBe(false);
   });
 
-  it("exempts a knight from drowning, same immunity swampSystem already grants heroes", () => {
+  it("exempts a knight from open-water drowning (unlike swamps, which still drown heroes)", () => {
     const world = new World();
     const heightmap = flatHeightmap(10, 10, 5);
     digPool(heightmap, 5, 5);
