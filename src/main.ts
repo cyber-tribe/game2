@@ -28,7 +28,7 @@ import { IsoRenderer, isWithinTileBounds, visibleTileBounds, type TileBounds } f
 import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
 import { Minimap } from "./render/Minimap";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
-import { DEFAULT_EARTHQUAKE_RADIUS, DEFAULT_VOLCANO_RADIUS, applyEarthquake, applyFlood, applyVolcano, createHeightmap, isTerrainEditAllowed, raiseTile } from "./world/heightmap";
+import { DEFAULT_EARTHQUAKE_RADIUS, DEFAULT_VOLCANO_RADIUS, applyEarthquake, applyFlood, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseTile } from "./world/heightmap";
 
 /**
  * The camera's fixed base scale — see layout()'s doc comment for why this
@@ -445,6 +445,15 @@ async function bootstrap(world: WorldDefinition) {
     return best;
   };
 
+  // The elevation a "flatten" brush stroke is leveling everything toward —
+  // captured from the first tile the stroke touches (see
+  // applyTerrainEditAt's "flatten" branch) and reused for every tile the
+  // same continuous gesture then paints over, so dragging across a bumpy
+  // area levels it all to one common plateau instead of flattening each
+  // tile to its own separate target. Reset to undefined between gestures —
+  // see stopPainting and the pointerdown handler further down.
+  let flattenTargetElevation: number | undefined;
+
   // Shared by the plain single-tap path (applyTool, below) and by ブラシ
   // continuous painting (see the pointer handlers further down) — both
   // just need "spend mana, edit this one tile, redraw". Edits a whole tile
@@ -452,6 +461,34 @@ async function bootstrap(world: WorldDefinition) {
   // point, matching the original game's tile-based terraforming — see
   // plan/0065-tile-based-terraform.md.
   const applyTerrainEditAt = (tile: { x: number; y: number }): void => {
+    if (toolMode === "flatten") {
+      if (flattenTargetElevation === undefined) {
+        // The tile's own corners decide the target, biased by direction
+        // when this match restricts one — per TerrainEditRule's own doc
+        // comment, a restricted match must still be able to fully level an
+        // ordinary tile using only its permitted direction: raiseOnly
+        // levels up to the tile's own highest corner, lowerOnly down to its
+        // lowest, "both" simply averages them.
+        const corners = [
+          heightmap.vertices[tile.y][tile.x],
+          heightmap.vertices[tile.y][tile.x + 1],
+          heightmap.vertices[tile.y + 1][tile.x + 1],
+          heightmap.vertices[tile.y + 1][tile.x],
+        ];
+        flattenTargetElevation =
+          terrainEditRule === "raiseOnly"
+            ? Math.max(...corners)
+            : terrainEditRule === "lowerOnly"
+              ? Math.min(...corners)
+              : corners.reduce((sum, h) => sum + h, 0) / corners.length;
+      }
+      if (!trySpendPlayerMana(TERRAIN_EDIT_MANA_COST)) return;
+      flattenTile(heightmap, tile.x, tile.y, flattenTargetElevation, terrainEditRule);
+      renderer.redraw(visibleBounds());
+      dismissTutorialHint();
+      return;
+    }
+
     const delta = toolMode === "lower" ? -1 : 1;
     // Should be unreachable in practice — the toolbar disables whichever
     // of raise/lower this match's terrainEditRule forbids — but checked
@@ -478,7 +515,7 @@ async function bootstrap(world: WorldDefinition) {
       return;
     }
 
-    if (toolMode === "raise" || toolMode === "lower") {
+    if (toolMode === "raise" || toolMode === "lower" || toolMode === "flatten") {
       const tile = renderer.pickTile(local.x, local.y);
       if (tile) applyTerrainEditAt(tile);
       return;
@@ -585,9 +622,9 @@ async function bootstrap(world: WorldDefinition) {
   // "ブラシ" continuous terraforming (see plan/0054-terraform-brush.md):
   // holding a single press still for LONG_PRESS_DURATION_MS — long enough
   // that it hasn't already turned into a pan — engages painting, so every
-  // tile the pointer then passes over gets edited once. Flattening a
-  // wide area becomes one smooth gesture instead of many precise
-  // individual taps. Restricted to the "raise"/"lower" tools (checked at
+  // tile the pointer then passes over gets edited once. Leveling a wide
+  // area becomes one smooth gesture instead of many precise individual
+  // taps. Restricted to the "raise"/"lower"/"flatten" tools (checked at
   // each call site below): every other toolMode is a single deliberate,
   // often expensive miracle cast that a drag should never be able to repeat.
   let longPressTimer: ReturnType<typeof setTimeout> | undefined;
@@ -604,6 +641,7 @@ async function bootstrap(world: WorldDefinition) {
     clearLongPressTimer();
     painting = false;
     lastPaintedTile = undefined;
+    flattenTargetElevation = undefined;
   };
 
   // A second finger switches to rotating/pinch-zooming the map instead of
@@ -698,8 +736,9 @@ async function bootstrap(world: WorldDefinition) {
       isDragging = false;
       dragStart = { x: event.global.x, y: event.global.y };
       viewStartPos = { x: renderer.view.position.x, y: renderer.view.position.y };
+      flattenTargetElevation = undefined; // fresh gesture — see its own doc comment
 
-      if (toolMode === "raise" || toolMode === "lower") {
+      if (toolMode === "raise" || toolMode === "lower" || toolMode === "flatten") {
         clearLongPressTimer();
         longPressTimer = setTimeout(() => {
           longPressTimer = undefined;

@@ -11,6 +11,7 @@ import {
   countFlatNeighbors,
   createHeightmap,
   findLeastFlatVertex,
+  flattenTile,
   isBuildable,
   isRock,
   isTerrainEditAllowed,
@@ -174,6 +175,67 @@ describe("raiseTile", () => {
 
     expect(heightmap.rockHardness[0][0]).toBe(2);
     expect(heightmap.rockHardness[1][1]).toBe(1);
+  });
+});
+
+describe("flattenTile", () => {
+  it("sets all 4 corners of the targeted tile to elevation, and no others", () => {
+    const heightmap = createHeightmap(3, 3);
+    heightmap.vertices[1][1] = 2;
+    heightmap.vertices[1][2] = 9;
+    heightmap.vertices[2][2] = 5;
+    heightmap.vertices[2][1] = 1;
+    heightmap.vertices[0][0] = 7;
+
+    flattenTile(heightmap, 1, 1, 6, "both");
+
+    expect(heightmap.vertices[1][1]).toBe(6);
+    expect(heightmap.vertices[1][2]).toBe(6);
+    expect(heightmap.vertices[2][2]).toBe(6);
+    expect(heightmap.vertices[2][1]).toBe(6);
+    // A vertex diagonally outside tile (1,1)'s own 4 corners is untouched.
+    expect(heightmap.vertices[0][0]).toBe(7);
+  });
+
+  it("clamps to MIN_ELEVATION/MAX_ELEVATION, same as raiseTile", () => {
+    const heightmap = createHeightmap(2, 2);
+
+    flattenTile(heightmap, 0, 0, MAX_ELEVATION + 5, "both");
+    expect(heightmap.vertices[0][0]).toBe(MAX_ELEVATION);
+
+    flattenTile(heightmap, 0, 0, MIN_ELEVATION - 5, "both");
+    expect(heightmap.vertices[0][0]).toBe(MIN_ELEVATION);
+  });
+
+  it("under raiseOnly, only ever raises a corner toward elevation, never lowers it", () => {
+    const heightmap = createHeightmap(2, 2);
+    heightmap.vertices[0][0] = 2; // below target — should raise
+    heightmap.vertices[0][1] = 9; // above target — must stay put under raiseOnly
+
+    flattenTile(heightmap, 0, 0, 5, "raiseOnly");
+
+    expect(heightmap.vertices[0][0]).toBe(5);
+    expect(heightmap.vertices[0][1]).toBe(9);
+  });
+
+  it("under lowerOnly, only ever lowers a corner toward elevation, never raises it", () => {
+    const heightmap = createHeightmap(2, 2);
+    heightmap.vertices[0][0] = 8; // above target — should lower
+    heightmap.vertices[0][1] = 1; // below target — must stay put under lowerOnly
+
+    flattenTile(heightmap, 0, 0, 5, "lowerOnly");
+
+    expect(heightmap.vertices[0][0]).toBe(5);
+    expect(heightmap.vertices[0][1]).toBe(1);
+  });
+
+  it("leaves an already-level corner untouched", () => {
+    const heightmap = createHeightmap(2, 2);
+    heightmap.vertices[0][0] = 5;
+
+    flattenTile(heightmap, 0, 0, 5, "both");
+
+    expect(heightmap.vertices[0][0]).toBe(5);
   });
 });
 
