@@ -1,6 +1,20 @@
 import type { TerrainEditRule, TerrainType } from "../world/heightmap";
 
 /**
+ * The discretionary miracles a world can lock/unlock — everything a player
+ * casts through the toolbar's [data-tool] buttons except 隆起/沈降 (always
+ * available, gated only by terrainEditRule — it's the core "flatten your
+ * land" loop every world needs to be playable at all) and 照会 (a free
+ * inspection tool, not a miracle). Kept as its own type here rather than
+ * reusing ui/toolbar.ts's ToolMode so game/ doesn't depend on ui/ — main.ts
+ * bridges the two.
+ */
+export type MiracleId = "shrine" | "earthquake" | "swamp" | "knight" | "volcano" | "flood" | "armageddon";
+
+/** Every discretionary miracle — see MiracleId. */
+export const ALL_MIRACLES: readonly MiracleId[] = ["shrine", "earthquake", "swamp", "knight", "volcano", "flood", "armageddon"];
+
+/**
  * One fixed, selectable world for the 征服モード ("conquest mode") skeleton
  * — see docs/game-system.md 10節's "各ワールドは地形タイプ・初期配置・
  * 敵AIの攻撃性／賢さ・使用可能な奇跡の制限などが異なり、徐々に難しく
@@ -47,26 +61,40 @@ export interface WorldDefinition {
    * "攻撃性".
    */
   enemyAggressionThreshold: number;
+  /**
+   * Which discretionary miracles this world lets either side cast at all —
+   * per docs/game-system.md 10節's "使用可能な奇跡の制限" — checked
+   * equally for the player's own taps (main.ts) and the enemy's own
+   * casting (enemyMiracles.ts only ever casts earthquake/volcano/knight/
+   * armageddon, so swamp/flood/shrine restrictions only affect the
+   * player). Earlier worlds unlock fewer, later ones unlock more, same
+   * monotonic "never relaxing" curve as terrain/terrainEditRule/enemy AI
+   * speed — see WORLDS' own doc comment.
+   */
+  allowedMiracles: readonly MiracleId[];
 }
 
 /**
  * Every world is a fixed 64x64 (see WorldDefinition's doc comment) — only
- * terrain, terrainEditRule, and the enemy AI's speed/aggression vary and
- * grow harder as the list goes on: terrain gets harsher (TERRAIN_GROWTH_
- * MULTIPLIER: grass 1 > snow 0.75 > desert 0.6 > rock 0.4), terraforming
- * gets restricted to one direction (raiseOnly/lowerOnly, harder than
- * "both"), and the enemy AI gets faster/more aggressive — never any axis
- * relaxing at once.
+ * terrain, terrainEditRule, enemy AI speed/aggression, and allowedMiracles
+ * vary and grow harder as the list goes on: terrain gets harsher (TERRAIN_
+ * GROWTH_MULTIPLIER: grass 1 > snow 0.75 > desert 0.6 > rock 0.4),
+ * terraforming gets restricted to one direction (raiseOnly/lowerOnly,
+ * harder than "both"), the enemy AI gets faster/more aggressive, and more
+ * miracles unlock — never any axis relaxing at once. allowedMiracles is
+ * cumulative (each world keeps everything the previous one had) so a
+ * returning player is never surprised by something that used to work no
+ * longer working; by the final world every miracle is unlocked.
  */
 const WORLD_SIZE = 64;
 
 export const WORLDS: WorldDefinition[] = [
-  { id: "quiet-plain", name: "静かな草原", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "grass", terrainEditRule: "both", enemyDecisionInterval: 6, enemyAggressionThreshold: 6 },
-  { id: "dry-highland", name: "乾いた高地", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "desert", terrainEditRule: "both", enemyDecisionInterval: 5, enemyAggressionThreshold: 5 },
-  { id: "frozen-border", name: "凍てつく国境", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "snow", terrainEditRule: "raiseOnly", enemyDecisionInterval: 5, enemyAggressionThreshold: 4 },
-  { id: "ashen-waste", name: "灰の荒野", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 4, enemyAggressionThreshold: 3 },
-  { id: "rising-frontier", name: "隆起する辺境", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "desert", terrainEditRule: "raiseOnly", enemyDecisionInterval: 3, enemyAggressionThreshold: 3 },
-  { id: "final-frontline", name: "最終戦線", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 2, enemyAggressionThreshold: 2 },
+  { id: "quiet-plain", name: "静かな草原", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "grass", terrainEditRule: "both", enemyDecisionInterval: 6, enemyAggressionThreshold: 6, allowedMiracles: ["earthquake"] },
+  { id: "dry-highland", name: "乾いた高地", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "desert", terrainEditRule: "both", enemyDecisionInterval: 5, enemyAggressionThreshold: 5, allowedMiracles: ["earthquake", "swamp"] },
+  { id: "frozen-border", name: "凍てつく国境", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "snow", terrainEditRule: "raiseOnly", enemyDecisionInterval: 5, enemyAggressionThreshold: 4, allowedMiracles: ["earthquake", "swamp", "shrine"] },
+  { id: "ashen-waste", name: "灰の荒野", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 4, enemyAggressionThreshold: 3, allowedMiracles: ["earthquake", "swamp", "shrine", "knight"] },
+  { id: "rising-frontier", name: "隆起する辺境", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "desert", terrainEditRule: "raiseOnly", enemyDecisionInterval: 3, enemyAggressionThreshold: 3, allowedMiracles: ["earthquake", "swamp", "shrine", "knight", "volcano"] },
+  { id: "final-frontline", name: "最終戦線", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 2, enemyAggressionThreshold: 2, allowedMiracles: ALL_MIRACLES },
 ];
 
 /**

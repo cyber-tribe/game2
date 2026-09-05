@@ -50,6 +50,49 @@ describe("Simulation", () => {
     expect(passive.summarize().find((s) => s.id === "enemy")!.behaviorMode).toBe("gather");
   });
 
+  it("passes allowedMiracles through to the enemy's own miracle casting (see game/worlds.ts's per-world miracle unlocks)", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    const giveEnemyManaAndTarget = (sim: Simulation) => {
+      const [enemyState] = sim.world.query(FactionState).filter((e) => sim.world.get(e, FactionState)!.id === "enemy");
+      sim.world.add(enemyState, FactionState, { ...sim.world.get(enemyState, FactionState)!, mana: 999 });
+      // Both factions need at least one walker/house, or getOutcome() (only
+      // 1 faction left "alive") reports the match already over and update()
+      // becomes a permanent no-op before anything below gets a chance to run.
+      const enemyWalker = sim.world.createEntity();
+      sim.world.add(enemyWalker, Position, { x: 5, y: 5 });
+      sim.world.add(enemyWalker, Owner, { faction: "enemy" });
+      sim.world.add(enemyWalker, Walker, { strength: 1, state: "seeking", speed: 1 });
+      const house = sim.world.createEntity();
+      sim.world.add(house, Position, { x: 15, y: 15 });
+      sim.world.add(house, Owner, { faction: "player" });
+      sim.world.add(house, House, { level: "hut", population: 0 });
+    };
+
+    const restricted = new Simulation({
+      worldWidth: 20,
+      worldHeight: 20,
+      heightmap,
+      initialWalkersPerFaction: 0,
+      enemyDecisionInterval: 1,
+      allowedMiracles: [],
+    });
+    giveEnemyManaAndTarget(restricted);
+    restricted.update(1);
+    expect(restricted.getMatchEvents().filter((e) => e.faction === "enemy")).toEqual([]); // nothing unlocked, nothing cast
+
+    const unrestricted = new Simulation({
+      worldWidth: 20,
+      worldHeight: 20,
+      heightmap,
+      initialWalkersPerFaction: 0,
+      enemyDecisionInterval: 1,
+      allowedMiracles: ["earthquake"],
+    });
+    giveEnemyManaAndTarget(unrestricted);
+    unrestricted.update(1);
+    expect(unrestricted.getMatchEvents()).toContainEqual({ time: 1, faction: "enemy", type: "earthquake" });
+  });
+
   it("lists every walker as an InspectableEntity with its faction/strength/state", () => {
     const sim = new Simulation({ worldWidth: 20, worldHeight: 20, initialWalkersPerFaction: 2 });
 

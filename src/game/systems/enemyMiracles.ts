@@ -22,6 +22,7 @@ import { knightify } from "../knight";
 import { totalPopulation } from "../population";
 import { collapseSwampsNear } from "../swamp";
 import { eruptVolcano } from "../volcano";
+import { ALL_MIRACLES, type MiracleId } from "../worlds";
 import { distance, type Point } from "./geometry";
 
 /**
@@ -52,6 +53,13 @@ export interface EnemyMiracleConfig {
   minArmageddonTime: number;
   /** Injectable RNG, in [0, 1), for deterministic tests. */
   rng: () => number;
+  /**
+   * Same per-world "使用可能な奇跡の制限" the player's own toolbar is
+   * gated by (see game/worlds.ts's WorldDefinition.allowedMiracles) —
+   * "敵の神はプレイヤーと同じルールで介入する". Defaults to every
+   * miracle unlocked, matching today's unrestricted behavior.
+   */
+  allowedMiracles: readonly MiracleId[];
   /** Called once per miracle actually cast — see EnemyMiracleEvent. */
   onAction: (event: EnemyMiracleEvent) => void;
 }
@@ -82,7 +90,10 @@ export interface EnemyMiracleConfig {
  * coin-flip. Each branch spends mana through trySpendMana exactly like
  * a player's tap, so an enemy that can't afford a step simply falls
  * through to a cheaper one (or does nothing) rather than acting for
- * free. Skips everything once finalBattle is set, same as
+ * free — and a branch this world's allowedMiracles hasn't unlocked
+ * falls through the exact same way, so an early world that's only
+ * unlocked earthquake never sees the enemy volcano/knight/armageddon
+ * it either. Skips everything once finalBattle is set, same as
  * createEnemyAiSystem.
  *
  * The 最終決戦 branch additionally waits until minArmageddonTime has
@@ -102,6 +113,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
   const decisionInterval = config.decisionInterval ?? 8;
   const minArmageddonTime = config.minArmageddonTime ?? MIN_ARMAGEDDON_TIME;
   const rng = config.rng ?? Math.random;
+  const allowedMiracles = config.allowedMiracles ?? ALL_MIRACLES;
   const onAction = config.onAction ?? (() => {});
   let timeSincePass = decisionInterval;
   let elapsed = 0;
@@ -121,7 +133,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
     const theirPopulation = totalPopulation(world, opponentId);
     const populationRatio = theirPopulation > 0 ? myPopulation / theirPopulation : 0;
 
-    if (populationRatio >= ARMAGEDDON_POPULATION_RATIO && elapsed >= minArmageddonTime) {
+    if (allowedMiracles.includes("armageddon") && populationRatio >= ARMAGEDDON_POPULATION_RATIO && elapsed >= minArmageddonTime) {
       if (trySpendMana(world, factionId, ARMAGEDDON_MANA_COST)) {
         triggerArmageddon(world, worldCenter);
         onAction({ type: "armageddon" });
@@ -129,7 +141,12 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
       }
     }
 
-    if (state.behaviorMode === "fight" && state.leaderId !== undefined && world.isAlive(state.leaderId)) {
+    if (
+      allowedMiracles.includes("knight") &&
+      state.behaviorMode === "fight" &&
+      state.leaderId !== undefined &&
+      world.isAlive(state.leaderId)
+    ) {
       const leader = world.get(state.leaderId, Walker);
       if (leader && leader.state !== "knight" && trySpendMana(world, factionId, KNIGHT_MANA_COST)) {
         knightify(world, factionId);
@@ -138,7 +155,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
       }
     }
 
-    if (populationRatio >= VOLCANO_POPULATION_RATIO) {
+    if (allowedMiracles.includes("volcano") && populationRatio >= VOLCANO_POPULATION_RATIO) {
       const target = densestOpponentCluster(world, opponentId, DEFAULT_VOLCANO_RADIUS, rng);
       if (target && trySpendMana(world, factionId, VOLCANO_MANA_COST)) {
         applyVolcano(heightmap, target.x, target.y);
@@ -148,6 +165,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
       }
     }
 
+    if (!allowedMiracles.includes("earthquake")) return;
     const target = densestOpponentCluster(world, opponentId, DEFAULT_EARTHQUAKE_RADIUS, rng);
     if (target && trySpendMana(world, factionId, EARTHQUAKE_MANA_COST)) {
       applyEarthquake(heightmap, target.x, target.y, undefined, undefined, rng);

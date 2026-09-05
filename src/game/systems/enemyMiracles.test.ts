@@ -268,6 +268,83 @@ describe("createEnemyMiracleSystem", () => {
     expect(events).toEqual([]);
   });
 
+  it("falls through to earthquake when a decisive population lead exists but armageddon isn't unlocked yet", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: ARMAGEDDON_MANA_COST });
+    createFaction(world, "player", { x: 9, y: 9 });
+    createHouse(world, "enemy", 5, 5, 20);
+    createHouse(world, "player", 8, 8, 1);
+
+    const events: unknown[] = [];
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      minArmageddonTime: 0,
+      heightmap: flatHeightmap(10, 10, 5),
+      worldCenter: WORLD_CENTER,
+      allowedMiracles: ["earthquake"],
+      onAction: (event) => events.push(event),
+    })(world, 8);
+
+    expect(world.get(enemy, FactionState)!.finalBattle).toBeFalsy();
+    expect(events).toEqual([{ type: "earthquake", position: { x: 8, y: 8 } }]);
+  });
+
+  it("does not knight an aggressive leader when knight isn't unlocked", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 }, "fight");
+    const leader = createWalker(world, "enemy");
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: KNIGHT_MANA_COST, leaderId: leader });
+    createFaction(world, "player", { x: 9, y: 9 });
+    createHouse(world, "player", 5, 5);
+
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap: flatHeightmap(10, 10, 5),
+      worldCenter: WORLD_CENTER,
+      allowedMiracles: ["earthquake"],
+    })(world, 8);
+
+    expect(world.get(leader, Walker)!.state).toBe("seeking");
+  });
+
+  it("falls through to earthquake once a real population lead exists but volcano isn't unlocked yet", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: VOLCANO_MANA_COST });
+    createFaction(world, "player", { x: 9, y: 9 });
+    createHouse(world, "enemy", 5, 5, 3);
+    createHouse(world, "player", 8, 8, 1);
+
+    const events: unknown[] = [];
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap: flatHeightmap(10, 10, 5),
+      worldCenter: WORLD_CENTER,
+      allowedMiracles: ["earthquake"],
+      onAction: (event) => events.push(event),
+    })(world, 8);
+
+    expect(events).toEqual([{ type: "earthquake", position: { x: 8, y: 8 } }]);
+  });
+
+  it("does nothing at all once even earthquake isn't unlocked", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: EARTHQUAKE_MANA_COST });
+    createFaction(world, "player", { x: 9, y: 9 });
+    createHouse(world, "player", 5, 5);
+
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap: flatHeightmap(10, 10, 5),
+      worldCenter: WORLD_CENTER,
+      allowedMiracles: [],
+    })(world, 8);
+
+    expect(world.get(enemy, FactionState)!.mana).toBe(EARTHQUAKE_MANA_COST); // nothing spent
+  });
+
   it("does not act once finalBattle is already set", () => {
     const world = new World();
     const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
