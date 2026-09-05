@@ -1,12 +1,27 @@
 import { Container, Graphics } from "pixi.js";
-import { FactionState, House, Owner, Position, Swamp, Walker, type FactionId } from "../game/components";
+import { FactionState, House, MoveTarget, Owner, Position, Swamp, Walker, type FactionId } from "../game/components";
 import type { Entity, World } from "../ecs";
 import { FARMLAND_RADIUS, IMPACT_EFFECT_DURATION } from "../game/constants";
 import { distance, type Point } from "../game/systems/geometry";
 import type { ImpactEffectSnapshot, ImpactEffectType } from "../game/systems/effects";
 import { GAME_PALETTE } from "./palette";
 import { type IsoRenderer } from "./IsoRenderer";
-import { drawHouseSprite, drawWalkerSprite } from "./pixelArt";
+import { drawHouseSprite, drawWalkerSprite, type Facing } from "./pixelArt";
+
+/**
+ * Quantizes a tile-space heading (dx, dy) to one of the 4 iso screen
+ * diagonals a 2:1 projection produces from the 4 tile-axis directions —
+ * see pixelArt.ts's Facing doc comment. Ties (e.g. dx === dy) favor the
+ * x-axis reading, which only matters for a walker heading exactly
+ * diagonally in tile-space, an edge case with no single "more correct"
+ * answer. (0, 0) — no real heading — also falls through to "SE", the
+ * same default a walker just spawned or freshly arrived gets before it
+ * has ever had a MoveTarget.
+ */
+export function facingFor(dx: number, dy: number): Facing {
+  if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? "SE" : "NW";
+  return dy >= 0 ? "SW" : "NE";
+}
 
 const FACTION_COLOR: Record<FactionId, number> = {
   player: 0x4fa8ff,
@@ -15,11 +30,8 @@ const FACTION_COLOR: Record<FactionId, number> = {
 
 /** Pixel size of one "pixel" in a walker's sprite (see pixelArt.ts's WALKER_PATTERN, 5 cols wide). */
 const WALKER_PIXEL_SIZE = 1.3;
+/** A leader's own sprite renders bigger, plus a small plume (see drawWalkerSprite) — replaces the old halo circle. */
 const LEADER_PIXEL_SIZE = WALKER_PIXEL_SIZE * 1.8;
-/** Radius of the highlight halo drawn behind a leader's sprite. */
-const LEADER_HALO_RADIUS = 7;
-const KNIGHT_COLOR = 0xffcc00;
-const GUARDIAN_COLOR = 0x33e0ff;
 const SWAMP_COLOR = 0x6a3fa0;
 /** Alpha of the farmland's soil base fill — low enough that the terrain's own slope shading still reads through it. */
 const FARMLAND_SOIL_ALPHA = 0.35;
@@ -113,6 +125,13 @@ export class EntityLayer {
   readonly view = new Container();
   private readonly graphics = new Graphics();
   private elapsedTime = 0;
+  /**
+   * Each walker's last-known facing, kept across frames — a walker with no
+   * current MoveTarget (idle, mid-settle, or a hero holding position) has
+   * no heading to compute facingFor() from, so it keeps facing whichever
+   * way it was last actually walking instead of snapping to a default.
+   */
+  private readonly lastFacing = new Map<Entity, Facing>();
 
   constructor(private readonly iso: IsoRenderer) {
     this.view.addChild(this.graphics);
@@ -206,15 +225,22 @@ export class EntityLayer {
       const walker = world.get(entity, Walker)!;
       const { sx, sy } = this.iso.project(pos.x, pos.y);
       const isLeader = leaderIds.has(entity);
-      const heroColor = walker.state === "knight" ? KNIGHT_COLOR : walker.state === "guardian" ? GUARDIAN_COLOR : undefined;
+      const heroKind = walker.state === "knight" || walker.state === "guardian" ? walker.state : undefined;
       const pixelSize = isLeader ? LEADER_PIXEL_SIZE : WALKER_PIXEL_SIZE;
 
       const { stepping, bob } = walkCycle(this.elapsedTime, pos);
 
-      if (isLeader) {
-        g.circle(sx, sy - bob - LEADER_HALO_RADIUS, LEADER_HALO_RADIUS).fill({ color: 0xffffff, alpha: 0.35 });
-      }
-      drawWalkerSprite(g, sx, sy - bob, heroColor ?? FACTION_COLOR[owner.faction], pixelSize, stepping);
+      const target = world.get(entity, MoveTarget);
+      const facing = target ? facingFor(target.x - pos.x, target.y - pos.y) : (this.lastFacing.get(entity) ?? "SE");
+      this.lastFacing.set(entity, facing);
+
+      drawWalkerSprite(g, sx, sy - bob, pixelSize, {
+        facing,
+        stepping,
+        bodyColor: FACTION_COLOR[owner.faction],
+        isLeader,
+        heroKind,
+      });
     }
 
     for (const effect of impactEffects) {
