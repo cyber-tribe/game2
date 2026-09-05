@@ -59,10 +59,7 @@ def pack(frames: dict[str, Image.Image], image_name: str, columns: int = 16) -> 
     return sheet, meta
 
 
-def write(sheet: Image.Image, meta: dict, png_path: Path, json_path: Path) -> None:
+def write(sheet: Image.Image, meta_json: str, png_path: Path, json_path: Path) -> None:
     png_path.parent.mkdir(parents=True, exist_ok=True)
-    # optimize=True keeps the committed PNG byte-stable across Pillow's own
-    # default-compression changes, which would otherwise show up as a
-    # spurious diff (and a CI failure from `npm run sprites:check`).
     sheet.save(png_path, format="PNG", optimize=True)
-    json_path.write_text(json.dumps(meta, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    json_path.write_text(meta_json, encoding="utf-8")

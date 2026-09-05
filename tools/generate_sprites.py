@@ -13,9 +13,11 @@ is what makes "review the source, trust the binary" actually safe.
 from __future__ import annotations
 
 import argparse
-import io
+import json
 import sys
 from pathlib import Path
+
+from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -33,16 +35,24 @@ PNG_PATH = OUT_DIR / PNG_NAME
 JSON_PATH = OUT_DIR / "walkers.json"
 
 
-def build() -> tuple[bytes, str]:
+def build() -> tuple[Image.Image, str]:
     palette = load()
     sheet, meta = atlas.pack(walkers.render_all(palette), PNG_NAME)
+    return sheet, json.dumps(meta, indent=2, sort_keys=True) + "\n"
 
-    buffer = io.BytesIO()
-    sheet.save(buffer, format="PNG", optimize=True)
 
-    import json
+def _png_matches(path: Path, sheet: Image.Image) -> bool:
+    """Compares the *decoded pixels*, not the file's bytes.
 
-    return buffer.getvalue(), json.dumps(meta, indent=2, sort_keys=True) + "\n"
+    PNG bytes depend on the zlib build doing the compressing, so a byte
+    comparison fails on a machine whose zlib differs from the one that
+    produced the committed file — a false alarm about art that is in fact
+    identical. Pixels are what the check is actually about.
+    """
+    if not path.exists():
+        return False
+    with Image.open(path) as committed:
+        return committed.convert("RGBA").tobytes() == sheet.convert("RGBA").tobytes()
 
 
 def main() -> int:
@@ -50,12 +60,12 @@ def main() -> int:
     parser.add_argument("--check", action="store_true", help="exit non-zero if the committed atlas is stale")
     args = parser.parse_args()
 
-    png_bytes, json_text = build()
-    stale = [
-        path
-        for path, wanted in ((PNG_PATH, png_bytes), (JSON_PATH, json_text.encode("utf-8")))
-        if not path.exists() or path.read_bytes() != wanted
-    ]
+    sheet, json_text = build()
+    stale: list[Path] = []
+    if not _png_matches(PNG_PATH, sheet):
+        stale.append(PNG_PATH)
+    if not JSON_PATH.exists() or JSON_PATH.read_text(encoding="utf-8") != json_text:
+        stale.append(JSON_PATH)
 
     if args.check:
         if stale:
@@ -67,8 +77,7 @@ def main() -> int:
         return 0
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    PNG_PATH.write_bytes(png_bytes)
-    JSON_PATH.write_text(json_text, encoding="utf-8")
+    atlas.write(sheet, json_text, PNG_PATH, JSON_PATH)
     print(f"wrote {PNG_PATH.relative_to(REPO_ROOT)} and {JSON_PATH.relative_to(REPO_ROOT)}")
     return 0
 

@@ -101,6 +101,22 @@ Map だと死んだ walker ごとに Sprite が漏れ、独自の掃除パスが
 **添字によるプール**にして、そのフレームで描かれなかった分は
 `visible = false` にするだけにした。
 
+## CI で Python が要る一点
+
+生成物をコミットしているのでゲームのビルドに Python は要らないが、
+`npm run sprites:check` だけは生成器を実際に走らせるので Pillow が要る。
+最初の push はここを忘れて CI が `ModuleNotFoundError: No module named
+'PIL'` で落ちた。`tools/requirements.txt`（Pillow をピン留め）と
+workflow の setup-python / pip install を追加した。
+
+あわせて `--check` の比較を**PNGのバイト列から復号後のピクセルへ**変えた。
+PNG のバイト列は圧縮した zlib の実装に依存するため、コミットした環境と
+zlib が違うマシンでは**絵が全く同じでも**バイト比較が落ちる。この検査が
+見たいのはピクセルであってバイトではない。
+
+実際に、1ピクセル書き換えたときは exit 1、圧縮レベルだけ変えた
+（絵は同一の）ときは exit 0 になることを確認している。
+
 ## 検証
 
 - `npm run typecheck` 通過、`npm run test -- --run` 454件通過（+7件）
