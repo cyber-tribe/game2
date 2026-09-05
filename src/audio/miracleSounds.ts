@@ -8,7 +8,7 @@
  * later — see main.ts's onEnemyAction, which already does this for the
  * screen-shake/toast but had no audio equivalent before this.
  */
-export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "volcano" | "knight" | "armageddon" | "flood";
+export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "volcano" | "knight" | "guardian" | "armageddon" | "flood";
 
 /** Every MiracleSoundType, for tests and any future UI that wants to list them. */
 export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
@@ -17,6 +17,7 @@ export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
   "swamp",
   "volcano",
   "knight",
+  "guardian",
   "armageddon",
   "flood",
 ];
@@ -74,6 +75,13 @@ export const RECIPES: Record<MiracleSoundType, MiracleSoundRecipe> = {
       { waveform: "square", startFrequency: 700, endFrequency: 500, delay: 0, duration: 0.12, peakGain: 0.22 },
       { waveform: "square", startFrequency: 900, endFrequency: 600, delay: 0.08, duration: 0.1, peakGain: 0.15 },
     ],
+  },
+  // A low, steady triangle tone plus a short thud — a "shield raised"
+  // sound, deliberately calmer than knight's sharp rising-square "clang"
+  // to match guardian's defensive, stand-your-ground role.
+  guardian: {
+    tones: [{ waveform: "triangle", startFrequency: 260, endFrequency: 320, delay: 0, duration: 0.25, peakGain: 0.2 }],
+    noise: { delay: 0, duration: 0.15, peakGain: 0.15, filterFrequency: 300 },
   },
   armageddon: {
     tones: [

@@ -1,6 +1,6 @@
 import type { Entity, System, World } from "../../ecs";
-import { COMBAT_RANGE, HOUSE_LEVELS, KNIGHT_BURN_COOLDOWN } from "../constants";
-import { House, KnightCooldown, Owner, Position, Walker, type FactionId } from "../components";
+import { COMBAT_RANGE, HERO_ACTION_COOLDOWN, HOUSE_LEVELS } from "../constants";
+import { HeroCooldown, House, Owner, Position, Walker, type FactionId } from "../components";
 import type { OnImpactEffect } from "./effects";
 import { distance, type Point } from "./geometry";
 
@@ -85,10 +85,18 @@ export interface HouseCaptureConfig {
  * per docs/game-system.md a house fight always ends with capture or the
  * attacker's defeat, never a draw that leaves both sides as they were.
  *
- * A knight is the one exception: per docs/game-system.md, "敵の...家を
- * （奪わず）焼き払う" — it burns the house down (destroys it outright,
- * regardless of defense) rather than capturing it, and survives to keep
- * marching ("指示に依存せず戦い続ける").
+ * The two hero kinds (see isHeroState) are the exceptions:
+ * - A knight, per docs/game-system.md "敵の...家を（奪わず）焼き払う",
+ *   burns the house down (destroys it outright, regardless of defense)
+ *   rather than capturing it, and survives to keep marching
+ *   ("指示に依存せず戦い続ける").
+ * - A guardian captures normally (still checked against the house's
+ *   defense, still repelled and consumed on failure like any regular
+ *   walker) but survives a successful capture instead of being consumed by
+ *   it — a defender that holds what it takes rather than a raider that
+ *   burns and moves on.
+ * Both hero kinds get a HeroCooldown after resolving a house — see that
+ * component's doc comment.
  */
 export function createHouseCaptureSystem(config: Partial<HouseCaptureConfig> = {}): System {
   const onCapture = config.onCapture ?? (() => {});
@@ -100,7 +108,6 @@ export function createHouseCaptureSystem(config: Partial<HouseCaptureConfig> = {
       const walkerPos = world.get(walkerEntity, Position)!;
       const walkerOwner = world.get(walkerEntity, Owner)!;
       const walker = world.get(walkerEntity, Walker)!;
-      const isKnight = walker.state === "knight";
 
       for (const houseEntity of world.query(Position, House, Owner)) {
         const houseOwner = world.get(houseEntity, Owner)!;
@@ -108,13 +115,13 @@ export function createHouseCaptureSystem(config: Partial<HouseCaptureConfig> = {
         const housePos = world.get(houseEntity, Position)!;
         if (!withinRange(walkerPos, housePos)) continue;
 
-        if (isKnight) {
+        if (walker.state === "knight") {
           world.destroyEntity(houseEntity);
           onImpact({ position: housePos, type: "houseBurned" });
           onBurn(walkerOwner.faction);
-          // See KnightCooldown's doc comment / knightTargetingSystem — without
+          // See HeroCooldown's doc comment / knightTargetingSystem — without
           // this a knight instantly marches on to its next-nearest target.
-          world.add(walkerEntity, KnightCooldown, { remaining: KNIGHT_BURN_COOLDOWN });
+          world.add(walkerEntity, HeroCooldown, { remaining: HERO_ACTION_COOLDOWN });
           break;
         }
 
@@ -124,11 +131,20 @@ export function createHouseCaptureSystem(config: Partial<HouseCaptureConfig> = {
           world.add(houseEntity, House, { level: house.level, population: 0 });
           onImpact({ position: housePos, type: "houseCaptured" });
           onCapture(walkerOwner.faction);
+
+          if (walker.state === "guardian") {
+            // See HeroCooldown's doc comment / guardianTargetingSystem —
+            // without this a guardian instantly marches on to capture its
+            // next-nearest threatened target.
+            world.add(walkerEntity, HeroCooldown, { remaining: HERO_ACTION_COOLDOWN });
+          } else {
+            world.destroyEntity(walkerEntity);
+          }
         } else {
           onImpact({ position: walkerPos, type: "combatDeath" });
+          world.destroyEntity(walkerEntity);
         }
 
-        world.destroyEntity(walkerEntity);
         break;
       }
     }

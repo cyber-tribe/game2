@@ -18,8 +18,8 @@ export { createSwampSystem, type SwampConfig } from "./systems/swamp";
 export type { ImpactEffectEvent, ImpactEffectSnapshot, ImpactEffectType, OnImpactEffect } from "./systems/effects";
 export { eruptVolcano } from "./volcano";
 export { drownFlood } from "./flood";
-export { knightify } from "./knight";
-export { knightTargetingSystem } from "./systems/knight";
+export { guardianify, knightify } from "./hero";
+export { guardianTargetingSystem, heroCooldownSystem, knightTargetingSystem } from "./systems/hero";
 export { triggerArmageddon } from "./armageddon";
 export {
   Simulation,

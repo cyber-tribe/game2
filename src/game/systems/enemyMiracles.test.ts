@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
 import type { Heightmap } from "../../world/heightmap";
 import { FactionState, House, Owner, Position, Walker } from "../components";
-import { ARMAGEDDON_MANA_COST, EARTHQUAKE_MANA_COST, KNIGHT_MANA_COST, VOLCANO_MANA_COST } from "../constants";
+import { ARMAGEDDON_MANA_COST, EARTHQUAKE_MANA_COST, GUARDIAN_MANA_COST, KNIGHT_MANA_COST, VOLCANO_MANA_COST } from "../constants";
 import { createFaction } from "../faction";
 import { createEnemyMiracleSystem } from "./enemyMiracles";
 
@@ -145,6 +145,67 @@ describe("createEnemyMiracleSystem", () => {
     expect(world.get(leader, Walker)!.state).toBe("knight");
     expect(world.get(enemy, FactionState)!.mana).toBe(0);
     expect(events).toEqual([{ type: "knight" }]);
+  });
+
+  it("guardians instead of knighting its leader when meaningfully behind on population", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 }, "fight");
+    const leader = createWalker(world, "enemy");
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: GUARDIAN_MANA_COST, leaderId: leader });
+    createHouse(world, "enemy", 0, 0, 5);
+    createFaction(world, "player", { x: 9, y: 9 });
+    createHouse(world, "player", 9, 9, 20); // 5/20 = well below the "even" 1.0 line
+
+    const events: unknown[] = [];
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap: flatHeightmap(10, 10, 5),
+      worldCenter: WORLD_CENTER,
+      onAction: (event) => events.push(event),
+    })(world, 8);
+
+    expect(world.get(leader, Walker)!.state).toBe("guardian");
+    expect(world.get(enemy, FactionState)!.mana).toBe(0);
+    expect(events).toEqual([{ type: "guardian" }]);
+  });
+
+  it("does not fall back to knight when behind on population but guardian isn't unlocked", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 }, "fight");
+    const leader = createWalker(world, "enemy");
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: KNIGHT_MANA_COST, leaderId: leader });
+    createHouse(world, "enemy", 0, 0, 5);
+    createFaction(world, "player", { x: 9, y: 9 });
+    createHouse(world, "player", 9, 9, 20);
+
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap: flatHeightmap(10, 10, 5),
+      worldCenter: WORLD_CENTER,
+      allowedMiracles: ["earthquake", "knight"], // guardian deliberately absent
+    })(world, 8);
+
+    // The AI's read of the fight ("we're behind, defend") isn't unlocked as
+    // guardian here, and it doesn't second-guess itself into knighting
+    // instead — see createEnemyMiracleSystem's own doc comment.
+    expect(world.get(leader, Walker)!.state).toBe("seeking");
+  });
+
+  it("does not guardian an already-guardian leader", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 }, "fight");
+    const leader = createWalker(world, "enemy", "guardian");
+    // Too little mana for any other branch (earthquake's 20 included), so
+    // the only way this test's assertion could fail is the hero branch
+    // itself recasting guardian on an already-guardian leader.
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: 1, leaderId: leader });
+    createHouse(world, "enemy", 0, 0, 5);
+    createFaction(world, "player", { x: 9, y: 9 });
+    createHouse(world, "player", 9, 9, 20); // keeps the enemy "behind", so guardian stays its preferred kind
+
+    createEnemyMiracleSystem({ decisionInterval: 8, heightmap: flatHeightmap(10, 10, 5), worldCenter: WORLD_CENTER })(world, 8);
+
+    expect(world.get(enemy, FactionState)!.mana).toBe(1); // untouched — nothing to guardian
   });
 
   it("does not knight an already-knighted leader", () => {

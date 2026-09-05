@@ -25,6 +25,7 @@ const LEADER_PIXEL_SIZE = WALKER_PIXEL_SIZE * 1.8;
 /** Radius of the highlight halo drawn behind a leader's sprite. */
 const LEADER_HALO_RADIUS = 7;
 const KNIGHT_COLOR = 0xffcc00;
+const GUARDIAN_COLOR = 0x33e0ff;
 const SWAMP_COLOR = 0x6a3fa0;
 /** Alpha of the farmland tint — subtle, so it reads as ground coloring, not a bold overlay like a swamp hazard. */
 const FARMLAND_ALPHA = 0.16;
@@ -202,7 +203,7 @@ export class EntityLayer {
       const walker = world.get(entity, Walker)!;
       const { sx, sy } = this.iso.project(pos.x, pos.y);
       const isLeader = leaderIds.has(entity);
-      const isKnight = walker.state === "knight";
+      const heroColor = walker.state === "knight" ? KNIGHT_COLOR : walker.state === "guardian" ? GUARDIAN_COLOR : undefined;
       const pixelSize = isLeader ? LEADER_PIXEL_SIZE : WALKER_PIXEL_SIZE;
 
       const { stepping, bob } = walkCycle(this.elapsedTime, pos);
@@ -210,7 +211,7 @@ export class EntityLayer {
       if (isLeader) {
         g.circle(sx, sy - bob - LEADER_HALO_RADIUS, LEADER_HALO_RADIUS).fill({ color: 0xffffff, alpha: 0.35 });
       }
-      drawWalkerSprite(g, sx, sy - bob, isKnight ? KNIGHT_COLOR : FACTION_COLOR[owner.faction], pixelSize, stepping);
+      drawWalkerSprite(g, sx, sy - bob, heroColor ?? FACTION_COLOR[owner.faction], pixelSize, stepping);
     }
 
     for (const effect of impactEffects) {

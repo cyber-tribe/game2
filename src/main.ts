@@ -4,6 +4,7 @@ import {
   ARMAGEDDON_MANA_COST,
   EARTHQUAKE_MANA_COST,
   FLOOD_MANA_COST,
+  GUARDIAN_MANA_COST,
   KNIGHT_MANA_COST,
   SHRINE_MOVE_MANA_COST,
   SWAMP_MANA_COST,
@@ -191,13 +192,14 @@ async function bootstrap(world: WorldDefinition) {
   };
 
   // Mirrors the shake magnitudes applyTool uses for the player's own casts
-  // of the same miracles (knight has no player-side shake to match, so
-  // keeps its original, smaller value).
+  // of the same miracles (knight/guardian have no player-side shake to
+  // match, so keep their own small, hero-scale values).
   const ENEMY_SHAKE_MAGNITUDE: Record<EnemyMiracleEvent["type"], number> = {
     armageddon: 10,
     volcano: 8,
     earthquake: 6,
     knight: 3,
+    guardian: 3,
   };
 
   const onEnemyAction = (event: EnemyMiracleEvent) => {
@@ -531,6 +533,16 @@ async function bootstrap(world: WorldDefinition) {
       simulation.recordEvent("player", "knight");
       vibrate(30);
       playMiracleSound("knight");
+      return;
+    }
+
+    if (toolMode === "guardian") {
+      // Also a global effect (it acts on the leader, not the tapped spot).
+      if (!trySpendPlayerMana(GUARDIAN_MANA_COST)) return;
+      simulation.guardianify("player");
+      simulation.recordEvent("player", "guardian");
+      vibrate(25);
+      playMiracleSound("guardian");
       return;
     }
 

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
-import { Owner, Position, Swamp, Walker } from "../components";
+import { Owner, Position, Swamp, Walker, type WalkerState } from "../components";
 import { createSwamp } from "../swamp";
 import type { ImpactEffectEvent } from "./effects";
 import { createSwampSystem } from "./swamp";
 
-function createWalker(world: World, x: number, y: number, state: "seeking" | "knight" = "seeking") {
+function createWalker(world: World, x: number, y: number, state: WalkerState = "seeking") {
   const entity = world.createEntity();
   world.add(entity, Position, { x, y });
   world.add(entity, Owner, { faction: "player" });
@@ -65,6 +65,17 @@ describe("swampSystem", () => {
     createSwampSystem()(world, 0);
 
     expect(world.isAlive(knight)).toBe(true);
+    expect(world.get(swamp, Swamp)!.remainingCapacity).toBe(3);
+  });
+
+  it("lets a guardian walk through a swamp unharmed too", () => {
+    const world = new World();
+    const swamp = createSwamp(world, 5, 5, 1, 3);
+    const guardian = createWalker(world, 5, 5, "guardian");
+
+    createSwampSystem()(world, 0);
+
+    expect(world.isAlive(guardian)).toBe(true);
     expect(world.get(swamp, Swamp)!.remainingCapacity).toBe(3);
   });
 

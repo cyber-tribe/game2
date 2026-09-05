@@ -374,6 +374,35 @@ describe("Simulation", () => {
     expect(sim.getMatchEvents()).toContainEqual({ time: 0.1, faction: "player", type: "houseBurned" });
   });
 
+  it("records houseCaptured (not houseBurned) when a guardian captures an enemy house", () => {
+    const sim = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 0 });
+    const enemyHouse = sim.world.createEntity();
+    sim.world.add(enemyHouse, Position, { x: 5, y: 5 });
+    sim.world.add(enemyHouse, Owner, { faction: "enemy" });
+    sim.world.add(enemyHouse, House, { level: "hut", population: 0 });
+
+    const guardian = sim.world.createEntity();
+    sim.world.add(guardian, Position, { x: 5, y: 5 });
+    sim.world.add(guardian, Owner, { faction: "player" });
+    sim.world.add(guardian, Walker, { strength: HOUSE_LEVELS.hut.defense + 1, state: "guardian", speed: 1 });
+
+    sim.update(0.1);
+
+    expect(sim.getMatchEvents()).toContainEqual({ time: 0.1, faction: "player", type: "houseCaptured" });
+    expect(sim.world.isAlive(guardian)).toBe(true); // survives, unlike a regular attacker
+  });
+
+  it("guardianify turns the faction's current leader into a guardian", () => {
+    const sim = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 1 });
+    const [playerState] = sim.world.query(FactionState).filter((e) => sim.world.get(e, FactionState)!.id === "player");
+    const [playerWalker] = sim.world.query(Walker, Owner).filter((e) => sim.world.get(e, Owner)!.faction === "player");
+    sim.world.add(playerState, FactionState, { ...sim.world.get(playerState, FactionState)!, leaderId: playerWalker });
+
+    sim.guardianify("player");
+
+    expect(sim.world.get(playerWalker, Walker)!.state).toBe("guardian");
+  });
+
   it("records houseReachedCastle when a house's surroundings become flat enough", () => {
     const heightmap = flatHeightmap(20, 20, 5); // fully flat, comfortably away from any edge
     // initialWalkersPerFaction defaults to giving both sides walkers, so
@@ -590,7 +619,7 @@ describe("Simulation", () => {
     // knight can arrive at an already-stale, empty spot and only then
     // retarget to the walker's real (by now possibly settled) location —
     // occasionally adding a second full leg of travel plus
-    // KNIGHT_BURN_COOLDOWN on top. 150 ticks (15s) was tight enough to be
+    // HERO_ACTION_COOLDOWN on top. 150 ticks (15s) was tight enough to be
     // flaky in that case; 600 (60s) comfortably covers it.
     for (let i = 0; i < 600; i++) sim.update(0.1);
 

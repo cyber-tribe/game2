@@ -14,7 +14,7 @@ import {
 } from "./components";
 import { DEFAULT_WALKER_SPEED, HOUSE_LEVELS, IMPACT_EFFECT_DURATION, TILES_PER_HOUSE_CAP } from "./constants";
 import { createFaction, findFactionEntity, moveShrine } from "./faction";
-import { knightify } from "./knight";
+import { guardianify, knightify } from "./hero";
 import { totalPopulation } from "./population";
 import { releasePopulation } from "./populationRelease";
 import { createHouseCaptureSystem, createWalkerCombatSystem } from "./systems/combat";
@@ -28,7 +28,7 @@ import { gatherTargetingSystem } from "./systems/gatherTargeting";
 import { goToShrineSystem } from "./systems/goToShrine";
 import { createHouseGrowthSystem } from "./systems/houseGrowth";
 import { createHouseUpgradeSystem } from "./systems/houseUpgrade";
-import { knightCooldownSystem, knightTargetingSystem } from "./systems/knight";
+import { guardianTargetingSystem, heroCooldownSystem, knightTargetingSystem } from "./systems/hero";
 import { leaderSystem } from "./systems/leader";
 import { manaSystem } from "./systems/mana";
 import { movementSystem } from "./systems/movement";
@@ -139,6 +139,7 @@ export type MatchEventType =
   | "swamp"
   | "volcano"
   | "knight"
+  | "guardian"
   | "armageddon"
   | "flood"
   | "houseCaptured"
@@ -217,7 +218,8 @@ export class Simulation {
       .add(goToShrineSystem)
       .add(gatherTargetingSystem)
       .add(knightTargetingSystem)
-      .add(knightCooldownSystem)
+      .add(guardianTargetingSystem)
+      .add(heroCooldownSystem)
       .add(createWanderTargetSystem({ heightmap: config.heightmap }))
       .add(movementSystem)
       .add(gatherSystem)
@@ -328,6 +330,11 @@ export class Simulation {
   /** The "騎士化" miracle — turns a faction's current leader into a knight. */
   knightify(faction: FactionId): void {
     knightify(this.world, faction);
+  }
+
+  /** The "守護者化" miracle — turns a faction's current leader into a guardian. */
+  guardianify(faction: FactionId): void {
+    guardianify(this.world, faction);
   }
 
   /**
