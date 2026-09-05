@@ -16,6 +16,122 @@ const ELEVATION_STEP = 16;
  */
 const ELEVATION_EASE_TIME_CONSTANT = 0.05;
 
+/**
+ * Terrain renders as a true per-vertex mesh — each tile a pair of triangles
+ * using its own 4 corners' actual heights, shaded by how much each
+ * triangle's own slope faces a fixed light (see triangleBrightness) —
+ * rather than a flat-topped block with a separate vertical "cliff wall".
+ * Per feedback holding this renderer's own output up against a reference
+ * screenshot: "そもそも2段3段の段差があっても坂になるだけで、断層には
+ * なりません" ("even a 2-3 unit step just becomes a slope, not a cliff") —
+ * every reference image shown across this and the earlier grass/cliff
+ * legibility work agrees: an ordinary hill is a shaded slope, and the only
+ * hard vertical drop is the map's own outer edge (see drawEdgeWall) — never
+ * routine terrain. An earlier version tried the opposite: flatten every
+ * tile to its own average height and paint a flat-shaded vertical wall
+ * wherever that differed from a neighbor (plan/0064-terraced-terrain.md),
+ * tuning the wall's darkness down for small drops and rounding elevations
+ * to hide createHeightmap's routine 1-2 unit noise (plan/0073-grass-cliff-
+ * legibility.md) — but no amount of tuning a wall's *color* fixes a slope
+ * being rendered as a wall in the first place. This mesh needs none of
+ * that: a small height difference between adjacent tiles becomes a
+ * gently-tilted, gently-shaded triangle purely from its own geometry; a
+ * genuinely steep one becomes a dramatically-shaded, steeply-tilted one —
+ * both from the exact same code path, with no separate threshold, bucket,
+ * or wall-vs-slope decision anywhere.
+ */
+
+/**
+ * The fixed light direction every triangle (interior slopes and the map's
+ * own edge walls alike, see triangleBrightness/drawEdgeWall) is shaded
+ * against, expressed in the same (x, y, elevation) space toScreen projects
+ * from — i.e. before isometric projection distorts angles, not in screen
+ * pixels. Sits mostly overhead with a north-east tilt (-y/+x), continuing
+ * the same "sun in the north-east" convention plan/0073-grass-cliff-
+ * legibility.md picked for its own (now-removed) north/east-lit cliff
+ * walls — a face tilted toward -y/+x still reads as the brighter one.
+ * Pre-normalized so triangleBrightness's dot product needs no further
+ * scaling.
+ */
+const LIGHT_DIRECTION = normalize3({ x: 1, y: -1, z: 2 });
+
+/**
+ * triangleBrightness's own output for a perfectly flat, upward-facing
+ * triangle — i.e. dot(LIGHT_DIRECTION, {x:0,y:0,z:1}). Used to calibrate
+ * relative brightness so flat ground (by far the most common case) always
+ * renders at exactly its own base color, unmodified — only sloped or
+ * vertical faces shift away from 1.
+ */
+const FLAT_FACE_BRIGHTNESS = LIGHT_DIRECTION.z;
+
+/** How far a steeply shadowed face (facing away from LIGHT_DIRECTION) darkens from its base color, at most. */
+const MAX_SLOPE_DARKEN = 0.55;
+/** How far a steeply lit face (facing toward LIGHT_DIRECTION) lightens from its base color, at most. */
+const MAX_SLOPE_LIGHTEN = 0.25;
+
+/**
+ * How close two adjacent corner heights need to be to treat a triangle as
+ * "exactly flat" (see redraw()'s isFlatTriangle) — filters out floating-
+ * point noise from the easing animation (see update()) so a barely-
+ * mid-ease triangle doesn't flicker between the dithered flat look and a
+ * faintly-shaded sloped one for a difference of a few hundredths of a unit.
+ */
+const FLAT_EPSILON = 0.02;
+
+interface Vec3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
+function normalize3(v: Vec3): Vec3 {
+  const len = Math.hypot(v.x, v.y, v.z) || 1;
+  return { x: v.x / len, y: v.y / len, z: v.z / len };
+}
+
+/** The (non-normalized) normal of the plane through 3 points, via (b-a) x (c-a). */
+function triangleNormal(a: Vec3, b: Vec3, c: Vec3): Vec3 {
+  const ux = b.x - a.x;
+  const uy = b.y - a.y;
+  const uz = b.z - a.z;
+  const vx = c.x - a.x;
+  const vy = c.y - a.y;
+  const vz = c.z - a.z;
+  return { x: uy * vz - uz * vy, y: uz * vx - ux * vz, z: ux * vy - uy * vx };
+}
+
+/**
+ * A triangle/wall's brightness relative to flat ground (1 = unmodified),
+ * from how directly its own face (given as a, b, c in (x, y, elevation)
+ * space, or a precomputed normal — see drawEdgeWall) points toward
+ * LIGHT_DIRECTION. >1 for a face tilted toward the light (lightens, capped
+ * by MAX_SLOPE_LIGHTEN below), <1 for one tilted away (darkens, capped by
+ * MAX_SLOPE_DARKEN) — see shadeColor for how this turns into an actual
+ * color.
+ */
+function faceBrightness(normal: Vec3): number {
+  const n = normalize3(normal);
+  const dot = n.x * LIGHT_DIRECTION.x + n.y * LIGHT_DIRECTION.y + n.z * LIGHT_DIRECTION.z;
+  const deviation = dot - FLAT_FACE_BRIGHTNESS;
+  if (deviation < 0) {
+    // Normalized against the full possible range below flat (down to a
+    // face pointing exactly opposite the light) so even the most extreme
+    // shadow still only reaches MAX_SLOPE_DARKEN, never further.
+    return 1 - MAX_SLOPE_DARKEN * Math.min(1, -deviation / (FLAT_FACE_BRIGHTNESS + 1));
+  }
+  return 1 + MAX_SLOPE_LIGHTEN * Math.min(1, deviation / (1 - FLAT_FACE_BRIGHTNESS));
+}
+
+function triangleBrightness(a: Vec3, b: Vec3, c: Vec3): number {
+  return faceBrightness(triangleNormal(a, b, c));
+}
+
+/** Tints `color` toward black (brightness < 1) or white (brightness > 1) — see faceBrightness. */
+function shadeColor(color: number, brightness: number): number {
+  if (brightness < 1) return lerpColor(color, 0x000000, 1 - brightness);
+  return lerpColor(color, 0xffffff, brightness - 1);
+}
+
 const TERRAIN_COLOR: Record<Heightmap["terrain"], number> = {
   grass: 0x4a8c3f,
   desert: 0xd6b25e,
@@ -42,22 +158,6 @@ const GRASS_SPECKLE_COLOR = lerpColor(TERRAIN_COLOR.grass, 0x000000, 0.3);
 const GRASS_DITHER_SIZE = 8;
 /** Fraction of the dither texture's pixels that get GRASS_SPECKLE_COLOR rather than the plain grass color. */
 const GRASS_SPECKLE_DENSITY = 0.35;
-
-/**
- * How much darker a cliff wall is than the ground color of the tile it
- * belongs to — see drawCliffWalls. Picked to read clearly as a shaded
- * vertical face against the flat-shaded top colors above without going
- * fully black (which made tall cliffs look like silhouette cutouts).
- */
-const CLIFF_SHADE_AMOUNT = 0.35;
-
-/**
- * Minimum height difference (in elevation units) between a tile and its
- * neighbor before a cliff wall is drawn — filters out floating-point noise
- * from the easing animation (see update()) so a wall doesn't flicker in
- * and out for a difference of a few hundredths of a unit.
- */
-const CLIFF_MIN_STEP = 0.05;
 
 /**
  * Volcano rock (see applyVolcano/rockHardness) used to just render as
@@ -116,7 +216,10 @@ function lerpColor(from: number, to: number, t: number): number {
  * Deterministic pseudo-random value in [0, 1) for a tile's (x, y) — used to
  * give each volcano tile its own fixed crack angles and pulse phase, so
  * they don't all flicker in unison or reshuffle every frame. Same trick as
- * EntityLayer's walkCycle (a hash of position, not real randomness).
+ * EntityLayer's walkCycle (a hash of position, not real randomness). Fine
+ * for volcano tiles, which range over the whole map's worth of (x, y) —
+ * not a good fit for createDitherTexture's tiny fixed pixel grid, see
+ * ditherPixelHash below.
  */
 function tileHash(x: number, y: number): number {
   const v = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
@@ -124,21 +227,40 @@ function tileHash(x: number, y: number): number {
 }
 
 /**
+ * A separate integer hash for createDitherTexture, rather than reusing
+ * tileHash above: that one is a classic "sin of a big number" hash, which
+ * only decorrelates well across a wide, closely-spaced range of inputs.
+ * Sampled at just the 8x8 (or so) integer grid createDitherTexture actually
+ * needs, it instead aliased into a small number of repeating diagonal
+ * bands — reading as a handful of large triangular blotches, not a fine
+ * speckle, per feedback that the grass texture "isn't good". This bit-
+ * mixing hash (integer multiply + xor-shift, the "hash32shift" family)
+ * has no such periodicity: every (x, y) pair gets a well-scattered value
+ * even at this small a domain.
+ */
+function ditherPixelHash(x: number, y: number): number {
+  let h = (x * 0x1f1f1f1f) ^ (y * 0x27d4eb2d);
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+  h = h ^ (h >>> 16);
+  return (h >>> 0) / 4294967296;
+}
+
+/**
  * Builds a small tileable two-tone speckled texture, one pixel decided at
- * a time by the same deterministic tileHash trick used for volcano cracks
- * — mimics the original game's dithered ground instead of this renderer's
- * flat single-color fills. `size` is kept small (see GRASS_DITHER_SIZE) so
- * `addressMode: "repeat"` tiles it several times across one map tile;
- * `scaleMode: "nearest"` keeps the speckles crisp pixels rather than
- * blurring them into a smooth gradient. Works without a live GL context —
- * BufferImageSource takes raw pixel bytes directly, so this runs the same
- * in a headless test as in the browser.
+ * a time by ditherPixelHash — mimics the original game's dithered ground
+ * instead of this renderer's flat single-color fills. `size` is kept small
+ * (see GRASS_DITHER_SIZE) so `addressMode: "repeat"` tiles it several times
+ * across one map tile; `scaleMode: "nearest"` keeps the speckles crisp
+ * pixels rather than blurring them into a smooth gradient. Works without a
+ * live GL context — BufferImageSource takes raw pixel bytes directly, so
+ * this runs the same in a headless test as in the browser.
  */
 function createDitherTexture(size: number, baseColor: number, speckleColor: number, density: number): Texture {
   const pixels = new Uint8Array(size * size * 4);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      const color = tileHash(x, y) < density ? speckleColor : baseColor;
+      const color = ditherPixelHash(x, y) < density ? speckleColor : baseColor;
       const i = (y * size + x) * 4;
       pixels[i] = (color >> 16) & 0xff;
       pixels[i + 1] = (color >> 8) & 0xff;
@@ -205,10 +327,10 @@ export interface TileBounds {
  * farmland tint just past the exact edge never pops in/out as the camera
  * pans. (`diff` — sx/(TILE_WIDTH/2) — has no elevation term at all, so it
  * never needs padding; padding every side the same is just simpler than
- * tracking that asymmetry.) The same margin also covers a cliff wall (see
- * drawCliffWalls) belonging to a tile just past the edge of `bounds` — a
- * wall is at most this tall too, since it's just the gap between two
- * tiles' own elevations.
+ * tracking that asymmetry.) The same margin also covers a map-edge wall
+ * (see drawEdgeWall) belonging to a tile just past the edge of `bounds` —
+ * a wall is at most this tall too, since it's just the gap between a
+ * boundary vertex's own elevation and sea level.
  */
 const TILE_BOUNDS_MARGIN = Math.ceil(MAX_ELEVATION / 2) + 2;
 
@@ -272,14 +394,16 @@ export function isWithinTileBounds(point: { x: number; y: number }, bounds: Tile
 }
 
 /**
- * Renders a heightmap as terraced isometric blocks, one flat-topped block
- * per tile with a shaded vertical cliff face wherever it sits higher than
- * a neighboring tile — see redraw(). Deliberately not a smooth per-vertex
- * mesh (each tile's 4 corners individually at their own height, producing
- * continuous slopes): the original game's stepped, plateau-and-cliff look
- * reads far better at this game's low tile-per-screen zoom level than a
- * smooth ramp does, and matches the reference art the terracing was
- * modeled on. See plan/0064-terraced-terrain.md.
+ * Renders a heightmap as a true per-vertex isometric mesh: each tile is a
+ * pair of triangles using its own 4 corners' actual heights, so a height
+ * difference between tiles reads as a continuous, shaded slope rather than
+ * a flat block with a separate vertical cliff face — see redraw() and
+ * LIGHT_DIRECTION's own doc comment for why (plan/0073-grass-cliff-
+ * legibility.md's "追記" section, and plan/0064-terraced-terrain.md for
+ * the flat-block approach this replaced). The map's own outer edge is the
+ * one place that still gets a genuine vertical wall (see drawEdgeWall) —
+ * every reference image checked against this renderer agrees a real,
+ * original-game map ends in a hard drop at its border, not a slope.
  */
 export class IsoRenderer {
   readonly view = new Container();
@@ -472,20 +596,6 @@ export class IsoRenderer {
     const boundsWidth = maxX - minX + 1;
     const boundsHeight = maxY - minY + 1;
 
-    // A tile's flat-topped block height (see the class doc comment) is the
-    // average of its 4 (possibly uneven) corner vertices. Not just a
-    // lookup into a precomputed grid: drawCliffWalls needs this for a
-    // tile's neighbors too, which can sit just outside `bounds` — reading
-    // straight from `vertices` (the true, unbounded map) instead keeps
-    // that correct without needing to pad a bounded grid. Off the edge of
-    // the map reads as sea level, so an elevated tile at the map's border
-    // still gets a cliff wall down to it instead of just stopping bare —
-    // like the edge of a diorama base.
-    const tileElevation = (x: number, y: number): number =>
-      x < 0 || y < 0 || x >= width || y >= height
-        ? 0
-        : (vertices[y][x] + vertices[y][x + 1] + vertices[y + 1][x + 1] + vertices[y + 1][x]) / 4;
-
     // Precomputed once so the lava-flow pass (below) can look at each rock
     // tile's neighbors without recomputing isRockTile for them repeatedly.
     // Indexed by offset from (minX, minY), not by true tile coordinates —
@@ -514,42 +624,66 @@ export class IsoRenderer {
     }
     this.hasActiveLava = isRockTile.some((row) => row.some(Boolean));
 
-    // Pass 1: every tile's flat top plus its own cliff walls. Walked in
-    // back-to-front diagonal (x+y) order over `bounds` — not the simpler
-    // row-major order the old smooth mesh used — because a tall cliff wall
-    // (up to MAX_ELEVATION*ELEVATION_STEP px) can reach far enough up the
-    // screen to overlap tiles several rows behind it; only strict
-    // painter's-algorithm order draws those correctly. A wall never
-    // overlaps its own tile's top or its neighbor's top (it fills exactly
-    // the elevation gap between them), so within a single tile, top-then-
-    // walls order doesn't matter — only the across-tile order does.
+    // Pass 1: every tile's own sloped, shaded mesh (see the class doc
+    // comment) plus a genuine vertical wall wherever it sits on the map's
+    // own outer edge (see drawEdgeWall). Walked in back-to-front diagonal
+    // (x+y) order, not the simpler row-major order a plain per-vertex loop
+    // could use — a steep enough slope (up to MAX_ELEVATION*ELEVATION_STEP
+    // px of rise across one tile) can still reach far enough up the screen
+    // to overlap tiles several rows behind it, and only strict painter's-
+    // algorithm order draws those correctly.
     for (let d = minX + minY; d <= maxX + maxY; d++) {
       const yStart = Math.max(minY, d - maxX);
       const yEnd = Math.min(maxY, d - minX);
       for (let y = yStart; y <= yEnd; y++) {
         const x = d - y;
-        const elevation = tileElevation(x, y);
-        const p0 = this.toScreen(x, y, elevation);
-        const p1 = this.toScreen(x + 1, y, elevation);
-        const p2 = this.toScreen(x + 1, y + 1, elevation);
-        const p3 = this.toScreen(x, y + 1, elevation);
+        const h00 = vertices[y][x];
+        const h10 = vertices[y][x + 1];
+        const h11 = vertices[y + 1][x + 1];
+        const h01 = vertices[y + 1][x];
+        const avgElevation = (h00 + h10 + h11 + h01) / 4;
 
-        const isWater = elevation <= waterLevel;
+        const isWater = avgElevation <= waterLevel;
         const isRock = isRockTile[y - minY][x - minX];
-        // Always the plain flat color, even for grass — drawCliffWalls
-        // shades a wall by darkening this, and a dithered wall face isn't
-        // worth the complexity the top face's texture already solves.
-        const color = isWater ? WATER_COLOR : isRock ? VOLCANO_ROCK_COLOR : TERRAIN_COLOR[terrain];
-        // Grass ground alone gets the dithered look (see GRASS_FILL) —
-        // water and rock already read fine as flat colors.
-        const topFill = !isWater && !isRock && terrain === "grass" ? GRASS_FILL : color;
+        const baseColor = isWater ? WATER_COLOR : isRock ? VOLCANO_ROCK_COLOR : TERRAIN_COLOR[terrain];
 
-        graphics
-          .poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy])
-          .fill(topFill)
-          .stroke({ width: 1, color: 0x000000, alpha: 0.15 });
+        if (isWater) {
+          // Water always reads as a single flat, unshaded plane — never a
+          // sloped/shaded seabed showing through — at its own tile's
+          // average depth, same as before this became a per-vertex mesh.
+          const p0 = this.toScreen(x, y, avgElevation);
+          const p1 = this.toScreen(x + 1, y, avgElevation);
+          const p2 = this.toScreen(x + 1, y + 1, avgElevation);
+          const p3 = this.toScreen(x, y + 1, avgElevation);
+          graphics
+            .poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy])
+            .fill(baseColor)
+            .stroke({ width: 1, color: 0x000000, alpha: 0.15 });
+        } else {
+          const a: Vec3 = { x, y, z: h00 };
+          const b: Vec3 = { x: x + 1, y, z: h10 };
+          const c: Vec3 = { x: x + 1, y: y + 1, z: h11 };
+          const d2: Vec3 = { x, y: y + 1, z: h01 };
+          // Split along the (x,y)-(x+1,y+1) diagonal into 2 triangles —
+          // 3 points are always planar, so each triangle (unlike the full
+          // 4-corner quad, which can warp into a non-planar "saddle" when
+          // all 4 corners differ) has one well-defined normal to shade by.
+          this.fillTerrainTriangle(graphics, a, b, c, baseColor, terrain, isRock);
+          this.fillTerrainTriangle(graphics, a, c, d2, baseColor, terrain, isRock);
+        }
 
-        this.drawCliffWalls(graphics, x, y, elevation, color, tileElevation);
+        // The map's own outer edge always gets a genuine vertical wall
+        // down to elevation 0 — see drawEdgeWall and the class doc comment
+        // on why this is the one place a hard drop (rather than a slope)
+        // is still correct.
+        if (y === 0) this.drawEdgeWall(graphics, { x, y, z: h00 }, { x: x + 1, y, z: h10 }, baseColor, { x: 0, y: -1, z: 0 });
+        if (x === width - 1) {
+          this.drawEdgeWall(graphics, { x: x + 1, y, z: h10 }, { x: x + 1, y: y + 1, z: h11 }, baseColor, { x: 1, y: 0, z: 0 });
+        }
+        if (y === height - 1) {
+          this.drawEdgeWall(graphics, { x: x + 1, y: y + 1, z: h11 }, { x, y: y + 1, z: h01 }, baseColor, { x: 0, y: 1, z: 0 });
+        }
+        if (x === 0) this.drawEdgeWall(graphics, { x, y: y + 1, z: h01 }, { x, y, z: h00 }, baseColor, { x: -1, y: 0, z: 0 });
       }
     }
 
@@ -560,7 +694,7 @@ export class IsoRenderer {
     for (let y = minY; y <= maxY; y++) {
       for (let x = minX; x <= maxX; x++) {
         if (!isRockTile[y - minY][x - minX]) continue;
-        const elevation = tileElevation(x, y);
+        const elevation = (vertices[y][x] + vertices[y][x + 1] + vertices[y + 1][x + 1] + vertices[y + 1][x]) / 4;
         if (elevation <= waterLevel) continue;
 
         const p0 = this.toScreen(x, y, elevation);
@@ -587,42 +721,64 @@ export class IsoRenderer {
   }
 
   /**
-   * Draws a shaded vertical wall on each of this tile's 4 edges where a
-   * neighboring tile sits lower — the "cliff face" that makes the terrain
-   * read as stepped plateaus rather than a continuous ramp. A tile with no
-   * lower neighbors (flat ground, or the low side of a slope) draws none.
+   * Fills one terrain triangle (`a`, `b`, `c` in (x, y, elevation) space)
+   * with its base color, tinted by triangleBrightness — see that function
+   * and LIGHT_DIRECTION's own doc comment. Grass gets its dithered look
+   * (see GRASS_FILL) only when the triangle is exactly flat: sloped grass
+   * shades as a plain tinted color instead, same as every other terrain —
+   * a dithered *and* tilted face wasn't worth the complexity, and it
+   * usefully doubles as a visible reward for actually flattening land
+   * (the core "flatten to build" loop, see createHeightmap's own doc
+   * comment): a manicured, flattened plot reads distinctly from the rough,
+   * gently-shaded slopes of untouched terrain right next to it.
    */
-  private drawCliffWalls(
+  private fillTerrainTriangle(
     graphics: Graphics,
-    x: number,
-    y: number,
-    elevation: number,
-    color: number,
-    tileElevation: (x: number, y: number) => number,
+    a: Vec3,
+    b: Vec3,
+    c: Vec3,
+    baseColor: number,
+    terrain: Heightmap["terrain"],
+    isRock: boolean,
   ): void {
-    const wallColor = lerpColor(color, 0x000000, CLIFF_SHADE_AMOUNT);
+    const pa = this.toScreen(a.x, a.y, a.z);
+    const pb = this.toScreen(b.x, b.y, b.z);
+    const pc = this.toScreen(c.x, c.y, c.z);
+    const isFlat = Math.abs(a.z - b.z) < FLAT_EPSILON && Math.abs(b.z - c.z) < FLAT_EPSILON;
 
-    const addWall = (
-      neighborX: number,
-      neighborY: number,
-      edgeA: { x: number; y: number },
-      edgeB: { x: number; y: number },
-    ) => {
-      const neighborElevation = tileElevation(neighborX, neighborY);
-      if (elevation - neighborElevation <= CLIFF_MIN_STEP) return;
+    const fill =
+      isFlat && !isRock && terrain === "grass"
+        ? GRASS_FILL
+        : shadeColor(baseColor, isFlat ? 1 : triangleBrightness(a, b, c));
 
-      const topA = this.toScreen(edgeA.x, edgeA.y, elevation);
-      const topB = this.toScreen(edgeB.x, edgeB.y, elevation);
-      const bottomB = this.toScreen(edgeB.x, edgeB.y, neighborElevation);
-      const bottomA = this.toScreen(edgeA.x, edgeA.y, neighborElevation);
+    graphics
+      .poly([pa.sx, pa.sy, pb.sx, pb.sy, pc.sx, pc.sy])
+      .fill(fill)
+      .stroke({ width: 1, color: 0x000000, alpha: 0.15 });
+  }
 
-      graphics.poly([topA.sx, topA.sy, topB.sx, topB.sy, bottomB.sx, bottomB.sy, bottomA.sx, bottomA.sy]).fill(wallColor);
-    };
+  /**
+   * Draws a genuine vertical wall from one real map-boundary edge (`edgeA`
+   * -> `edgeB`, both in (x, y, elevation) space, at the tile's own actual
+   * corner heights) straight down to elevation 0 — the map's own outer
+   * "diorama base" edge, the one place a hard drop is still correct (see
+   * the class doc comment). `outwardNormal` is fixed per edge direction
+   * (north/east/south/west) rather than computed from the wall's own
+   * geometry: every point on a north (or south/east/west) edge shares the
+   * same x (or y) coordinate by definition, so the wall is always exactly
+   * vertical and planar regardless of edgeA/edgeB's own heights — its
+   * normal never actually depends on them.
+   */
+  private drawEdgeWall(graphics: Graphics, edgeA: Vec3, edgeB: Vec3, baseColor: number, outwardNormal: Vec3): void {
+    if (Math.max(edgeA.z, edgeB.z) < FLAT_EPSILON) return; // already at/below sea level — nothing to drop down to
 
-    addWall(x, y - 1, { x, y }, { x: x + 1, y });
-    addWall(x + 1, y, { x: x + 1, y }, { x: x + 1, y: y + 1 });
-    addWall(x, y + 1, { x: x + 1, y: y + 1 }, { x, y: y + 1 });
-    addWall(x - 1, y, { x, y: y + 1 }, { x, y });
+    const topA = this.toScreen(edgeA.x, edgeA.y, edgeA.z);
+    const topB = this.toScreen(edgeB.x, edgeB.y, edgeB.z);
+    const bottomB = this.toScreen(edgeB.x, edgeB.y, 0);
+    const bottomA = this.toScreen(edgeA.x, edgeA.y, 0);
+    const color = shadeColor(baseColor, faceBrightness(outwardNormal));
+
+    graphics.poly([topA.sx, topA.sy, topB.sx, topB.sy, bottomB.sx, bottomB.sy, bottomA.sx, bottomA.sy]).fill(color);
   }
 
   /**
