@@ -6,7 +6,21 @@ import { distance, type Point } from "../game/systems/geometry";
 import type { ImpactEffectSnapshot, ImpactEffectType } from "../game/systems/effects";
 import { GAME_PALETTE } from "./palette";
 import { type IsoRenderer } from "./IsoRenderer";
+import { createDitherTexture } from "./patternTexture";
 import { drawHouseSprite, drawWalkerSprite, type Facing } from "./pixelArt";
+
+/**
+ * Deterministic pseudo-random value in [0, 1) for a tile's (x, y) — fixes
+ * each swamp tile's own hole/bubble placement and pulse phase so they
+ * don't reshuffle every frame or all pulse in unison. Same trick as
+ * walkCycle below (a hash of position, not real randomness) and
+ * IsoRenderer's own tileHash, kept local here rather than shared since
+ * it's a one-line, easily-duplicated formula.
+ */
+function swampTileHash(x: number, y: number, salt: number): number {
+  const v = Math.sin(x * 127.1 + y * 311.7 + salt * 74.3) * 43758.5453;
+  return v - Math.floor(v);
+}
 
 /**
  * Quantizes a tile-space heading (dx, dy) to one of the 4 iso screen
@@ -32,7 +46,25 @@ const FACTION_COLOR: Record<FactionId, number> = {
 const WALKER_PIXEL_SIZE = 1.3;
 /** A leader's own sprite renders bigger, plus a small plume (see drawWalkerSprite) — replaces the old halo circle. */
 const LEADER_PIXEL_SIZE = WALKER_PIXEL_SIZE * 1.8;
-const SWAMP_COLOR = 0x6a3fa0;
+/**
+ * Swamp used to be a translucent purple overlay (a hazard-radius marker,
+ * not real ground) — per plan/0087, it's now drawn as an actual dark
+ * mud/bog surface: a dithered base (mud + a darker purple-brown speckle,
+ * see SWAMP_FILL) plus a few deterministic black "holes" and a slow bubble
+ * pulse, drawn per-tile in the loop below.
+ */
+const SWAMP_MUD_COLOR = 0x352336;
+const SWAMP_SPECKLE_COLOR = 0x201522;
+const SWAMP_DITHER_SIZE = 10;
+const SWAMP_SPECKLE_DENSITY = 0.4;
+const SWAMP_FILL = {
+  texture: createDitherTexture(SWAMP_DITHER_SIZE, SWAMP_MUD_COLOR, SWAMP_SPECKLE_COLOR, SWAMP_SPECKLE_DENSITY),
+  textureSpace: "global" as const,
+};
+const SWAMP_HOLE_COLOR = 0x0d070d;
+const SWAMP_BUBBLE_COLOR = 0x6a8f5a;
+/** Seconds per bubble on/off half-cycle — slow enough to read as "still water occasionally bubbling", not a strobe. */
+const SWAMP_BUBBLE_PERIOD = 1.2;
 /** Alpha of the farmland's soil base fill — low enough that the terrain's own slope shading still reads through it. */
 const FARMLAND_SOIL_ALPHA = 0.35;
 /** How many plowed-furrow lines each farmland tile gets — see the farmland loop in update(). */
@@ -203,10 +235,33 @@ export class EntityLayer {
         const p1 = this.iso.project(tile.x + 1, tile.y);
         const p2 = this.iso.project(tile.x + 1, tile.y + 1);
         const p3 = this.iso.project(tile.x, tile.y + 1);
+        g.poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy]).fill(SWAMP_FILL);
 
-        g.poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy])
-          .fill({ color: SWAMP_COLOR, alpha: 0.55 })
-          .stroke({ width: 1, color: 0x2a1a3a, alpha: 0.6 });
+        // A couple of deterministic dark "holes" per tile (see
+        // swampTileHash) — fixed pixel marks, not a randomly reshuffling
+        // texture, so the same tile always looks the same from frame to
+        // frame. Bilinear-interpolated within the tile's own projected
+        // quad so they stay correctly skewed on sloped/rotated ground.
+        const at = (u: number, v: number) => ({
+          sx: p0.sx + (p1.sx - p0.sx) * u + (p3.sx - p0.sx) * v + (p2.sx - p1.sx - (p3.sx - p0.sx)) * u * v,
+          sy: p0.sy + (p1.sy - p0.sy) * u + (p3.sy - p0.sy) * v + (p2.sy - p1.sy - (p3.sy - p0.sy)) * u * v,
+        });
+        for (let hole = 0; hole < 2; hole++) {
+          const u = swampTileHash(tile.x, tile.y, hole * 2 + 1);
+          const v = swampTileHash(tile.x, tile.y, hole * 2 + 2);
+          const { sx, sy } = at(u, v);
+          g.circle(sx, sy, 2).fill(SWAMP_HOLE_COLOR);
+        }
+
+        // A slow, per-tile-phased bubble — visible for roughly half of
+        // each SWAMP_BUBBLE_PERIOD cycle, offset by the tile's own hash so
+        // a whole swamp doesn't bubble in unison.
+        const bubblePhase = swampTileHash(tile.x, tile.y, 9);
+        const bubbleT = ((this.elapsedTime / SWAMP_BUBBLE_PERIOD + bubblePhase) % 1) - 0.5;
+        if (Math.abs(bubbleT) < 0.15) {
+          const { sx, sy } = at(swampTileHash(tile.x, tile.y, 5), swampTileHash(tile.x, tile.y, 6));
+          g.circle(sx, sy, 1.2).fill(SWAMP_BUBBLE_COLOR);
+        }
       }
     }
 

@@ -8,6 +8,7 @@ import {
   isWithinTileBounds,
   visibleTileBounds,
   volcanoGlowIntensity,
+  waterFrameIndex,
   type TileBounds,
 } from "./IsoRenderer";
 
@@ -214,6 +215,17 @@ describe("IsoRenderer.redraw (sloped mesh)", () => {
     expect(instructions.filter((i) => i.action === "stroke")).toHaveLength(0);
   });
 
+  it("fills water with an animated wave texture instead of a flat color", () => {
+    const heightmap = flatHeightmap(2, 2, 0); // == default waterLevel 0, so every tile is water
+    const renderer = new IsoRenderer(heightmap);
+    const fills = drawInstructions(renderer).filter((i) => i.action === "fill");
+
+    expect(fills).toHaveLength(2 * 2);
+    for (const fill of fills) {
+      expect(fill.data.style!.texture).not.toBe(Texture.WHITE);
+    }
+  });
+
   it("draws more fills once a raised patch turns neighboring underwater tiles into dry land", () => {
     const heightmap = flatHeightmap(5, 5, 0); // every tile starts as water (elevation 0 == waterLevel 0)
     const flatFillCount = drawInstructions(new IsoRenderer(heightmap)).filter((i) => i.action === "fill").length;
@@ -233,30 +245,31 @@ describe("IsoRenderer.redraw (sloped mesh)", () => {
   });
 
   it("shades a map-edge wall darker than the flat top it descends from, in one of two directional tones", () => {
-    // Desert, not grass: grass tops are dithered (see GRASS_FILL) rather
-    // than a plain color, which this test isn't about. A uniform flat map
-    // relies purely on the map's own true outer edge for its walls — every
-    // interior tile boundary here is perfectly flat and gets no wall at all.
+    // A uniform flat map relies purely on the map's own true outer edge for
+    // its walls — every interior tile boundary here is perfectly flat and
+    // gets no wall at all.
     const heightmap = flatHeightmap(3, 3, 5);
     heightmap.terrain = "desert";
     const renderer = new IsoRenderer(heightmap);
-    const instructions = drawInstructions(renderer);
-    const colors = new Set(instructions.filter((i) => i.action === "fill").map((i) => i.data.style!.color));
+    const fills = drawInstructions(renderer).filter((i) => i.action === "fill");
 
-    // Every tile here is flat plain desert (elevation is above waterLevel 0
-    // and none of it is volcano rock), so every triangle fills unshaded
-    // with TERRAIN_COLOR.desert. Only tile (1,1) has no map-edge wall; every
-    // other tile borders the map's true edge on at least one side, shading
-    // toward one of two tones depending on which way it faces (see
-    // drawEdgeWall's fixed outward normal per direction) — exactly 3
-    // distinct colors total: the flat top, plus a lit and a shadowed wall.
-    const DESERT = 0xd6b25e;
-    expect(colors.has(DESERT)).toBe(true);
-    expect(colors.size).toBe(3);
+    // Every tile's own flat top is dithered (see TERRAIN_FILL) rather than
+    // a plain color — not what this test is about — so walls are singled
+    // out by their plain Texture.WHITE fill (see the dithering tests below)
+    // rather than by position, since redraw() interleaves each tile's own
+    // walls right after its 2 top triangles instead of drawing all walls
+    // last. Only tile (1,1) has no map-edge wall; every other tile borders
+    // the map's true edge on at least one side, shading toward one of two
+    // tones depending on which way it faces (see drawEdgeWall's fixed
+    // outward normal per direction) — exactly 2 distinct wall colors.
+    const wallColors = new Set(
+      fills.filter((f) => f.data.style!.texture === Texture.WHITE).map((f) => f.data.style!.color),
+    );
+    expect(wallColors.size).toBe(2);
 
+    const DESERT = 0xd6b25e; // TERRAIN_COLOR.desert
     const [tr, tg, tb] = channels(DESERT);
-    for (const wallColor of colors) {
-      if (wallColor === DESERT) continue;
+    for (const wallColor of wallColors) {
       const [wr, wg, wb] = channels(wallColor);
       expect(wr).toBeLessThan(tr);
       expect(wg).toBeLessThan(tg);
@@ -319,10 +332,16 @@ describe("IsoRenderer.redraw (sloped mesh)", () => {
       );
     };
 
-    expect(maxShadeDistance(0.01)).toBe(0); // within FLAT_EPSILON: still reads as perfectly flat
+    // Within FLAT_EPSILON, the tile dithers (see TERRAIN_FILL) instead of
+    // filling with a plain shaded color at all — not a meaningful "shade
+    // distance" to compare against DESERT, so this only checks that
+    // shading itself starts immediately past that threshold, with no dead
+    // zone before it kicks in.
+    const justPastFlat = maxShadeDistance(0.03);
     const gentle = maxShadeDistance(0.5);
     const steep = maxShadeDistance(4);
-    expect(gentle).toBeGreaterThan(0);
+    expect(justPastFlat).toBeGreaterThan(0);
+    expect(gentle).toBeGreaterThan(justPastFlat);
     expect(steep).toBeGreaterThan(gentle);
   });
 
@@ -355,6 +374,19 @@ describe("IsoRenderer.redraw (sloped mesh)", () => {
       // A plain color fill (a map-edge wall, or a sloped/non-grass
       // triangle) still carries Pixi's own default 1x1 white texture — a
       // real texture fill (GRASS_FILL) is the only kind that replaces it.
+      expect(top.data.style!.texture).not.toBe(Texture.WHITE);
+    }
+  });
+
+  it.each(["desert", "snow", "rock"] as const)("dithers a flat %s triangle too, not just grass", (terrain) => {
+    const heightmap = flatHeightmap(3, 3, 0); // elevation 0 draws no walls (see drawEdgeWall's own FLAT_EPSILON check)
+    heightmap.terrain = terrain;
+    heightmap.waterLevel = -1; // land despite elevation 0
+    const renderer = new IsoRenderer(heightmap);
+    const tops = drawInstructions(renderer).filter((i) => i.action === "fill");
+
+    expect(tops).toHaveLength(3 * 3 * 2);
+    for (const top of tops) {
       expect(top.data.style!.texture).not.toBe(Texture.WHITE);
     }
   });
@@ -467,5 +499,21 @@ describe("volcanoGlowIntensity", () => {
 
   it("gives the same inputs the same result (deterministic, not tied to draw order)", () => {
     expect(volcanoGlowIntensity(9, 20, 1.5, 0.3)).toBe(volcanoGlowIntensity(9, 20, 1.5, 0.3));
+  });
+});
+
+describe("waterFrameIndex", () => {
+  it("cycles through more than one frame as time advances", () => {
+    const seen = new Set<number>();
+    for (let t = 0; t < 3; t += 0.1) seen.add(waterFrameIndex(t));
+    expect(seen.size).toBeGreaterThan(1);
+  });
+
+  it("holds the same frame within one animation step, not every tick", () => {
+    expect(waterFrameIndex(0)).toBe(waterFrameIndex(0.1));
+  });
+
+  it("gives the same elapsed time the same frame (deterministic)", () => {
+    expect(waterFrameIndex(1.23)).toBe(waterFrameIndex(1.23));
   });
 });

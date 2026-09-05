@@ -1,5 +1,6 @@
-import { BufferImageSource, Container, Graphics, Texture } from "pixi.js";
+import { Container, Graphics, Texture } from "pixi.js";
 import { MAX_ELEVATION, sampleElevation, VOLCANO_ROCK_HARDNESS, type Heightmap } from "../world/heightmap";
+import { createDitherTexture, createPatternTexture } from "./patternTexture";
 
 // Sized for finger taps rather than mouse clicks: at scale 1 adjacent
 // vertices sit 32px/16px apart on screen, which pickVertex's default
@@ -143,21 +144,31 @@ const WATER_COLOR = 0x2a5f8c;
 
 /**
  * A single flat solid color read as "のっぺり" (flat, lifeless) next to the
- * original game's turf, which dithers between two greens in a fine speckle
- * rather than one uniform fill — see createDitherTexture. Only grass gets
- * this treatment for now, since that's specifically what was flagged;
- * desert/snow/rock stay plain TERRAIN_COLOR fills.
+ * original game's turf, which dithers between two tones in a fine speckle
+ * rather than one uniform fill — see createDitherTexture. Originally only
+ * grass got this treatment; plan/0087-terrain-texture-unification.md gives
+ * every terrain its own dithered pattern instead of a flat fill, per
+ * "全terrainに固有pixel patternを持たせる".
  */
 const GRASS_SPECKLE_COLOR = lerpColor(TERRAIN_COLOR.grass, 0x000000, 0.3);
 /**
- * Size (px, at scale 1) of one repeat of the grass dither texture — see
+ * Size (px, at scale 1) of one repeat of a terrain's dither texture — see
  * createDitherTexture. Small relative to a tile (64x32px) so it tiles
  * several times across each tile, reading as a fine even stipple like the
- * reference art rather than a few large blotches.
+ * reference art rather than a few large blotches. Rock uses a larger size
+ * than the others — "Grassより粗いpattern" — so its speckle reads as
+ * chunkier gravel rather than the same fine stipple as turf.
  */
-const GRASS_DITHER_SIZE = 8;
-/** Fraction of the dither texture's pixels that get GRASS_SPECKLE_COLOR rather than the plain grass color. */
+const DITHER_SIZE = 8;
+const ROCK_DITHER_SIZE = 12;
+/** Fraction of each terrain's dither texture that gets its speckle color rather than its plain base color. */
 const GRASS_SPECKLE_DENSITY = 0.35;
+const DESERT_SPECKLE_COLOR = lerpColor(TERRAIN_COLOR.desert, 0x3a2410, 0.35);
+const DESERT_SPECKLE_DENSITY = 0.15;
+const SNOW_SPECKLE_COLOR = 0xffffff;
+const SNOW_SPECKLE_DENSITY = 0.2;
+const ROCK_SPECKLE_COLOR = lerpColor(TERRAIN_COLOR.rock, 0x000000, 0.35);
+const ROCK_SPECKLE_DENSITY = 0.4;
 
 /**
  * Volcano rock (see applyVolcano/rockHardness) used to just render as
@@ -219,7 +230,7 @@ function lerpColor(from: number, to: number, t: number): number {
  * EntityLayer's walkCycle (a hash of position, not real randomness). Fine
  * for volcano tiles, which range over the whole map's worth of (x, y) —
  * not a good fit for createDitherTexture's tiny fixed pixel grid, see
- * ditherPixelHash below.
+ * patternTexture.ts's own ditherPixelHash.
  */
 function tileHash(x: number, y: number): number {
   const v = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
@@ -227,67 +238,71 @@ function tileHash(x: number, y: number): number {
 }
 
 /**
- * A separate integer hash for createDitherTexture, rather than reusing
- * tileHash above: that one is a classic "sin of a big number" hash, which
- * only decorrelates well across a wide, closely-spaced range of inputs.
- * Sampled at just the 8x8 (or so) integer grid createDitherTexture actually
- * needs, it instead aliased into a small number of repeating diagonal
- * bands — reading as a handful of large triangular blotches, not a fine
- * speckle, per feedback that the grass texture "isn't good". This bit-
- * mixing hash (integer multiply + xor-shift, the "hash32shift" family)
- * has no such periodicity: every (x, y) pair gets a well-scattered value
- * even at this small a domain.
+ * One frame of a simple pixel-art water animation — per plan/0087's
+ * "SFCゲームとして動いて見える水" (not a realistic shader/reflection): a
+ * few horizontal wave-crest bands, offset by `phase` (0..1) so consecutive
+ * frames read as the crests scrolling sideways. `phase` shifts the sine
+ * argument by a full period times itself, so frame i/N tiles seamlessly
+ * into frame (i+1)/N.
  */
-function ditherPixelHash(x: number, y: number): number {
-  let h = (x * 0x1f1f1f1f) ^ (y * 0x27d4eb2d);
-  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
-  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
-  h = h ^ (h >>> 16);
-  return (h >>> 0) / 4294967296;
-}
+/** How many wave-crest bands repeat across one WATER_WAVE_SIZE-wide texture tile — see createWaveTexture. */
+const WATER_WAVE_CYCLES = 3;
 
-/**
- * Builds a small tileable two-tone speckled texture, one pixel decided at
- * a time by ditherPixelHash — mimics the original game's dithered ground
- * instead of this renderer's flat single-color fills. `size` is kept small
- * (see GRASS_DITHER_SIZE) so `addressMode: "repeat"` tiles it several times
- * across one map tile; `scaleMode: "nearest"` keeps the speckles crisp
- * pixels rather than blurring them into a smooth gradient. Works without a
- * live GL context — BufferImageSource takes raw pixel bytes directly, so
- * this runs the same in a headless test as in the browser.
- */
-function createDitherTexture(size: number, baseColor: number, speckleColor: number, density: number): Texture {
-  const pixels = new Uint8Array(size * size * 4);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const color = ditherPixelHash(x, y) < density ? speckleColor : baseColor;
-      const i = (y * size + x) * 4;
-      pixels[i] = (color >> 16) & 0xff;
-      pixels[i + 1] = (color >> 8) & 0xff;
-      pixels[i + 2] = color & 0xff;
-      pixels[i + 3] = 255;
-    }
-  }
-  const source = new BufferImageSource({
-    resource: pixels,
-    width: size,
-    height: size,
-    addressMode: "repeat",
-    scaleMode: "nearest",
+function createWaveTexture(size: number, baseColor: number, waveColor: number, phase: number): Texture {
+  return createPatternTexture(size, (x, y) => {
+    // A gentle per-row offset (y * 0.4, not a steep diagonal) keeps this
+    // reading as wavy crest lines rather than a rigid horizontal stripe,
+    // and a high threshold (0.75) keeps the crest itself a thin
+    // highlight rather than filling half of each band — per plan/0087's
+    // own "リアルな水ではなくSFCゲームとして動いて見える水" (a couple of
+    // thin bright pixels, not a bold candy-stripe).
+    const wave = Math.sin(((x / size) * WATER_WAVE_CYCLES + phase) * Math.PI * 2 + y * 0.4);
+    return wave > 0.75 ? waveColor : baseColor;
   });
-  return new Texture({ source });
 }
 
 /**
- * Filled with textureSpace: "global" wherever it's used (see redraw()) so
- * the speckles stay fixed to the ground and pan/zoom/rotate along with the
- * terrain, like a texture actually painted onto it, rather than sliding
- * around as if it were laid over the screen.
+ * One dithered fill per terrain type, each filled with textureSpace:
+ * "global" wherever it's used (see redraw()) so the speckles stay fixed to
+ * the ground and pan/zoom/rotate along with the terrain, like a texture
+ * actually painted onto it, rather than sliding around as if it were laid
+ * over the screen.
  */
-const GRASS_FILL = {
-  texture: createDitherTexture(GRASS_DITHER_SIZE, TERRAIN_COLOR.grass, GRASS_SPECKLE_COLOR, GRASS_SPECKLE_DENSITY),
-  textureSpace: "global" as const,
+const TERRAIN_FILL: Record<Heightmap["terrain"], { texture: Texture; textureSpace: "global" }> = {
+  grass: {
+    texture: createDitherTexture(DITHER_SIZE, TERRAIN_COLOR.grass, GRASS_SPECKLE_COLOR, GRASS_SPECKLE_DENSITY),
+    textureSpace: "global",
+  },
+  desert: {
+    texture: createDitherTexture(DITHER_SIZE, TERRAIN_COLOR.desert, DESERT_SPECKLE_COLOR, DESERT_SPECKLE_DENSITY),
+    textureSpace: "global",
+  },
+  snow: {
+    texture: createDitherTexture(DITHER_SIZE, TERRAIN_COLOR.snow, SNOW_SPECKLE_COLOR, SNOW_SPECKLE_DENSITY),
+    textureSpace: "global",
+  },
+  rock: {
+    texture: createDitherTexture(ROCK_DITHER_SIZE, TERRAIN_COLOR.rock, ROCK_SPECKLE_COLOR, ROCK_SPECKLE_DENSITY),
+    textureSpace: "global",
+  },
 };
+
+/** Size (px) of one repeat of the water wave texture — see createWaveTexture. */
+const WATER_WAVE_SIZE = 16;
+const WATER_WAVE_COLOR = lerpColor(WATER_COLOR, 0xffffff, 0.35);
+/** How many distinct animation frames the water cycles through — see WATER_FRAMES/waterFrameIndex. */
+const WATER_FRAME_COUNT = 3;
+/** Frames per second the water animation advances — slow and gentle, per plan/0087's "動いて見える" rather than a fast realistic ripple. */
+const WATER_FRAME_RATE = 2;
+const WATER_FRAMES: { texture: Texture; textureSpace: "global" }[] = Array.from({ length: WATER_FRAME_COUNT }, (_, i) => ({
+  texture: createWaveTexture(WATER_WAVE_SIZE, WATER_COLOR, WATER_WAVE_COLOR, i / WATER_FRAME_COUNT),
+  textureSpace: "global",
+}));
+
+/** Which of WATER_FRAMES should be showing right now — pulled out as a pure function so the cadence is unit-testable. */
+export function waterFrameIndex(elapsedTime: number): number {
+  return Math.floor(elapsedTime * WATER_FRAME_RATE) % WATER_FRAME_COUNT;
+}
 
 /**
  * How brightly a volcano tile's lava should glow right now: a base level
@@ -653,12 +668,16 @@ export class IsoRenderer {
           // average depth, same as before this became a per-vertex mesh.
           // No stroke (see fillTerrainTriangle's own doc comment on why):
           // a whole lake is one continuous color, so outlining every tile
-          // seam would draw a visible grid across it for no reason.
+          // seam would draw a visible grid across it for no reason. A
+          // simple pixel wave animation (see WATER_FRAMES/waterFrameIndex)
+          // replaces the old flat WATER_COLOR fill, per plan/0087.
           const p0 = this.toScreen(x, y, avgElevation);
           const p1 = this.toScreen(x + 1, y, avgElevation);
           const p2 = this.toScreen(x + 1, y + 1, avgElevation);
           const p3 = this.toScreen(x, y + 1, avgElevation);
-          graphics.poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy]).fill(baseColor);
+          graphics
+            .poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy])
+            .fill(WATER_FRAMES[waterFrameIndex(this.elapsedTime)]);
         } else {
           const a: Vec3 = { x, y, z: h00 };
           const b: Vec3 = { x: x + 1, y, z: h10 };
@@ -723,10 +742,10 @@ export class IsoRenderer {
   /**
    * Fills one terrain triangle (`a`, `b`, `c` in (x, y, elevation) space)
    * with its base color, tinted by triangleBrightness — see that function
-   * and LIGHT_DIRECTION's own doc comment. Grass gets its dithered look
-   * (see GRASS_FILL) only when the triangle is exactly flat: sloped grass
-   * shades as a plain tinted color instead, same as every other terrain —
-   * a dithered *and* tilted face wasn't worth the complexity, and it
+   * and LIGHT_DIRECTION's own doc comment. Every terrain gets its own
+   * dithered look (see TERRAIN_FILL) only when the triangle is exactly
+   * flat: a sloped triangle shades as a plain tinted color instead — a
+   * dithered *and* tilted face wasn't worth the complexity, and it
    * usefully doubles as a visible reward for actually flattening land
    * (the core "flatten to build" loop, see createHeightmap's own doc
    * comment): a manicured, flattened plot reads distinctly from the rough,
@@ -757,10 +776,7 @@ export class IsoRenderer {
     const pc = this.toScreen(c.x, c.y, c.z);
     const isFlat = Math.abs(a.z - b.z) < FLAT_EPSILON && Math.abs(b.z - c.z) < FLAT_EPSILON;
 
-    const fill =
-      isFlat && !isRock && terrain === "grass"
-        ? GRASS_FILL
-        : shadeColor(baseColor, isFlat ? 1 : triangleBrightness(a, b, c));
+    const fill = isFlat && !isRock ? TERRAIN_FILL[terrain] : shadeColor(baseColor, isFlat ? 1 : triangleBrightness(a, b, c));
 
     graphics.poly([pa.sx, pa.sy, pb.sx, pb.sy, pc.sx, pc.sy]).fill(fill);
   }
