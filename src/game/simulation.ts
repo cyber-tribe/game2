@@ -19,6 +19,7 @@ import { totalPopulation } from "./population";
 import { releasePopulation } from "./populationRelease";
 import { createHouseCaptureSystem, createWalkerCombatSystem } from "./systems/combat";
 import type { ImpactEffectEvent, ImpactEffectSnapshot } from "./systems/effects";
+import { createDrowningSystem } from "./systems/drowning";
 import { createEnemyAiSystem } from "./systems/enemyAi";
 import { createEnemyMiracleSystem, type EnemyMiracleEvent } from "./systems/enemyMiracles";
 import { createEnemyTerraformSystem } from "./systems/enemyTerraform";
@@ -94,6 +95,15 @@ export interface SimulationConfig {
    * rendering.
    */
   onEnemyAction?: (event: EnemyMiracleEvent) => void;
+  /**
+   * Same per-world "海がマグマ" theming (see game/worlds.ts's
+   * WorldDefinition.instantDrowning) applied to systems/drowning.ts: skips
+   * the gradual breath countdown and drowns a walker outright the instant
+   * it's caught in a genuine body of water. Defaults to false (today's new
+   * gradual/recoverable behavior) when omitted, which is fine for tests
+   * that don't care about it.
+   */
+  instantDrowning?: boolean;
 }
 
 export interface FactionSummary {
@@ -231,6 +241,13 @@ export class Simulation {
       .add(movementSystem)
       .add(gatherSystem)
       .add(createSwampSystem({ onImpact: (event) => this.recordImpactEffect(event) }))
+      .add(
+        createDrowningSystem({
+          heightmap: config.heightmap,
+          instant: config.instantDrowning,
+          onImpact: (event) => this.recordImpactEffect(event),
+        }),
+      )
       .add(createWalkerCombatSystem({ onImpact: (event) => this.recordImpactEffect(event) }))
       .add(
         createHouseCaptureSystem({

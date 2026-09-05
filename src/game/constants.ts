@@ -163,6 +163,17 @@ export const FARMLAND_RADIUS: Record<HouseLevel, number> = {
 export const COMBAT_RANGE = 0.5;
 
 /**
+ * Seconds a walker can survive standing in a genuine body of water (see
+ * world/heightmap.ts's isInWaterPool) before drowning — see
+ * systems/drowning.ts. At DEFAULT_WALKER_SPEED (1.5 tiles/s) that's 6
+ * tiles' worth of travel, long enough for a walker caught at the edge of a
+ * freshly-dug pond a real chance to reach dry land, per feedback: "基本は
+ * 溺れてもエネルギーが0になるまでは生きており陸に上がると普段の動きに
+ * 戻る" — not so long it stops reading as a real hazard.
+ */
+export const DROWNING_BREATH_SECONDS = 4;
+
+/**
  * Seconds an ImpactEffect (see systems/effects.ts) stays on screen before
  * effectAgingSystem destroys it — a kill/capture/drowning's visible
  * lifetime is brief on purpose: it's a punctuation mark on the moment it

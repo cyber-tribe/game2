@@ -266,6 +266,7 @@ async function bootstrap(world: WorldDefinition) {
     enemyAggressionThreshold: world.enemyAggressionThreshold,
     allowedMiracles: world.allowedMiracles,
     enemyPersonality: world.enemyPersonality,
+    instantDrowning: world.instantDrowning,
     onEnemyAction,
   });
 

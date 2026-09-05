@@ -194,6 +194,40 @@ export function isBuildable(heightmap: Heightmap, x: number, y: number): boolean
   return sampleElevation(heightmap, x, y) > heightmap.waterLevel && !isRock(heightmap, x, y);
 }
 
+/** Whether tile (tileX, tileY) itself — not just one corner — sits at/below sea level, same test IsoRenderer's redraw() uses to pick a water tile's fill. */
+function isWaterTile(heightmap: Heightmap, tileX: number, tileY: number): boolean {
+  if (tileX < 0 || tileY < 0 || tileX >= heightmap.width || tileY >= heightmap.height) return false;
+  return sampleElevation(heightmap, tileX + 0.5, tileY + 0.5) <= heightmap.waterLevel;
+}
+
+/**
+ * Whether the tile containing (x, y) is part of a genuine 2x2-or-larger
+ * body of water — checked as any of the 4 axis-aligned 2x2 tile blocks
+ * that include this tile being entirely underwater (isWaterTile), rather
+ * than treating a single half-submerged tile at a shoreline as equally
+ * dangerous. Per feedback: "4マス水が正方形になるとその中にいる人は
+ * 溺れる" ("once 4 tiles form a square of water, whoever's inside
+ * drowns") — see systems/drowning.ts, the one caller, for what actually
+ * happens to a walker caught in one.
+ */
+export function isInWaterPool(heightmap: Heightmap, x: number, y: number): boolean {
+  const tileX = Math.floor(x);
+  const tileY = Math.floor(y);
+  for (const [dx, dy] of [
+    [0, 0],
+    [-1, 0],
+    [0, -1],
+    [-1, -1],
+  ] as const) {
+    const bx = tileX + dx;
+    const by = tileY + dy;
+    if (isWaterTile(heightmap, bx, by) && isWaterTile(heightmap, bx + 1, by) && isWaterTile(heightmap, bx, by + 1) && isWaterTile(heightmap, bx + 1, by + 1)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * How many vertices within `radius` of the vertex nearest (x, y) share its
  * exact height — a proxy for "how much flat land surrounds this point".
