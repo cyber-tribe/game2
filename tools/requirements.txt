@@ -1,0 +1,4 @@
+# The sprite generators' only dependency (tools/sprites/). Pinned so that a
+# contributor and CI draw the same pixels; see tools/generate_sprites.py for
+# why the --check comparison is on decoded pixels rather than PNG bytes.
+Pillow==12.3.0

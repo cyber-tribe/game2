@@ -102,6 +102,18 @@ walker と建物でアトラスを分けたのは、フレームサイズが5倍
 `walkerSprites.ts` へ移してファイルごと削除した。**描画コードはすべて
 Python 側に移った。**
 
+## CI で Python が要る一点（plan/0090 から引き継ぎ）
+
+生成物をコミットしているのでゲームのビルドに Python は要らないが、
+`npm run sprites:check` だけは生成器を走らせるので Pillow が要る。
+plan/0090 の最初の push でこれを忘れて CI が `ModuleNotFoundError:
+No module named 'PIL'` で落ちた。`tools/requirements.txt` と
+workflow の setup-python / pip install で解決している。
+
+あわせて `--check` の比較は**PNGのバイト列ではなく復号後のピクセル**で
+行う。PNG のバイト列は圧縮した zlib の実装に依存するため、絵が全く
+同じでも環境が違えばバイト比較は落ちる。
+
 ## 検証
 
 - `npm run typecheck` 通過、`npm run test -- --run` 457件通過
