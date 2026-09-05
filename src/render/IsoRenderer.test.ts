@@ -197,17 +197,21 @@ describe("isWithinTileBounds", () => {
 });
 
 describe("IsoRenderer.redraw (sloped mesh)", () => {
-  it("draws each tile as a single flat, unshaded quad + stroke when everything is at sea level", () => {
+  it("draws each tile as a single flat, unshaded quad (no stroke) when everything is at sea level", () => {
     // Elevation 0 matches flatHeightmap's own default waterLevel (0), so
     // every tile here is water — always a flat quad, never split into
     // sloped triangles (see redraw()'s isWater branch) — and no edge walls
     // either, since there's nothing above sea level to drop down from.
+    // No stroke anywhere either — see fillTerrainTriangle's own doc
+    // comment on why every tile seam used to get outlined regardless of
+    // whether its neighbor was the same color, drawing a distracting
+    // wireframe grid over otherwise-uniform ground.
     const heightmap = flatHeightmap(4, 4, 0);
     const renderer = new IsoRenderer(heightmap);
     const instructions = drawInstructions(renderer);
-    expect(instructions).toHaveLength(4 * 4 * 2);
+    expect(instructions).toHaveLength(4 * 4);
     expect(instructions.filter((i) => i.action === "fill")).toHaveLength(4 * 4);
-    expect(instructions.filter((i) => i.action === "stroke")).toHaveLength(4 * 4);
+    expect(instructions.filter((i) => i.action === "stroke")).toHaveLength(0);
   });
 
   it("draws more fills once a raised patch turns neighboring underwater tiles into dry land", () => {
