@@ -74,6 +74,16 @@ describe("WORLDS", () => {
   it("gives at least one world a personality other than balanced", () => {
     expect(WORLDS.some((world) => world.enemyPersonality !== "balanced")).toBe(true);
   });
+
+  it("never relaxes enemyTerritoryEditable back to true once a world has set it false", () => {
+    for (let i = 1; i < WORLDS.length; i++) {
+      if (!WORLDS[i - 1].enemyTerritoryEditable) expect(WORLDS[i].enemyTerritoryEditable).toBe(false);
+    }
+  });
+
+  it("restricts enemyTerritoryEditable somewhere in the list, not every world staying editable", () => {
+    expect(WORLDS.some((world) => !world.enemyTerritoryEditable)).toBe(true);
+  });
 });
 
 describe("nextWorldId", () => {

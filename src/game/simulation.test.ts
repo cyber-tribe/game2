@@ -508,6 +508,31 @@ describe("Simulation", () => {
     expect(sim.getBehaviorMode("enemy")).toBe("settle");
   });
 
+  it("reports a tile within an enemy house's own radius as that faction's territory, not one's own", () => {
+    const sim = new Simulation({ worldWidth: 20, worldHeight: 20 });
+    const enemyHouse = sim.world.createEntity();
+    sim.world.add(enemyHouse, Position, { x: 10, y: 10 });
+    sim.world.add(enemyHouse, Owner, { faction: "enemy" });
+    sim.world.add(enemyHouse, House, { level: "hut", population: 0 });
+
+    expect(sim.isEnemyTerritory("player", { x: 10, y: 10 })).toBe(true); // right on the house's own tile
+    expect(sim.isEnemyTerritory("player", { x: 15, y: 15 })).toBe(false); // well outside a hut's small radius
+    // From the enemy's own point of view, its own house is never "enemy" territory.
+    expect(sim.isEnemyTerritory("enemy", { x: 10, y: 10 })).toBe(false);
+  });
+
+  it("grows the territory radius with the house's level, matching FARMLAND_RADIUS", () => {
+    const sim = new Simulation({ worldWidth: 20, worldHeight: 20 });
+    const enemyCastle = sim.world.createEntity();
+    sim.world.add(enemyCastle, Position, { x: 10, y: 10 });
+    sim.world.add(enemyCastle, Owner, { faction: "enemy" });
+    sim.world.add(enemyCastle, House, { level: "castle", population: 0 });
+
+    // ~2.1 tiles out (center-to-center) — inside a castle's own (2.5)
+    // radius, outside a hut's (1).
+    expect(sim.isEnemyTerritory("player", { x: 11, y: 11 })).toBe(true);
+  });
+
   it("upgrades houses beyond hut when the whole map is perfectly flat", () => {
     const width = 20;
     const height = 20;

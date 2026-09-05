@@ -12,7 +12,7 @@ import {
   type HouseLevel,
   type WalkerState,
 } from "./components";
-import { DEFAULT_WALKER_SPEED, HOUSE_LEVELS, IMPACT_EFFECT_DURATION, TILES_PER_HOUSE_CAP } from "./constants";
+import { DEFAULT_WALKER_SPEED, FARMLAND_RADIUS, HOUSE_LEVELS, IMPACT_EFFECT_DURATION, TILES_PER_HOUSE_CAP } from "./constants";
 import { createFaction, findFactionEntity, moveShrine } from "./faction";
 import { guardianify, knightify } from "./hero";
 import { totalPopulation } from "./population";
@@ -317,6 +317,27 @@ export class Simulation {
   getBehaviorMode(faction: FactionId): BehaviorMode | undefined {
     const entity = findFactionEntity(this.world, faction);
     return entity === undefined ? undefined : this.world.get(entity, FactionState)!.behaviorMode;
+  }
+
+  /**
+   * Whether (tile.x + 0.5, tile.y + 0.5) falls within another faction's own
+   * "territory" — the same farmland radius EntityLayer already tints
+   * around each of that faction's houses (see FARMLAND_RADIUS's own doc
+   * comment on why that's a house's visual sphere of influence). Some
+   * worlds forbid the player from directly raising/lowering/flattening
+   * land here at all — see WorldDefinition's enemyTerritoryEditable, which
+   * main.ts's applyTerrainEditAt actually gates through; this is just the
+   * read-only geometry check.
+   */
+  isEnemyTerritory(faction: FactionId, tile: { x: number; y: number }): boolean {
+    const center = { x: tile.x + 0.5, y: tile.y + 0.5 };
+    for (const entity of this.world.query(House, Owner, Position)) {
+      if (this.world.get(entity, Owner)!.faction === faction) continue;
+      const house = this.world.get(entity, House)!;
+      const pos = this.world.get(entity, Position)!;
+      if (Math.hypot(pos.x - center.x, pos.y - center.y) <= FARMLAND_RADIUS[house.level]) return true;
+    }
+    return false;
   }
 
   /** The "集結シンボル移動" miracle — relocates where "goToShrine" mode leads the army. */
