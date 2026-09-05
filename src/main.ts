@@ -28,6 +28,7 @@ import { Hud } from "./render/Hud";
 import { IsoRenderer, isWithinTileBounds, visibleTileBounds, type TileBounds } from "./render/IsoRenderer";
 import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
 import { Minimap } from "./render/Minimap";
+import { GAME_PALETTE } from "./render/palette";
 import { mountCommandIcons } from "./ui/commandIcons";
 import { StatusPanel } from "./ui/statusPanel";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
@@ -107,7 +108,11 @@ async function bootstrap(world: WorldDefinition) {
   const app = new Application();
   await app.init({
     resizeTo: window,
-    background: "#0a1a2a",
+    // The off-map void. Deliberately the palette's darkest ink rather than
+    // the navy this project started with: a blue void behind a sandstone UI
+    // and green land reads as a modern web canvas, where the original's
+    // out-of-bounds area is near-black (see plan/0088-palette-calibration.md).
+    background: GAME_PALETTE.ink,
     // Off, not on: MSAA roughly doubled full-screen frame cost in testing
     // (see plan/0062-original-scale-map.md) once the map — and so the
     // terrain mesh redrawn every frame — grew from ≤32x32 to 64x64. This

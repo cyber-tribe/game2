@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { VOLCANO_ROCK_HARDNESS, type Heightmap } from "../world/heightmap";
 import {
   IsoRenderer,
+  TERRAIN_COLOR,
   TILE_HEIGHT,
   TILE_WIDTH,
   isWithinTileBounds,
@@ -267,7 +268,7 @@ describe("IsoRenderer.redraw (sloped mesh)", () => {
     );
     expect(wallColors.size).toBe(2);
 
-    const DESERT = 0xd6b25e; // TERRAIN_COLOR.desert
+    const DESERT = TERRAIN_COLOR.desert;
     const [tr, tg, tb] = channels(DESERT);
     for (const wallColor of wallColors) {
       const [wr, wg, wb] = channels(wallColor);
@@ -312,7 +313,7 @@ describe("IsoRenderer.redraw (sloped mesh)", () => {
   });
 
   it("shades an interior slope more the steeper it is, with no minimum threshold and never a vertical wall", () => {
-    const DESERT = 0xd6b25e; // TERRAIN_COLOR.desert
+    const DESERT = TERRAIN_COLOR.desert;
     const [dr, dg, db] = channels(DESERT);
 
     const maxShadeDistance = (cornerDelta: number): number => {
