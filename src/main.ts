@@ -512,6 +512,13 @@ async function bootstrap(world: WorldDefinition) {
     // here too so a stale toolMode can never spend mana for an edit that
     // silently does nothing.
     if (!isTerrainEditAllowed(terrainEditRule, delta)) return;
+    // Some worlds forbid reshaping land inside the enemy's own territory —
+    // see WorldDefinition's enemyTerritoryEditable — checked (and reported)
+    // before spending any mana, same as isOwnFactionVisible above.
+    if (!world.enemyTerritoryEditable && simulation.isEnemyTerritory("player", tile)) {
+      showEntityInfo("この面では敵の陣地を直接操作できません");
+      return;
+    }
     if (!trySpendPlayerMana(TERRAIN_EDIT_MANA_COST)) return;
     raiseTile(heightmap, tile.x, tile.y, delta);
     renderer.redraw(visibleBounds());
