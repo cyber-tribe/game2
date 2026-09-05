@@ -29,12 +29,28 @@ function drawInstructions(renderer: IsoRenderer) {
   // data even without a canvas (see the module-level comment in this file).
   return renderer.graphics.context.instructions as {
     action: string;
-    data: { style?: { color: number; texture?: Texture } };
+    data: {
+      style?: { color: number; texture?: Texture };
+      path?: { instructions: { action: string; data: unknown[] }[] };
+    };
   }[];
 }
 
 function channels(color: number): [number, number, number] {
   return [(color >> 16) & 0xff, (color >> 8) & 0xff, color & 0xff];
+}
+
+/**
+ * The first (sx, sy) point of a fill's polygon — for a cliff wall (see
+ * drawCliffWalls' `.poly([topA.sx, topA.sy, ...])`), this is topA, which
+ * pins down exactly which of the tile's 4 edges the wall belongs to. Used
+ * instead of trusting fill order, which isn't part of drawCliffWalls' own
+ * contract.
+ */
+function firstPoint(fill: ReturnType<typeof drawInstructions>[number]): [number, number] {
+  const polyInstruction = fill.data.path!.instructions.find((i) => i.action === "poly")!;
+  const points = polyInstruction.data[0] as number[];
+  return [points[0], points[1]];
 }
 
 describe("IsoRenderer.update", () => {
@@ -225,7 +241,7 @@ describe("IsoRenderer.redraw (terraced blocks)", () => {
     expect(raisedFillCount).toBeGreaterThan(flatFillCount);
   });
 
-  it("shades a cliff wall darker than the top it descends from", () => {
+  it("shades a cliff wall darker than the top it descends from, in one of two directional tones", () => {
     // Desert, not grass: grass tops are dithered (see GRASS_FILL) rather
     // than a plain color, which this test isn't about — wall shading
     // itself is the same darkening regardless of which terrain it's on.
@@ -241,19 +257,99 @@ describe("IsoRenderer.redraw (terraced blocks)", () => {
 
     // Every tile here is plain desert (elevation is above waterLevel 0 and
     // none of it is volcano rock), so every top — raised or not — fills
-    // with TERRAIN_COLOR.desert, and every wall (the raised tile's own,
-    // and the sea-level ring's walls down to the map's off-edge default)
-    // shades that same color the same way: exactly 2 distinct colors.
+    // with TERRAIN_COLOR.desert. Every wall (the raised tile's own 4, and
+    // the sea-level ring's walls down to the map's off-edge default) shades
+    // that same color, but toward one of two tones depending on which way
+    // it faces (see drawCliffWalls' doc comment on the fixed light
+    // direction) — exactly 3 distinct colors total: the top, plus a lit
+    // and a shadowed wall tone.
     const DESERT = 0xd6b25e;
     expect(colors.has(DESERT)).toBe(true);
-    expect(colors.size).toBe(2);
+    expect(colors.size).toBe(3);
 
-    const wallColor = [...colors].find((c) => c !== DESERT)!;
     const [tr, tg, tb] = channels(DESERT);
-    const [wr, wg, wb] = channels(wallColor);
-    expect(wr).toBeLessThan(tr);
-    expect(wg).toBeLessThan(tg);
-    expect(wb).toBeLessThan(tb);
+    for (const wallColor of colors) {
+      if (wallColor === DESERT) continue;
+      const [wr, wg, wb] = channels(wallColor);
+      expect(wr).toBeLessThan(tr);
+      expect(wg).toBeLessThan(tg);
+      expect(wb).toBeLessThan(tb);
+    }
+  });
+
+  it("shades a grass cliff wall from an earthy tone instead of grass's own green", () => {
+    // A darkened copy of grass's own green landed almost exactly on
+    // GRASS_SPECKLE_COLOR's own dark speckle pixels — see GRASS_CLIFF_
+    // COLOR's doc comment — so a grass cliff shades from a dedicated
+    // brown base instead, a hue change rather than just a darker green.
+    const heightmap = flatHeightmap(3, 3, 5); // grass by default
+    heightmap.vertices[1][1] = 9;
+    heightmap.vertices[1][2] = 9;
+    heightmap.vertices[2][1] = 9;
+    heightmap.vertices[2][2] = 9;
+    const renderer = new IsoRenderer(heightmap);
+    const instructions = drawInstructions(renderer);
+
+    // Grass tops fill with GRASS_FILL's own dither texture; walls are still
+    // plain color fills carrying Pixi's default white texture (see the
+    // dither test below) — this isolates the walls from the tops.
+    const wallColors = new Set(
+      instructions
+        .filter((i) => i.action === "fill" && i.data.style!.texture === Texture.WHITE)
+        .map((i) => i.data.style!.color),
+    );
+    // Both directional tones (see drawCliffWalls) are earthy — 2 distinct
+    // wall colors, not 1, since this scene has walls facing every direction.
+    expect(wallColors.size).toBe(2);
+
+    for (const wallColor of wallColors) {
+      const [wr, wg, wb] = channels(wallColor);
+      // A darkened grass green keeps green as the dominant channel; an
+      // earthy brown instead has red at least as strong as green.
+      expect(wr).toBeGreaterThanOrEqual(wg);
+      expect(wg).toBeGreaterThan(wb);
+    }
+  });
+
+  it("shades the north/east walls of a raised tile lighter than its south/west walls", () => {
+    // A 5x5 map keeps the raised tile at (2,2) — and so all 4 of its own
+    // walls — away from the map's own off-edge walls, which would
+    // otherwise add more instances of the same two directional colors and
+    // make them harder to tell apart by position alone.
+    const heightmap = flatHeightmap(5, 5, 5);
+    heightmap.terrain = "desert";
+    heightmap.vertices[2][2] = 9;
+    heightmap.vertices[2][3] = 9;
+    heightmap.vertices[3][2] = 9;
+    heightmap.vertices[3][3] = 9;
+    const renderer = new IsoRenderer(heightmap);
+    const fills = drawInstructions(renderer).filter((i) => i.action === "fill");
+
+    // toScreen(x, y, elevation) = { sx: (x-y)*32, sy: (x+y)*16 - elevation*16 }
+    // (TILE_WIDTH=64, TILE_HEIGHT=32, ELEVATION_STEP=16) — each wall's own
+    // first point (topA, i.e. edgeA at the tile's raised elevation 9) is
+    // distinct, so this pins down exactly which wall is which regardless
+    // of draw order.
+    const colorAt = (sx: number, sy: number): number =>
+      fills.find((f) => {
+        const [fx, fy] = firstPoint(f);
+        return fx === sx && fy === sy;
+      })!.data.style!.color;
+
+    const north = colorAt(0, -80); // edgeA = (2, 2)
+    const east = colorAt(32, -64); // edgeA = (3, 2)
+    const south = colorAt(0, -48); // edgeA = (3, 3)
+    const west = colorAt(-32, -64); // edgeA = (2, 3)
+
+    expect(north).toBe(east);
+    expect(south).toBe(west);
+    expect(north).not.toBe(south);
+
+    const [nr, ng, nb] = channels(north);
+    const [sr, sg, sb] = channels(south);
+    expect(nr).toBeGreaterThan(sr);
+    expect(ng).toBeGreaterThan(sg);
+    expect(nb).toBeGreaterThan(sb);
   });
 
   it("dithers grass tops with the speckled texture instead of a flat color", () => {

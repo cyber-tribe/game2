@@ -44,12 +44,46 @@ const GRASS_DITHER_SIZE = 8;
 const GRASS_SPECKLE_DENSITY = 0.35;
 
 /**
- * How much darker a cliff wall is than the ground color of the tile it
- * belongs to — see drawCliffWalls. Picked to read clearly as a shaded
+ * How much darker a cliff wall is than the ground color it's shaded from
+ * (see drawCliffWalls' `color` argument), for whichever two of the tile's
+ * four wall directions face away from the fixed light source — see
+ * CLIFF_LIT_SHADE_AMOUNT's doc comment for the other two, and
+ * drawCliffWalls for which is which. Picked to read clearly as a shaded
  * vertical face against the flat-shaded top colors above without going
  * fully black (which made tall cliffs look like silhouette cutouts).
  */
 const CLIFF_SHADE_AMOUNT = 0.35;
+
+/**
+ * How much darker a cliff wall is than the ground color it's shaded from,
+ * for the two wall directions facing *toward* the fixed light source —
+ * see CLIFF_SHADE_AMOUNT for the other two. Every wall used to get the
+ * exact same flat shade regardless of which way it faced, which read as
+ * "no lighting at all" once the reference screenshot the player pointed
+ * back to was checked side by side with this renderer's own output: real
+ * Populous shades a plateau's two visible cliff faces at distinctly
+ * different brightness — this renderer's flat single-tone walls were the
+ * missing "lighting and shadow" the player then called out directly.
+ * Kept lighter than CLIFF_SHADE_AMOUNT but still darker than the top
+ * (0 would make a lit wall exactly as bright as the ground it descends
+ * from, erasing the edge between them again).
+ */
+const CLIFF_LIT_SHADE_AMOUNT = 0.15;
+
+/**
+ * A grass cliff's wall is shaded from this earthy tone instead of grass's
+ * own green (see redraw()'s wallBaseColor) — per feedback that a same-hue
+ * darkened wall barely read as a distinct "cross-section" at all: darkened
+ * 35% toward black, TERRAIN_COLOR.grass lands at (48, 91, 41), almost the
+ * exact same color as GRASS_SPECKLE_COLOR's own dark speckle pixels (51,
+ * 98, 40) — so a cliff right under a dark speckle pixel had essentially
+ * zero contrast against it. A brown "exposed dirt" base (a hue change, not
+ * just a luminance one) stays legible against grass regardless of which
+ * dither pixel happens to sit above it, and matches how the reference
+ * game — and most terrain-based city-builders — render a cliff cutting
+ * through turf: green on top, dirt on the sides.
+ */
+const GRASS_CLIFF_COLOR = 0x8a6a45;
 
 /**
  * Minimum height difference (in elevation units) between a tile and its
@@ -116,7 +150,10 @@ function lerpColor(from: number, to: number, t: number): number {
  * Deterministic pseudo-random value in [0, 1) for a tile's (x, y) — used to
  * give each volcano tile its own fixed crack angles and pulse phase, so
  * they don't all flicker in unison or reshuffle every frame. Same trick as
- * EntityLayer's walkCycle (a hash of position, not real randomness).
+ * EntityLayer's walkCycle (a hash of position, not real randomness). Fine
+ * for volcano tiles, which range over the whole map's worth of (x, y) —
+ * not a good fit for createDitherTexture's tiny fixed pixel grid, see
+ * ditherPixelHash below.
  */
 function tileHash(x: number, y: number): number {
   const v = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
@@ -124,21 +161,40 @@ function tileHash(x: number, y: number): number {
 }
 
 /**
+ * A separate integer hash for createDitherTexture, rather than reusing
+ * tileHash above: that one is a classic "sin of a big number" hash, which
+ * only decorrelates well across a wide, closely-spaced range of inputs.
+ * Sampled at just the 8x8 (or so) integer grid createDitherTexture actually
+ * needs, it instead aliased into a small number of repeating diagonal
+ * bands — reading as a handful of large triangular blotches, not a fine
+ * speckle, per feedback that the grass texture "isn't good". This bit-
+ * mixing hash (integer multiply + xor-shift, the "hash32shift" family)
+ * has no such periodicity: every (x, y) pair gets a well-scattered value
+ * even at this small a domain.
+ */
+function ditherPixelHash(x: number, y: number): number {
+  let h = (x * 0x1f1f1f1f) ^ (y * 0x27d4eb2d);
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+  h = h ^ (h >>> 16);
+  return (h >>> 0) / 4294967296;
+}
+
+/**
  * Builds a small tileable two-tone speckled texture, one pixel decided at
- * a time by the same deterministic tileHash trick used for volcano cracks
- * — mimics the original game's dithered ground instead of this renderer's
- * flat single-color fills. `size` is kept small (see GRASS_DITHER_SIZE) so
- * `addressMode: "repeat"` tiles it several times across one map tile;
- * `scaleMode: "nearest"` keeps the speckles crisp pixels rather than
- * blurring them into a smooth gradient. Works without a live GL context —
- * BufferImageSource takes raw pixel bytes directly, so this runs the same
- * in a headless test as in the browser.
+ * a time by ditherPixelHash — mimics the original game's dithered ground
+ * instead of this renderer's flat single-color fills. `size` is kept small
+ * (see GRASS_DITHER_SIZE) so `addressMode: "repeat"` tiles it several times
+ * across one map tile; `scaleMode: "nearest"` keeps the speckles crisp
+ * pixels rather than blurring them into a smooth gradient. Works without a
+ * live GL context — BufferImageSource takes raw pixel bytes directly, so
+ * this runs the same in a headless test as in the browser.
  */
 function createDitherTexture(size: number, baseColor: number, speckleColor: number, density: number): Texture {
   const pixels = new Uint8Array(size * size * 4);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      const color = tileHash(x, y) < density ? speckleColor : baseColor;
+      const color = ditherPixelHash(x, y) < density ? speckleColor : baseColor;
       const i = (y * size + x) * 4;
       pixels[i] = (color >> 16) & 0xff;
       pixels[i + 1] = (color >> 8) & 0xff;
@@ -536,20 +592,26 @@ export class IsoRenderer {
 
         const isWater = elevation <= waterLevel;
         const isRock = isRockTile[y - minY][x - minX];
-        // Always the plain flat color, even for grass — drawCliffWalls
-        // shades a wall by darkening this, and a dithered wall face isn't
-        // worth the complexity the top face's texture already solves.
+        // The plain flat color for the top — drawCliffWalls shades a wall
+        // by darkening whatever base color it's given, and a dithered wall
+        // face isn't worth the complexity the top face's texture already
+        // solves.
         const color = isWater ? WATER_COLOR : isRock ? VOLCANO_ROCK_COLOR : TERRAIN_COLOR[terrain];
+        const isGrassGround = !isWater && !isRock && terrain === "grass";
         // Grass ground alone gets the dithered look (see GRASS_FILL) —
         // water and rock already read fine as flat colors.
-        const topFill = !isWater && !isRock && terrain === "grass" ? GRASS_FILL : color;
+        const topFill = isGrassGround ? GRASS_FILL : color;
+        // A grass cliff is shaded from an earthy tone instead of grass's
+        // own green — see GRASS_CLIFF_COLOR's doc comment for why a same-
+        // hue darkened wall wasn't legible enough against the dither.
+        const wallBaseColor = isGrassGround ? GRASS_CLIFF_COLOR : color;
 
         graphics
           .poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy])
           .fill(topFill)
           .stroke({ width: 1, color: 0x000000, alpha: 0.15 });
 
-        this.drawCliffWalls(graphics, x, y, elevation, color, tileElevation);
+        this.drawCliffWalls(graphics, x, y, elevation, wallBaseColor, tileElevation);
       }
     }
 
@@ -591,6 +653,18 @@ export class IsoRenderer {
    * neighboring tile sits lower — the "cliff face" that makes the terrain
    * read as stepped plateaus rather than a continuous ramp. A tile with no
    * lower neighbors (flat ground, or the low side of a slope) draws none.
+   * `color` is the wall's own base color to shade darker — usually the same
+   * flat color as the tile's top, but not always (see redraw()'s
+   * wallBaseColor/GRASS_CLIFF_COLOR).
+   *
+   * The fixed light source sits toward the map's north-east (-y/+x in
+   * toScreen's own coordinates — see drawLavaFlow's isRim comment on which
+   * edge is which): the north and east walls (this tile's outward-facing
+   * normal pointing that way) face toward it and get CLIFF_LIT_SHADE_
+   * AMOUNT's lighter shade; south and west face away and get CLIFF_SHADE_
+   * AMOUNT's darker one. Matches the two-tone brightness split between a
+   * plateau's two faces in the reference screenshot this scheme was
+   * checked against.
    */
   private drawCliffWalls(
     graphics: Graphics,
@@ -600,13 +674,15 @@ export class IsoRenderer {
     color: number,
     tileElevation: (x: number, y: number) => number,
   ): void {
-    const wallColor = lerpColor(color, 0x000000, CLIFF_SHADE_AMOUNT);
+    const litWallColor = lerpColor(color, 0x000000, CLIFF_LIT_SHADE_AMOUNT);
+    const shadowWallColor = lerpColor(color, 0x000000, CLIFF_SHADE_AMOUNT);
 
     const addWall = (
       neighborX: number,
       neighborY: number,
       edgeA: { x: number; y: number },
       edgeB: { x: number; y: number },
+      wallColor: number,
     ) => {
       const neighborElevation = tileElevation(neighborX, neighborY);
       if (elevation - neighborElevation <= CLIFF_MIN_STEP) return;
@@ -619,10 +695,10 @@ export class IsoRenderer {
       graphics.poly([topA.sx, topA.sy, topB.sx, topB.sy, bottomB.sx, bottomB.sy, bottomA.sx, bottomA.sy]).fill(wallColor);
     };
 
-    addWall(x, y - 1, { x, y }, { x: x + 1, y });
-    addWall(x + 1, y, { x: x + 1, y }, { x: x + 1, y: y + 1 });
-    addWall(x, y + 1, { x: x + 1, y: y + 1 }, { x, y: y + 1 });
-    addWall(x - 1, y, { x, y: y + 1 }, { x, y });
+    addWall(x, y - 1, { x, y }, { x: x + 1, y }, litWallColor); // north: faces -y, toward the light
+    addWall(x + 1, y, { x: x + 1, y }, { x: x + 1, y: y + 1 }, litWallColor); // east: faces +x, toward the light
+    addWall(x, y + 1, { x: x + 1, y: y + 1 }, { x, y: y + 1 }, shadowWallColor); // south: faces +y, away from the light
+    addWall(x - 1, y, { x, y: y + 1 }, { x, y }, shadowWallColor); // west: faces -x, away from the light
   }
 
   /**
