@@ -508,6 +508,16 @@ describe("Simulation", () => {
     expect(sim.getBehaviorMode("enemy")).toBe("settle");
   });
 
+  it("reports each faction's own current mana, starting at 0", () => {
+    const sim = new Simulation({ worldWidth: 10, worldHeight: 10 });
+
+    expect(sim.getMana("player")).toBe(0);
+    expect(sim.getMana("enemy")).toBe(0);
+
+    sim.update(10); // manaSystem accrues mana over time from each faction's houses
+    expect(sim.getMana("player")).toBeGreaterThan(0);
+  });
+
   it("upgrades houses beyond hut when the whole map is perfectly flat", () => {
     const width = 20;
     const height = 20;

@@ -134,6 +134,17 @@
         cursor: not-allowed;
       }
 
+      /*
+       * The player's current mana can't cover this button's cost right now
+       * (main.ts's updateToolbarAffordability, re-evaluated every frame as
+       * mana rises/falls) — dimmed but, unlike :disabled above, still
+       * tappable: a tap still gives the clearer "マナが足りません" message,
+       * and raise/lower must stay selectable even while unaffordable.
+       */
+      .toolbar-row button.mana-low {
+        opacity: 0.55;
+      }
+
       /* Behavior-mode buttons get the green accent instead of the default miracle blue. */
       [data-group="behavior"] button {
         border-color: #3fbf5e;

@@ -389,13 +389,19 @@ async function bootstrap(world: WorldDefinition) {
   // Every mana-costing action a tap can trigger goes through this instead
   // of calling trySpendMana directly — see isOwnFactionVisible above. Mana
   // is left untouched and the "🔍 照会" info panel (reused here rather
-  // than adding a near-identical banner) explains why nothing happened.
+  // than adding a near-identical banner) explains why nothing happened —
+  // without this, a raise/lower tap (or any miracle) with insufficient
+  // mana was a silent no-op, indistinguishable from the edit just not
+  // having registered at all (per feedback: "上げ下げができているのか
+  // 分からない").
   const trySpendPlayerMana = (cost: number): boolean => {
     if (!isOwnFactionVisible(visibleBounds())) {
       showEntityInfo("自分の勢力が画面内に見えていません");
       return false;
     }
-    return trySpendMana(simulation.world, "player", cost);
+    if (trySpendMana(simulation.world, "player", cost)) return true;
+    showEntityInfo(`マナが足りません（必要 ${cost} / 現在 ${simulation.getMana("player").toFixed(1)}）`);
+    return false;
   };
 
   // Nudges a first-time player toward the core loop — see Hud.ts's
@@ -814,6 +820,44 @@ async function bootstrap(world: WorldDefinition) {
     .querySelectorAll<HTMLButtonElement>('#toolbar [data-tool="raise"], #toolbar [data-tool="lower"]')
     .forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.tool === toolMode)));
 
+  // Every tool that spends the player's mana, and how much — used below to
+  // dim a button the player can't currently afford, at a glance, rather
+  // than relying purely on the "マナが足りません" message a failed tap
+  // shows (per feedback: "上げ下げができているのか分からない"). "raise"/
+  // "lower" share TERRAIN_EDIT_MANA_COST despite being 2 separate buttons.
+  // Omits "shrine"/"inspect", which spend no mana or (shrine) aren't
+  // ToolMode-costed the same way — see toolbar.ts's ToolMode union.
+  const MANA_COST_BY_TOOL: Partial<Record<ToolMode, number>> = {
+    raise: TERRAIN_EDIT_MANA_COST,
+    lower: TERRAIN_EDIT_MANA_COST,
+    shrine: SHRINE_MOVE_MANA_COST,
+    earthquake: EARTHQUAKE_MANA_COST,
+    swamp: SWAMP_MANA_COST,
+    knight: KNIGHT_MANA_COST,
+    guardian: GUARDIAN_MANA_COST,
+    volcano: VOLCANO_MANA_COST,
+    flood: FLOOD_MANA_COST,
+    armageddon: ARMAGEDDON_MANA_COST,
+  };
+  const toolButtonsByCost = Object.entries(MANA_COST_BY_TOOL).map(([tool, cost]) => ({
+    cost: cost!,
+    button: document.querySelector<HTMLButtonElement>(`#toolbar [data-tool="${tool}"]`),
+  }));
+
+  // Dims (but doesn't disable — a tap still gives the clearer "マナが
+  // 足りません" message above, and raise/lower must stay selectable even
+  // while unaffordable so mana regenerating mid-selection doesn't require
+  // re-picking the tool) any button whose cost currently exceeds the
+  // player's mana. A separate CSS class from `disabled` (used for
+  // terrainEditRule/allowedMiracles above) since those are permanent for
+  // the match, while this changes every frame as mana rises and falls.
+  const updateToolbarAffordability = () => {
+    const mana = simulation.getMana("player");
+    for (const { cost, button } of toolButtonsByCost) {
+      button?.classList.toggle("mana-low", mana < cost);
+    }
+  };
+
   // Which bounds renderer.redraw() last actually ran with — see the ticker
   // below's skip-if-nothing-would-look-different check.
   let lastRedrawnBounds: TileBounds | undefined;
@@ -849,6 +893,7 @@ async function bootstrap(world: WorldDefinition) {
     entityLayer.update(simulation.world, deltaSeconds, simulation.getImpactEffects());
     const outcome = simulation.getOutcome();
     hud.update(simulation.summarize(), outcome);
+    updateToolbarAffordability();
     if (outcome.over && !matchRecordShown) {
       matchRecordShown = true;
       showMatchRecord(outcome, simulation.getMatchEvents());
