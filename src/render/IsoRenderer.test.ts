@@ -29,28 +29,12 @@ function drawInstructions(renderer: IsoRenderer) {
   // data even without a canvas (see the module-level comment in this file).
   return renderer.graphics.context.instructions as {
     action: string;
-    data: {
-      style?: { color: number; texture?: Texture };
-      path?: { instructions: { action: string; data: unknown[] }[] };
-    };
+    data: { style?: { color: number; texture?: Texture } };
   }[];
 }
 
 function channels(color: number): [number, number, number] {
   return [(color >> 16) & 0xff, (color >> 8) & 0xff, color & 0xff];
-}
-
-/**
- * The first (sx, sy) point of a fill's polygon — for a cliff wall (see
- * drawCliffWalls' `.poly([topA.sx, topA.sy, ...])`), this is topA, which
- * pins down exactly which of the tile's 4 edges the wall belongs to. Used
- * instead of trusting fill order, which isn't part of drawCliffWalls' own
- * contract.
- */
-function firstPoint(fill: ReturnType<typeof drawInstructions>[number]): [number, number] {
-  const polyInstruction = fill.data.path!.instructions.find((i) => i.action === "poly")!;
-  const points = polyInstruction.data[0] as number[];
-  return [points[0], points[1]];
 }
 
 describe("IsoRenderer.update", () => {
@@ -241,28 +225,56 @@ describe("IsoRenderer.redraw (terraced blocks)", () => {
     expect(raisedFillCount).toBeGreaterThan(flatFillCount);
   });
 
+  it("rounds a tile's rendered elevation to VISUAL_ELEVATION_BUCKET, merging small differences into the same flat plateau", () => {
+    // A 4x4 map, uniformly elevation 4 (bucketed elevation is also 4, since
+    // it's already an even multiple of VISUAL_ELEVATION_BUCKET=2).
+    const baseline = flatHeightmap(4, 4, 4);
+    const baselineFillCount = drawInstructions(new IsoRenderer(baseline)).filter((i) => i.action === "fill").length;
+
+    // Nudging one corner of tile (1, 1) up by 1 raises its raw average to
+    // 4.25 — still within the same rounded-to-4 bucket as its flat
+    // neighbors, so no new wall should appear at all: this is exactly the
+    // "routine 1-unit worldgen noise" VISUAL_ELEVATION_BUCKET exists to
+    // hide (see its own doc comment).
+    const nudged = flatHeightmap(4, 4, 4);
+    nudged.vertices[1][1] = 5;
+    const nudgedFillCount = drawInstructions(new IsoRenderer(nudged)).filter((i) => i.action === "fill").length;
+    expect(nudgedFillCount).toBe(baselineFillCount);
+
+    // Raising that same corner enough to push the tile's raw average past
+    // the next bucket boundary (4.25 -> 5.25, rounding to 6 instead of 4)
+    // does still show real walls — VISUAL_ELEVATION_BUCKET hides routine
+    // noise, not genuine elevation differences.
+    const raised = flatHeightmap(4, 4, 4);
+    raised.vertices[1][1] = 9;
+    const raisedFillCount = drawInstructions(new IsoRenderer(raised)).filter((i) => i.action === "fill").length;
+    expect(raisedFillCount).toBeGreaterThan(baselineFillCount);
+  });
+
   it("shades a cliff wall darker than the top it descends from, in one of two directional tones", () => {
     // Desert, not grass: grass tops are dithered (see GRASS_FILL) rather
     // than a plain color, which this test isn't about — wall shading
     // itself is the same darkening regardless of which terrain it's on.
+    // A uniform flat map relies purely on the map's own off-edge default
+    // (elevation 0) for its cliffs, rather than raising an interior patch
+    // — raising a patch also partially lifts its neighbors' own averaged
+    // heights (see the "draws extra cliff-wall fills..." test above), which
+    // would give some walls here a smaller, proportionally-scaled-down
+    // drop (see CLIFF_FULL_SHADE_DROP) instead of the single clean, fully
+    // capped magnitude this test wants.
     const heightmap = flatHeightmap(3, 3, 5);
     heightmap.terrain = "desert";
-    heightmap.vertices[1][1] = 9;
-    heightmap.vertices[1][2] = 9;
-    heightmap.vertices[2][1] = 9;
-    heightmap.vertices[2][2] = 9;
     const renderer = new IsoRenderer(heightmap);
     const instructions = drawInstructions(renderer);
     const colors = new Set(instructions.filter((i) => i.action === "fill").map((i) => i.data.style!.color));
 
     // Every tile here is plain desert (elevation is above waterLevel 0 and
-    // none of it is volcano rock), so every top — raised or not — fills
-    // with TERRAIN_COLOR.desert. Every wall (the raised tile's own 4, and
-    // the sea-level ring's walls down to the map's off-edge default) shades
-    // that same color, but toward one of two tones depending on which way
-    // it faces (see drawCliffWalls' doc comment on the fixed light
-    // direction) — exactly 3 distinct colors total: the top, plus a lit
-    // and a shadowed wall tone.
+    // none of it is volcano rock), so every top fills with TERRAIN_COLOR.
+    // desert. Every tile borders the map edge on at least one side, so
+    // every wall shades that same color down from the same elevation-5
+    // drop, toward one of two tones depending on which way it faces (see
+    // drawCliffWalls' doc comment on the fixed light direction) — exactly
+    // 3 distinct colors total: the top, plus a lit and a shadowed wall tone.
     const DESERT = 0xd6b25e;
     expect(colors.has(DESERT)).toBe(true);
     expect(colors.size).toBe(3);
@@ -282,11 +294,8 @@ describe("IsoRenderer.redraw (terraced blocks)", () => {
     // GRASS_SPECKLE_COLOR's own dark speckle pixels — see GRASS_CLIFF_
     // COLOR's doc comment — so a grass cliff shades from a dedicated
     // brown base instead, a hue change rather than just a darker green.
+    // Uniform + map-edge-only for the same reason as the desert test above.
     const heightmap = flatHeightmap(3, 3, 5); // grass by default
-    heightmap.vertices[1][1] = 9;
-    heightmap.vertices[1][2] = 9;
-    heightmap.vertices[2][1] = 9;
-    heightmap.vertices[2][2] = 9;
     const renderer = new IsoRenderer(heightmap);
     const instructions = drawInstructions(renderer);
 
@@ -312,34 +321,26 @@ describe("IsoRenderer.redraw (terraced blocks)", () => {
   });
 
   it("shades the north/east walls of a raised tile lighter than its south/west walls", () => {
-    // A 5x5 map keeps the raised tile at (2,2) — and so all 4 of its own
-    // walls — away from the map's own off-edge walls, which would
-    // otherwise add more instances of the same two directional colors and
-    // make them harder to tell apart by position alone.
-    const heightmap = flatHeightmap(5, 5, 5);
+    // A single-tile map borders the (off-edge, elevation 0) map default on
+    // all 4 sides — the simplest possible scene with all 4 wall directions
+    // present, at one single clean drop magnitude, and with no other tile
+    // around to produce a wall whose screen position could coincidentally
+    // collide with one of these 4 (toScreen's projection can otherwise map
+    // distinct (x, y, elevation) triples onto the same screen point).
+    const heightmap = flatHeightmap(1, 1, 9);
     heightmap.terrain = "desert";
-    heightmap.vertices[2][2] = 9;
-    heightmap.vertices[2][3] = 9;
-    heightmap.vertices[3][2] = 9;
-    heightmap.vertices[3][3] = 9;
     const renderer = new IsoRenderer(heightmap);
     const fills = drawInstructions(renderer).filter((i) => i.action === "fill");
+    expect(fills).toHaveLength(5); // 1 top + 4 walls
 
-    // toScreen(x, y, elevation) = { sx: (x-y)*32, sy: (x+y)*16 - elevation*16 }
-    // (TILE_WIDTH=64, TILE_HEIGHT=32, ELEVATION_STEP=16) — each wall's own
-    // first point (topA, i.e. edgeA at the tile's raised elevation 9) is
-    // distinct, so this pins down exactly which wall is which regardless
-    // of draw order.
-    const colorAt = (sx: number, sy: number): number =>
-      fills.find((f) => {
-        const [fx, fy] = firstPoint(f);
-        return fx === sx && fy === sy;
-      })!.data.style!.color;
-
-    const north = colorAt(0, -80); // edgeA = (2, 2)
-    const east = colorAt(32, -64); // edgeA = (3, 2)
-    const south = colorAt(0, -48); // edgeA = (3, 3)
-    const west = colorAt(-32, -64); // edgeA = (2, 3)
+    // redraw() fills a tile's own top first, then calls drawCliffWalls,
+    // which itself always calls addWall in north/east/south/west order
+    // (see its own body) — a stable enough contract for this single-tile
+    // scene to just read the walls off by position instead of hunting for
+    // each one by its screen geometry (north's own first point coincides
+    // with the top's own first point, since both start at this tile's
+    // (x, y) corner — geometry alone can't tell them apart here).
+    const [, north, east, south, west] = fills.map((f) => f.data.style!.color);
 
     expect(north).toBe(east);
     expect(south).toBe(west);
@@ -350,6 +351,35 @@ describe("IsoRenderer.redraw (terraced blocks)", () => {
     expect(nr).toBeGreaterThan(sr);
     expect(ng).toBeGreaterThan(sg);
     expect(nb).toBeGreaterThan(sb);
+  });
+
+  it("shades a small drop much more subtly than a full-strength cliff", () => {
+    // createHeightmap's own generation noise (see its doc comment) makes a
+    // small step between adjacent tiles routine, not a deliberate feature
+    // — rendering it at the same full darkness as a real multi-unit cliff
+    // (a volcano, an earthquake, several taps of terraforming) painted
+    // almost the entire map in bold cliff faces. See CLIFF_FULL_SHADE_DROP.
+    const southWallDistanceFromTop = (elevation: number): number => {
+      const heightmap = flatHeightmap(1, 1, elevation);
+      heightmap.terrain = "desert";
+      const fills = drawInstructions(new IsoRenderer(heightmap)).filter((i) => i.action === "fill");
+      const [top, , , south] = fills.map((f) => f.data.style!.color);
+      const [tr, tg, tb] = channels(top);
+      const [sr, sg, sb] = channels(south);
+      return tr - sr + (tg - sg) + (tb - sb);
+    };
+
+    // 2, not 1: VISUAL_ELEVATION_BUCKET rounds every rendered elevation to
+    // an even number first, so 2 units — one bucket step, the smallest gap
+    // between two adjacent terrace levels — is the smallest drop that can
+    // ever actually render; CLIFF_FULL_SHADE_DROP holds it at half
+    // strength rather than full.
+    const smallDrop = southWallDistanceFromTop(2);
+    const fullDrop = southWallDistanceFromTop(9); // well past CLIFF_FULL_SHADE_DROP — a real cliff
+
+    expect(smallDrop).toBeGreaterThan(0); // still visibly darker than the top, not invisible
+    // ~half of fullDrop, give or take integer-channel rounding in lerpColor.
+    expect(smallDrop).toBeLessThanOrEqual(fullDrop / 2 + 1);
   });
 
   it("dithers grass tops with the speckled texture instead of a flat color", () => {

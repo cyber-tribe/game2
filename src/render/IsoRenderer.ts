@@ -16,6 +16,29 @@ const ELEVATION_STEP = 16;
  */
 const ELEVATION_EASE_TIME_CONSTANT = 0.05;
 
+/**
+ * Tile tops (see redraw()'s tileElevation) round to the nearest multiple
+ * of this many elevation units before rendering — the underlying data
+ * itself stays at full resolution (createHeightmap's own generation noise
+ * is deliberately rough at the single-unit level, see its doc comment, to
+ * keep a castle's worth of flatness from being free), only what gets
+ * *drawn* is coarsened. Without this, nearly every adjacent tile pair
+ * differed by at least 1 unit, and once cliff walls were fixed to
+ * actually be visible (plan/0073-grass-cliff-legibility.md), that meant a
+ * distinct wall on almost every tile boundary — a map that reads as
+ * "wall-to-wall cliffs" instead of the reference game's mostly-flat plains
+ * with occasional real drops. Rounding to the nearest 2 units merges most
+ * of that routine 1-unit noise into shared flat plateaus, leaving only
+ * genuine multi-unit differences (a volcano, an earthquake, several taps
+ * of deliberate terraforming) as visible cliffs.
+ */
+const VISUAL_ELEVATION_BUCKET = 2;
+
+/** Rounds a raw elevation to the nearest VISUAL_ELEVATION_BUCKET step — see its own doc comment. */
+function bucketElevation(elevation: number): number {
+  return Math.round(elevation / VISUAL_ELEVATION_BUCKET) * VISUAL_ELEVATION_BUCKET;
+}
+
 const TERRAIN_COLOR: Record<Heightmap["terrain"], number> = {
   grass: 0x4a8c3f,
   desert: 0xd6b25e,
@@ -44,31 +67,47 @@ const GRASS_DITHER_SIZE = 8;
 const GRASS_SPECKLE_DENSITY = 0.35;
 
 /**
- * How much darker a cliff wall is than the ground color it's shaded from
- * (see drawCliffWalls' `color` argument), for whichever two of the tile's
- * four wall directions face away from the fixed light source — see
- * CLIFF_LIT_SHADE_AMOUNT's doc comment for the other two, and
- * drawCliffWalls for which is which. Picked to read clearly as a shaded
+ * The most a cliff wall ever darkens from the ground color it's shaded
+ * from (see drawCliffWalls' `color` argument), for whichever two of the
+ * tile's four wall directions face away from the fixed light source — see
+ * CLIFF_LIT_SHADE_AMOUNT's doc comment for the other two. Reached once the
+ * drop is CLIFF_FULL_SHADE_DROP units or more (see drawCliffWalls);
+ * smaller drops scale down from here. Picked to read clearly as a shaded
  * vertical face against the flat-shaded top colors above without going
  * fully black (which made tall cliffs look like silhouette cutouts).
  */
-const CLIFF_SHADE_AMOUNT = 0.35;
+const CLIFF_SHADE_AMOUNT = 0.3;
 
 /**
- * How much darker a cliff wall is than the ground color it's shaded from,
- * for the two wall directions facing *toward* the fixed light source —
- * see CLIFF_SHADE_AMOUNT for the other two. Every wall used to get the
- * exact same flat shade regardless of which way it faced, which read as
- * "no lighting at all" once the reference screenshot the player pointed
- * back to was checked side by side with this renderer's own output: real
- * Populous shades a plateau's two visible cliff faces at distinctly
- * different brightness — this renderer's flat single-tone walls were the
- * missing "lighting and shadow" the player then called out directly.
- * Kept lighter than CLIFF_SHADE_AMOUNT but still darker than the top
- * (0 would make a lit wall exactly as bright as the ground it descends
- * from, erasing the edge between them again).
+ * The most a cliff wall ever darkens, for the two wall directions facing
+ * *toward* the fixed light source — see CLIFF_SHADE_AMOUNT for the other
+ * two. Every wall used to get the exact same flat shade regardless of
+ * which way it faced, which read as "no lighting at all" once the
+ * reference screenshot the player pointed back to was checked side by
+ * side with this renderer's own output: real Populous shades a plateau's
+ * two visible cliff faces at distinctly different brightness — this
+ * renderer's flat single-tone walls were the missing "lighting and
+ * shadow" the player then called out directly. Kept lighter than
+ * CLIFF_SHADE_AMOUNT but still darker than the top (0 would make a lit
+ * wall exactly as bright as the ground it descends from, erasing the edge
+ * between them again).
  */
-const CLIFF_LIT_SHADE_AMOUNT = 0.15;
+const CLIFF_LIT_SHADE_AMOUNT = 0.12;
+
+/**
+ * Elevation-unit drop at which a cliff wall's shading maxes out at
+ * CLIFF_SHADE_AMOUNT/CLIFF_LIT_SHADE_AMOUNT — see drawCliffWalls. Below
+ * this, the shade scales down proportionally with the drop instead of
+ * jumping straight to full strength. Set to 2 full VISUAL_ELEVATION_
+ * BUCKET steps: since every rendered elevation is now rounded to that
+ * bucket, the smallest drop that can ever actually render is exactly one
+ * bucket's worth — this keeps that smallest, most common case (two
+ * adjacent terrace levels) at half shading strength rather than jumping
+ * straight to full drama, while a real multi-level cliff (a volcano, an
+ * earthquake, several taps of deliberate terraforming) still reads at
+ * full strength.
+ */
+const CLIFF_FULL_SHADE_DROP = 2 * VISUAL_ELEVATION_BUCKET;
 
 /**
  * A grass cliff's wall is shaded from this earthy tone instead of grass's
@@ -540,7 +579,7 @@ export class IsoRenderer {
     const tileElevation = (x: number, y: number): number =>
       x < 0 || y < 0 || x >= width || y >= height
         ? 0
-        : (vertices[y][x] + vertices[y][x + 1] + vertices[y + 1][x + 1] + vertices[y + 1][x]) / 4;
+        : bucketElevation((vertices[y][x] + vertices[y][x + 1] + vertices[y + 1][x + 1] + vertices[y + 1][x]) / 4);
 
     // Precomputed once so the lava-flow pass (below) can look at each rock
     // tile's neighbors without recomputing isRockTile for them repeatedly.
@@ -660,11 +699,12 @@ export class IsoRenderer {
    * The fixed light source sits toward the map's north-east (-y/+x in
    * toScreen's own coordinates — see drawLavaFlow's isRim comment on which
    * edge is which): the north and east walls (this tile's outward-facing
-   * normal pointing that way) face toward it and get CLIFF_LIT_SHADE_
-   * AMOUNT's lighter shade; south and west face away and get CLIFF_SHADE_
-   * AMOUNT's darker one. Matches the two-tone brightness split between a
-   * plateau's two faces in the reference screenshot this scheme was
-   * checked against.
+   * normal pointing that way) face toward it and shade up to CLIFF_LIT_
+   * SHADE_AMOUNT's lighter maximum; south and west face away and shade up
+   * to CLIFF_SHADE_AMOUNT's darker one — see CLIFF_FULL_SHADE_DROP for how
+   * a small drop scales down from that maximum. Matches the two-tone
+   * brightness split between a plateau's two faces in the reference
+   * screenshot this scheme was checked against.
    */
   private drawCliffWalls(
     graphics: Graphics,
@@ -674,18 +714,22 @@ export class IsoRenderer {
     color: number,
     tileElevation: (x: number, y: number) => number,
   ): void {
-    const litWallColor = lerpColor(color, 0x000000, CLIFF_LIT_SHADE_AMOUNT);
-    const shadowWallColor = lerpColor(color, 0x000000, CLIFF_SHADE_AMOUNT);
-
     const addWall = (
       neighborX: number,
       neighborY: number,
       edgeA: { x: number; y: number },
       edgeB: { x: number; y: number },
-      wallColor: number,
+      maxShade: number,
     ) => {
       const neighborElevation = tileElevation(neighborX, neighborY);
-      if (elevation - neighborElevation <= CLIFF_MIN_STEP) return;
+      const drop = elevation - neighborElevation;
+      if (drop <= CLIFF_MIN_STEP) return;
+
+      // Scales linearly up to CLIFF_FULL_SHADE_DROP's worth of drop, then
+      // holds at maxShade — see that constant's doc comment for why a
+      // small ripple shouldn't shade as dramatically as a real cliff.
+      const shadeAmount = maxShade * Math.min(1, drop / CLIFF_FULL_SHADE_DROP);
+      const wallColor = lerpColor(color, 0x000000, shadeAmount);
 
       const topA = this.toScreen(edgeA.x, edgeA.y, elevation);
       const topB = this.toScreen(edgeB.x, edgeB.y, elevation);
@@ -695,10 +739,10 @@ export class IsoRenderer {
       graphics.poly([topA.sx, topA.sy, topB.sx, topB.sy, bottomB.sx, bottomB.sy, bottomA.sx, bottomA.sy]).fill(wallColor);
     };
 
-    addWall(x, y - 1, { x, y }, { x: x + 1, y }, litWallColor); // north: faces -y, toward the light
-    addWall(x + 1, y, { x: x + 1, y }, { x: x + 1, y: y + 1 }, litWallColor); // east: faces +x, toward the light
-    addWall(x, y + 1, { x: x + 1, y: y + 1 }, { x, y: y + 1 }, shadowWallColor); // south: faces +y, away from the light
-    addWall(x - 1, y, { x, y: y + 1 }, { x, y }, shadowWallColor); // west: faces -x, away from the light
+    addWall(x, y - 1, { x, y }, { x: x + 1, y }, CLIFF_LIT_SHADE_AMOUNT); // north: faces -y, toward the light
+    addWall(x + 1, y, { x: x + 1, y }, { x: x + 1, y: y + 1 }, CLIFF_LIT_SHADE_AMOUNT); // east: faces +x, toward the light
+    addWall(x, y + 1, { x: x + 1, y: y + 1 }, { x, y: y + 1 }, CLIFF_SHADE_AMOUNT); // south: faces +y, away from the light
+    addWall(x - 1, y, { x, y: y + 1 }, { x, y }, CLIFF_SHADE_AMOUNT); // west: faces -x, away from the light
   }
 
   /**

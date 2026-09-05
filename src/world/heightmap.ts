@@ -38,8 +38,20 @@ export const MAX_ELEVATION = 20;
  * terraforming. That let a match's population/mana explode within under a
  * minute (see plan/0043-terrain-roughness.md) since the core "flatten your
  * land to grow a house" loop was already done by worldgen. At these
- * frequencies a fresh map has ~0% castle-ready and ~2-3% manor-ready
- * vertices — reaching those tiers again requires actually terraforming.
+ * frequencies a fresh map has ~0% castle-ready and single-digit %
+ * manor-ready vertices — reaching those tiers again requires actually
+ * terraforming.
+ *
+ * The amplitudes were trimmed down from the original 1.5/1.5/2 (see
+ * plan/0073-grass-cliff-legibility.md) once fixing that renderer's cliff
+ * legibility bug made this same wave's true roughness visible for the
+ * first time: at the original amplitude, 18% of all adjacent vertex pairs
+ * differed by 3 or more units, rendering as a wall of cliffs almost
+ * everywhere — nothing like the reference game's mostly-flat plains with
+ * occasional drops. Trimmed to 1.2/1.2/1.6, adjacent 3+-unit steps drop to
+ * under 7% while keeping castle-flatness at 0% (manor rises modestly, from
+ * 2.5% to ~6% — still a small minority, and still far from the "manor
+ * nearly free" territory the frequency change above was fixing).
  */
 export function createHeightmap(
   width: number,
@@ -52,9 +64,9 @@ export function createHeightmap(
     const row: number[] = [];
     for (let x = 0; x <= width; x++) {
       const wave =
-        Math.sin(x * 1.3) * 1.5 +
-        Math.cos(y * 1.1) * 1.5 +
-        Math.sin((x - y) * 0.9) * 2;
+        Math.sin(x * 1.3) * 1.2 +
+        Math.cos(y * 1.1) * 1.2 +
+        Math.sin((x - y) * 0.9) * 1.6;
       row.push(Math.max(0, Math.round(wave + 3)));
     }
     vertices.push(row);
