@@ -35,6 +35,7 @@ import { movementSystem } from "./systems/movement";
 import { createSettleSystem } from "./systems/settle";
 import { createSwampSystem } from "./systems/swamp";
 import { createWanderTargetSystem } from "./systems/wanderTarget";
+import { ALL_MIRACLES, type MiracleId } from "./worlds";
 
 export interface SimulationConfig {
   worldWidth: number;
@@ -68,6 +69,16 @@ export interface SimulationConfig {
    */
   enemyDecisionInterval?: number;
   enemyAggressionThreshold?: number;
+  /**
+   * Same per-world "使用可能な奇跡の制限" (see game/worlds.ts's
+   * WorldDefinition.allowedMiracles) applied to the enemy's own miracle
+   * casting (enemyMiracles.ts), not just the player's toolbar — "敵の神は
+   * プレイヤーと同じルールで介入する". Only earthquake/volcano/knight/
+   * armageddon are ever cast by the enemy, so restricting swamp/flood/
+   * shrine here has no effect on it. Defaults to every miracle unlocked
+   * when omitted, which is fine for tests that don't care about it.
+   */
+  allowedMiracles?: readonly MiracleId[];
   /**
    * Called whenever the enemy actually casts a miracle (see
    * enemyMiracles.ts's EnemyMiracleEvent) — lets main.ts surface it
@@ -234,6 +245,7 @@ export class Simulation {
           heightmap: config.heightmap,
           worldCenter: this.worldCenter,
           decisionInterval: config.enemyDecisionInterval,
+          allowedMiracles: config.allowedMiracles ?? ALL_MIRACLES,
           onAction: (event) => {
             this.recordEvent("enemy", event.type);
             config.onEnemyAction?.(event);

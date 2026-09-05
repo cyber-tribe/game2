@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { WORLDS, nextWorldId, unlockedCountForPassword } from "./worlds";
+import { ALL_MIRACLES, WORLDS, nextWorldId, unlockedCountForPassword } from "./worlds";
 
 describe("WORLDS", () => {
   it("has at least one selectable world", () => {
@@ -29,6 +29,34 @@ describe("WORLDS", () => {
     for (const world of WORLDS) {
       expect(world.enemyDecisionInterval).toBeGreaterThan(0);
       expect(world.enemyAggressionThreshold).toBeGreaterThan(0);
+    }
+  });
+
+  it("never drops a miracle a previous world already unlocked (allowedMiracles only grows)", () => {
+    for (let i = 1; i < WORLDS.length; i++) {
+      for (const miracle of WORLDS[i - 1].allowedMiracles) {
+        expect(WORLDS[i].allowedMiracles).toContain(miracle);
+      }
+    }
+  });
+
+  it("unlocks strictly more miracles at some point across the list, not the same set throughout", () => {
+    const counts = WORLDS.map((world) => world.allowedMiracles.length);
+    expect(Math.max(...counts)).toBeGreaterThan(Math.min(...counts));
+  });
+
+  it("unlocks every miracle by the final world", () => {
+    const lastWorld = WORLDS[WORLDS.length - 1];
+    for (const miracle of ALL_MIRACLES) {
+      expect(lastWorld.allowedMiracles).toContain(miracle);
+    }
+  });
+
+  it("never lists a miracle outside the known set", () => {
+    for (const world of WORLDS) {
+      for (const miracle of world.allowedMiracles) {
+        expect(ALL_MIRACLES).toContain(miracle);
+      }
     }
   });
 });

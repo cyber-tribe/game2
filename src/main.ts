@@ -18,7 +18,7 @@ import { drownFlood } from "./game/flood";
 import { Simulation, type GameOutcome, type InspectableEntity, type MatchEvent } from "./game/simulation";
 import { collapseSwampsNear, createSwamp } from "./game/swamp";
 import { eruptVolcano } from "./game/volcano";
-import { WORLDS, nextWorldId, unlockedCountForPassword, type WorldDefinition } from "./game/worlds";
+import { ALL_MIRACLES, WORLDS, nextWorldId, unlockedCountForPassword, type MiracleId, type WorldDefinition } from "./game/worlds";
 import { EntityLayer } from "./render/EntityLayer";
 import { describeInspectableEntity } from "./render/entityInfoLabel";
 import { Hud } from "./render/Hud";
@@ -124,6 +124,12 @@ async function bootstrap(world: WorldDefinition) {
   // TerrainEditRule's doc comment for why this doesn't take away the
   // player's ability to flatten land, just which direction does it.
   const terrainEditRule = world.terrainEditRule;
+
+  // The other half of "使用可能な奇跡の制限": which discretionary miracles
+  // (everything but 隆起/沈降/照会 — see MiracleId's doc comment) this
+  // world has unlocked at all. Non-miracle ToolModes always pass.
+  const isAllowedMiracle = (mode: ToolMode): boolean =>
+    !(ALL_MIRACLES as readonly string[]).includes(mode) || world.allowedMiracles.includes(mode as MiracleId);
 
   // A wrapper around renderer.view purely for screen shake (see
   // triggerShake below): renderer.view.position is the "real" camera
@@ -456,6 +462,11 @@ async function bootstrap(world: WorldDefinition) {
   const applyTool = (event: FederatedPointerEvent) => {
     const local = renderer.view.toLocal(event.global);
 
+    // Should be unreachable in practice — the toolbar disables any miracle
+    // this world hasn't unlocked yet (see below) — but checked here too so
+    // a stale toolMode can never cast something this world forbids.
+    if (!isAllowedMiracle(toolMode)) return;
+
     if (toolMode === "inspect") {
       const entity = pickInspectableEntity(local.x, local.y);
       if (entity) showEntityInfo(describeInspectableEntity(entity));
@@ -773,6 +784,13 @@ async function bootstrap(world: WorldDefinition) {
   if (terrainEditRule !== "both") {
     const forbidden: ToolMode = terrainEditRule === "raiseOnly" ? "lower" : "raise";
     document.querySelector<HTMLButtonElement>(`#toolbar [data-tool="${forbidden}"]`)?.setAttribute("disabled", "true");
+  }
+  // Same idea for allowedMiracles: a player should never be able to select
+  // a miracle this world hasn't unlocked yet, rather than tapping it and
+  // having nothing happen.
+  for (const miracle of ALL_MIRACLES) {
+    if (world.allowedMiracles.includes(miracle)) continue;
+    document.querySelector<HTMLButtonElement>(`#toolbar [data-tool="${miracle}"]`)?.setAttribute("disabled", "true");
   }
   // Syncs the toolbar's visual "pressed" state with toolMode's actual
   // default set above — index.html hardcodes "raise" as pressed, which is
