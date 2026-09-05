@@ -22,41 +22,39 @@ describe("facingFor", () => {
 });
 
 describe("walkCycle", () => {
-  it("alternates between stepping frames as time advances", () => {
+  it("visits every frame of the cycle as time advances", () => {
     const pos = { x: 0, y: 0 };
-    const seenStepping = new Set<boolean>();
+    const seen = new Set<number>();
 
-    for (let t = 0; t < 5; t += 0.05) {
-      seenStepping.add(walkCycle(t, pos).stepping);
-    }
+    for (let t = 0; t < 5; t += 0.02) seen.add(walkCycle(t, pos));
 
-    expect(seenStepping).toEqual(new Set([true, false]));
+    expect([...seen].sort()).toEqual([0, 1, 2, 3]);
   });
 
-  it("bobs between 0 and the amplitude, never negative or overshooting", () => {
-    const pos = { x: 2, y: 3 };
-
-    for (let t = 0; t < 5; t += 0.05) {
-      const { bob } = walkCycle(t, pos);
-      expect(bob).toBeGreaterThanOrEqual(0);
-      expect(bob).toBeLessThanOrEqual(1);
+  it("stays inside the frame range for any time, including negative", () => {
+    for (let t = -5; t < 5; t += 0.05) {
+      const frame = walkCycle(t, { x: 2, y: 3 });
+      expect(Number.isInteger(frame)).toBe(true);
+      expect(frame).toBeGreaterThanOrEqual(0);
+      expect(frame).toBeLessThan(4);
     }
   });
 
   it("offsets the phase by position, so two walkers at different spots aren't synchronized", () => {
-    const t = 1.23;
-    const a = walkCycle(t, { x: 0, y: 0 });
-    const b = walkCycle(t, { x: 5, y: 5 });
+    // Asserted over a span rather than at one instant: the cycle is only 4
+    // frames now, so any given pair of positions coincides a quarter of the
+    // time by chance. What matters is that they don't march in lockstep.
+    let differed = 0;
+    for (let t = 0; t < 2; t += 0.01) {
+      if (walkCycle(t, { x: 0, y: 0 }) !== walkCycle(t, { x: 5, y: 5 })) differed++;
+    }
 
-    // Same instant, different positions -> not guaranteed to match (this
-    // pair in particular doesn't), proving the phase actually depends on
-    // position and not just on elapsedTime.
-    expect(a).not.toEqual(b);
+    expect(differed).toBeGreaterThan(0);
   });
 
-  it("gives the same walker the same result for the same instant (deterministic, not tied to draw order)", () => {
+  it("gives the same walker the same frame for the same instant (deterministic, not tied to draw order)", () => {
     const pos = { x: 4, y: 7 };
-    expect(walkCycle(2.5, pos)).toEqual(walkCycle(2.5, pos));
+    expect(walkCycle(2.5, pos)).toBe(walkCycle(2.5, pos));
   });
 });
 

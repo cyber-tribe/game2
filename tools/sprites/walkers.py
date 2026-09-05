@@ -1,16 +1,19 @@
 """Draws the walker sprite frames.
 
-This is the authoring source for what used to be immediate-mode `Graphics`
-calls in src/render/pixelArt.ts's drawWalkerSprite. The move is per the
-agreed tooling direction (plan/0089): PixiJS already has everything needed
-to *display* pixel art, what the project lacked was a decent way to
-*author* it. A pattern here can be edited a pixel at a time; a chain of
-`g.rect(...).fill(...)` calls could not.
+The authoring source for what used to be immediate-mode `Graphics` calls in
+src/render/pixelArt.ts. A pattern here can be edited a pixel at a time; a
+chain of `g.rect(...).fill(...)` could not.
 
-The frame matrix is small enough to enumerate exhaustively — 2 factions x
-6 poses x 4 facings x 2 walk-cycle frames = 96 frames of 7x9 pixels — so
-there is no need for runtime tinting or layer compositing on the TS side.
-Every frame is a finished picture.
+At the first pass these figures were 5x9 pixels — barely enough for a head,
+a block of body and two boot pixels. They are now 11x18, which buys a face
+with eyes, arms that swing independently of the body, legs that stride, and
+room for a leader's plume and a hero's weapon to be actual shapes rather
+than a rectangle stuck to one side.
+
+The walk cycle is 4 frames (contact / passing / contact / passing) instead
+of the old 2. Two frames at this size read as a twitch; four read as
+walking, because the passing pose can lift the whole figure a pixel while
+the contact poses plant it.
 """
 
 from __future__ import annotations
@@ -24,56 +27,85 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from palette import Palette  # noqa: E402
 
-# Every frame shares one canvas size with the walker's ground point at the
-# bottom-center, so the TS side can anchor every sprite identically instead
-# of carrying a per-frame offset. The cost is a few transparent pixels on
-# the poses that don't need the full box.
-FRAME_WIDTH = 5
-FRAME_HEIGHT = 9
+from .canvas import RGB, Canvas, shade  # noqa: E402
 
-BODY_LEFT = 0
-"""The body pattern is itself 5 wide, so it fills the canvas horizontally."""
-BODY_TOP = 2
-"""Row the 7-row body pattern starts at, leaving rows 0-1 for a leader's plume."""
+FRAME_WIDTH = 11
+FRAME_HEIGHT = 18
+"""Every frame shares one canvas with the walker's ground point at bottom
+center, so the TS side anchors every sprite identically (0.5, 1) instead of
+carrying a per-frame offset."""
 
-TRANSPARENT = (0, 0, 0, 0)
+BODY_TOP = 4
+"""Rows 0-3 are left clear for a leader's plume. The body below it is laid
+out head 5 / torso 4 / legs 5, which lands the boots exactly on row 17 —
+the frame's bottom row, and so the walker's ground point."""
 
-# Front (toward camera) has a small dark eye-pixel; back doesn't. Only the
-# stepping frame's arm is asymmetric (poking out to one side), so a mirrored
-# "*W" step reads as a genuinely different pose from its "*E" counterpart,
-# not just a recolor — the arm is what actually sells the walking direction;
-# a standing person can look symmetric either way.
+WALK_FRAMES = 4
+"""contact / passing / contact / passing — see the module docstring."""
+
+# One character per pixel. '.' is transparent; every other character is a
+# key into the tone table built in _tones().
 #
-#   H skin   E eye   C clothing   A clothing (swinging arm)   T boot
-BODY_PATTERNS: dict[tuple[bool, bool], list[str]] = {
-    # (toward_camera, stepping)
-    (True, False): [".HHH.", ".HEH.", ".CCC.", ".CCC.", ".CCC.", ".T.T.", ".T.T."],
-    (True, True): [".HHH.", ".HEH.", "ACCC.", ".CCC.", ".CCC.", "T...T", ".T.T."],
-    (False, False): [".HHH.", ".HHH.", ".CCC.", ".CCC.", ".CCC.", ".T.T.", ".T.T."],
-    (False, True): [".HHH.", ".HHH.", "ACCC.", ".CCC.", ".CCC.", "T...T", ".T.T."],
-}
+#   h hair   S skin   e eye   C tunic   c tunic shadow
+#   A sleeve  s hand   L leg   B boot
+#
+# The head, torso and arms are shared; only the legs and the swinging arm
+# change per walk frame, so those are overlaid separately below.
+# One row of hair rather than two: the first pass gave the head a full cap
+# of dark hair plus dark sides, and at 5x5 that left almost no face — the
+# figure read as wearing a helmet.
+HEAD_FRONT = [
+    "....hhh....",
+    "...hSSSh...",
+    "...SeSeS...",
+    "...SSSSS...",
+    "....SSS....",
+]
+HEAD_BACK = [
+    "....hhh....",
+    "...hhhhh...",
+    "...hhhhh...",
+    "...hhhhh...",
+    "....hSh....",
+]
+TORSO = [
+    "...CCCCC...",
+    "...CCCCC...",
+    "...CCCCC...",
+    "...ccccc...",
+]
 
-# Marks drawn in the column outside the body, as (column, rows, palette key).
-# Unlike the old Graphics version — which placed these at fractional offsets
-# like `centerX + scale * 1.8` and so never landed on a pixel boundary —
-# these are whole pixels by construction. That is the point of authoring the
-# art on a grid rather than as draw calls.
-# Column 2 is the canvas centerline, so the plume is mirror-invariant and
-# stays over the head on all four facings.
-LEADER_PLUME = {"rows": (0, 1), "column": 2, "key": "clothing"}
-# Column 4 is the body's own outer edge, so a mark there is held against the
-# walker rather than floating beside it. It only ever shares that column
-# with the stepping frame's trailing boot, which is two rows lower.
-KNIGHT_BLADE = {"rows": (3, 4, 5, 6), "column": 4, "key": "stoneLight"}
-GUARDIAN_SHIELD = {"rows": (4, 5, 6), "column": 4, "key": "bronzeMid"}
+# Legs, indexed by walk frame. The contact poses plant the feet apart; the
+# passing poses bring them together under the body.
+LEGS_CONTACT = [
+    "...LL.LL...",
+    "..LL...LL..",
+    "..LL...LL..",
+    "..BB...BB..",
+    ".BBB...BBB.",
+]
+LEGS_PASSING = [
+    "...LL.LL...",
+    "...LL.LL...",
+    "...LL.LL...",
+    "...BB.BB...",
+    "..BBB.BBB..",
+]
+LEGS_BY_FRAME = [LEGS_CONTACT, LEGS_PASSING, LEGS_CONTACT, LEGS_PASSING]
+
+# Arms, indexed by walk frame: which of the two swings forward (drawn a row
+# lower, with the hand showing) and which is back. Frames 0 and 2 are the
+# two contact poses and swing opposite arms — that opposition, not the leg
+# spread, is what makes the two contacts read as different moments.
+ARM_ROWS = 4
+ARMS_BY_FRAME = [(1, 0), (0, 0), (0, 1), (0, 0)]
+
+BOB_BY_FRAME = [0, -1, 0, -1]
+"""Passing poses lift the figure a pixel — a walk's own vertical bounce."""
 
 FACINGS = ("NE", "NW", "SE", "SW")
 """The 4 isometric movement directions — see Facing in src/render/pixelArt.ts.
 "S*" faces toward the camera, "*W" is the horizontal mirror of "*E"."""
-
-SKIN = (0xE0, 0xB8, 0x8A)
-"""The walker's own skin tone. Not in the shared palette: it is specific to
-this one sprite and would only be noise in a palette the UI also reads."""
 
 
 @dataclass(frozen=True)
@@ -93,64 +125,146 @@ POSES = [
     Pose("leaderKnight", leader=True, hero="knight"),
     Pose("leaderGuardian", leader=True, hero="guardian"),
 ]
-"""A leader can also be promoted to a hero, and the old Graphics version drew
-both marks in that case, so the pair is enumerated rather than treated as
-mutually exclusive."""
+"""A leader can also be promoted to a hero, and both marks are drawn in that
+case, so the pairs are enumerated rather than treated as exclusive."""
 
 FACTIONS = {"player": "playerAccent", "enemy": "enemyAccent"}
-"""Walker clothing takes the calibrated faction accents straight from the
-palette. EntityLayer used to keep its own brighter pair of literals, which
-is exactly the drift plan/0089 set out to remove — and the palette's blue is
-the original's own walker blue, so this is also the more faithful color."""
+"""Walker clothing takes the calibrated faction accents from the palette.
+EntityLayer used to keep its own brighter pair of literals — exactly the
+drift plan/archived/0089 set out to remove — and the palette's blue is the
+original's own faction blue."""
+
+SKIN = (0xE0, 0xB8, 0x8A)
+"""Specific to this one sprite; in the shared palette it would only be noise
+for the UI that also reads from it."""
 
 
-def frame_key(faction: str, pose: str, facing: str, stepping: bool) -> str:
-    """The atlas key. Mirrored by walkerFrameKey() in src/render/walkerSprites.ts —
-    the two must agree exactly, which the round-trip test there checks."""
-    return f"walker_{faction}_{pose}_{facing}_{'step' if stepping else 'stand'}"
+def frame_key(faction: str, pose: str, facing: str, frame: int) -> str:
+    """The atlas key. Mirrored by walkerFrameKey() in
+    src/render/walkerSprites.ts — the two must agree exactly, which the
+    round-trip test there checks."""
+    return f"walker_{faction}_{pose}_{facing}_{frame}"
 
 
-def _put(image: Image.Image, x: int, y: int, rgb: tuple[int, int, int], mirror: bool) -> None:
-    column = FRAME_WIDTH - 1 - x if mirror else x
-    image.putpixel((column, y), (*rgb, 255))
-
-
-def render_frame(palette: Palette, faction: str, pose: Pose, facing: str, stepping: bool) -> Image.Image:
-    toward_camera = facing[0] == "S"
-    mirror = facing[1] == "W"
-    clothing = palette.rgb(FACTIONS[faction])
-    colors = {
-        "H": SKIN,
-        "E": palette.rgb("ink"),
+def _tones(palette: Palette, clothing: RGB) -> dict[str, RGB]:
+    return {
+        "h": shade(palette.rgb("bronzeDark"), 0.22),
+        "S": SKIN,
+        "e": palette.rgb("ink"),
         "C": clothing,
-        "A": clothing,
-        "T": palette.rgb("ink"),
-        "clothing": clothing,
-        "stoneLight": palette.rgb("stoneLight"),
-        "bronzeMid": palette.rgb("bronzeMid"),
+        "c": shade(clothing, -0.3),
+        # A full step darker than the tunic, not a hint. At -0.15 the sleeves
+        # were the same value as the torso and the figure had no arms.
+        "A": shade(clothing, -0.28),
+        "s": shade(SKIN, -0.12),
+        # Trousers and boots have to stay clearly lighter than the outline.
+        # The first pass made both near-black and the outline swallowed the
+        # whole lower half of the figure.
+        "L": palette.rgb("stoneMid"),
+        "B": palette.rgb("stoneShadow"),
     }
 
-    image = Image.new("RGBA", (FRAME_WIDTH, FRAME_HEIGHT), TRANSPARENT)
 
-    for row_index, row in enumerate(BODY_PATTERNS[(toward_camera, stepping)]):
-        for column_index, key in enumerate(row):
+def _blit(canvas: Canvas, rows: list[str], top: int, tones: dict[str, RGB], mirror: bool) -> None:
+    for row_index, row in enumerate(rows):
+        for column, key in enumerate(row):
             if key == ".":
                 continue
-            _put(image, BODY_LEFT + column_index, BODY_TOP + row_index, colors[key], mirror)
+            x = FRAME_WIDTH - 1 - column if mirror else column
+            canvas.px(x, top + row_index, tones[key])
 
-    marks = []
+
+def _arms(canvas: Canvas, tones: dict[str, RGB], top: int, frame: int, mirror: bool) -> None:
+    """Sleeves down both sides of the torso, with the forward-swinging one
+    dropped a row so its hand clears the hip. Drawn as code rather than in
+    the pattern strings because only this part differs per walk frame."""
+    left_forward, right_forward = ARMS_BY_FRAME[frame]
+    for column, forward in ((2, left_forward), (8, right_forward)):
+        x = FRAME_WIDTH - 1 - column if mirror else column
+        offset = 1 if forward else 0
+        for row in range(ARM_ROWS - 1):
+            canvas.px(x, top + row + offset, tones["A"])
+        canvas.px(x, top + ARM_ROWS - 1 + offset, tones["s"])
+
+
+def _plume(canvas: Canvas, tones: dict[str, RGB], color: RGB) -> None:
+    """A leader's crest: a tuft rising from the crown, on the centerline so
+    it stays put under mirroring."""
+    center = FRAME_WIDTH // 2
+    canvas.px(center, 1, shade(color, 0.35))
+    canvas.px(center, 2, color)
+    canvas.px(center - 1, 2, color)
+    canvas.px(center + 1, 2, color)
+    canvas.px(center, 3, color)
+
+
+def _sword(canvas: Canvas, tones: dict[str, RGB], palette: Palette, top: int, mirror: bool) -> None:
+    """A knight's blade held upright: a hilt at the hand and a blade above
+    it. The old version was a 1x4 rectangle beside the body; at this size
+    there is room for the blade to actually taper into a crossguard."""
+    column = 9
+    x = FRAME_WIDTH - 1 - column if mirror else column
+    blade = palette.rgb("stoneHighlight")
+    edge = palette.rgb("stoneLight")
+    guard = palette.rgb("bronzeLight")
+    for row in range(6):
+        canvas.px(x, top - 3 + row, blade if row else edge)
+    canvas.px(x - 1 if not mirror else x + 1, top + 3, guard)
+    canvas.px(x, top + 3, guard)
+    canvas.px(x, top + 4, palette.rgb("bronzeDark"))
+
+
+SHIELD = [
+    ".RR.",
+    "RFFR",
+    "RFBR",
+    "RFFR",
+    ".RR.",
+    "..R.",
+]
+"""A kite shield, 4x6 — R rim, F face, B boss. Wide enough to break the
+walker's silhouette so the role reads from shape alone, not only color."""
+
+
+def _shield(canvas: Canvas, tones: dict[str, RGB], palette: Palette, top: int, mirror: bool) -> None:
+    colors = {
+        "R": palette.rgb("bronzeDark"),
+        "F": palette.rgb("bronzeMid"),
+        "B": palette.rgb("bronzeLight"),
+    }
+    for row_index, row in enumerate(SHIELD):
+        for column, key in enumerate(row):
+            if key == ".":
+                continue
+            base = 7 + column
+            x = FRAME_WIDTH - 1 - base if mirror else base
+            canvas.px(x, top + row_index, colors[key])
+
+
+def render_frame(palette: Palette, faction: str, pose: Pose, facing: str, frame: int) -> Image.Image:
+    toward_camera = facing[0] == "S"
+    mirror = facing[1] == "W"
+    tones = _tones(palette, palette.rgb(FACTIONS[faction]))
+
+    canvas = Canvas(FRAME_WIDTH, FRAME_HEIGHT)
+    top = BODY_TOP + BOB_BY_FRAME[frame]
+
+    _blit(canvas, HEAD_FRONT if toward_camera else HEAD_BACK, top, tones, mirror)
+    _blit(canvas, TORSO, top + 5, tones, mirror)
+    _blit(canvas, LEGS_BY_FRAME[frame], top + 9, tones, mirror)
+    # Arms last: the forward-swinging one reaches a row into the hips, and
+    # drawing the legs over it erased the hand that gives the arm its end.
+    _arms(canvas, tones, top + 6, frame, mirror)
+
     if pose.leader:
-        marks.append(LEADER_PLUME)
+        _plume(canvas, tones, palette.rgb(FACTIONS[faction]))
     if pose.hero == "knight":
-        marks.append(KNIGHT_BLADE)
+        _sword(canvas, tones, palette, top + 6, mirror)
     elif pose.hero == "guardian":
-        marks.append(GUARDIAN_SHIELD)
+        _shield(canvas, tones, palette, top + 6, mirror)
 
-    for mark in marks:
-        for row in mark["rows"]:
-            _put(image, mark["column"], row, colors[mark["key"]], mirror)
-
-    return image
+    canvas.outline(palette.rgb("ink"))
+    return canvas.to_image()
 
 
 def render_all(palette: Palette) -> dict[str, Image.Image]:
@@ -158,7 +272,8 @@ def render_all(palette: Palette) -> dict[str, Image.Image]:
     for faction in FACTIONS:
         for pose in POSES:
             for facing in FACINGS:
-                for stepping in (False, True):
-                    key = frame_key(faction, pose.name, facing, stepping)
-                    frames[key] = render_frame(palette, faction, pose, facing, stepping)
+                for frame in range(WALK_FRAMES):
+                    frames[frame_key(faction, pose.name, facing, frame)] = render_frame(
+                        palette, faction, pose, facing, frame
+                    )
     return frames
