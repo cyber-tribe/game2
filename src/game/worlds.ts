@@ -24,6 +24,18 @@ export const ALL_MIRACLES: readonly MiracleId[] = [
 ];
 
 /**
+ * A qualitatively different way the enemy god plays, on top of (not instead
+ * of) the purely numeric difficulty knobs below — see
+ * plan/0072-enemy-personality.md. "aggressive"/"defensive" bias
+ * systems/enemyMiracles.ts's escalation thresholds and hero-kind choice
+ * (see ENEMY_PERSONALITY_TUNING in constants.ts); "balanced" reproduces
+ * today's original thresholds exactly, so it's a safe default for tests
+ * and for worlds too early to have a hero/volcano/armageddon to season
+ * with a personality in the first place.
+ */
+export type EnemyPersonality = "balanced" | "aggressive" | "defensive";
+
+/**
  * One fixed, selectable world for the 征服モード ("conquest mode") skeleton
  * — see docs/game-system.md 10節's "各ワールドは地形タイプ・初期配置・
  * 敵AIの攻撃性／賢さ・使用可能な奇跡の制限などが異なり、徐々に難しく
@@ -35,7 +47,10 @@ export const ALL_MIRACLES: readonly MiracleId[] = [
  * *logic*, not just how eagerly/often it acts) is deliberately not touched
  * here — per the same doc's own "高難度では敵の介入頻度が上がるが、行動
  * パターン自体は比較的予測可能", a harder world should still play by
- * recognizable rules, just press harder.
+ * recognizable rules, just press harder. enemyPersonality (see its own doc
+ * comment) is the one axis that's exempt from that "same rules, just
+ * harder" framing on purpose — it's meant to feel like a different
+ * opponent, not a faster one.
  *
  * Map size is a fixed 64x64 for every world (see WORLDS below), not a
  * difficulty axis of its own — per plan/0062-original-scale-map.md's move
@@ -81,6 +96,14 @@ export interface WorldDefinition {
    * speed — see WORLDS' own doc comment.
    */
   allowedMiracles: readonly MiracleId[];
+  /**
+   * The enemy god's play style for this world — see EnemyPersonality's own
+   * doc comment. Deliberately not part of the monotonic "never relaxing"
+   * curve the other axes follow (WORLDS' own doc comment): a later world
+   * isn't necessarily a *more* aggressive/defensive version of an earlier
+   * one, just a different character to play against.
+   */
+  enemyPersonality: EnemyPersonality;
 }
 
 /**
@@ -98,12 +121,15 @@ export interface WorldDefinition {
 const WORLD_SIZE = 64;
 
 export const WORLDS: WorldDefinition[] = [
-  { id: "quiet-plain", name: "静かな草原", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "grass", terrainEditRule: "both", enemyDecisionInterval: 6, enemyAggressionThreshold: 6, allowedMiracles: ["earthquake"] },
-  { id: "dry-highland", name: "乾いた高地", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "desert", terrainEditRule: "both", enemyDecisionInterval: 5, enemyAggressionThreshold: 5, allowedMiracles: ["earthquake", "swamp"] },
-  { id: "frozen-border", name: "凍てつく国境", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "snow", terrainEditRule: "raiseOnly", enemyDecisionInterval: 5, enemyAggressionThreshold: 4, allowedMiracles: ["earthquake", "swamp", "shrine"] },
-  { id: "ashen-waste", name: "灰の荒野", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 4, enemyAggressionThreshold: 3, allowedMiracles: ["earthquake", "swamp", "shrine", "knight", "guardian"] },
-  { id: "rising-frontier", name: "隆起する辺境", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "desert", terrainEditRule: "raiseOnly", enemyDecisionInterval: 3, enemyAggressionThreshold: 3, allowedMiracles: ["earthquake", "swamp", "shrine", "knight", "guardian", "volcano"] },
-  { id: "final-frontline", name: "最終戦線", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 2, enemyAggressionThreshold: 2, allowedMiracles: ALL_MIRACLES },
+  { id: "quiet-plain", name: "静かな草原", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "grass", terrainEditRule: "both", enemyDecisionInterval: 6, enemyAggressionThreshold: 6, allowedMiracles: ["earthquake"], enemyPersonality: "balanced" },
+  { id: "dry-highland", name: "乾いた高地", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "desert", terrainEditRule: "both", enemyDecisionInterval: 5, enemyAggressionThreshold: 5, allowedMiracles: ["earthquake", "swamp"], enemyPersonality: "balanced" },
+  { id: "frozen-border", name: "凍てつく国境", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "snow", terrainEditRule: "raiseOnly", enemyDecisionInterval: 5, enemyAggressionThreshold: 4, allowedMiracles: ["earthquake", "swamp", "shrine"], enemyPersonality: "balanced" },
+  // First world with hero miracles — an aggressive god shows off knight rushing.
+  { id: "ashen-waste", name: "灰の荒野", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 4, enemyAggressionThreshold: 3, allowedMiracles: ["earthquake", "swamp", "shrine", "knight", "guardian"], enemyPersonality: "aggressive" },
+  // A turtling god that leans on guardian/volcano and needs a much bigger lead to commit — teaches the player to break a defense, not just outrace one.
+  { id: "rising-frontier", name: "隆起する辺境", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "desert", terrainEditRule: "raiseOnly", enemyDecisionInterval: 3, enemyAggressionThreshold: 3, allowedMiracles: ["earthquake", "swamp", "shrine", "knight", "guardian", "volcano"], enemyPersonality: "defensive" },
+  // The final boss goes back to all-in aggression, decisively finishing the match the moment it's ahead.
+  { id: "final-frontline", name: "最終戦線", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 2, enemyAggressionThreshold: 2, allowedMiracles: ALL_MIRACLES, enemyPersonality: "aggressive" },
 ];
 
 /**

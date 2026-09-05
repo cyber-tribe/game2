@@ -35,7 +35,7 @@ import { movementSystem } from "./systems/movement";
 import { createSettleSystem } from "./systems/settle";
 import { createSwampSystem } from "./systems/swamp";
 import { createWanderTargetSystem } from "./systems/wanderTarget";
-import { ALL_MIRACLES, type MiracleId } from "./worlds";
+import { ALL_MIRACLES, type EnemyPersonality, type MiracleId } from "./worlds";
 
 export interface SimulationConfig {
   worldWidth: number;
@@ -79,6 +79,13 @@ export interface SimulationConfig {
    * when omitted, which is fine for tests that don't care about it.
    */
   allowedMiracles?: readonly MiracleId[];
+  /**
+   * The enemy god's play style for this world — see game/worlds.ts's
+   * WorldDefinition.enemyPersonality and constants.ts's ENEMY_PERSONALITY_
+   * TUNING. Defaults to "balanced" (today's original thresholds) when
+   * omitted, which is fine for tests that don't care about it.
+   */
+  enemyPersonality?: EnemyPersonality;
   /**
    * Called whenever the enemy actually casts a miracle (see
    * enemyMiracles.ts's EnemyMiracleEvent) — lets main.ts surface it
@@ -248,6 +255,7 @@ export class Simulation {
           worldCenter: this.worldCenter,
           decisionInterval: config.enemyDecisionInterval,
           allowedMiracles: config.allowedMiracles ?? ALL_MIRACLES,
+          personality: config.enemyPersonality,
           onAction: (event) => {
             this.recordEvent("enemy", event.type);
             config.onEnemyAction?.(event);

@@ -1,5 +1,6 @@
 import type { TerrainEditRule, TerrainType } from "../world/heightmap";
 import type { HouseLevel } from "./components";
+import type { EnemyPersonality } from "./worlds";
 
 /** Tiles per second for a freshly spawned walker. */
 export const DEFAULT_WALKER_SPEED = 1.5;
@@ -346,3 +347,52 @@ export const MIN_ARMAGEDDON_TIME = 600;
  * over just temporarily disrupting it.
  */
 export const VOLCANO_POPULATION_RATIO = 1.3;
+
+/**
+ * How much an EnemyPersonality (see worlds.ts) biases enemyMiracles.ts's
+ * escalation math, on top of (not instead of) the per-world difficulty
+ * knobs above — the qualitative "character" axis docs/game-system.md's
+ * 敵AI section was missing (see plan/0072-enemy-personality.md): earlier
+ * worlds all played the exact same way, just faster/more trigger-happy.
+ *
+ * - `volcanoRatioMultiplier`/`armageddonRatioMultiplier` scale
+ *   VOLCANO_POPULATION_RATIO/ARMAGEDDON_POPULATION_RATIO: below 1 the
+ *   personality commits to that escalation with a smaller lead than
+ *   normal (more trigger-happy), above 1 it holds out for a bigger one
+ *   (more cautious).
+ * - `heroPreferenceBias` shifts the population-ratio line enemyMiracles.ts
+ *   draws between "prefer guardian" (defend) and "prefer knight" (attack):
+ *   a faction is read as "behind" (guardian) when its ratio is below
+ *   `1 + heroPreferenceBias`. Negative narrows that window (turtles only
+ *   when genuinely losing, attacks otherwise); positive widens it (turtles
+ *   readily, attacks only once clearly ahead).
+ *
+ * "balanced" is exactly 1/1/0 — today's original thresholds, unchanged —
+ * so it's both a safe default for tests and the right choice for worlds
+ * too early (no hero/volcano/armageddon unlocked yet) for a personality to
+ * have anything to season.
+ */
+export interface EnemyPersonalityTuning {
+  volcanoRatioMultiplier: number;
+  armageddonRatioMultiplier: number;
+  heroPreferenceBias: number;
+}
+
+export const ENEMY_PERSONALITY_TUNING: Record<EnemyPersonality, EnemyPersonalityTuning> = {
+  balanced: { volcanoRatioMultiplier: 1, armageddonRatioMultiplier: 1, heroPreferenceBias: 0 },
+  // Commits to volcano/armageddon with a smaller lead, and only ever turtles
+  // behind a guardian once genuinely losing (ratio < 0.7) rather than at
+  // the first sign of not being ahead.
+  aggressive: { volcanoRatioMultiplier: 0.85, armageddonRatioMultiplier: 0.85, heroPreferenceBias: -0.3 },
+  // Holds out for a much bigger lead before volcano/armageddon, and turtles
+  // behind a guardian readily (ratio < 1.3) — even a slight edge isn't
+  // enough to make it commit to knighting instead.
+  defensive: { volcanoRatioMultiplier: 1.3, armageddonRatioMultiplier: 1.2, heroPreferenceBias: 0.3 },
+};
+
+/** Japanese label for each EnemyPersonality, shown at world-select so a personality is never a silent mystery — same idea as TERRAIN_EDIT_RULE_LABELS. */
+export const ENEMY_PERSONALITY_LABELS: Record<EnemyPersonality, string> = {
+  balanced: "堅実",
+  aggressive: "好戦的",
+  defensive: "専守防衛",
+};

@@ -12,6 +12,7 @@ import {
   ARMAGEDDON_MANA_COST,
   ARMAGEDDON_POPULATION_RATIO,
   EARTHQUAKE_MANA_COST,
+  ENEMY_PERSONALITY_TUNING,
   GUARDIAN_MANA_COST,
   KNIGHT_MANA_COST,
   MIN_ARMAGEDDON_TIME,
@@ -23,7 +24,7 @@ import { guardianify, knightify } from "../hero";
 import { totalPopulation } from "../population";
 import { collapseSwampsNear } from "../swamp";
 import { eruptVolcano } from "../volcano";
-import { ALL_MIRACLES, type MiracleId } from "../worlds";
+import { ALL_MIRACLES, type EnemyPersonality, type MiracleId } from "../worlds";
 import { distance, type Point } from "./geometry";
 
 /**
@@ -62,6 +63,14 @@ export interface EnemyMiracleConfig {
    * miracle unlocked, matching today's unrestricted behavior.
    */
   allowedMiracles: readonly MiracleId[];
+  /**
+   * The enemy god's play style (see worlds.ts's EnemyPersonality and
+   * constants.ts's ENEMY_PERSONALITY_TUNING) — biases the escalation
+   * thresholds and hero-kind choice below without changing which branch
+   * runs or in what order. Defaults to "balanced", i.e. today's original
+   * thresholds, unchanged.
+   */
+  personality: EnemyPersonality;
   /** Called once per miracle actually cast — see EnemyMiracleEvent. */
   onAction: (event: EnemyMiracleEvent) => void;
 }
@@ -88,6 +97,14 @@ export interface EnemyMiracleConfig {
  * 4. Otherwise, if it can afford it, shakes up the opponent's biggest
  *    house cluster with an earthquake — economic sabotage rather than
  *    pure combat.
+ *
+ * `config.personality` (see EnemyPersonality) biases the thresholds in
+ * steps 1-3 without changing this priority order or which branch runs —
+ * an "aggressive" world's enemy commits to volcano/armageddon with a
+ * smaller lead and only ever turtles behind a guardian once genuinely
+ * losing; a "defensive" one holds out for a bigger lead and turtles
+ * readily. "balanced" (the default) reproduces the original, unbiased
+ * thresholds exactly.
  *
  * Both the earthquake and volcano targets are picked by
  * densestOpponentCluster rather than uniformly at random: a real
@@ -119,6 +136,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
   const minArmageddonTime = config.minArmageddonTime ?? MIN_ARMAGEDDON_TIME;
   const rng = config.rng ?? Math.random;
   const allowedMiracles = config.allowedMiracles ?? ALL_MIRACLES;
+  const tuning = ENEMY_PERSONALITY_TUNING[config.personality ?? "balanced"];
   const onAction = config.onAction ?? (() => {});
   let timeSincePass = decisionInterval;
   let elapsed = 0;
@@ -138,7 +156,11 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
     const theirPopulation = totalPopulation(world, opponentId);
     const populationRatio = theirPopulation > 0 ? myPopulation / theirPopulation : 0;
 
-    if (allowedMiracles.includes("armageddon") && populationRatio >= ARMAGEDDON_POPULATION_RATIO && elapsed >= minArmageddonTime) {
+    if (
+      allowedMiracles.includes("armageddon") &&
+      populationRatio >= ARMAGEDDON_POPULATION_RATIO * tuning.armageddonRatioMultiplier &&
+      elapsed >= minArmageddonTime
+    ) {
       if (trySpendMana(world, factionId, ARMAGEDDON_MANA_COST)) {
         triggerArmageddon(world, worldCenter);
         onAction({ type: "armageddon" });
@@ -151,7 +173,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
       // population recorded yet", which populationRatio also reads as 0)
       // means the enemy is actually losing — dig in with a guardian rather
       // than sending its one hero off to hunt while its own houses burn.
-      const preferredHeroKind = theirPopulation > 0 && populationRatio < 1 ? "guardian" : "knight";
+      const preferredHeroKind = theirPopulation > 0 && populationRatio < 1 + tuning.heroPreferenceBias ? "guardian" : "knight";
       const heroCost = preferredHeroKind === "guardian" ? GUARDIAN_MANA_COST : KNIGHT_MANA_COST;
       const leader = world.get(state.leaderId, Walker);
 
@@ -163,7 +185,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
       }
     }
 
-    if (allowedMiracles.includes("volcano") && populationRatio >= VOLCANO_POPULATION_RATIO) {
+    if (allowedMiracles.includes("volcano") && populationRatio >= VOLCANO_POPULATION_RATIO * tuning.volcanoRatioMultiplier) {
       const target = densestOpponentCluster(world, opponentId, DEFAULT_VOLCANO_RADIUS, rng);
       if (target && trySpendMana(world, factionId, VOLCANO_MANA_COST)) {
         applyVolcano(heightmap, target.x, target.y);

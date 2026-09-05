@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { ALL_MIRACLES, WORLDS, nextWorldId, unlockedCountForPassword } from "./worlds";
+import { ALL_MIRACLES, WORLDS, nextWorldId, unlockedCountForPassword, type EnemyPersonality } from "./worlds";
+
+const KNOWN_PERSONALITIES: readonly EnemyPersonality[] = ["balanced", "aggressive", "defensive"];
 
 describe("WORLDS", () => {
   it("has at least one selectable world", () => {
@@ -58,6 +60,19 @@ describe("WORLDS", () => {
         expect(ALL_MIRACLES).toContain(miracle);
       }
     }
+  });
+
+  it("gives every world a known EnemyPersonality", () => {
+    // Deliberately not asserted monotonic like the difficulty axes above —
+    // see EnemyPersonality's own doc comment: it's meant to feel like a
+    // different opponent per world, not a strictly harsher one.
+    for (const world of WORLDS) {
+      expect(KNOWN_PERSONALITIES).toContain(world.enemyPersonality);
+    }
+  });
+
+  it("gives at least one world a personality other than balanced", () => {
+    expect(WORLDS.some((world) => world.enemyPersonality !== "balanced")).toBe(true);
   });
 });
 
