@@ -651,14 +651,14 @@ export class IsoRenderer {
           // Water always reads as a single flat, unshaded plane — never a
           // sloped/shaded seabed showing through — at its own tile's
           // average depth, same as before this became a per-vertex mesh.
+          // No stroke (see fillTerrainTriangle's own doc comment on why):
+          // a whole lake is one continuous color, so outlining every tile
+          // seam would draw a visible grid across it for no reason.
           const p0 = this.toScreen(x, y, avgElevation);
           const p1 = this.toScreen(x + 1, y, avgElevation);
           const p2 = this.toScreen(x + 1, y + 1, avgElevation);
           const p3 = this.toScreen(x, y + 1, avgElevation);
-          graphics
-            .poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy])
-            .fill(baseColor)
-            .stroke({ width: 1, color: 0x000000, alpha: 0.15 });
+          graphics.poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy]).fill(baseColor);
         } else {
           const a: Vec3 = { x, y, z: h00 };
           const b: Vec3 = { x: x + 1, y, z: h10 };
@@ -731,6 +731,17 @@ export class IsoRenderer {
    * (the core "flatten to build" loop, see createHeightmap's own doc
    * comment): a manicured, flattened plot reads distinctly from the rough,
    * gently-shaded slopes of untouched terrain right next to it.
+   *
+   * Deliberately no stroke on the triangle's own outline: two adjacent
+   * triangles that end up the exact same shaded color (the ordinary case
+   * on flat or gently-sloped ground, since brightness is continuous) are
+   * meant to read as one seamless surface. An outline on every triangle
+   * regardless drew a fine diamond-grid wireframe over the *entire* map —
+   * on real mobile hardware, glaringly visible even over otherwise flat
+   * grass — per feedback: "これじゃ視認性が悪すぎます、原作に可能な限り
+   * 揃えてください". The reference art itself never outlines a facet
+   * seam; only an actual brightness change (a real slope or cliff) reads
+   * as an edge there, exactly like this now does with the stroke gone.
    */
   private fillTerrainTriangle(
     graphics: Graphics,
@@ -751,10 +762,7 @@ export class IsoRenderer {
         ? GRASS_FILL
         : shadeColor(baseColor, isFlat ? 1 : triangleBrightness(a, b, c));
 
-    graphics
-      .poly([pa.sx, pa.sy, pb.sx, pb.sy, pc.sx, pc.sy])
-      .fill(fill)
-      .stroke({ width: 1, color: 0x000000, alpha: 0.15 });
+    graphics.poly([pa.sx, pa.sy, pb.sx, pb.sy, pc.sx, pc.sy]).fill(fill);
   }
 
   /**
