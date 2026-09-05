@@ -380,10 +380,24 @@ export function applyEarthquake(
 export const DEFAULT_VOLCANO_RADIUS = 1;
 export const VOLCANO_ROCK_HARDNESS = 20;
 
+/** How far below MAX_ELEVATION (the crater rim) applyVolcano's own crater floor and outer slope sit — see its doc comment. */
+export const VOLCANO_CRATER_DEPTH = 3;
+export const VOLCANO_OUTER_DROP = 6;
+
 /**
- * Heaves every vertex within `radius` of (centerX, centerY) up to
- * MAX_ELEVATION and covers it in rock — docs/game-system.md's "対象地点
- * を高く隆起させ、岩石で覆う". Unlike an earthquake this is deterministic
+ * Heaves the footprint within `radius` of (centerX, centerY) into a real
+ * cone-with-crater shape and covers it in rock — docs/game-system.md's
+ * "対象地点を高く隆起させ、岩石で覆う", refined per plan/0087's "外側：
+ * 低い→中間：高い→火口縁：さらに高い→中央：少し低い": the ring exactly
+ * `radius` vertices out (the crater rim) sits at MAX_ELEVATION, the exact
+ * center dips VOLCANO_CRATER_DEPTH below that (the crater floor — still a
+ * genuine peak versus the surroundings, just lower than its own rim), and
+ * anything further out but still inside the square footprint (radius=1's
+ * diagonal corners, since the loop below is a Chebyshev/square footprint —
+ * see volcano.ts's own doc comment) sits VOLCANO_OUTER_DROP below the rim,
+ * i.e. the cone's outer slope. At radius 0 there's no rim to speak of, so
+ * the single affected vertex is just a bare peak at MAX_ELEVATION, same as
+ * before this shape existed. Unlike an earthquake this is deterministic
  * and one-directional: it always builds a peak, never a pit. The rock
  * makes the area unbuildable (see isBuildable) until enough later
  * raiseVertex calls chip its hardness down to 0 — "復旧には大量の地形
@@ -405,7 +419,16 @@ export function applyVolcano(
     for (let dx = -radius; dx <= radius; dx++) {
       const vx = cx + dx;
       if (vx < 0 || vx > heightmap.width) continue;
-      heightmap.vertices[vy][vx] = MAX_ELEVATION;
+      const distance = Math.hypot(dx, dy);
+      const elevation =
+        distance < 0.5
+          ? radius >= 1
+            ? MAX_ELEVATION - VOLCANO_CRATER_DEPTH
+            : MAX_ELEVATION
+          : distance <= radius + 0.01
+            ? MAX_ELEVATION
+            : MAX_ELEVATION - VOLCANO_OUTER_DROP;
+      heightmap.vertices[vy][vx] = elevation;
       heightmap.rockHardness[vy][vx] = hardness;
     }
   }

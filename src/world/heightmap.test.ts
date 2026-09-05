@@ -4,6 +4,8 @@ import {
   FLOOD_ROCK_COOLING,
   MAX_ELEVATION,
   MIN_ELEVATION,
+  VOLCANO_CRATER_DEPTH,
+  VOLCANO_OUTER_DROP,
   VOLCANO_ROCK_HARDNESS,
   applyEarthquake,
   applyFlood,
@@ -456,14 +458,36 @@ describe("applyEarthquake", () => {
 });
 
 describe("applyVolcano", () => {
-  it("raises every vertex within radius to MAX_ELEVATION and marks it as rock", () => {
+  it("shapes a cone-with-crater within radius, and marks every affected vertex as rock", () => {
     const heightmap = flatHeightmap(10, 10, 3);
 
     applyVolcano(heightmap, 5, 5, 1, 7);
 
+    // Rim (the 4 orthogonal neighbors, exactly `radius` out) is the peak.
+    for (const [dy, dx] of [
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+    ]) {
+      expect(heightmap.vertices[5 + dy][5 + dx]).toBe(MAX_ELEVATION);
+    }
+    // Center dips below the rim — a crater floor, not a flat plateau.
+    expect(heightmap.vertices[5][5]).toBe(MAX_ELEVATION - VOLCANO_CRATER_DEPTH);
+    // Diagonal corners (outside the circular rim but still inside the
+    // square footprint — see volcano.ts's own Chebyshev-footprint note)
+    // sit lower still: the cone's outer slope.
+    for (const [dy, dx] of [
+      [-1, -1],
+      [-1, 1],
+      [1, -1],
+      [1, 1],
+    ]) {
+      expect(heightmap.vertices[5 + dy][5 + dx]).toBe(MAX_ELEVATION - VOLCANO_OUTER_DROP);
+    }
+    // Every vertex in the footprint (all 9) is rock, regardless of elevation.
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
-        expect(heightmap.vertices[5 + dy][5 + dx]).toBe(MAX_ELEVATION);
         expect(heightmap.rockHardness[5 + dy][5 + dx]).toBe(7);
       }
     }
@@ -502,7 +526,9 @@ describe("applyVolcano", () => {
     const heightmap = flatHeightmap(4, 4, 3);
 
     expect(() => applyVolcano(heightmap, 0, 0, 3)).not.toThrow();
-    expect(heightmap.vertices[0][0]).toBe(MAX_ELEVATION);
+    // (0, 0) is the volcano's own center, which — with a real rim to sit
+    // below (radius >= 1) — is the crater floor, not the rim itself.
+    expect(heightmap.vertices[0][0]).toBe(MAX_ELEVATION - VOLCANO_CRATER_DEPTH);
   });
 });
 
