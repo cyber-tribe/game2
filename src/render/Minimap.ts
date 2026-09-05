@@ -9,14 +9,22 @@ const FACTION_COLOR: Record<FactionId, number> = {
   enemy: 0xd94f4f,
 };
 
+/**
+ * Darker than the main map's own TERRAIN_COLOR on purpose: the minimap
+ * quantizes elevation into brightness bands on top of these (see
+ * terrainColorAt), so its base tone has to leave headroom for the
+ * brightest band without washing out. Hues follow the calibrated
+ * GAME_PALETTE (see plan/0088-palette-calibration.md) so the overview map
+ * reads as the same world, just smaller.
+ */
 const TERRAIN_COLOR: Record<Heightmap["terrain"], number> = {
-  grass: 0x2f5c29,
-  desert: 0x8a6b3a,
+  grass: GAME_PALETTE.grassDark,
+  desert: GAME_PALETTE.soilMid,
   snow: 0x8fa3aa,
-  rock: 0x453a30,
+  rock: GAME_PALETTE.stoneShadow,
 };
 
-const WATER_COLOR = 0x1e3f5c;
+const WATER_COLOR = GAME_PALETTE.waterDark;
 
 const HOUSE_DOT_SIZE = 3;
 const WALKER_DOT_RADIUS = 1;

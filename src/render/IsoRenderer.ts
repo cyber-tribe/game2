@@ -1,5 +1,6 @@
 import { Container, Graphics, Texture } from "pixi.js";
 import { MAX_ELEVATION, sampleElevation, VOLCANO_ROCK_HARDNESS, type Heightmap } from "../world/heightmap";
+import { GAME_PALETTE } from "./palette";
 import { createDitherTexture, createPatternTexture } from "./patternTexture";
 
 // Sized for finger taps rather than mouse clicks: at scale 1 adjacent
@@ -133,14 +134,23 @@ function shadeColor(color: number, brightness: number): number {
   return lerpColor(color, 0xffffff, brightness - 1);
 }
 
-const TERRAIN_COLOR: Record<Heightmap["terrain"], number> = {
-  grass: 0x4a8c3f,
-  desert: 0xd6b25e,
-  snow: 0xe8f0f5,
-  rock: 0x6b5a4a,
+/**
+ * Sourced from GAME_PALETTE rather than its own hex literals, per the
+ *改修指示's "ゲーム全体を限定された共通paletteで描画する" — and, since
+ * plan/0088-palette-calibration.md, those values are sampled off the
+ * original's own screenshots. Grass in particular is an olive/khaki, not
+ * the spring green this renderer used to draw. Snow has no reference
+ * screenshot to sample from (none of the 11 shows a snow map), so it stays
+ * a harmonized guess: a cold off-white against the same warm stone.
+ */
+export const TERRAIN_COLOR: Record<Heightmap["terrain"], number> = {
+  grass: GAME_PALETTE.grassMid,
+  desert: GAME_PALETTE.soilLight,
+  snow: 0xd8dce0,
+  rock: GAME_PALETTE.stoneDark,
 };
 
-const WATER_COLOR = 0x2a5f8c;
+const WATER_COLOR = GAME_PALETTE.waterMid;
 
 /**
  * A single flat solid color read as "のっぺり" (flat, lifeless) next to the
@@ -148,9 +158,11 @@ const WATER_COLOR = 0x2a5f8c;
  * rather than one uniform fill — see createDitherTexture. Originally only
  * grass got this treatment; plan/0087-terrain-texture-unification.md gives
  * every terrain its own dithered pattern instead of a flat fill, per
- * "全terrainに固有pixel patternを持たせる".
+ * "全terrainに固有pixel patternを持たせる". Grass dithers between the
+ * palette's own sampled mid and dark olive rather than an arbitrary
+ * darkening of one tone.
  */
-const GRASS_SPECKLE_COLOR = lerpColor(TERRAIN_COLOR.grass, 0x000000, 0.3);
+const GRASS_SPECKLE_COLOR = GAME_PALETTE.grassDark;
 /**
  * Size (px, at scale 1) of one repeat of a terrain's dither texture — see
  * createDitherTexture. Small relative to a tile (64x32px) so it tiles
@@ -163,11 +175,11 @@ const DITHER_SIZE = 8;
 const ROCK_DITHER_SIZE = 12;
 /** Fraction of each terrain's dither texture that gets its speckle color rather than its plain base color. */
 const GRASS_SPECKLE_DENSITY = 0.35;
-const DESERT_SPECKLE_COLOR = lerpColor(TERRAIN_COLOR.desert, 0x3a2410, 0.35);
+const DESERT_SPECKLE_COLOR = GAME_PALETTE.soilMid;
 const DESERT_SPECKLE_DENSITY = 0.15;
 const SNOW_SPECKLE_COLOR = 0xffffff;
 const SNOW_SPECKLE_DENSITY = 0.2;
-const ROCK_SPECKLE_COLOR = lerpColor(TERRAIN_COLOR.rock, 0x000000, 0.35);
+const ROCK_SPECKLE_COLOR = GAME_PALETTE.stoneShadow;
 const ROCK_SPECKLE_DENSITY = 0.4;
 
 /**
