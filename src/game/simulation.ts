@@ -19,6 +19,7 @@ import { totalPopulation } from "./population";
 import { releasePopulation } from "./populationRelease";
 import { createHouseCaptureSystem, createWalkerCombatSystem } from "./systems/combat";
 import type { ImpactEffectEvent, ImpactEffectSnapshot } from "./systems/effects";
+import { createDrowningSystem } from "./systems/drowning";
 import { createEnemyAiSystem } from "./systems/enemyAi";
 import { createEnemyMiracleSystem, type EnemyMiracleEvent } from "./systems/enemyMiracles";
 import { createEnemyTerraformSystem } from "./systems/enemyTerraform";
@@ -94,6 +95,15 @@ export interface SimulationConfig {
    * rendering.
    */
   onEnemyAction?: (event: EnemyMiracleEvent) => void;
+  /**
+   * Same per-world "海がマグマ" theming (see game/worlds.ts's
+   * WorldDefinition.instantDrowning) applied to systems/drowning.ts: skips
+   * the gradual breath countdown and drowns a walker outright the instant
+   * it's caught in a genuine body of water. Defaults to false (today's new
+   * gradual/recoverable behavior) when omitted, which is fine for tests
+   * that don't care about it.
+   */
+  instantDrowning?: boolean;
 }
 
 export interface FactionSummary {
@@ -231,6 +241,13 @@ export class Simulation {
       .add(movementSystem)
       .add(gatherSystem)
       .add(createSwampSystem({ onImpact: (event) => this.recordImpactEffect(event) }))
+      .add(
+        createDrowningSystem({
+          heightmap: config.heightmap,
+          instant: config.instantDrowning,
+          onImpact: (event) => this.recordImpactEffect(event),
+        }),
+      )
       .add(createWalkerCombatSystem({ onImpact: (event) => this.recordImpactEffect(event) }))
       .add(
         createHouseCaptureSystem({
@@ -312,6 +329,18 @@ export class Simulation {
     if (entity === undefined) return;
     const state = this.world.get(entity, FactionState)!;
     this.world.add(entity, FactionState, { ...state, behaviorMode: mode });
+  }
+
+  /**
+   * A faction's current mana — main.ts uses this to show the player a
+   * clear "マナが足りません" message and to dim toolbar buttons it can't
+   * currently afford, instead of a tap on an unaffordable miracle silently
+   * doing nothing (see trySpendMana, which is what actually enforces the
+   * cost — this is read-only).
+   */
+  getMana(faction: FactionId): number {
+    const entity = findFactionEntity(this.world, faction);
+    return entity === undefined ? 0 : this.world.get(entity, FactionState)!.mana;
   }
 
   getBehaviorMode(faction: FactionId): BehaviorMode | undefined {

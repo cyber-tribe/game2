@@ -28,7 +28,7 @@ import { IsoRenderer, isWithinTileBounds, visibleTileBounds, type TileBounds } f
 import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
 import { Minimap } from "./render/Minimap";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
-import { DEFAULT_EARTHQUAKE_RADIUS, DEFAULT_VOLCANO_RADIUS, applyEarthquake, applyFlood, applyVolcano, createHeightmap, isTerrainEditAllowed, raiseTile } from "./world/heightmap";
+import { DEFAULT_EARTHQUAKE_RADIUS, DEFAULT_VOLCANO_RADIUS, applyEarthquake, applyFlood, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseTile } from "./world/heightmap";
 
 /**
  * The camera's fixed base scale — see layout()'s doc comment for why this
@@ -266,6 +266,7 @@ async function bootstrap(world: WorldDefinition) {
     enemyAggressionThreshold: world.enemyAggressionThreshold,
     allowedMiracles: world.allowedMiracles,
     enemyPersonality: world.enemyPersonality,
+    instantDrowning: world.instantDrowning,
     onEnemyAction,
   });
 
@@ -389,13 +390,19 @@ async function bootstrap(world: WorldDefinition) {
   // Every mana-costing action a tap can trigger goes through this instead
   // of calling trySpendMana directly — see isOwnFactionVisible above. Mana
   // is left untouched and the "🔍 照会" info panel (reused here rather
-  // than adding a near-identical banner) explains why nothing happened.
+  // than adding a near-identical banner) explains why nothing happened —
+  // without this, a raise/lower tap (or any miracle) with insufficient
+  // mana was a silent no-op, indistinguishable from the edit just not
+  // having registered at all (per feedback: "上げ下げができているのか
+  // 分からない").
   const trySpendPlayerMana = (cost: number): boolean => {
     if (!isOwnFactionVisible(visibleBounds())) {
       showEntityInfo("自分の勢力が画面内に見えていません");
       return false;
     }
-    return trySpendMana(simulation.world, "player", cost);
+    if (trySpendMana(simulation.world, "player", cost)) return true;
+    showEntityInfo(`マナが足りません（必要 ${cost} / 現在 ${simulation.getMana("player").toFixed(1)}）`);
+    return false;
   };
 
   // Nudges a first-time player toward the core loop — see Hud.ts's
@@ -445,6 +452,15 @@ async function bootstrap(world: WorldDefinition) {
     return best;
   };
 
+  // The elevation a "flatten" brush stroke is leveling everything toward —
+  // captured from the first tile the stroke touches (see
+  // applyTerrainEditAt's "flatten" branch) and reused for every tile the
+  // same continuous gesture then paints over, so dragging across a bumpy
+  // area levels it all to one common plateau instead of flattening each
+  // tile to its own separate target. Reset to undefined between gestures —
+  // see stopPainting and the pointerdown handler further down.
+  let flattenTargetElevation: number | undefined;
+
   // Shared by the plain single-tap path (applyTool, below) and by ブラシ
   // continuous painting (see the pointer handlers further down) — both
   // just need "spend mana, edit this one tile, redraw". Edits a whole tile
@@ -452,6 +468,34 @@ async function bootstrap(world: WorldDefinition) {
   // point, matching the original game's tile-based terraforming — see
   // plan/0065-tile-based-terraform.md.
   const applyTerrainEditAt = (tile: { x: number; y: number }): void => {
+    if (toolMode === "flatten") {
+      if (flattenTargetElevation === undefined) {
+        // The tile's own corners decide the target, biased by direction
+        // when this match restricts one — per TerrainEditRule's own doc
+        // comment, a restricted match must still be able to fully level an
+        // ordinary tile using only its permitted direction: raiseOnly
+        // levels up to the tile's own highest corner, lowerOnly down to its
+        // lowest, "both" simply averages them.
+        const corners = [
+          heightmap.vertices[tile.y][tile.x],
+          heightmap.vertices[tile.y][tile.x + 1],
+          heightmap.vertices[tile.y + 1][tile.x + 1],
+          heightmap.vertices[tile.y + 1][tile.x],
+        ];
+        flattenTargetElevation =
+          terrainEditRule === "raiseOnly"
+            ? Math.max(...corners)
+            : terrainEditRule === "lowerOnly"
+              ? Math.min(...corners)
+              : corners.reduce((sum, h) => sum + h, 0) / corners.length;
+      }
+      if (!trySpendPlayerMana(TERRAIN_EDIT_MANA_COST)) return;
+      flattenTile(heightmap, tile.x, tile.y, flattenTargetElevation, terrainEditRule);
+      renderer.redraw(visibleBounds());
+      dismissTutorialHint();
+      return;
+    }
+
     const delta = toolMode === "lower" ? -1 : 1;
     // Should be unreachable in practice — the toolbar disables whichever
     // of raise/lower this match's terrainEditRule forbids — but checked
@@ -485,7 +529,7 @@ async function bootstrap(world: WorldDefinition) {
       return;
     }
 
-    if (toolMode === "raise" || toolMode === "lower") {
+    if (toolMode === "raise" || toolMode === "lower" || toolMode === "flatten") {
       const tile = renderer.pickTile(local.x, local.y);
       if (tile) applyTerrainEditAt(tile);
       return;
@@ -592,9 +636,9 @@ async function bootstrap(world: WorldDefinition) {
   // "ブラシ" continuous terraforming (see plan/0054-terraform-brush.md):
   // holding a single press still for LONG_PRESS_DURATION_MS — long enough
   // that it hasn't already turned into a pan — engages painting, so every
-  // tile the pointer then passes over gets edited once. Flattening a
-  // wide area becomes one smooth gesture instead of many precise
-  // individual taps. Restricted to the "raise"/"lower" tools (checked at
+  // tile the pointer then passes over gets edited once. Leveling a wide
+  // area becomes one smooth gesture instead of many precise individual
+  // taps. Restricted to the "raise"/"lower"/"flatten" tools (checked at
   // each call site below): every other toolMode is a single deliberate,
   // often expensive miracle cast that a drag should never be able to repeat.
   let longPressTimer: ReturnType<typeof setTimeout> | undefined;
@@ -611,6 +655,7 @@ async function bootstrap(world: WorldDefinition) {
     clearLongPressTimer();
     painting = false;
     lastPaintedTile = undefined;
+    flattenTargetElevation = undefined;
   };
 
   // A second finger switches to rotating/pinch-zooming the map instead of
@@ -705,8 +750,9 @@ async function bootstrap(world: WorldDefinition) {
       isDragging = false;
       dragStart = { x: event.global.x, y: event.global.y };
       viewStartPos = { x: renderer.view.position.x, y: renderer.view.position.y };
+      flattenTargetElevation = undefined; // fresh gesture — see its own doc comment
 
-      if (toolMode === "raise" || toolMode === "lower") {
+      if (toolMode === "raise" || toolMode === "lower" || toolMode === "flatten") {
         clearLongPressTimer();
         longPressTimer = setTimeout(() => {
           longPressTimer = undefined;
@@ -821,6 +867,44 @@ async function bootstrap(world: WorldDefinition) {
     .querySelectorAll<HTMLButtonElement>('#toolbar [data-tool="raise"], #toolbar [data-tool="lower"]')
     .forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.tool === toolMode)));
 
+  // Every tool that spends the player's mana, and how much — used below to
+  // dim a button the player can't currently afford, at a glance, rather
+  // than relying purely on the "マナが足りません" message a failed tap
+  // shows (per feedback: "上げ下げができているのか分からない"). "raise"/
+  // "lower" share TERRAIN_EDIT_MANA_COST despite being 2 separate buttons.
+  // Omits "shrine"/"inspect", which spend no mana or (shrine) aren't
+  // ToolMode-costed the same way — see toolbar.ts's ToolMode union.
+  const MANA_COST_BY_TOOL: Partial<Record<ToolMode, number>> = {
+    raise: TERRAIN_EDIT_MANA_COST,
+    lower: TERRAIN_EDIT_MANA_COST,
+    shrine: SHRINE_MOVE_MANA_COST,
+    earthquake: EARTHQUAKE_MANA_COST,
+    swamp: SWAMP_MANA_COST,
+    knight: KNIGHT_MANA_COST,
+    guardian: GUARDIAN_MANA_COST,
+    volcano: VOLCANO_MANA_COST,
+    flood: FLOOD_MANA_COST,
+    armageddon: ARMAGEDDON_MANA_COST,
+  };
+  const toolButtonsByCost = Object.entries(MANA_COST_BY_TOOL).map(([tool, cost]) => ({
+    cost: cost!,
+    button: document.querySelector<HTMLButtonElement>(`#toolbar [data-tool="${tool}"]`),
+  }));
+
+  // Dims (but doesn't disable — a tap still gives the clearer "マナが
+  // 足りません" message above, and raise/lower must stay selectable even
+  // while unaffordable so mana regenerating mid-selection doesn't require
+  // re-picking the tool) any button whose cost currently exceeds the
+  // player's mana. A separate CSS class from `disabled` (used for
+  // terrainEditRule/allowedMiracles above) since those are permanent for
+  // the match, while this changes every frame as mana rises and falls.
+  const updateToolbarAffordability = () => {
+    const mana = simulation.getMana("player");
+    for (const { cost, button } of toolButtonsByCost) {
+      button?.classList.toggle("mana-low", mana < cost);
+    }
+  };
+
   // Which bounds renderer.redraw() last actually ran with — see the ticker
   // below's skip-if-nothing-would-look-different check.
   let lastRedrawnBounds: TileBounds | undefined;
@@ -856,6 +940,7 @@ async function bootstrap(world: WorldDefinition) {
     entityLayer.update(simulation.world, deltaSeconds, simulation.getImpactEffects());
     const outcome = simulation.getOutcome();
     hud.update(simulation.summarize(), outcome);
+    updateToolbarAffordability();
     if (outcome.over && !matchRecordShown) {
       matchRecordShown = true;
       showMatchRecord(outcome, simulation.getMatchEvents());

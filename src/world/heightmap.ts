@@ -153,6 +153,40 @@ export function raiseTile(heightmap: Heightmap, tileX: number, tileY: number, de
 }
 
 /**
+ * Sets a whole tile's 4 corners as close to `elevation` as `rule` allows
+ * (clamped to [MIN_ELEVATION, MAX_ELEVATION]) — the "平坦化" tool's basic
+ * operation (main.ts), for leveling a bumpy plot in one action instead of
+ * raiseTile's repeated +1/-1 nudges, which fight over corners shared with
+ * every neighboring tile and rarely converge on a clean flat plot by hand
+ * (per feedback: "平地が作りたくてもうまく作れない"). Under a restricted
+ * rule, a corner that would need the forbidden direction to reach
+ * `elevation` is left untouched rather than moved — per TerrainEditRule's
+ * own doc comment, raiseOnly/lowerOnly stay "still fully capable of
+ * flattening land ... just constrained to one direction": main.ts picks
+ * `elevation` as that direction's own natural target (the tile's highest
+ * corner under raiseOnly, lowest under lowerOnly), so an ordinary tile
+ * still fully levels in one call despite the restriction. Doesn't touch
+ * rockHardness — this is a land-shaping tool, not a way to cool volcano
+ * rock (see raiseVertex for that).
+ */
+export function flattenTile(heightmap: Heightmap, tileX: number, tileY: number, elevation: number, rule: TerrainEditRule): void {
+  const clamped = Math.min(MAX_ELEVATION, Math.max(MIN_ELEVATION, elevation));
+  const corners: [number, number][] = [
+    [tileX, tileY],
+    [tileX + 1, tileY],
+    [tileX + 1, tileY + 1],
+    [tileX, tileY + 1],
+  ];
+
+  for (const [x, y] of corners) {
+    const row = heightmap.vertices[y];
+    if (!row || row[x] === undefined) continue;
+    const delta = clamped - row[x];
+    if (delta !== 0 && isTerrainEditAllowed(rule, delta)) row[x] = clamped;
+  }
+}
+
+/**
  * Bilinearly interpolated elevation at a fractional tile-space point,
  * clamped to the grid. Shared by the renderer (to place things on the
  * surface) and by game logic (to decide what's dry land).
@@ -192,6 +226,40 @@ export function isRock(heightmap: Heightmap, x: number, y: number): boolean {
  */
 export function isBuildable(heightmap: Heightmap, x: number, y: number): boolean {
   return sampleElevation(heightmap, x, y) > heightmap.waterLevel && !isRock(heightmap, x, y);
+}
+
+/** Whether tile (tileX, tileY) itself — not just one corner — sits at/below sea level, same test IsoRenderer's redraw() uses to pick a water tile's fill. */
+function isWaterTile(heightmap: Heightmap, tileX: number, tileY: number): boolean {
+  if (tileX < 0 || tileY < 0 || tileX >= heightmap.width || tileY >= heightmap.height) return false;
+  return sampleElevation(heightmap, tileX + 0.5, tileY + 0.5) <= heightmap.waterLevel;
+}
+
+/**
+ * Whether the tile containing (x, y) is part of a genuine 2x2-or-larger
+ * body of water — checked as any of the 4 axis-aligned 2x2 tile blocks
+ * that include this tile being entirely underwater (isWaterTile), rather
+ * than treating a single half-submerged tile at a shoreline as equally
+ * dangerous. Per feedback: "4マス水が正方形になるとその中にいる人は
+ * 溺れる" ("once 4 tiles form a square of water, whoever's inside
+ * drowns") — see systems/drowning.ts, the one caller, for what actually
+ * happens to a walker caught in one.
+ */
+export function isInWaterPool(heightmap: Heightmap, x: number, y: number): boolean {
+  const tileX = Math.floor(x);
+  const tileY = Math.floor(y);
+  for (const [dx, dy] of [
+    [0, 0],
+    [-1, 0],
+    [0, -1],
+    [-1, -1],
+  ] as const) {
+    const bx = tileX + dx;
+    const by = tileY + dy;
+    if (isWaterTile(heightmap, bx, by) && isWaterTile(heightmap, bx + 1, by) && isWaterTile(heightmap, bx, by + 1) && isWaterTile(heightmap, bx + 1, by + 1)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**

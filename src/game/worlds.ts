@@ -119,6 +119,18 @@ export interface WorldDefinition {
    * houses (see that file's own doc comment), never the player's.
    */
   enemyTerritoryEditable: boolean;
+  /**
+   * Whether a walker caught in a genuine body of water (see world/
+   * heightmap.ts's isInWaterPool) drowns instantly instead of getting the
+   * ordinary gradual, escapable countdown (see systems/drowning.ts) — a
+   * "海がマグマ" ("the sea is molten") theming per feedback: "溺れると
+   * すぐに死ぬなどの制約のある面もある(海がマグマなど)". This codebase's
+   * "rock" terrain already stands in for lava fields (see TERRAIN_LABELS'
+   * own "溶岩地帯" and TERRAIN_GROWTH_MULTIPLIER's doc comment), so every
+   * rock-terrain world sets this true rather than introducing a separate
+   * hazard concept.
+   */
+  instantDrowning: boolean;
 }
 
 /**
@@ -136,15 +148,15 @@ export interface WorldDefinition {
 const WORLD_SIZE = 64;
 
 export const WORLDS: WorldDefinition[] = [
-  { id: "quiet-plain", name: "静かな草原", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "grass", terrainEditRule: "both", enemyDecisionInterval: 6, enemyAggressionThreshold: 6, allowedMiracles: ["earthquake"], enemyPersonality: "balanced", enemyTerritoryEditable: true },
-  { id: "dry-highland", name: "乾いた高地", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "desert", terrainEditRule: "both", enemyDecisionInterval: 5, enemyAggressionThreshold: 5, allowedMiracles: ["earthquake", "swamp"], enemyPersonality: "balanced", enemyTerritoryEditable: true },
-  { id: "frozen-border", name: "凍てつく国境", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "snow", terrainEditRule: "raiseOnly", enemyDecisionInterval: 5, enemyAggressionThreshold: 4, allowedMiracles: ["earthquake", "swamp", "shrine"], enemyPersonality: "balanced", enemyTerritoryEditable: true },
-  // First world with hero miracles — an aggressive god shows off knight rushing.
-  { id: "ashen-waste", name: "灰の荒野", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 4, enemyAggressionThreshold: 3, allowedMiracles: ["earthquake", "swamp", "shrine", "knight", "guardian"], enemyPersonality: "aggressive", enemyTerritoryEditable: true },
+  { id: "quiet-plain", name: "静かな草原", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "grass", terrainEditRule: "both", enemyDecisionInterval: 6, enemyAggressionThreshold: 6, allowedMiracles: ["earthquake"], enemyPersonality: "balanced", enemyTerritoryEditable: true, instantDrowning: false },
+  { id: "dry-highland", name: "乾いた高地", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "desert", terrainEditRule: "both", enemyDecisionInterval: 5, enemyAggressionThreshold: 5, allowedMiracles: ["earthquake", "swamp"], enemyPersonality: "balanced", enemyTerritoryEditable: true, instantDrowning: false },
+  { id: "frozen-border", name: "凍てつく国境", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "snow", terrainEditRule: "raiseOnly", enemyDecisionInterval: 5, enemyAggressionThreshold: 4, allowedMiracles: ["earthquake", "swamp", "shrine"], enemyPersonality: "balanced", enemyTerritoryEditable: true, instantDrowning: false },
+  // First world with hero miracles — an aggressive god shows off knight rushing. Rock/溶岩地帯 terrain: its own water is "海がマグマ" themed — instant drowning.
+  { id: "ashen-waste", name: "灰の荒野", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 4, enemyAggressionThreshold: 3, allowedMiracles: ["earthquake", "swamp", "shrine", "knight", "guardian"], enemyPersonality: "aggressive", enemyTerritoryEditable: true, instantDrowning: true },
   // A turtling god that leans on guardian/volcano and needs a much bigger lead to commit — teaches the player to break a defense, not just outrace one.
-  { id: "rising-frontier", name: "隆起する辺境", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "desert", terrainEditRule: "raiseOnly", enemyDecisionInterval: 3, enemyAggressionThreshold: 3, allowedMiracles: ["earthquake", "swamp", "shrine", "knight", "guardian", "volcano"], enemyPersonality: "defensive", enemyTerritoryEditable: true },
-  // The final boss goes back to all-in aggression, decisively finishing the match the moment it's ahead — and, for the first time, its own territory is off-limits to direct terraforming: cornering it takes combat/miracles, not just digging its houses into the sea by hand.
-  { id: "final-frontline", name: "最終戦線", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 2, enemyAggressionThreshold: 2, allowedMiracles: ALL_MIRACLES, enemyPersonality: "aggressive", enemyTerritoryEditable: false },
+  { id: "rising-frontier", name: "隆起する辺境", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "desert", terrainEditRule: "raiseOnly", enemyDecisionInterval: 3, enemyAggressionThreshold: 3, allowedMiracles: ["earthquake", "swamp", "shrine", "knight", "guardian", "volcano"], enemyPersonality: "defensive", enemyTerritoryEditable: true, instantDrowning: false },
+  // The final boss goes back to all-in aggression, decisively finishing the match the moment it's ahead — and, for the first time, its own territory is off-limits to direct terraforming: cornering it takes combat/miracles, not just digging its houses into the sea by hand. Rock terrain again — same lava-sea theming as ashen-waste.
+  { id: "final-frontline", name: "最終戦線", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 2, enemyAggressionThreshold: 2, allowedMiracles: ALL_MIRACLES, enemyPersonality: "aggressive", enemyTerritoryEditable: false, instantDrowning: true },
 ];
 
 /**

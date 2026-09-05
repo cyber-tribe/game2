@@ -11,7 +11,9 @@ import {
   countFlatNeighbors,
   createHeightmap,
   findLeastFlatVertex,
+  flattenTile,
   isBuildable,
+  isInWaterPool,
   isRock,
   isTerrainEditAllowed,
   pickTerrainEditRule,
@@ -177,6 +179,67 @@ describe("raiseTile", () => {
   });
 });
 
+describe("flattenTile", () => {
+  it("sets all 4 corners of the targeted tile to elevation, and no others", () => {
+    const heightmap = createHeightmap(3, 3);
+    heightmap.vertices[1][1] = 2;
+    heightmap.vertices[1][2] = 9;
+    heightmap.vertices[2][2] = 5;
+    heightmap.vertices[2][1] = 1;
+    heightmap.vertices[0][0] = 7;
+
+    flattenTile(heightmap, 1, 1, 6, "both");
+
+    expect(heightmap.vertices[1][1]).toBe(6);
+    expect(heightmap.vertices[1][2]).toBe(6);
+    expect(heightmap.vertices[2][2]).toBe(6);
+    expect(heightmap.vertices[2][1]).toBe(6);
+    // A vertex diagonally outside tile (1,1)'s own 4 corners is untouched.
+    expect(heightmap.vertices[0][0]).toBe(7);
+  });
+
+  it("clamps to MIN_ELEVATION/MAX_ELEVATION, same as raiseTile", () => {
+    const heightmap = createHeightmap(2, 2);
+
+    flattenTile(heightmap, 0, 0, MAX_ELEVATION + 5, "both");
+    expect(heightmap.vertices[0][0]).toBe(MAX_ELEVATION);
+
+    flattenTile(heightmap, 0, 0, MIN_ELEVATION - 5, "both");
+    expect(heightmap.vertices[0][0]).toBe(MIN_ELEVATION);
+  });
+
+  it("under raiseOnly, only ever raises a corner toward elevation, never lowers it", () => {
+    const heightmap = createHeightmap(2, 2);
+    heightmap.vertices[0][0] = 2; // below target — should raise
+    heightmap.vertices[0][1] = 9; // above target — must stay put under raiseOnly
+
+    flattenTile(heightmap, 0, 0, 5, "raiseOnly");
+
+    expect(heightmap.vertices[0][0]).toBe(5);
+    expect(heightmap.vertices[0][1]).toBe(9);
+  });
+
+  it("under lowerOnly, only ever lowers a corner toward elevation, never raises it", () => {
+    const heightmap = createHeightmap(2, 2);
+    heightmap.vertices[0][0] = 8; // above target — should lower
+    heightmap.vertices[0][1] = 1; // below target — must stay put under lowerOnly
+
+    flattenTile(heightmap, 0, 0, 5, "lowerOnly");
+
+    expect(heightmap.vertices[0][0]).toBe(5);
+    expect(heightmap.vertices[0][1]).toBe(1);
+  });
+
+  it("leaves an already-level corner untouched", () => {
+    const heightmap = createHeightmap(2, 2);
+    heightmap.vertices[0][0] = 5;
+
+    flattenTile(heightmap, 0, 0, 5, "both");
+
+    expect(heightmap.vertices[0][0]).toBe(5);
+  });
+});
+
 describe("sampleElevation", () => {
   it("returns the exact vertex height at integer coordinates", () => {
     const heightmap = createHeightmap(4, 4);
@@ -230,6 +293,40 @@ describe("isBuildable", () => {
   it("is true when land still stands above a raised water level", () => {
     const heightmap = flatHeightmap(2, 2, 5, 1);
     expect(isBuildable(heightmap, 1, 1)).toBe(true);
+  });
+});
+
+describe("isInWaterPool", () => {
+  it("is true everywhere on a map that's entirely water", () => {
+    const heightmap = flatHeightmap(4, 4, 0); // elevation 0 == waterLevel 0
+    expect(isInWaterPool(heightmap, 1.5, 1.5)).toBe(true);
+  });
+
+  it("is false everywhere on dry land", () => {
+    const heightmap = flatHeightmap(4, 4, 5);
+    expect(isInWaterPool(heightmap, 1.5, 1.5)).toBe(false);
+  });
+
+  it("is false for a single isolated water tile — a lone wet corner isn't a real pool", () => {
+    const heightmap = flatHeightmap(5, 5, 5);
+    // Dig just tile (2,2) down to sea level — every neighboring tile stays dry.
+    heightmap.vertices[2][2] = 0;
+    heightmap.vertices[2][3] = 0;
+    heightmap.vertices[3][2] = 0;
+    heightmap.vertices[3][3] = 0;
+
+    expect(isInWaterPool(heightmap, 2.5, 2.5)).toBe(false);
+  });
+
+  it("is true once 4 tiles form an actual 2x2 square of water", () => {
+    const heightmap = flatHeightmap(5, 5, 5);
+    // Dig tiles (1,1), (2,1), (1,2), (2,2) — a real 2x2 pool.
+    for (let y = 1; y <= 3; y++) {
+      for (let x = 1; x <= 3; x++) heightmap.vertices[y][x] = 0;
+    }
+
+    expect(isInWaterPool(heightmap, 1.5, 1.5)).toBe(true); // inside the pool
+    expect(isInWaterPool(heightmap, 0.5, 0.5)).toBe(false); // dry, no adjoining water block
   });
 });
 

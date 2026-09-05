@@ -49,6 +49,18 @@ export interface MoveTarget {
   y: number;
 }
 
+/**
+ * Attached to a Walker only while it's standing in a genuine body of water
+ * (see world/heightmap.ts's isInWaterPool) — see systems/drowning.ts, the
+ * only reader/writer. `breath` counts down each tick it stays submerged;
+ * reaching dry land removes this component outright (full, instant
+ * recovery — per feedback: "陸に上がると普段の動きに戻る"), rather than
+ * the breath just pausing where it was.
+ */
+export interface Drowning {
+  breath: number;
+}
+
 export type HouseLevel = "hut" | "lodge" | "manor" | "castle";
 
 export interface House {
@@ -117,3 +129,4 @@ export const House = defineComponent<House>("House");
 export const FactionState = defineComponent<FactionState>("FactionState");
 export const Swamp = defineComponent<Swamp>("Swamp");
 export const HeroCooldown = defineComponent<HeroCooldown>("HeroCooldown");
+export const Drowning = defineComponent<Drowning>("Drowning");

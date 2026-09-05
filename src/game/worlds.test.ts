@@ -84,6 +84,16 @@ describe("WORLDS", () => {
   it("restricts enemyTerritoryEditable somewhere in the list, not every world staying editable", () => {
     expect(WORLDS.some((world) => !world.enemyTerritoryEditable)).toBe(true);
   });
+
+  it("only sets instantDrowning on rock (溶岩地帯) terrain — not a monotonic difficulty axis, tied to the terrain's own lava theming", () => {
+    for (const world of WORLDS) {
+      expect(world.instantDrowning).toBe(world.terrain === "rock");
+    }
+  });
+
+  it("gives at least one world instantDrowning", () => {
+    expect(WORLDS.some((world) => world.instantDrowning)).toBe(true);
+  });
 });
 
 describe("nextWorldId", () => {
