@@ -352,23 +352,32 @@ async function bootstrap(world: WorldDefinition) {
   layout();
   window.addEventListener("resize", layout);
 
+  // The 4 screen corners' current world (tile) positions — shared by
+  // visibleBounds/strictVisibleBounds below. Recomputed fresh wherever
+  // needed rather than cached, since pan/zoom/rotate can change between
+  // any two calls.
+  const screenCornersInWorldSpace = () => [
+    renderer.view.toLocal({ x: 0, y: 0 }),
+    renderer.view.toLocal({ x: app.screen.width, y: 0 }),
+    renderer.view.toLocal({ x: app.screen.width, y: app.screen.height }),
+    renderer.view.toLocal({ x: 0, y: app.screen.height }),
+  ];
+
   // Which tiles the current camera could possibly show, in world (tile)
-  // coordinates — see IsoRenderer's visibleTileBounds doc comment for why
-  // this matters now that the map is far bigger than one screen. Recomputed
-  // fresh wherever it's needed (the ticker below, and every immediate
-  // redraw() a miracle triggers) rather than cached, since pan/zoom/rotate
-  // can change between any two calls.
-  const visibleBounds = () =>
-    visibleTileBounds(
-      [
-        renderer.view.toLocal({ x: 0, y: 0 }),
-        renderer.view.toLocal({ x: app.screen.width, y: 0 }),
-        renderer.view.toLocal({ x: app.screen.width, y: app.screen.height }),
-        renderer.view.toLocal({ x: 0, y: app.screen.height }),
-      ],
-      heightmap.width,
-      heightmap.height,
-    );
+  // coordinates, padded by TILE_BOUNDS_MARGIN (see IsoRenderer's
+  // visibleTileBounds doc comment for why redraw() wants that slack — a
+  // tall raised vertex or a rock tile's lava overshoot must never pop
+  // in/out right at the screen edge).
+  const visibleBounds = () => visibleTileBounds(screenCornersInWorldSpace(), heightmap.width, heightmap.height);
+
+  // The same rectangle with no padding — see isOwnFactionVisible below,
+  // the one caller. Reusing visibleBounds()'s own padded result there let
+  // a faction sitting up to a dozen tiles outside the real screen still
+  // count as "visible", making the "must actually see your own base" rule
+  // nearly toothless (per feedback: "自勢力が映っていないと奇跡を発動
+  // できない制約が崩れています"). That gameplay rule needs the actual
+  // screen rectangle, not redraw()'s deliberately padded one.
+  const strictVisibleBounds = () => visibleTileBounds(screenCornersInWorldSpace(), heightmap.width, heightmap.height, 0);
 
   // docs/game-system.md-inspired original-game rule: the player can only
   // act with their god-given powers while at least one of their own
@@ -378,7 +387,8 @@ async function bootstrap(world: WorldDefinition) {
   // single tap snipe anywhere on the map instantly, with no need to
   // actually travel there first. The enemy AI is exempt — it has no
   // "camera" to speak of, so this only ever constrains the human player.
-  const isOwnFactionVisible = (bounds: TileBounds): boolean => {
+  const isOwnFactionVisible = (): boolean => {
+    const bounds = strictVisibleBounds();
     const shrine = simulation.getShrinePosition("player");
     if (shrine && isWithinTileBounds(shrine, bounds)) return true;
     for (const entity of simulation.listInspectableEntities()) {
@@ -396,7 +406,7 @@ async function bootstrap(world: WorldDefinition) {
   // having registered at all (per feedback: "上げ下げができているのか
   // 分からない").
   const trySpendPlayerMana = (cost: number): boolean => {
-    if (!isOwnFactionVisible(visibleBounds())) {
+    if (!isOwnFactionVisible()) {
       showEntityInfo("自分の勢力が画面内に見えていません");
       return false;
     }
