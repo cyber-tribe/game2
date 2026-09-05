@@ -263,6 +263,7 @@ async function bootstrap(world: WorldDefinition) {
     terrainEditRule,
     enemyDecisionInterval: world.enemyDecisionInterval,
     enemyAggressionThreshold: world.enemyAggressionThreshold,
+    allowedMiracles: world.allowedMiracles,
     onEnemyAction,
   });
 
