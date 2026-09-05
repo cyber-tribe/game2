@@ -548,10 +548,14 @@ describe("Simulation", () => {
 
   it("under goToShrine mode, walks a lone leader to a relocated shrine and settles it there", () => {
     const sim = new Simulation({ worldWidth: 20, worldHeight: 20, initialWalkersPerFaction: 1 });
-    // The lone walker starts right at the (not yet relocated) shrine, so a
-    // brief gather pass promotes it to leader before goToShrine needs one.
-    sim.setBehaviorMode("player", "gather");
-    sim.update(0.001);
+    // Assigning leaderId directly (rather than via a "gather" pass) sidesteps
+    // gatherTargetingSystem's own "nobody else left to gather" fallback (see
+    // plan/0069-gather-settle-fallback.md) — a lone walker with no one else
+    // to gather would otherwise fall through to a random wander target in
+    // that same transitional tick, which this test isn't about.
+    const [playerState] = sim.world.query(FactionState).filter((e) => sim.world.get(e, FactionState)!.id === "player");
+    const [playerWalker] = sim.world.query(Walker, Owner).filter((e) => sim.world.get(e, Owner)!.faction === "player");
+    sim.world.add(playerState, FactionState, { ...sim.world.get(playerState, FactionState)!, leaderId: playerWalker });
     sim.setBehaviorMode("player", "goToShrine");
     const shrine = { x: 5, y: 5 };
     sim.moveShrine("player", shrine);
