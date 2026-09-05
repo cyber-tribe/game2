@@ -31,8 +31,9 @@ export interface DrowningConfig {
  * "通常の民は入ると溺れる", never actually wired up for anything but
  * those two miracles until now).
  *
- * Heroes are exempt (isHeroState), same immunity swampSystem already
- * grants them ("騎士は...沼を避ける", extended to every hero kind).
+ * Heroes are exempt from this open-water drowning (isHeroState) — unlike
+ * swampSystem, which drowns heroes just like any other walker; open water
+ * and swamps are deliberately different hazards here.
  * Houses aren't covered here — see flood.ts's drownFlood, which still
  * destroys a submerged house outright: a building can't swim to shore, so
  * there's no "gradual" version of that to model.

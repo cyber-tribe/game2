@@ -698,9 +698,8 @@ describe("Simulation", () => {
     expect(sim.world.get(playerWalker, Walker)!.state).toBe("knight");
     // Overwhelming strength removes any doubt about walker-vs-walker combat
     // (an exact tie would destroy both sides) — this test is about the
-    // knight's unconditional targeting/burning/swamp-immunity wiring, not
-    // combat math, which walkerCombatSystem/houseCaptureSystem already
-    // cover on their own.
+    // knight's unconditional targeting/burning wiring, not combat math,
+    // which walkerCombatSystem/houseCaptureSystem already cover on their own.
     sim.world.add(playerWalker, Walker, { ...sim.world.get(playerWalker, Walker)!, strength: 999 });
 
     // Generous budget: knightTargetingSystem/fightTargetingSystem lock onto
