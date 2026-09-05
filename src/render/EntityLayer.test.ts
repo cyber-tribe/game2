@@ -1,5 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { impactEffectVisual, swampAffectedTiles, walkCycle } from "./EntityLayer";
+import { facingFor, impactEffectVisual, swampAffectedTiles, walkCycle } from "./EntityLayer";
+
+describe("facingFor", () => {
+  it("picks the iso-screen diagonal matching each tile-axis direction", () => {
+    expect(facingFor(1, 0)).toBe("SE"); // +x
+    expect(facingFor(-1, 0)).toBe("NW"); // -x
+    expect(facingFor(0, 1)).toBe("SW"); // +y
+    expect(facingFor(0, -1)).toBe("NE"); // -y
+  });
+
+  it("picks the axis with the larger magnitude when heading diagonally", () => {
+    expect(facingFor(3, 1)).toBe("SE");
+    expect(facingFor(1, 3)).toBe("SW");
+    expect(facingFor(-3, -1)).toBe("NW");
+    expect(facingFor(-1, -3)).toBe("NE");
+  });
+
+  it("falls back to SE for no heading at all", () => {
+    expect(facingFor(0, 0)).toBe("SE");
+  });
+});
 
 describe("walkCycle", () => {
   it("alternates between stepping frames as time advances", () => {
