@@ -7,6 +7,7 @@ import {
   FLOOD_MANA_COST,
   GUARDIAN_MANA_COST,
   KNIGHT_MANA_COST,
+  MAX_MANA,
   SHRINE_MOVE_MANA_COST,
   SWAMP_MANA_COST,
   TERRAIN_EDIT_MANA_COST,
@@ -27,6 +28,8 @@ import { Hud } from "./render/Hud";
 import { IsoRenderer, isWithinTileBounds, visibleTileBounds, type TileBounds } from "./render/IsoRenderer";
 import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
 import { Minimap } from "./render/Minimap";
+import { mountCommandIcons } from "./ui/commandIcons";
+import { StatusPanel } from "./ui/statusPanel";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
 import { DEFAULT_EARTHQUAKE_RADIUS, DEFAULT_VOLCANO_RADIUS, applyEarthquake, applyFlood, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
 
@@ -164,33 +167,36 @@ async function bootstrap(world: WorldDefinition) {
   const minimap = new Minimap(heightmap, MINIMAP_SIZE);
   app.stage.addChild(minimap.view);
 
-  const enemyEventToast = document.getElementById("enemy-event-toast");
-  let toastHideTimeout: ReturnType<typeof setTimeout> | undefined;
+  mountCommandIcons();
+  const statusPanel = new StatusPanel(MAX_MANA);
+
+  // The command panel's single message line (see index.html's
+  // #panel-message) — replaces the old floating pill toasts
+  // (#enemy-event-toast/#entity-info-panel) per plan/0084-original-ui-
+  // foundation.md's "画面中央に現代的なfloating toastを出す方式を減らす".
+  // Only one message shows at a time; a new one simply pre-empts whatever
+  // was showing (both are short-lived, low-frequency notices in practice).
+  const panelMessage = document.getElementById("panel-message");
+  let panelMessageHideTimeout: ReturnType<typeof setTimeout> | undefined;
+  const showPanelMessage = (text: string, durationMs: number, tone: "neutral" | "warning" = "neutral") => {
+    if (!panelMessage) return;
+    panelMessage.textContent = text;
+    panelMessage.classList.toggle("warning", tone === "warning");
+    panelMessage.classList.add("visible");
+    clearTimeout(panelMessageHideTimeout);
+    panelMessageHideTimeout = setTimeout(() => panelMessage.classList.remove("visible"), durationMs);
+  };
 
   // Surfaces enemy-cast miracles even when they happen outside the
-  // player's current view — see index.html's comment on #enemy-event-toast
-  // for why this matters more now that the enemy AI acts on its own.
-  const showEnemyEventToast = (text: string) => {
-    if (!enemyEventToast) return;
-    enemyEventToast.textContent = text;
-    enemyEventToast.classList.remove("hidden");
-    clearTimeout(toastHideTimeout);
-    toastHideTimeout = setTimeout(() => enemyEventToast.classList.add("hidden"), 3000);
-  };
+  // player's current view — see enemyMiracles.ts for why this matters more
+  // now that the enemy AI acts on its own.
+  const showEnemyEventToast = (text: string) => showPanelMessage(text, 3000, "warning");
 
-  const entityInfoPanel = document.getElementById("entity-info-panel");
-  let entityInfoHideTimeout: ReturnType<typeof setTimeout> | undefined;
-
-  // Shows one walker/house's own detail under the "🔍 照会" tool (see
-  // applyTool's "inspect" branch and index.html's comment on
-  // #entity-info-panel) — docs/game-system.md 11節's 情報パネル.
-  const showEntityInfo = (text: string) => {
-    if (!entityInfoPanel) return;
-    entityInfoPanel.textContent = text;
-    entityInfoPanel.classList.remove("hidden");
-    clearTimeout(entityInfoHideTimeout);
-    entityInfoHideTimeout = setTimeout(() => entityInfoPanel.classList.add("hidden"), 4000);
-  };
+  // Shows one walker/house's own detail under the "照会" tool (see
+  // applyTool's "inspect" branch) — docs/game-system.md 11節の情報パネル.
+  // Also reused for mana-shortfall/enemy-territory rejection messages
+  // (tone: "warning"), which used to have their own floating pill.
+  const showEntityInfo = (text: string, tone: "neutral" | "warning" = "neutral") => showPanelMessage(text, 4000, tone);
 
   // Mirrors the shake magnitudes applyTool uses for the player's own casts
   // of the same miracles (knight/guardian have no player-side shake to
@@ -248,9 +254,7 @@ async function bootstrap(world: WorldDefinition) {
       const password = nextWorldId(world.id);
       const passwordLine = document.createElement("div");
       passwordLine.id = "match-record-password";
-      passwordLine.textContent = password
-        ? `🔑 次のワールドのパスワード: ${password}`
-        : "🏆 全ワールドを制覇しました！";
+      passwordLine.textContent = password ? `次のワールドのパスワード: ${password}` : "全ワールドを制覇しました！";
       matchRecordList.appendChild(passwordLine);
     }
 
@@ -335,7 +339,7 @@ async function bootstrap(world: WorldDefinition) {
   // has since panned to.
   let hasCenteredOnce = false;
   const layout = () => {
-    const toolbarHeight = document.getElementById("toolbar")?.getBoundingClientRect().height ?? 0;
+    const toolbarHeight = document.getElementById("command-panel")?.getBoundingClientRect().height ?? 0;
     const safeAreaTop = getSafeAreaInsetTop();
     currentScale = baseScale * zoomFactor;
     renderer.view.scale.set(currentScale);
@@ -399,7 +403,7 @@ async function bootstrap(world: WorldDefinition) {
 
   // Every mana-costing action a tap can trigger goes through this instead
   // of calling trySpendMana directly — see isOwnFactionVisible above. Mana
-  // is left untouched and the "🔍 照会" info panel (reused here rather
+  // is left untouched and the "照会" info panel (reused here rather
   // than adding a near-identical banner) explains why nothing happened —
   // without this, a raise/lower tap (or any miracle) with insufficient
   // mana was a silent no-op, indistinguishable from the edit just not
@@ -407,11 +411,11 @@ async function bootstrap(world: WorldDefinition) {
   // 分からない").
   const trySpendPlayerMana = (cost: number): boolean => {
     if (!isOwnFactionVisible()) {
-      showEntityInfo("自分の勢力が画面内に見えていません");
+      showEntityInfo("自分の勢力が画面内に見えていません", "warning");
       return false;
     }
     if (trySpendMana(simulation.world, "player", cost)) return true;
-    showEntityInfo(`マナが足りません（必要 ${cost} / 現在 ${simulation.getMana("player").toFixed(1)}）`);
+    showEntityInfo(`マナが足りません（必要 ${cost} / 現在 ${simulation.getMana("player").toFixed(1)}）`, "warning");
     return false;
   };
 
@@ -440,7 +444,7 @@ async function bootstrap(world: WorldDefinition) {
   let toolMode: ToolMode = terrainEditRule === "lowerOnly" ? "lower" : "raise";
 
   // Finds the walker/house closest to a tapped point in renderer.view's
-  // local space, for the "🔍 照会" tool — mirrors IsoRenderer.pickVertex's
+  // local space, for the "照会" tool — mirrors IsoRenderer.pickVertex's
   // own nearest-within-maxDistance approach (maxDistance in real screen
   // px, converted to local-space units so a finger's tap tolerance stays
   // constant regardless of the current zoom), just against entities'
@@ -482,7 +486,7 @@ async function bootstrap(world: WorldDefinition) {
     // is computed below: an enemy-territory tile blocked here must never get
     // the chance to seed that gesture-wide cached target in the first place.
     if (!world.enemyTerritoryEditable && simulation.isEnemyTerritory("player", tile)) {
-      showEntityInfo("この面では敵の陣地を直接操作できません");
+      showEntityInfo("この面では敵の陣地を直接操作できません", "warning");
       return;
     }
     if (flattenTargetElevation === undefined) {
@@ -540,7 +544,7 @@ async function bootstrap(world: WorldDefinition) {
     // see WorldDefinition's enemyTerritoryEditable — checked (and reported)
     // before spending any mana, same as isOwnFactionVisible above.
     if (!world.enemyTerritoryEditable && simulation.isEnemyTerritory("player", vertex)) {
-      showEntityInfo("この面では敵の陣地を直接操作できません");
+      showEntityInfo("この面では敵の陣地を直接操作できません", "warning");
       return;
     }
     if (!trySpendPlayerMana(TERRAIN_EDIT_MANA_COST)) return;
@@ -992,7 +996,8 @@ async function bootstrap(world: WorldDefinition) {
     }
     entityLayer.update(simulation.world, deltaSeconds, simulation.getImpactEffects());
     const outcome = simulation.getOutcome();
-    hud.update(simulation.summarize(), outcome);
+    hud.update();
+    statusPanel.update(simulation.summarize());
     updateToolbarAffordability();
     if (outcome.over && !matchRecordShown) {
       matchRecordShown = true;
@@ -1042,7 +1047,7 @@ function showWorldSelect(): void {
 
         const name = document.createElement("span");
         name.className = "world-select-name";
-        name.textContent = locked ? `🔒 ${world.name}` : world.name;
+        name.textContent = world.name;
 
         const detail = document.createElement("span");
         detail.className = "world-select-detail";

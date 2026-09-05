@@ -2,7 +2,7 @@ import { HOUSE_LEVEL_LABELS } from "../game/constants";
 import type { WalkerState } from "../game/components";
 import type { InspectableEntity } from "../game/simulation";
 
-/** Japanese label for each WalkerState, for the "🔍 照会" 情報パネル (see describeInspectableEntity). */
+/** Japanese label for each WalkerState, for the "照会" 情報パネル (see describeInspectableEntity). */
 const WALKER_STATE_LABELS: Record<WalkerState, string> = {
   seeking: "定住地を探索中",
   traveling: "移動中",
@@ -12,7 +12,7 @@ const WALKER_STATE_LABELS: Record<WalkerState, string> = {
 };
 
 /**
- * Formats an InspectableEntity for the "🔍 照会" 情報パネル (see
+ * Formats an InspectableEntity for the "照会" 情報パネル (see
  * docs/game-system.md 11節's "任意のウォーカー・家を照会して人数／強さ／
  * 発達段階を確認できる"). Mirrors describeMatchEvent's "あなた"/"敵"
  * phrasing so every player-facing faction label in this game reads the
