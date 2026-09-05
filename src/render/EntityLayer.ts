@@ -4,6 +4,7 @@ import type { Entity, World } from "../ecs";
 import { FARMLAND_RADIUS, IMPACT_EFFECT_DURATION } from "../game/constants";
 import { distance, type Point } from "../game/systems/geometry";
 import type { ImpactEffectSnapshot, ImpactEffectType } from "../game/systems/effects";
+import { GAME_PALETTE } from "./palette";
 import { type IsoRenderer } from "./IsoRenderer";
 import { drawHouseSprite, drawWalkerSprite } from "./pixelArt";
 
@@ -20,8 +21,11 @@ const LEADER_HALO_RADIUS = 7;
 const KNIGHT_COLOR = 0xffcc00;
 const GUARDIAN_COLOR = 0x33e0ff;
 const SWAMP_COLOR = 0x6a3fa0;
-/** Alpha of the farmland tint — subtle, so it reads as ground coloring, not a bold overlay like a swamp hazard. */
-const FARMLAND_ALPHA = 0.16;
+/** Alpha of the farmland's soil base fill — low enough that the terrain's own slope shading still reads through it. */
+const FARMLAND_SOIL_ALPHA = 0.35;
+/** How many plowed-furrow lines each farmland tile gets — see the farmland loop in update(). */
+const FARMLAND_FURROW_ROWS = 3;
+const FARMLAND_FURROW_ALPHA = 0.45;
 const SHRINE_POLE_HEIGHT = 18;
 const SHRINE_FLAG_WIDTH = 10;
 /** Radians/second the walk-cycle phase advances — see the per-walker animation in update(). */
@@ -123,12 +127,13 @@ export class EntityLayer {
     // 勢力圏を示す") drawn first, under everything else, so it reads as
     // ground coloring rather than obscuring the shrine/houses/walkers drawn
     // on top of it. Reuses swampAffectedTiles' generic "tiles within radius
-    // of a point" selection — the same grid-tinting shape, just a different
-    // radius/color/alpha.
+    // of a point" selection. Per plan/0085-isometric-house-sprites.md, this
+    // is a real soil/furrow texture now, not a faction-colored overlay —
+    // ownership reads from the house's own flag (see pixelArt.ts's
+    // drawFlag), not from tinting the ground a whole faction's color.
     const { width: mapWidth, height: mapHeight } = this.iso.heightmap;
-    for (const entity of world.query(Position, House, Owner)) {
+    for (const entity of world.query(Position, House)) {
       const pos = world.get(entity, Position)!;
-      const owner = world.get(entity, Owner)!;
       const house = world.get(entity, House)!;
 
       for (const tile of swampAffectedTiles(pos, FARMLAND_RADIUS[house.level], mapWidth, mapHeight)) {
@@ -138,9 +143,18 @@ export class EntityLayer {
         const p3 = this.iso.project(tile.x, tile.y + 1);
 
         g.poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy]).fill({
-          color: FACTION_COLOR[owner.faction],
-          alpha: FARMLAND_ALPHA,
+          color: GAME_PALETTE.soilMid,
+          alpha: FARMLAND_SOIL_ALPHA,
         });
+        // Plowed furrow rows, parallel to the tile's (x, y)->(x+1, y) edge —
+        // thin straight lines rather than a smooth texture, matching the
+        // rest of the terrain's hard-edged pixel-art style.
+        for (let row = 1; row <= FARMLAND_FURROW_ROWS; row++) {
+          const t = row / (FARMLAND_FURROW_ROWS + 1);
+          g.moveTo(p0.sx + (p3.sx - p0.sx) * t, p0.sy + (p3.sy - p0.sy) * t)
+            .lineTo(p1.sx + (p2.sx - p1.sx) * t, p1.sy + (p2.sy - p1.sy) * t)
+            .stroke({ width: 1, color: GAME_PALETTE.soilDark, alpha: FARMLAND_FURROW_ALPHA });
+        }
       }
     }
 
