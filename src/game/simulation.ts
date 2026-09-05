@@ -314,6 +314,18 @@ export class Simulation {
     this.world.add(entity, FactionState, { ...state, behaviorMode: mode });
   }
 
+  /**
+   * A faction's current mana — main.ts uses this to show the player a
+   * clear "マナが足りません" message and to dim toolbar buttons it can't
+   * currently afford, instead of a tap on an unaffordable miracle silently
+   * doing nothing (see trySpendMana, which is what actually enforces the
+   * cost — this is read-only).
+   */
+  getMana(faction: FactionId): number {
+    const entity = findFactionEntity(this.world, faction);
+    return entity === undefined ? 0 : this.world.get(entity, FactionState)!.mana;
+  }
+
   getBehaviorMode(faction: FactionId): BehaviorMode | undefined {
     const entity = findFactionEntity(this.world, faction);
     return entity === undefined ? undefined : this.world.get(entity, FactionState)!.behaviorMode;
