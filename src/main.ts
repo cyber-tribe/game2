@@ -1003,7 +1003,8 @@ async function bootstrap(world: WorldDefinition) {
       matchRecordShown = true;
       showMatchRecord(outcome, simulation.getMatchEvents());
     }
-    minimap.update(simulation.world);
+    minimap.redrawTerrain();
+    minimap.update(simulation.world, strictVisibleBounds());
 
     if (shakeTimeRemaining > 0) {
       shakeTimeRemaining = Math.max(0, shakeTimeRemaining - deltaSeconds);
