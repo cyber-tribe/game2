@@ -22,7 +22,7 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from palette import load  # noqa: E402
-from sprites import atlas, houses, walkers  # noqa: E402
+from sprites import atlas, houses, icons, walkers  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 # Under src/, not public/: Vite then owns the URL, so the atlas picks up the
@@ -34,7 +34,7 @@ OUT_DIR = REPO_ROOT / "src" / "assets" / "sprites"
 # Walkers and buildings are packed separately rather than into one sheet:
 # their frame sizes differ by a factor of five, and a single uniform grid
 # would pad every 11x18 walker out to 56x56.
-SHEETS = {"walkers": walkers.render_all, "houses": houses.render_all}
+SHEETS = {"walkers": walkers.render_all, "houses": houses.render_all, "icons": icons.render_all}
 
 
 def build() -> dict[str, tuple[Image.Image, str]]:

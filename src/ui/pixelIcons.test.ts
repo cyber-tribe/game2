@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildIconGrid, ICON_SIZE, type IconKind } from "./pixelIcons";
+import { ATLAS_FRAME_KEYS, iconFrameKey, type IconKind } from "./pixelIcons";
 
 const ALL_KINDS: IconKind[] = [
   "raise",
@@ -23,34 +23,32 @@ const ALL_KINDS: IconKind[] = [
   "population",
 ];
 
-function paintedPixelCount(kind: IconKind): number {
-  const grid = buildIconGrid(kind);
-  return grid.flat().filter((cell) => cell !== undefined).length;
-}
+/**
+ * The same bidirectional guard the walker and house atlases carry. This key
+ * and frame_key() in tools/sprites/icons.py are built independently in two
+ * languages, and a disagreement wouldn't throw — the frame lookup would
+ * come back undefined and the button would render blank.
+ *
+ * The checks that used to live here (every icon is 16x16, none is blank, no
+ * two share a silhouette) moved to _validate() in tools/sprites/icons.py.
+ * The patterns are the art now, so those are defects in that file, and CI's
+ * `npm run sprites:check` builds every sheet and so runs them.
+ */
+describe("iconFrameKey", () => {
+  it("produces only keys the committed atlas actually contains", () => {
+    const atlas = new Set(ATLAS_FRAME_KEYS);
+    const asked = ALL_KINDS.map(iconFrameKey);
 
-describe("buildIconGrid", () => {
-  it("builds a 16x16 grid for every icon kind", () => {
-    for (const kind of ALL_KINDS) {
-      const grid = buildIconGrid(kind);
-      expect(grid).toHaveLength(ICON_SIZE);
-      for (const row of grid) expect(row).toHaveLength(ICON_SIZE);
-    }
+    expect(asked.filter((key) => !atlas.has(key))).toEqual([]);
   });
 
-  it("paints at least some pixels for every icon — none render as a blank square", () => {
-    for (const kind of ALL_KINDS) {
-      expect(paintedPixelCount(kind)).toBeGreaterThan(0);
-    }
+  it("uses every frame the atlas ships — no dead art", () => {
+    const asked = new Set(ALL_KINDS.map(iconFrameKey));
+
+    expect(ATLAS_FRAME_KEYS.filter((key) => !asked.has(key))).toEqual([]);
   });
 
-  it("gives every icon kind a visually distinct silhouette (no two share the same painted-pixel pattern)", () => {
-    const signatures = new Map<string, IconKind>();
-    for (const kind of ALL_KINDS) {
-      const grid = buildIconGrid(kind);
-      const signature = grid.map((row) => row.map((cell) => (cell === undefined ? "." : "#")).join("")).join("|");
-      const existing = signatures.get(signature);
-      expect(existing, `${kind} has the same silhouette as ${existing}`).toBeUndefined();
-      signatures.set(signature, kind);
-    }
+  it("gives every icon kind its own key", () => {
+    expect(new Set(ALL_KINDS.map(iconFrameKey)).size).toBe(ALL_KINDS.length);
   });
 });

@@ -30,6 +30,7 @@ import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
 import { Minimap } from "./render/Minimap";
 import { GAME_PALETTE } from "./render/palette";
 import { mountCommandIcons } from "./ui/commandIcons";
+import { loadCommandIcons } from "./ui/pixelIcons";
 import { StatusPanel } from "./ui/statusPanel";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
 import { DEFAULT_EARTHQUAKE_RADIUS, DEFAULT_VOLCANO_RADIUS, applyEarthquake, applyFlood, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
@@ -161,10 +162,11 @@ async function bootstrap(world: WorldDefinition) {
     shakeMagnitude = magnitude;
   };
 
-  // Awaited before the first frame so walkers have textures from the start;
-  // EntityLayer skips drawing them until this resolves, so a slow parse would
-  // show an empty map rather than crash.
-  await EntityLayer.loadAssets();
+  // Awaited before the first frame so walkers, buildings and command icons
+  // all have their art from the start. Each of these skips drawing rather
+  // than throwing until it resolves, so a slow decode would show an empty
+  // map and blank buttons rather than crash.
+  await Promise.all([EntityLayer.loadAssets(), loadCommandIcons()]);
   const entityLayer = new EntityLayer(renderer);
   renderer.view.addChild(entityLayer.view);
 
