@@ -24,6 +24,7 @@ export type MiracleId =
   | "odysseus"
   | "achilles"
   | "adonis"
+  | "helen"
   | "guardian"
   | "forest"
   | "flower"
@@ -48,6 +49,7 @@ export const ALL_MIRACLES: readonly MiracleId[] = [
   "odysseus",
   "achilles",
   "adonis",
+  "helen",
   "guardian",
   "forest",
   "flower",

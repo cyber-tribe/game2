@@ -30,6 +30,11 @@ export interface Owner {
  *   walker faster.
  * - "achilles" — 「火が効かず焼死しない」. The counter to fire rain, and
  *   so to a forest turned against its owner (game/fire.ts).
+ * - "helen" — 「女性英雄。**敵と戦わない**。敵信者を魅了・拘束して建物から
+ *   引き離し連れ回す。ヘレンが死ぬと拘束は解ける。敵の人口・建築基盤を崩す」.
+ *   The one hero that wins nothing by force: she takes an enemy's people
+ *   away from their work rather than killing them, and she is the only
+ *   walker in the game that cannot fight at all (systems/helen.ts).
  * - "adonis" — 「戦闘に勝つと2体に分裂する（分裂後は体力が半分）。増やし
  *   すぎは英雄死亡時のマナ損失というリスクを伴う」. The only hero whose
  *   trait is a rule about *winning* rather than about surviving something
@@ -42,7 +47,7 @@ export interface Owner {
  * roster would be a loss, so it stays alongside them, like 平坦化 does
  * among the terrain tools.
  */
-export type HeroKind = "perseus" | "hercules" | "odysseus" | "achilles" | "adonis" | "guardian";
+export type HeroKind = "perseus" | "hercules" | "odysseus" | "achilles" | "adonis" | "helen" | "guardian";
 
 /**
  * "seeking" and the hero kinds are driven by systems in this slice: the
@@ -55,7 +60,7 @@ export type HeroKind = "perseus" | "hercules" | "odysseus" | "achilles" | "adoni
 export type WalkerState = "seeking" | "traveling" | "fighting" | HeroKind;
 
 /** Every HeroKind, in the order the toolbar lists them. */
-export const HERO_KINDS: readonly HeroKind[] = ["perseus", "hercules", "odysseus", "achilles", "adonis", "guardian"];
+export const HERO_KINDS: readonly HeroKind[] = ["perseus", "hercules", "odysseus", "achilles", "adonis", "helen", "guardian"];
 
 /**
  * The attacking heroes: every kind that marches on the enemy and burns
@@ -172,6 +177,23 @@ export interface Swamp {
 }
 
 /**
+ * An enemy walker held by トロイのヘレン (docs/original-miracles.md #28):
+ * 「敵信者を魅了・拘束して建物から引き離し連れ回す。ヘレンが死ぬと拘束は
+ * 解ける」.
+ *
+ * A charmed walker keeps its own Owner — it is not converted (that is
+ * 聖水の泉's job, see HolyWater). It simply stops doing anything for its
+ * side and trails after Helen, which is how she 「敵の人口・建築基盤を崩す」
+ * without killing anyone: those people are still counted, still alive, and
+ * no longer anywhere near their houses.
+ *
+ * `by` is the Helen holding it, so the hold can be released when she dies.
+ */
+export interface Charmed {
+  by: Entity;
+}
+
+/**
  * The original's 竜巻 (docs/original-miracles.md #17): 「一定時間ランダムに
  * 移動し被害を与える。信者を巻き込んで運び体力を減らす。**水地形へ入ると
  * 渦巻きへ変化する**」.
@@ -256,5 +278,6 @@ export const Swamp = defineComponent<Swamp>("Swamp");
 export const HolyWater = defineComponent<HolyWater>("HolyWater");
 export const Tornado = defineComponent<Tornado>("Tornado");
 export const Whirlpool = defineComponent<Whirlpool>("Whirlpool");
+export const Charmed = defineComponent<Charmed>("Charmed");
 export const HeroCooldown = defineComponent<HeroCooldown>("HeroCooldown");
 export const Drowning = defineComponent<Drowning>("Drowning");

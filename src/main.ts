@@ -17,6 +17,7 @@ import {
   ODYSSEUS_MANA_COST,
   ACHILLES_MANA_COST,
   ADONIS_MANA_COST,
+  HELEN_MANA_COST,
   MAX_MANA,
   SHRINE_MOVE_MANA_COST,
   SWAMP_MANA_COST,
@@ -46,6 +47,7 @@ const HERO_MANA_COST: Record<HeroKind, number> = {
   odysseus: ODYSSEUS_MANA_COST,
   achilles: ACHILLES_MANA_COST,
   adonis: ADONIS_MANA_COST,
+  helen: HELEN_MANA_COST,
   guardian: GUARDIAN_MANA_COST,
 };
 import { createHolyWater } from "./game/holyWater";

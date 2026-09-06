@@ -18,6 +18,7 @@ const MATCH_EVENT_TEMPLATE: Record<MatchEventType, string> = {
   odysseus: "{subject}のリーダーがオディッセウスになった",
   achilles: "{subject}のリーダーがアキレスになった",
   adonis: "{subject}のリーダーがアドニスになった",
+  helen: "{subject}のリーダーがトロイのヘレンになった",
   guardian: "{subject}がリーダーを守護者化した",
   heroLost: "{subject}が英雄を失った",
   armageddon: "{subject}が最終決戦を発動した",

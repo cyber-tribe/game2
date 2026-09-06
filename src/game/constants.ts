@@ -357,6 +357,41 @@ export const ADONIS_MIN_SPLIT_STRENGTH = 1;
 /** How far apart the two halves of a split アドニス are placed, in tiles. */
 export const ADONIS_SPLIT_GAP = 0.6;
 
+/**
+ * Mana cost of トロイのヘレン — the cheapest hero after オディッセウス.
+ *
+ * She kills nothing and takes nothing permanently: everyone she holds is
+ * still the enemy's, still alive, and comes straight back the moment she
+ * dies. What she buys is *time* — an enemy settlement whose people are
+ * being walked away from it stops growing — and time is worth less than a
+ * kill, so she is priced under the heroes that make them.
+ */
+export const HELEN_MANA_COST = 32;
+
+/**
+ * How far トロイのヘレン's charm reaches, in tiles.
+ *
+ * Deliberately far larger than COMBAT_RANGE. She cannot fight at all (see
+ * systems/helen.ts), so an enemy that gets close enough to touch her kills
+ * her; the charm has to land first, or she is simply the worst hero in the
+ * game. At this radius an approaching walker is taken several ticks before
+ * it is in reach.
+ */
+export const HELEN_CHARM_RADIUS = 3;
+
+/**
+ * How many enemy walkers トロイのヘレン can hold at once.
+ *
+ * The limit is what keeps her from quietly absorbing an entire army, and
+ * it is also what can get her killed: the enemy she has no room left for
+ * walks right up to her. Casting her into a crowd is a gamble, which is
+ * the shape a hero who cannot fight ought to have.
+ */
+export const HELEN_CHARM_CAPACITY = 4;
+
+/** How closely a charmed walker trails トロイのヘレン, in tiles. */
+export const HELEN_FOLLOW_DISTANCE = 1;
+
 export const GUARDIAN_MANA_COST = 25;
 
 /**
@@ -384,6 +419,8 @@ export const HERO_TRAITS: Record<HeroKind, { strength: number; speed: number }> 
   odysseus: { strength: 1, speed: 1.8 },
   perseus: { strength: 1, speed: 1 },
   achilles: { strength: 1, speed: 1 },
+  // ヘレン's trait is not a number either — it is that she never fights.
+  helen: { strength: 1, speed: 1 },
   // アドニス's trait is not a number at all — it is what happens after a
   // won fight (systems/combat.ts). Promoting simply makes the leader one.
   adonis: { strength: 1, speed: 1 },

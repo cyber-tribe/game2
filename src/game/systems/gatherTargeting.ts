@@ -1,5 +1,5 @@
 import type { Entity, System, World } from "../../ecs";
-import { FactionState, MoveTarget, Owner, Position, Walker, type FactionId } from "../components";
+import { Charmed, FactionState, MoveTarget, Owner, Position, Walker, type FactionId } from "../components";
 import type { Point } from "./geometry";
 
 /**
@@ -40,6 +40,7 @@ export const gatherTargetingSystem: System = (world) => {
     const leaderHasNoOneLeftToGather = leader !== undefined && !hasOtherSeekingWalkers(world, state.id, leader);
 
     for (const entity of world.query(Position, Walker, Owner)) {
+      if (world.has(entity, Charmed)) continue;
       if (world.get(entity, Owner)!.faction !== state.id) continue;
       if (entity === leader && leaderHasNoOneLeftToGather) continue;
 

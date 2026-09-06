@@ -1,5 +1,5 @@
 import type { Entity, System, World } from "../../ecs";
-import { FactionState, MoveTarget, Owner, Position, Walker } from "../components";
+import { Charmed, FactionState, MoveTarget, Owner, Position, Walker } from "../components";
 import type { Point } from "./geometry";
 
 /**
@@ -22,6 +22,7 @@ export const goToShrineSystem: System = (world) => {
     if (!leaderPos) continue;
 
     for (const entity of world.query(Position, Walker, Owner)) {
+      if (world.has(entity, Charmed)) continue;
       if (entity === state.leaderId) continue;
       if (world.get(entity, Owner)!.faction !== state.id) continue;
 
