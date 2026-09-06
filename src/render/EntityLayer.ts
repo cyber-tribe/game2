@@ -1,5 +1,5 @@
 import { Container, Graphics, Sprite } from "pixi.js";
-import { FactionState, House, MoveTarget, Owner, Position, Swamp, Walker, type FactionId } from "../game/components";
+import { Drowning, FactionState, House, MoveTarget, Owner, Position, Swamp, Walker, type FactionId } from "../game/components";
 import type { Entity, World } from "../ecs";
 import { FARMLAND_RADIUS, IMPACT_EFFECT_DURATION } from "../game/constants";
 import { distance, type Point } from "../game/systems/geometry";
@@ -8,7 +8,15 @@ import { GAME_PALETTE } from "./palette";
 import { type IsoRenderer } from "./IsoRenderer";
 import { createDitherTexture } from "./patternTexture";
 import { houseFrameKey, houseTexture, loadHouseSprites } from "./houseSprites";
-import { WALK_FRAMES, loadWalkerSprites, walkerFrameKey, walkerPose, walkerTexture, type Facing } from "./walkerSprites";
+import {
+  WALK_FRAMES,
+  loadWalkerSprites,
+  walkerAction,
+  walkerFrameKey,
+  walkerPose,
+  walkerTexture,
+  type Facing,
+} from "./walkerSprites";
 
 /**
  * Deterministic pseudo-random value in [0, 1) for a tile's (x, y) — fixes
@@ -360,7 +368,10 @@ export class EntityLayer {
       const facing = target ? facingFor(target.x - pos.x, target.y - pos.y) : (this.lastFacing.get(entity) ?? "SE");
       this.lastFacing.set(entity, facing);
 
-      const texture = walkerTexture(walkerFrameKey(owner.faction, walkerPose(isLeader, heroKind), facing, frame));
+      const action = walkerAction(walker.state, world.get(entity, Drowning) !== undefined);
+      const texture = walkerTexture(
+        walkerFrameKey(owner.faction, walkerPose(isLeader, heroKind), action, facing, frame),
+      );
       if (!texture) continue;
 
       const sprite = this.pooled(this.walkerPool, this.walkerLayer, drawnWalkers++);

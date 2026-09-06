@@ -3,16 +3,19 @@ import type { FactionId } from "../game/components";
 import {
   ATLAS_FRAME_KEYS,
   WALK_FRAMES,
+  walkerAction,
   walkerFrameKey,
   walkerPose,
   type Facing,
   type HeroKind,
+  type WalkerAction,
   type WalkerPose,
 } from "./walkerSprites";
 
 const FACTIONS: FactionId[] = ["player", "enemy"];
 const FACINGS: Facing[] = ["NE", "NW", "SE", "SW"];
 const POSES: WalkerPose[] = ["plain", "leader", "knight", "guardian", "leaderKnight", "leaderGuardian"];
+const ACTIONS: WalkerAction[] = ["walk", "fight", "drown"];
 const FRAMES = Array.from({ length: WALK_FRAMES }, (_, i) => i);
 
 describe("walkerPose", () => {
@@ -57,9 +60,11 @@ describe("walkerFrameKey", () => {
 
     for (const faction of FACTIONS) {
       for (const pose of POSES) {
-        for (const facing of FACINGS) {
-          for (const frame of FRAMES) {
-            asked.push(walkerFrameKey(faction, pose, facing, frame));
+        for (const action of ACTIONS) {
+          for (const facing of FACINGS) {
+            for (const frame of FRAMES) {
+              asked.push(walkerFrameKey(faction, pose, action, facing, frame));
+            }
           }
         }
       }
@@ -72,7 +77,9 @@ describe("walkerFrameKey", () => {
     const asked = new Set(
       FACTIONS.flatMap((faction) =>
         POSES.flatMap((pose) =>
-          FACINGS.flatMap((facing) => FRAMES.map((frame) => walkerFrameKey(faction, pose, facing, frame))),
+          ACTIONS.flatMap((action) =>
+            FACINGS.flatMap((facing) => FRAMES.map((frame) => walkerFrameKey(faction, pose, action, facing, frame))),
+          ),
         ),
       ),
     );
@@ -81,7 +88,36 @@ describe("walkerFrameKey", () => {
   });
 
   it("gives every walk-cycle frame its own key", () => {
-    const keys = new Set(FRAMES.map((frame) => walkerFrameKey("player", "plain", "SE", frame)));
+    const keys = new Set(FRAMES.map((frame) => walkerFrameKey("player", "plain", "walk", "SE", frame)));
     expect(keys.size).toBe(WALK_FRAMES);
+  });
+
+  it("gives every action its own key", () => {
+    const keys = new Set(ACTIONS.map((action) => walkerFrameKey("player", "plain", action, "SE", 0)));
+    expect(keys.size).toBe(ACTIONS.length);
+  });
+});
+
+describe("walkerAction", () => {
+  it("walks for the states that are just going somewhere", () => {
+    expect(walkerAction("seeking", false)).toBe("walk");
+    expect(walkerAction("traveling", false)).toBe("walk");
+  });
+
+  it("fights when fighting", () => {
+    expect(walkerAction("fighting", false)).toBe("fight");
+  });
+
+  it("keeps heroes on the walking art — their gear is what marks them, not their gait", () => {
+    expect(walkerAction("knight", false)).toBe("walk");
+    expect(walkerAction("guardian", false)).toBe("walk");
+  });
+
+  it("lets drowning win over every other state, fighting included", () => {
+    // A walker going under has stopped being a combatant, and that is the
+    // more urgent thing for the player to see.
+    for (const state of ["seeking", "traveling", "fighting", "knight", "guardian"] as const) {
+      expect(walkerAction(state, true)).toBe("drown");
+    }
   });
 });
