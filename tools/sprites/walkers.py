@@ -151,7 +151,7 @@ class Pose:
     hero: str | None
 
 
-HEROES = ("perseus", "hercules", "odysseus", "achilles", "guardian")
+HEROES = ("perseus", "hercules", "odysseus", "achilles", "adonis", "guardian")
 """The hero kinds, matching HeroKind in src/game/components.ts. Each carries
 its own prop (see _PROPS) — at this size the weapon *is* the identity, since
 there is no room for a face or a costume, and a player who cannot tell which
@@ -353,6 +353,22 @@ def _spear(canvas: Canvas, tones: dict[str, RGB], palette: Palette, top: int, mi
         canvas.px(x, top + row, shaft)
 
 
+def _twin_blades(canvas: Canvas, tones: dict[str, RGB], palette: Palette, top: int, mirror: bool) -> None:
+    """アドニス's paired knives — one in each of the two columns, the shorter
+    one a row lower. The hero that becomes two carries two blades, which is
+    the only way this trait can be shown on a body that has not split yet."""
+    x, _, out = _prop_columns(mirror)
+    blade = palette.rgb("stoneHighlight")
+    edge = palette.rgb("stoneLight")
+    guard = palette.rgb("bronzeLight")
+    for row in range(4):
+        canvas.px(x, top - 3 + row, blade if row else edge)
+    canvas.px(x, top + 1, guard)
+    for row in range(3):
+        canvas.px(out, top - 1 + row, blade if row else edge)
+    canvas.px(out, top + 2, guard)
+
+
 _PROPS = {
     # ペルセウス keeps the blade the nameless 騎士 already carried: it is
     # the original's "基準の英雄", and the baseline should look like the
@@ -361,6 +377,7 @@ _PROPS = {
     "hercules": _club,
     "odysseus": _bow,
     "achilles": _spear,
+    "adonis": _twin_blades,
     "guardian": _shield,
 }
 

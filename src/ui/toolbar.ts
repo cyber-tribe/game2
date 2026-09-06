@@ -14,6 +14,7 @@ export type ToolMode =
   | "hercules"
   | "odysseus"
   | "achilles"
+  | "adonis"
   | "guardian"
   | "volcano"
   | "forest"

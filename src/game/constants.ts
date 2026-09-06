@@ -317,6 +317,46 @@ export const ACHILLES_MANA_COST = 40;
  * than knighting's unconditional, go-anywhere aggression. See hero.ts's
  * guardianify/systems/hero.ts's guardianTargetingSystem.
  */
+/**
+ * Mana cost of アドニス — above ペルセウス, below ヘラクレス.
+ *
+ * On paper it is a ペルセウス that multiplies, which sounds like the best
+ * hero in the game; in practice every extra body is one more chance to pay
+ * HERO_DEATH_MANA_LOSS, and they are all half strength. The price is for
+ * the upside, the mana loss is the downside, and the original says both in
+ * the same breath: 「増やしすぎは英雄死亡時のマナ損失というリスクを伴う」.
+ */
+export const ADONIS_MANA_COST = 42;
+
+/**
+ * Mana a faction loses whenever one of its heroes dies — the risk half of
+ * アドニス (docs/original-miracles.md #10).
+ *
+ * Applies to every hero, not only アドニス. The original raises it as
+ * アドニス's own drawback, but a rule that only charged for *that* hero's
+ * deaths would be a tax on one miracle rather than what it plainly is:
+ * heroes are an investment, and losing one costs you.
+ *
+ * Set below what any hero costs to cast, so dying is a setback rather than
+ * a second purchase — but high enough that splitting アドニス into four
+ * bodies and marching them all into a swamp is a real, felt mistake.
+ */
+export const HERO_DEATH_MANA_LOSS = 12;
+
+/**
+ * Strength below which アドニス stops splitting.
+ *
+ * Halving has no floor of its own: without this, a hero that keeps winning
+ * ends up as a crowd of thirty-second-strength heroes, individually too
+ * weak to beat a single walker and collectively a standing mana liability
+ * (see HERO_DEATH_MANA_LOSS). One at a strength of 1 is exactly a plain
+ * walker, so that is where the doubling stops paying for itself.
+ */
+export const ADONIS_MIN_SPLIT_STRENGTH = 1;
+
+/** How far apart the two halves of a split アドニス are placed, in tiles. */
+export const ADONIS_SPLIT_GAP = 0.6;
+
 export const GUARDIAN_MANA_COST = 25;
 
 /**
@@ -344,6 +384,9 @@ export const HERO_TRAITS: Record<HeroKind, { strength: number; speed: number }> 
   odysseus: { strength: 1, speed: 1.8 },
   perseus: { strength: 1, speed: 1 },
   achilles: { strength: 1, speed: 1 },
+  // アドニス's trait is not a number at all — it is what happens after a
+  // won fight (systems/combat.ts). Promoting simply makes the leader one.
+  adonis: { strength: 1, speed: 1 },
   guardian: { strength: 1, speed: 1 },
 };
 

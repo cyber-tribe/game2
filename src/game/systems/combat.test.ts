@@ -280,3 +280,66 @@ describe("houseCaptureSystem", () => {
     expect(impacts).toEqual([{ position: { x: 1, y: 2 }, type: "houseBurned" }]);
   });
 });
+
+describe("アドニス — 戦闘に勝つと2体に分裂する", () => {
+  it("splits the winner in two, each at half the strength it had left", () => {
+    const world = new World();
+    const hero = createWalker(world, "player", 5, 5, 5, "adonis");
+    createWalker(world, "enemy", 5, 5, 1);
+
+    createWalkerCombatSystem()(world, 0.1);
+
+    const heroes = world.query(Walker, Owner).filter((e) => world.get(e, Owner)!.faction === "player");
+    expect(heroes).toHaveLength(2);
+    for (const entity of heroes) {
+      expect(world.get(entity, Walker)!.strength).toBe(2);
+      expect(world.get(entity, Walker)!.state).toBe("adonis");
+    }
+    expect(world.isAlive(hero)).toBe(true);
+  });
+
+  it("puts the two halves a little apart, so one hazard cannot take both", () => {
+    const world = new World();
+    createWalker(world, "player", 5, 5, 5, "adonis");
+    createWalker(world, "enemy", 5, 5, 1);
+
+    createWalkerCombatSystem()(world, 0.1);
+
+    const positions = world
+      .query(Walker, Owner)
+      .filter((e) => world.get(e, Owner)!.faction === "player")
+      .map((e) => world.get(e, Position)!.x);
+    expect(positions[0]).not.toBe(positions[1]);
+  });
+
+  it("does not split any other hero", () => {
+    const world = new World();
+    createWalker(world, "player", 5, 5, 5, "perseus");
+    createWalker(world, "enemy", 5, 5, 1);
+
+    createWalkerCombatSystem()(world, 0.1);
+
+    expect(world.query(Walker, Owner).filter((e) => world.get(e, Owner)!.faction === "player")).toHaveLength(1);
+  });
+
+  /** Halving forever would leave a crowd of heroes too weak to win anything. */
+  it("stops splitting once the halves would be weaker than a plain walker", () => {
+    const world = new World();
+    createWalker(world, "player", 5, 5, 1.5, "adonis");
+    createWalker(world, "enemy", 5, 5, 1);
+
+    createWalkerCombatSystem()(world, 0.1);
+
+    expect(world.query(Walker, Owner).filter((e) => world.get(e, Owner)!.faction === "player")).toHaveLength(1);
+  });
+
+  it("does not split a loser", () => {
+    const world = new World();
+    createWalker(world, "player", 5, 5, 2, "adonis");
+    createWalker(world, "enemy", 5, 5, 9);
+
+    createWalkerCombatSystem()(world, 0.1);
+
+    expect(world.query(Walker, Owner).filter((e) => world.get(e, Owner)!.faction === "player")).toHaveLength(0);
+  });
+});
