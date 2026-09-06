@@ -19,6 +19,7 @@ import {
   MAX_MANA,
   SHRINE_MOVE_MANA_COST,
   SWAMP_MANA_COST,
+  HOLY_WATER_MANA_COST,
   TERRAIN_EDIT_MANA_COST,
   TERRAIN_EDIT_RULE_LABELS,
   TERRAIN_LABELS,
@@ -43,6 +44,7 @@ const HERO_MANA_COST: Record<HeroKind, number> = {
   achilles: ACHILLES_MANA_COST,
   guardian: GUARDIAN_MANA_COST,
 };
+import { createHolyWater } from "./game/holyWater";
 import { collapseSwampsNear, createSwamp } from "./game/swamp";
 import { burnFire } from "./game/fire";
 import { eruptVolcano } from "./game/volcano";
@@ -681,6 +683,18 @@ async function bootstrap(world: WorldDefinition) {
       return;
     }
 
+    if (toolMode === "holyWater") {
+      // The spring belongs to whoever cast it — walkers come out as *its*
+      // owner's, which is why it is worth casting on the enemy's doorstep
+      // rather than on your own ground (see systems/holyWater.ts).
+      if (!trySpendPlayerMana(HOLY_WATER_MANA_COST)) return;
+      createHolyWater(simulation.world, "player", vertex.x, vertex.y);
+      simulation.recordEvent("player", "holyWater");
+      vibrate(20);
+      playMiracleSound("holyWater");
+      return;
+    }
+
     if (toolMode === "forest") {
       // Affordability first, then whether it would do anything: a forest
       // only takes on buildable land, and charging for a cast that plants
@@ -1095,6 +1109,7 @@ async function bootstrap(world: WorldDefinition) {
     shrine: SHRINE_MOVE_MANA_COST,
     earthquake: EARTHQUAKE_MANA_COST,
     swamp: SWAMP_MANA_COST,
+    holyWater: HOLY_WATER_MANA_COST,
     ...HERO_MANA_COST,
     volcano: VOLCANO_MANA_COST,
     forest: FOREST_MANA_COST,

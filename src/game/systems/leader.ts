@@ -23,7 +23,16 @@ import { distance } from "./geometry";
 export const leaderSystem: System = (world) => {
   for (const factionEntity of world.query(FactionState)) {
     const state = world.get(factionEntity, FactionState)!;
-    if (state.leaderId !== undefined && world.isAlive(state.leaderId) && world.has(state.leaderId, Walker)) {
+    // Ownership is checked, not just liveness: a leader can change sides
+    // now (聖水の泉 — see systems/holyWater.ts), and a faction that kept
+    // pointing at a walker the enemy owns would keep steering its gather
+    // toward it and would spend hero miracles promoting an enemy unit.
+    if (
+      state.leaderId !== undefined &&
+      world.isAlive(state.leaderId) &&
+      world.has(state.leaderId, Walker) &&
+      world.get(state.leaderId, Owner)?.faction === state.id
+    ) {
       continue;
     }
     if (state.behaviorMode !== "gather") continue;

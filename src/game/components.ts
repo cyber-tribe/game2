@@ -167,6 +167,27 @@ export interface Swamp {
 }
 
 /**
+ * The original's 聖水の泉 (docs/original-miracles.md #27): 「落ちた信者が
+ * 敵側へ寝返る。英雄まで寝返る可能性があり、強い英雄を奪えば形勢逆転できる。
+ * 再度落ちると元へ戻る場合もある」.
+ *
+ * Shaped like a Swamp on purpose — a radius and a capacity — because it is
+ * the same kind of thing: a patch of ground that does something to whoever
+ * walks into it, a fixed number of times, and then is gone. What differs is
+ * only that a swamp deletes them and a spring takes them.
+ *
+ * The spring's own Owner is which side converts walkers walk out as, so
+ * "再度落ちると元へ戻る" needs no rule of its own: a walker taken by the
+ * player's spring and then wandering into the enemy's changes sides again,
+ * because each spring only ever converts walkers that are not already its
+ * owner's.
+ */
+export interface HolyWater {
+  radius: number;
+  remainingCapacity: number;
+}
+
+/**
  * A brief rest a hero takes right after resolving a house — a knight
  * burning it, or a guardian capturing one — before its targeting system
  * will send it marching after its next target. See knightTargetingSystem/
@@ -185,5 +206,6 @@ export const MoveTarget = defineComponent<MoveTarget>("MoveTarget");
 export const House = defineComponent<House>("House");
 export const FactionState = defineComponent<FactionState>("FactionState");
 export const Swamp = defineComponent<Swamp>("Swamp");
+export const HolyWater = defineComponent<HolyWater>("HolyWater");
 export const HeroCooldown = defineComponent<HeroCooldown>("HeroCooldown");
 export const Drowning = defineComponent<Drowning>("Drowning");

@@ -37,6 +37,7 @@ import { createMovementSystem } from "./systems/movement";
 import { createSettleSystem } from "./systems/settle";
 import { createCreviceSystem } from "./systems/crevice";
 import { createFungusSystem } from "./systems/fungus";
+import { createHolyWaterSystem } from "./systems/holyWater";
 import { createSwampSystem } from "./systems/swamp";
 import { createWanderTargetSystem } from "./systems/wanderTarget";
 import { ALL_MIRACLES, type EnemyPersonality, type MiracleId } from "./worlds";
@@ -157,6 +158,7 @@ export type MatchEventType =
   | "shrineMove"
   | "earthquake"
   | "swamp"
+  | "holyWater"
   | "volcano"
   | "forest"
   | "flower"
@@ -260,6 +262,7 @@ export class Simulation {
       .add(createMovementSystem({ heightmap: config.heightmap }))
       .add(gatherSystem)
       .add(createSwampSystem({ onImpact: (event) => this.recordImpactEffect(event) }))
+      .add(createHolyWaterSystem({ onImpact: (event) => this.recordImpactEffect(event) }))
       .add(createCreviceSystem({ heightmap: config.heightmap, onImpact: (event) => this.recordImpactEffect(event) }))
       .add(
         createFungusSystem({

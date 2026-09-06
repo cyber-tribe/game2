@@ -1,5 +1,5 @@
 import { Container, Graphics, Sprite } from "pixi.js";
-import { Drowning, FactionState, House, MoveTarget, Owner, Position, Swamp, Walker, isHeroState, type FactionId, type HeroKind } from "../game/components";
+import { Drowning, FactionState, HolyWater, House, MoveTarget, Owner, Position, Swamp, Walker, isHeroState, type FactionId, type HeroKind } from "../game/components";
 import type { Entity, World } from "../ecs";
 import { FARMLAND_RADIUS, IMPACT_EFFECT_DURATION } from "../game/constants";
 import { distance, type Point } from "../game/systems/geometry";
@@ -88,6 +88,23 @@ const SWAMP_FILL = {
   texture: createDitherTexture(SWAMP_DITHER_SIZE, SWAMP_MUD_COLOR, SWAMP_SPECKLE_COLOR, SWAMP_SPECKLE_DENSITY),
   textureSpace: "global" as const,
 };
+/**
+ * 聖水の泉 (see the HolyWater component). Bright, still water — the visual
+ * opposite of the swamp's mud, because the two are the opposite miracle:
+ * one deletes whoever walks in, the other takes them. Ringed in its owner's
+ * faction color, since the whole decision a player makes about a spring is
+ * *whose* it is — an unlabelled pool would be a trap with no way to read
+ * which way it points.
+ */
+const HOLY_WATER_COLOR = 0x9fd8e8;
+const HOLY_WATER_SPECKLE_COLOR = 0xf2e6a8;
+const HOLY_WATER_DITHER_SIZE = 8;
+const HOLY_WATER_SPECKLE_DENSITY = 0.22;
+const HOLY_WATER_FILL = {
+  texture: createDitherTexture(HOLY_WATER_DITHER_SIZE, HOLY_WATER_COLOR, HOLY_WATER_SPECKLE_COLOR, HOLY_WATER_SPECKLE_DENSITY),
+  textureSpace: "global" as const,
+};
+const HOLY_WATER_RIM_WIDTH = 2;
 const SWAMP_HOLE_COLOR = 0x0d070d;
 const SWAMP_BUBBLE_COLOR = 0x6a8f5a;
 /** Seconds per bubble on/off half-cycle — slow enough to read as "still water occasionally bubbling", not a strobe. */
@@ -165,6 +182,9 @@ const IMPACT_EFFECT_COLOR: Record<ImpactEffectType, number> = {
   houseCaptured: 0xffe066,
   houseBurned: 0xff8c1a,
   drowned: 0x6a8fd9,
+  // 聖水の泉 — the pale gold of the spring itself, so a conversion reads
+  // as "something was taken", not as another death.
+  converted: 0xf2e6a8,
 };
 
 /** Screen-px radius an ImpactEffect's ring has expanded to by the time it fully fades out. */
@@ -192,7 +212,7 @@ export function impactEffectVisual(
   };
 }
 
-/** Draws every Swamp/Walker/House in the ECS world onto the isometric map. */
+/** Draws every Swamp/HolyWater/Walker/House in the ECS world onto the isometric map. */
 export class EntityLayer {
   readonly view = new Container();
   /** Farmland, swamp and houses — everything drawn *under* the walkers. */
@@ -333,6 +353,24 @@ export class EntityLayer {
           const { sx, sy } = at(swampTileHash(tile.x, tile.y, 5), swampTileHash(tile.x, tile.y, 6));
           g.circle(sx, sy, 1.2).fill(SWAMP_BUBBLE_COLOR);
         }
+      }
+    }
+
+    // Drawn after the swamps and before the houses, for the same reason
+    // the swamps are: it is ground, not a marker.
+    for (const entity of world.query(Position, HolyWater, Owner)) {
+      const pos = world.get(entity, Position)!;
+      const spring = world.get(entity, HolyWater)!;
+      const faction = world.get(entity, Owner)!.faction;
+
+      for (const tile of swampAffectedTiles(pos, spring.radius, mapWidth, mapHeight)) {
+        const p0 = this.iso.project(tile.x, tile.y);
+        const p1 = this.iso.project(tile.x + 1, tile.y);
+        const p2 = this.iso.project(tile.x + 1, tile.y + 1);
+        const p3 = this.iso.project(tile.x, tile.y + 1);
+        g.poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy])
+          .fill(HOLY_WATER_FILL)
+          .stroke({ width: HOLY_WATER_RIM_WIDTH, color: FACTION_COLOR[faction], alpha: 0.9 });
       }
     }
 

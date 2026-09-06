@@ -163,6 +163,28 @@ ICONS: dict[str, list[str]] = {
         "................",
         "................",
     ],
+    # 聖水の泉: a jet rising out of a bright basin. The only icon in the
+    # panel drawn entirely in the water tones, and the only one that is not
+    # a weapon, a hazard or a tool — which is the point: it takes rather
+    # than destroys.
+    "holyWater": [
+        ".......oo.......",
+        "......oSSo.S....",
+        "...S..oSSo......",
+        "......oSSo..S...",
+        "......oSSo......",
+        "......oSSo......",
+        "......oSSo......",
+        "..oooooooooooo..",
+        "..owSwwwwwSwSo..",
+        "..oWWWWWWWWWWo..",
+        "...oWWWWWWWWo...",
+        "....oWWWWWWo....",
+        "....oooooooo....",
+        "................",
+        "................",
+        "................",
+    ],
     # A dark rock cone with a bright plume over it. The first version made
     # the cone almost white and the plume two stray pixels, so it read as a
     # tent — the lava has to be the loudest thing in the tile.
@@ -674,6 +696,7 @@ ICON_KINDS = (
     "shrine",
     "earthquake",
     "swamp",
+    "holyWater",
     "perseus",
     "hercules",
     "odysseus",

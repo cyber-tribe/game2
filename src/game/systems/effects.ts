@@ -5,7 +5,7 @@ import type { Point } from "./geometry";
  * cosmetic (EntityLayer picks a color/shape per type); nothing in game
  * logic branches on it.
  */
-export type ImpactEffectType = "combatDeath" | "houseCaptured" | "houseBurned" | "drowned";
+export type ImpactEffectType = "combatDeath" | "houseCaptured" | "houseBurned" | "drowned" | "converted";
 
 /** One kill/capture/drowning worth reporting visually, and where it happened. */
 export interface ImpactEffectEvent {
