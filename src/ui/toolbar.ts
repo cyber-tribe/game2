@@ -14,6 +14,8 @@ export type ToolMode =
   | "fireRain"
   | "tsunami"
   | "reef"
+  | "road"
+  | "fungus"
   | "armageddon"
   | "inspect";
 

@@ -182,6 +182,25 @@ const FOREST_COLOR = GAME_PALETTE.grassDark;
 const FOREST_SPECKLE_COLOR = 0x1e3a12;
 const FOREST_DITHER_DENSITY = 0.55;
 /**
+ * Paving (see Heightmap.road). Bare stone, deliberately the one surface on
+ * the map with no colour of its own: a road is worth seeing at a glance
+ * because of where it runs, not because it is pretty, and its real job —
+ * being the line 毒カビ cannot cross — is only legible if the eye can
+ * follow the whole run of it across whatever terrain it was laid on.
+ */
+const ROAD_COLOR = GAME_PALETTE.stoneLight;
+const ROAD_SPECKLE_COLOR = GAME_PALETTE.stoneDark;
+const ROAD_DITHER_DENSITY = 0.3;
+/**
+ * 毒カビ (see Heightmap.fungus). The mana purple, which appears nowhere
+ * else on the ground — rot has to be unmistakable at a glance, because
+ * every tick a walker spends standing in it is fatal, and the player is
+ * usually looking at the whole map rather than at their own feet.
+ */
+const FUNGUS_COLOR = GAME_PALETTE.manaAccent;
+const FUNGUS_SPECKLE_COLOR = GAME_PALETTE.manaHighlight;
+const FUNGUS_DITHER_DENSITY = 0.45;
+/**
  * Size (px, at scale 1) of one repeat of a terrain's dither texture — see
  * createDitherTexture. Small relative to a tile (64x32px) so it tiles
  * several times across each tile, reading as a fine even stipple like the
@@ -302,6 +321,37 @@ const FOREST_FILL = {
   texture: createDitherTexture(DITHER_SIZE, FOREST_COLOR, FOREST_SPECKLE_COLOR, FOREST_DITHER_DENSITY),
   textureSpace: "global",
 } as const;
+
+const ROAD_FILL = {
+  texture: createDitherTexture(DITHER_SIZE, ROAD_COLOR, ROAD_SPECKLE_COLOR, ROAD_DITHER_DENSITY),
+  textureSpace: "global",
+} as const;
+
+const FUNGUS_FILL = {
+  texture: createDitherTexture(DITHER_SIZE, FUNGUS_COLOR, FUNGUS_SPECKLE_COLOR, FUNGUS_DITHER_DENSITY),
+  textureSpace: "global",
+} as const;
+
+/**
+ * What is on top of a tile's ordinary terrain, if anything — see
+ * redraw()'s own precedence and fillTerrainTriangle. Only surfaces that
+ * are still *ground* (walkable, shaded and dithered like terrain) belong
+ * here; water, rock and crevices replace the ground entirely and are
+ * handled by hasOwnColor instead.
+ */
+type GroundSurface = "terrain" | "forest" | "road" | "fungus";
+
+const SURFACE_COLOR: Record<Exclude<GroundSurface, "terrain">, number> = {
+  forest: FOREST_COLOR,
+  road: ROAD_COLOR,
+  fungus: FUNGUS_COLOR,
+};
+
+const SURFACE_FILL: Record<Exclude<GroundSurface, "terrain">, { texture: Texture; textureSpace: "global" }> = {
+  forest: FOREST_FILL,
+  road: ROAD_FILL,
+  fungus: FUNGUS_FILL,
+};
 
 const TERRAIN_FILL: Record<Heightmap["terrain"], { texture: Texture; textureSpace: "global" }> = {
   grass: {
@@ -634,7 +684,7 @@ export class IsoRenderer {
    * initial full-map render before any camera/viewport exists yet.
    */
   redraw(bounds?: TileBounds): void {
-    const { width, height, rockHardness, forest, crevice, waterLevel, terrain } = this.heightmap;
+    const { width, height, rockHardness, forest, crevice, road, fungus, waterLevel, terrain } = this.heightmap;
     const vertices = this.displayVertices;
     const graphics = this.graphics;
     graphics.clear();
@@ -696,23 +746,34 @@ export class IsoRenderer {
         const isWater = avgElevation <= waterLevel;
         const isRock = isRockTile[y - minY][x - minX];
         const isCreviceTile = crevice[y][x] || crevice[y][x + 1] || crevice[y + 1][x + 1] || crevice[y + 1][x];
-        // Woodland is ordinary ground with a different canopy, so it loses
-        // to every kind of ground that is *not* ordinary — a crevice torn
-        // through a forest is a hole, not trees.
-        const isForestTile =
-          !isCreviceTile &&
-          !isWater &&
-          !isRock &&
-          (forest[y][x] || forest[y][x + 1] || forest[y + 1][x + 1] || forest[y + 1][x]);
+        // Woodland, paving and rot are all ordinary ground wearing a
+        // different surface, so they lose to every kind of ground that is
+        // *not* ordinary — a crevice torn through a forest is a hole, not
+        // trees. Among themselves the danger wins: a vertex is never both
+        // paved and rotten (see applyRoad), but a tile has four corners, so
+        // a tile on the boundary can touch one of each, and the one worth
+        // seeing there is the 毒カビ.
+        const anyCorner = (layer: boolean[][]) =>
+          layer[y][x] || layer[y][x + 1] || layer[y + 1][x + 1] || layer[y + 1][x];
+        const isOrdinaryGround = !isCreviceTile && !isWater && !isRock;
+        const surface: GroundSurface = !isOrdinaryGround
+          ? "terrain"
+          : anyCorner(fungus)
+            ? "fungus"
+            : anyCorner(road)
+              ? "road"
+              : anyCorner(forest)
+                ? "forest"
+                : "terrain";
         const baseColor = isCreviceTile
           ? CREVICE_COLOR
           : isWater
             ? WATER_COLOR
             : isRock
               ? VOLCANO_ROCK_COLOR
-              : isForestTile
-                ? FOREST_COLOR
-                : TERRAIN_COLOR[terrain];
+              : surface === "terrain"
+                ? TERRAIN_COLOR[terrain]
+                : SURFACE_COLOR[surface];
 
         if (isWater && !isCreviceTile) {
           // Water always reads as a single flat, unshaded plane — never a
@@ -739,8 +800,8 @@ export class IsoRenderer {
           // 3 points are always planar, so each triangle (unlike the full
           // 4-corner quad, which can warp into a non-planar "saddle" when
           // all 4 corners differ) has one well-defined normal to shade by.
-          this.fillTerrainTriangle(graphics, a, b, c, baseColor, terrain, isRock || isCreviceTile, isForestTile);
-          this.fillTerrainTriangle(graphics, a, c, d2, baseColor, terrain, isRock || isCreviceTile, isForestTile);
+          this.fillTerrainTriangle(graphics, a, b, c, baseColor, terrain, isRock || isCreviceTile, surface);
+          this.fillTerrainTriangle(graphics, a, c, d2, baseColor, terrain, isRock || isCreviceTile, surface);
         }
 
         // The map's own outer edge always gets a genuine vertical wall
@@ -822,7 +883,7 @@ export class IsoRenderer {
     baseColor: number,
     terrain: Heightmap["terrain"],
     hasOwnColor: boolean,
-    isForest = false,
+    surface: GroundSurface = "terrain",
   ): void {
     const pa = this.toScreen(a.x, a.y, a.z);
     const pb = this.toScreen(b.x, b.y, b.z);
@@ -837,14 +898,14 @@ export class IsoRenderer {
     // freshly-torn crevices as grass (a crevice is carved dead flat to the
     // floor, so it hit that path every time).
     //
-    // `isForest` picks *which* texture ordinary flat ground gets — canopy
-    // or bare terrain. Woodland still wants a texture; it just wants a
-    // different one.
+    // `surface` picks *which* texture ordinary flat ground gets — canopy,
+    // paving, rot or bare terrain. All of them still want a texture; they
+    // just want different ones.
     const fill =
       isFlat && !hasOwnColor
-        ? isForest
-          ? FOREST_FILL
-          : TERRAIN_FILL[terrain]
+        ? surface === "terrain"
+          ? TERRAIN_FILL[terrain]
+          : SURFACE_FILL[surface]
         : shadeColor(baseColor, isFlat ? 1 : triangleBrightness(a, b, c));
 
     graphics.poly([pa.sx, pa.sy, pb.sx, pb.sy, pc.sx, pc.sy]).fill(fill);

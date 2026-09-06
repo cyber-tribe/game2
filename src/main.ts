@@ -7,6 +7,8 @@ import {
   REEF_MANA_COST,
   FIRE_RAIN_MANA_COST,
   FOREST_MANA_COST,
+  ROAD_MANA_COST,
+  FUNGUS_MANA_COST,
   TSUNAMI_MANA_COST,
   GUARDIAN_MANA_COST,
   KNIGHT_MANA_COST,
@@ -37,7 +39,7 @@ import { mountCommandIcons } from "./ui/commandIcons";
 import { loadCommandIcons } from "./ui/pixelIcons";
 import { StatusPanel } from "./ui/statusPanel";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
-import { DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyForest, applyReef, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
+import { DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyForest, applyFungus, applyReef, applyRoad, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
 
 /**
  * The camera's fixed base scale — see layout()'s doc comment for why this
@@ -424,14 +426,29 @@ async function bootstrap(world: WorldDefinition) {
   // mana was a silent no-op, indistinguishable from the edit just not
   // having registered at all (per feedback: "上げ下げができているのか
   // 分からない").
-  const trySpendPlayerMana = (cost: number): boolean => {
+  /**
+   * The same check without spending anything, for the miracles that have
+   * to *apply themselves* to find out whether they did anything at all —
+   * applyForest/applyRoad/applyFungus each return the vertices they
+   * changed, and a cast that changes nothing is refused rather than
+   * charged for. Those have to ask before they act: mutating the terrain
+   * and only then discovering the mana was short handed the player the
+   * whole effect for free.
+   */
+  const canAffordPlayerMana = (cost: number): boolean => {
     if (!isOwnFactionVisible()) {
       showEntityInfo("自分の勢力が画面内に見えていません", "warning");
       return false;
     }
-    if (trySpendMana(simulation.world, "player", cost)) return true;
-    showEntityInfo(`マナが足りません（必要 ${cost} / 現在 ${simulation.getMana("player").toFixed(1)}）`, "warning");
+    const mana = simulation.getMana("player");
+    if (mana >= cost) return true;
+    showEntityInfo(`マナが足りません（必要 ${cost} / 現在 ${mana.toFixed(1)}）`, "warning");
     return false;
+  };
+
+  const trySpendPlayerMana = (cost: number): boolean => {
+    if (!canAffordPlayerMana(cost)) return false;
+    return trySpendMana(simulation.world, "player", cost);
   };
 
   // Nudges a first-time player toward the core loop — see Hud.ts's
@@ -646,18 +663,52 @@ async function bootstrap(world: WorldDefinition) {
     }
 
     if (toolMode === "forest") {
-      // Checked before spending: a forest only takes on buildable land, and
-      // charging for a cast that plants nothing reads as the game being
-      // broken.
+      // Affordability first, then whether it would do anything: a forest
+      // only takes on buildable land, and charging for a cast that plants
+      // nothing reads as the game being broken — but so does planting one
+      // the player cannot pay for (see canAffordPlayerMana).
+      if (!canAffordPlayerMana(FOREST_MANA_COST)) return;
       if (applyForest(heightmap, vertex.x, vertex.y).length === 0) {
         showEntityInfo("ここには森が育ちません", "warning");
         return;
       }
-      if (!trySpendPlayerMana(FOREST_MANA_COST)) return;
+      trySpendPlayerMana(FOREST_MANA_COST);
       renderer.redraw(visibleBounds());
       simulation.recordEvent("player", "forest");
       vibrate(20);
       playMiracleSound("forest");
+      return;
+    }
+
+    if (toolMode === "road") {
+      // Same order as the forest: a road only takes on open ground, and
+      // paving is refused outright on 毒カビ (see applyRoad) — the
+      // interaction is that you lay a road *ahead* of an outbreak.
+      if (!canAffordPlayerMana(ROAD_MANA_COST)) return;
+      if (applyRoad(heightmap, vertex.x, vertex.y).length === 0) {
+        showEntityInfo("ここには道を敷けません", "warning");
+        return;
+      }
+      trySpendPlayerMana(ROAD_MANA_COST);
+      renderer.redraw(visibleBounds());
+      simulation.recordEvent("player", "road");
+      vibrate(20);
+      playMiracleSound("road");
+      return;
+    }
+
+    if (toolMode === "fungus") {
+      // Nothing takes root on water, rock, a crevice or a road.
+      if (!canAffordPlayerMana(FUNGUS_MANA_COST)) return;
+      if (applyFungus(heightmap, vertex.x, vertex.y).length === 0) {
+        showEntityInfo("ここには毒カビが根付きません", "warning");
+        return;
+      }
+      trySpendPlayerMana(FUNGUS_MANA_COST);
+      renderer.redraw(visibleBounds());
+      simulation.recordEvent("player", "fungus");
+      vibrate(25);
+      playMiracleSound("fungus");
       return;
     }
 
@@ -1009,6 +1060,8 @@ async function bootstrap(world: WorldDefinition) {
     guardian: GUARDIAN_MANA_COST,
     volcano: VOLCANO_MANA_COST,
     forest: FOREST_MANA_COST,
+    road: ROAD_MANA_COST,
+    fungus: FUNGUS_MANA_COST,
     fireRain: FIRE_RAIN_MANA_COST,
     reef: REEF_MANA_COST,
     tsunami: TSUNAMI_MANA_COST,
@@ -1061,7 +1114,10 @@ async function bootstrap(world: WorldDefinition) {
     // visible bounds haven't moved and nothing's still animating (see
     // IsoRenderer.isAnimating) avoids that redundant CPU cost without ever
     // skipping a frame that would actually look different.
-    if (!lastRedrawnBounds || !boundsEqual(bounds, lastRedrawnBounds) || renderer.isAnimating(bounds)) {
+    // consumeTerrainChanged() covers terrain that changes with no camera
+    // movement and no elevation animation to notice — 毒カビ's own growth.
+    const terrainChanged = simulation.consumeTerrainChanged();
+    if (!lastRedrawnBounds || !boundsEqual(bounds, lastRedrawnBounds) || renderer.isAnimating(bounds) || terrainChanged) {
       renderer.redraw(bounds);
       lastRedrawnBounds = bounds;
     }

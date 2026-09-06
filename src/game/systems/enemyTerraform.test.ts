@@ -5,10 +5,6 @@ import { FactionState, House, Owner, Position } from "../components";
 import { TERRAIN_EDIT_MANA_COST } from "../constants";
 import { createFaction } from "../faction";
 import { createEnemyTerraformSystem } from "./enemyTerraform";
-function blankCrevice(width: number, height: number): boolean[][] {
-  return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
-}
-
 function blankLayer(width: number, height: number): boolean[][] {
   return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
 }
@@ -17,7 +13,7 @@ function flatHeightmap(width: number, height: number, elevation: number): Height
   const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
   const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
   return { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
-      crevice: blankCrevice(width, height), waterLevel: 0 };
+      crevice: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), waterLevel: 0 };
 }
 
 function createHouse(world: World, faction: "player" | "enemy", x: number, y: number) {

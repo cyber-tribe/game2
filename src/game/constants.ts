@@ -433,3 +433,41 @@ export const ENEMY_PERSONALITY_LABELS: Record<EnemyPersonality, string> = {
   aggressive: "好戦的",
   defensive: "専守防衛",
 };
+
+/**
+ * How much faster a walker standing on a road moves — the original's 道,
+ * "上では信者の移動速度が上がる" (docs/original-miracles.md #11).
+ *
+ * Big enough to be worth a detour, small enough that a road is not a
+ * replacement for settling closer: at 1.6x, crossing ten tiles of pavement
+ * saves about the time it takes to walk four tiles of open ground.
+ */
+export const ROAD_SPEED_MULTIPLIER = 1.6;
+
+/**
+ * Mana cost of a road. Cheap, like the reef: its real value is the 毒カビ
+ * it stops, which means it has to be affordable *before* an outbreak makes
+ * it obviously necessary. A quarantine line the player can only pay for
+ * after the rot arrives is not a quarantine line.
+ */
+export const ROAD_MANA_COST = 8;
+
+/**
+ * Mana cost of one 毒カビ outbreak. Cheap on purpose, and the price is a
+ * design statement: the original's "複数設置すると大繁殖" only means
+ * anything if casting several in one place is a real option, so this is
+ * priced per seed rather than per acre of eventual rot.
+ */
+export const FUNGUS_MANA_COST = 14;
+
+/**
+ * Seconds between growth steps of every 毒カビ patch — see
+ * systems/fungus.ts and world/heightmap.ts's spreadFungus.
+ *
+ * A discrete generation clock, not a per-frame rate: the spread rule is a
+ * cellular automaton, so stepping it per frame would tie how fast the rot
+ * grows to how fast the machine draws. At 1.5s a patch left alone visibly
+ * creeps over the course of a match without ever outrunning a player who
+ * answers it.
+ */
+export const FUNGUS_GROWTH_INTERVAL = 1.5;

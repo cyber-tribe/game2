@@ -535,6 +535,48 @@ ICONS.update({
         "................",
         "................",
     ],
+    # 道: a paved way running toward the horizon. Perspective rather than a
+    # flat strip — at 16px a plain rectangle of stone reads as a wall, and
+    # the courses of laid stone are what say "road" rather than "floor".
+"road": [
+        "................",
+        "......oooo......",
+        "......osdo......",
+        "......osdo......",
+        "......osdo......",
+        ".....oddddo.....",
+        ".....odssso.....",
+        ".....odssso.....",
+        "....osdsssdo....",
+        "....oddddddo....",
+        "...osdssdssdo...",
+        "...osdssdssdo...",
+        "...osdssdssdo...",
+        "..oddddddddddo..",
+        "..osdsssdsssdo..",
+        ".ossdsssdsssdso.",
+    ],
+    # 毒カビ: toadstools with spores drifting off them. Purple (the mana
+    # tones) rather than the swamp's own murk, and a hard silhouette of caps
+    # and stems, so it never reads as "another swamp" in the panel.
+    "fungus": [
+        ".........m......",
+        ".m..............",
+        "..oMMMMMo..m....",
+        ".oMMMMMMMo...m..",
+        ".oMMMMMMMo......",
+        "ommmmmmmmmo...m.",
+        "ooooooooooo.....",
+        "...ossso..oMMMo.",
+        "...ossso.oMMMMMo",
+        "...ossso.ommmmmo",
+        "...ossso.ooooooo",
+        "...ossso...oso..",
+        "...ossso...oso..",
+        "...ooooo...ooo..",
+        "................",
+        "................",
+    ],
 })
 
 # Ordered so the atlas and the contact sheet both follow the panel's own
@@ -558,6 +600,8 @@ ICON_KINDS = (
     "fireRain",
     "volcano",
     "reef",
+    "road",
+    "fungus",
     "tsunami",
     "armageddon",
     "mana",
