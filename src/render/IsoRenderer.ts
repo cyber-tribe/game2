@@ -160,15 +160,21 @@ const WATER_COLOR = GAME_PALETTE.waterMid;
 const CREVICE_COLOR = 0x120e08;
 
 /**
- * A 城壁 (see Heightmap.wall). Bare cut stone — lighter than volcano rock
- * and quite unlike any terrain, because a wall is the one piece of ground
- * a player must be able to tell apart at a glance from ground: walking
- * into it is the difference between a plan working and not. Undithered
- * (like rock and crevices, see hasOwnColor) so it reads as masonry rather
- * than as one more kind of dirt; applyWall's own elevation bump is what
- * gives it a lit face and a shadowed one.
+ * A 城壁 (see Heightmap.wall). A cold grey, and the one terrain color here
+ * taken from outside GAME_PALETTE's own stone family on purpose: that
+ * family is the warm khaki this world is *made of* — soilLight (desert
+ * terrain) is 0x9f8c6d and stoneLight is 0xa1916f, four values apart
+ * across all three channels — so a wall painted in it disappears into
+ * desert ground entirely, which was exactly what the first build of this
+ * did. A wall is the one piece of the map a player has to recognize
+ * without looking twice: walking into it is the difference between a plan
+ * working and not. Cold grey reads as masonry against every terrain here
+ * (olive grass, khaki soil, dark volcanic stone) and stays clearly darker
+ * than the cold off-white of snow. Undithered like rock and crevices (see
+ * hasOwnColor); applyWall's own elevation bump gives it a lit face and a
+ * shadowed one.
  */
-const WALL_COLOR = GAME_PALETTE.stoneLight;
+const WALL_COLOR = 0x8d8f96;
 
 /**
  * A single flat solid color read as "のっぺり" (flat, lifeless) next to the
