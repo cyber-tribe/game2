@@ -26,12 +26,15 @@ export function createSwamp(
  * on top of an enemy's (or one's own) swamp reliably removes it instead
  * of just rearranging the terrain underneath it.
  */
-export function collapseSwampsNear(world: World, x: number, y: number, radius: number): void {
+export function collapseSwampsNear(world: World, x: number, y: number, radius: number): number {
+  let collapsed = 0;
   for (const entity of world.query(Position, Swamp)) {
     const pos = world.get(entity, Position)!;
     const swamp = world.get(entity, Swamp)!;
     if (distance(pos, { x, y }) <= radius + swamp.radius) {
       world.destroyEntity(entity);
+      collapsed++;
     }
   }
+  return collapsed;
 }

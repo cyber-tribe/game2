@@ -100,7 +100,7 @@
       },
       "trimmed": false
     },
-    "icon_forest": {
+    "icon_flower": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -120,7 +120,7 @@
       },
       "trimmed": false
     },
-    "icon_gather": {
+    "icon_forest": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -140,7 +140,7 @@
       },
       "trimmed": false
     },
-    "icon_goToShrine": {
+    "icon_gather": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -160,7 +160,7 @@
       },
       "trimmed": false
     },
-    "icon_guardian": {
+    "icon_goToShrine": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -180,7 +180,7 @@
       },
       "trimmed": false
     },
-    "icon_inspect": {
+    "icon_guardian": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -200,7 +200,7 @@
       },
       "trimmed": false
     },
-    "icon_knight": {
+    "icon_inspect": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -220,7 +220,7 @@
       },
       "trimmed": false
     },
-    "icon_lower": {
+    "icon_knight": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -240,7 +240,7 @@
       },
       "trimmed": false
     },
-    "icon_mana": {
+    "icon_lower": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -260,7 +260,7 @@
       },
       "trimmed": false
     },
-    "icon_population": {
+    "icon_mana": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -280,7 +280,7 @@
       },
       "trimmed": false
     },
-    "icon_raise": {
+    "icon_population": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -300,7 +300,7 @@
       },
       "trimmed": false
     },
-    "icon_reef": {
+    "icon_raise": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -320,7 +320,7 @@
       },
       "trimmed": false
     },
-    "icon_releasePopulation": {
+    "icon_reef": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -340,7 +340,7 @@
       },
       "trimmed": false
     },
-    "icon_settle": {
+    "icon_releasePopulation": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -360,7 +360,7 @@
       },
       "trimmed": false
     },
-    "icon_shrine": {
+    "icon_settle": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -380,7 +380,7 @@
       },
       "trimmed": false
     },
-    "icon_swamp": {
+    "icon_shrine": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -400,7 +400,7 @@
       },
       "trimmed": false
     },
-    "icon_tsunami": {
+    "icon_swamp": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -420,11 +420,31 @@
       },
       "trimmed": false
     },
-    "icon_volcano": {
+    "icon_tsunami": {
       "frame": {
         "h": 16,
         "w": 16,
         "x": 80,
+        "y": 16
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 16,
+        "w": 16
+      },
+      "spriteSourceSize": {
+        "h": 16,
+        "w": 16,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "icon_volcano": {
+      "frame": {
+        "h": 16,
+        "w": 16,
+        "x": 96,
         "y": 16
       },
       "rotated": false,

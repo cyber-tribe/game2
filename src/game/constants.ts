@@ -306,6 +306,14 @@ export const FOREST_GROWTH_MULTIPLIER = 1.5;
 /** Mana cost of planting a forest — cheap, since its payoff is slow and it can be turned against its owner. */
 export const FOREST_MANA_COST = 10;
 
+/**
+ * Mana cost of a flower. Cheap relative to what it undoes, deliberately:
+ * it repairs one small patch, while an earthquake tears a long fissure and
+ * a volcano buries a valley. Pricing it against the damage it can reverse
+ * would make repairing a ruined map impossible in practice.
+ */
+export const FLOWER_MANA_COST = 8;
+
 /** Mana cost of fire rain — mid-tier on its own, but a forest multiplies what it reaches. */
 export const FIRE_RAIN_MANA_COST = 25;
 

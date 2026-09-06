@@ -6,6 +6,7 @@ import {
   ENEMY_PERSONALITY_LABELS,
   REEF_MANA_COST,
   FIRE_RAIN_MANA_COST,
+  FLOWER_MANA_COST,
   FOREST_MANA_COST,
   TSUNAMI_MANA_COST,
   GUARDIAN_MANA_COST,
@@ -37,7 +38,7 @@ import { mountCommandIcons } from "./ui/commandIcons";
 import { loadCommandIcons } from "./ui/pixelIcons";
 import { StatusPanel } from "./ui/statusPanel";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
-import { DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyForest, applyReef, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
+import { DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyFlower, applyForest, DEFAULT_FLOWER_RADIUS, applyReef, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
 
 /**
  * The camera's fixed base scale — see layout()'s doc comment for why this
@@ -661,6 +662,26 @@ async function bootstrap(world: WorldDefinition) {
       return;
     }
 
+    if (toolMode === "flower") {
+      // Checked before spending: the flower only heals torn ground, and
+      // charging for a cast that finds nothing to heal reads as the game
+      // being broken. Swamps count, so they are checked too — they are ECS
+      // entities rather than terrain (see swamp.ts).
+      const healed = applyFlower(heightmap, vertex.x, vertex.y);
+      const clearedSwamps = collapseSwampsNear(simulation.world, vertex.x, vertex.y, DEFAULT_FLOWER_RADIUS);
+
+      if (healed.length === 0 && clearedSwamps === 0) {
+        showEntityInfo("ここには癒すものがありません", "warning");
+        return;
+      }
+      if (!trySpendPlayerMana(FLOWER_MANA_COST)) return;
+      renderer.redraw(visibleBounds());
+      simulation.recordEvent("player", "flower");
+      vibrate(20);
+      playMiracleSound("flower");
+      return;
+    }
+
     if (toolMode === "fireRain") {
       if (!trySpendPlayerMana(FIRE_RAIN_MANA_COST)) return;
       burnFire(simulation.world, applyFireRain(heightmap, vertex.x, vertex.y), (event) =>
@@ -1009,6 +1030,7 @@ async function bootstrap(world: WorldDefinition) {
     guardian: GUARDIAN_MANA_COST,
     volcano: VOLCANO_MANA_COST,
     forest: FOREST_MANA_COST,
+    flower: FLOWER_MANA_COST,
     fireRain: FIRE_RAIN_MANA_COST,
     reef: REEF_MANA_COST,
     tsunami: TSUNAMI_MANA_COST,

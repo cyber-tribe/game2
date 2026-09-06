@@ -186,6 +186,26 @@ ICONS: dict[str, list[str]] = {
         "....ooooo.......",
         "................",
     ],
+    # 花: a bloom opening. The only miracle that repairs, so it is the only
+    # icon built from a soft rounded shape rather than an edge or a blade.
+    "flower": [
+        "................",
+        "......oo........",
+        ".....obbo.......",
+        "..oo.obbo.oo....",
+        ".obbooBBoobbo...",
+        ".obbbBbbBbbbo...",
+        "..obBbbbbBbo....",
+        "...obbbbbbo.....",
+        "..obbbBBbbbo....",
+        ".obbboBBobbbo...",
+        ".obbo.oo.obbo...",
+        "..oo..gg..oo....",
+        "......ogo.......",
+        ".....gogog......",
+        "....ogo.ogo.....",
+        ".....o...o......",
+    ],
     # 火の雨: flame falling, over ground that is already alight.
     "fireRain": [
         "................",
@@ -555,6 +575,7 @@ ICON_KINDS = (
     "knight",
     "guardian",
     "forest",
+    "flower",
     "fireRain",
     "volcano",
     "reef",
