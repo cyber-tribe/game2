@@ -1,5 +1,5 @@
 import type { Entity, System, World } from "../../ecs";
-import { COMBAT_RANGE, HERO_ACTION_COOLDOWN, HOUSE_LEVELS } from "../constants";
+import { ADONIS_MIN_SPLIT_STRENGTH, ADONIS_SPLIT_GAP, COMBAT_RANGE, HERO_ACTION_COOLDOWN, HOUSE_LEVELS } from "../constants";
 import { HeroCooldown, House, Owner, Position, Walker, isAdvancingHeroState, type FactionId } from "../components";
 import type { OnImpactEffect } from "./effects";
 import { distance, type Point } from "./geometry";
@@ -56,10 +56,12 @@ function resolveWalkerFight(world: World, a: Entity, b: Entity, onImpact: OnImpa
     world.add(a, Walker, { ...walkerA, strength: walkerA.strength - walkerB.strength });
     world.destroyEntity(b);
     onImpact({ position: posB, type: "combatDeath" });
+    splitAdonis(world, a);
   } else if (walkerB.strength > walkerA.strength) {
     world.add(b, Walker, { ...walkerB, strength: walkerB.strength - walkerA.strength });
     world.destroyEntity(a);
     onImpact({ position: posA, type: "combatDeath" });
+    splitAdonis(world, b);
   } else {
     world.destroyEntity(a);
     world.destroyEntity(b);
@@ -150,4 +152,42 @@ export function createHouseCaptureSystem(config: Partial<HouseCaptureConfig> = {
       }
     }
   };
+}
+
+/**
+ * アドニス's own rule: 「戦闘に勝つと2体に分裂する（分裂後は体力が半分）」
+ * (docs/original-miracles.md #10). Called on the winner of a walker fight;
+ * a no-op for every other kind of walker.
+ *
+ * The copy is a full アドニス, so it splits again on its own next win —
+ * that runaway is the miracle, and what holds it in check is that every
+ * body is weaker than the last and each one that dies costs its faction
+ * HERO_DEATH_MANA_LOSS (see systems/heroLoss.ts). 「増やしすぎは英雄死亡
+ * 時のマナ損失というリスクを伴う」.
+ *
+ * The two halves are nudged apart along the x axis. Left exactly on top of
+ * each other they would read as one hero, and — worse — would be caught by
+ * the same swamp, the same crevice and the same gust for the rest of the
+ * match, which is the opposite of what splitting is for.
+ *
+ * A split below ADONIS_MIN_SPLIT_STRENGTH is skipped: halving forever
+ * produces an unbounded crowd of heroes too weak to beat anything, each
+ * still costing mana when it dies.
+ */
+function splitAdonis(world: World, winner: Entity): void {
+  const walker = world.get(winner, Walker)!;
+  if (walker.state !== "adonis") return;
+  if (walker.strength < ADONIS_MIN_SPLIT_STRENGTH) return;
+
+  const half = walker.strength / 2;
+  const pos = world.get(winner, Position)!;
+  const owner = world.get(winner, Owner)!;
+
+  world.add(winner, Walker, { ...walker, strength: half });
+  world.add(winner, Position, { x: pos.x - ADONIS_SPLIT_GAP / 2, y: pos.y });
+
+  const copy = world.createEntity();
+  world.add(copy, Position, { x: pos.x + ADONIS_SPLIT_GAP / 2, y: pos.y });
+  world.add(copy, Owner, { faction: owner.faction });
+  world.add(copy, Walker, { ...walker, strength: half });
 }

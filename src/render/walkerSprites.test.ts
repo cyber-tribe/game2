@@ -21,11 +21,13 @@ const POSES: WalkerPose[] = [
   "hercules",
   "odysseus",
   "achilles",
+  "adonis",
   "guardian",
   "leaderPerseus",
   "leaderHercules",
   "leaderOdysseus",
   "leaderAchilles",
+  "leaderAdonis",
   "leaderGuardian",
 ];
 const ACTIONS: WalkerAction[] = ["walk", "fight", "drown"];

@@ -39,11 +39,13 @@ export type WalkerPose =
   | "hercules"
   | "odysseus"
   | "achilles"
+  | "adonis"
   | "guardian"
   | "leaderPerseus"
   | "leaderHercules"
   | "leaderOdysseus"
   | "leaderAchilles"
+  | "leaderAdonis"
   | "leaderGuardian";
 
 export type { HeroKind };

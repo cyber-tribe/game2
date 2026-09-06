@@ -30,6 +30,11 @@ export interface Owner {
  *   walker faster.
  * - "achilles" — 「火が効かず焼死しない」. The counter to fire rain, and
  *   so to a forest turned against its owner (game/fire.ts).
+ * - "adonis" — 「戦闘に勝つと2体に分裂する（分裂後は体力が半分）。増やし
+ *   すぎは英雄死亡時のマナ損失というリスクを伴う」. The only hero whose
+ *   trait is a rule about *winning* rather than about surviving something
+ *   (systems/combat.ts), and the only one that can end up outnumbering the
+ *   army it came from.
  *
  * "guardian" is game2's own, not the original's — a defensive hero that
  * only engages threats near its own houses (see guardianTargetingSystem).
@@ -37,7 +42,7 @@ export interface Owner {
  * roster would be a loss, so it stays alongside them, like 平坦化 does
  * among the terrain tools.
  */
-export type HeroKind = "perseus" | "hercules" | "odysseus" | "achilles" | "guardian";
+export type HeroKind = "perseus" | "hercules" | "odysseus" | "achilles" | "adonis" | "guardian";
 
 /**
  * "seeking" and the hero kinds are driven by systems in this slice: the
@@ -50,7 +55,7 @@ export type HeroKind = "perseus" | "hercules" | "odysseus" | "achilles" | "guard
 export type WalkerState = "seeking" | "traveling" | "fighting" | HeroKind;
 
 /** Every HeroKind, in the order the toolbar lists them. */
-export const HERO_KINDS: readonly HeroKind[] = ["perseus", "hercules", "odysseus", "achilles", "guardian"];
+export const HERO_KINDS: readonly HeroKind[] = ["perseus", "hercules", "odysseus", "achilles", "adonis", "guardian"];
 
 /**
  * The attacking heroes: every kind that marches on the enemy and burns
@@ -60,7 +65,7 @@ export const HERO_KINDS: readonly HeroKind[] = ["perseus", "hercules", "odysseus
  * is a matter of deciding which list they join, not of discovering that
  * the negation quietly swept them up.
  */
-export const ADVANCING_HERO_KINDS: readonly HeroKind[] = ["perseus", "hercules", "odysseus", "achilles"];
+export const ADVANCING_HERO_KINDS: readonly HeroKind[] = ["perseus", "hercules", "odysseus", "achilles", "adonis"];
 
 /** Whether `state` is an attacking hero — see ADVANCING_HERO_KINDS. */
 export function isAdvancingHeroState(state: WalkerState): boolean {

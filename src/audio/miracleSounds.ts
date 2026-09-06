@@ -8,7 +8,7 @@
  * later — see main.ts's onEnemyAction, which already does this for the
  * screen-shake/toast but had no audio equivalent before this.
  */
-export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "holyWater" | "tornado" | "hurricane" | "volcano" | "perseus" | "hercules" | "odysseus" | "achilles" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "fungus";
+export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "holyWater" | "tornado" | "hurricane" | "volcano" | "perseus" | "hercules" | "odysseus" | "achilles" | "adonis" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "fungus";
 
 /** Every MiracleSoundType, for tests and any future UI that wants to list them. */
 export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
@@ -23,6 +23,7 @@ export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
   "hercules",
   "odysseus",
   "achilles",
+  "adonis",
   "guardian",
   "armageddon",
   "tsunami",
@@ -131,6 +132,14 @@ export const RECIPES: Record<MiracleSoundType, MiracleSoundRecipe> = {
     tones: [
       { waveform: "square", startFrequency: 900, endFrequency: 720, delay: 0, duration: 0.08, peakGain: 0.18 },
       { waveform: "square", startFrequency: 1180, endFrequency: 880, delay: 0.06, duration: 0.07, peakGain: 0.14 },
+    ],
+  },
+  // The same two notes struck twice over — the hero that becomes two.
+  adonis: {
+    tones: [
+      { waveform: "square", startFrequency: 660, endFrequency: 500, delay: 0, duration: 0.1, peakGain: 0.2 },
+      { waveform: "square", startFrequency: 660, endFrequency: 500, delay: 0.14, duration: 0.1, peakGain: 0.16 },
+      { waveform: "square", startFrequency: 880, endFrequency: 660, delay: 0.28, duration: 0.12, peakGain: 0.14 },
     ],
   },
   // The same two notes with a breath of fire under them.

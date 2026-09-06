@@ -451,6 +451,27 @@ ICONS.update({
         ".......odo......",
         ".......ooo......",
     ],
+    # アドニス: two crossed blades. Every other hero's icon is one weapon;
+    # this is the hero that becomes two, and the panel should say so before
+    # the first fight does.
+    "adonis": [
+        "................",
+        "..ooo......ooo..",
+        "..oSoo....ooSo..",
+        "..ooSoo..ooSoo..",
+        "...ooSooooSoo...",
+        "....ooSooSoo....",
+        ".....ooSSoo.....",
+        ".....ooSSoo.....",
+        "....ooSooSoo....",
+        "...ooSooooSoo...",
+        "...oSoo..ooSo...",
+        "...ooBo..oBoo...",
+        "...oBoo..ooBo...",
+        "...obo....obo...",
+        "...ooo....ooo...",
+        "................",
+    ],
     "guardian": [
         "................",
         "...oooooooo.....",
@@ -743,6 +764,7 @@ ICON_KINDS = (
     "hercules",
     "odysseus",
     "achilles",
+    "adonis",
     "guardian",
     "forest",
     "flower",

@@ -21,6 +21,7 @@ export type IconKind =
   | "hercules"
   | "odysseus"
   | "achilles"
+  | "adonis"
   | "guardian"
   | "volcano"
   | "forest"
