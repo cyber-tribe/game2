@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyTsunami, applyVolcano, isBuildable, isRock, type Heightmap } from "../world/heightmap";
 import { FactionState, House, Owner, Position, Swamp, Walker } from "./components";
-import { ARMAGEDDON_MANA_COST, HOUSE_LEVELS, MAX_MANA } from "./constants";
+import { ARMAGEDDON_MANA_COST, HOUSE_LEVELS, INITIAL_WALKER_SPREAD, MAX_MANA } from "./constants";
 import { drownFlood } from "./flood";
 import { Simulation } from "./simulation";
 import { createSwamp } from "./swamp";
@@ -808,5 +808,43 @@ describe("Simulation", () => {
     drownFlood(sim.world, heightmap);
 
     expect(sim.world.query(House).length).toBeGreaterThan(0);
+  });
+});
+
+describe("Simulation — the opening", () => {
+  /**
+   * The starting walkers used to share one exact position, and nothing
+   * makes an idle walker move: measured on the final world's rock terrain,
+   * a faction still occupied a single point at 40 seconds — three walkers,
+   * then three houses, all at identical coordinates. One area miracle of
+   * any size therefore erased a whole faction, which let an opening cast
+   * end a match outright (plan/0107).
+   */
+  it("does not start a faction's walkers all on the same spot", () => {
+    const sim = new Simulation({ worldWidth: 32, worldHeight: 32, initialWalkersPerFaction: 3 });
+
+    const positions = sim.world
+      .query(Position, Walker, Owner)
+      .filter((entity) => sim.world.get(entity, Owner)!.faction === "player")
+      .map((entity) => sim.world.get(entity, Position)!);
+
+    expect(positions).toHaveLength(3);
+    const unique = new Set(positions.map((p) => `${p.x.toFixed(3)},${p.y.toFixed(3)}`));
+    expect(unique.size).toBe(3);
+  });
+
+  it("keeps them close enough together to read as one settlement", () => {
+    const sim = new Simulation({ worldWidth: 32, worldHeight: 32, initialWalkersPerFaction: 3 });
+
+    const positions = sim.world
+      .query(Position, Walker, Owner)
+      .filter((entity) => sim.world.get(entity, Owner)!.faction === "player")
+      .map((entity) => sim.world.get(entity, Position)!);
+
+    for (const a of positions) {
+      for (const b of positions) {
+        expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeLessThanOrEqual(INITIAL_WALKER_SPREAD * 2 + 0.001);
+      }
+    }
   });
 });
