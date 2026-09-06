@@ -378,6 +378,16 @@ export function applyEarthquake(
 
 /** Radius (in vertices) and rock hardness of a default volcano. */
 export const DEFAULT_VOLCANO_RADIUS = 1;
+
+/**
+ * How many vertices of lava one eruption produces, beyond the cone itself.
+ *
+ * A budget rather than a radius: lava runs downhill and pools, so the same
+ * volume covers a long tongue down a valley or a wide puddle on a plain,
+ * which is the whole reason the flow is worth simulating instead of
+ * stamping another disc.
+ */
+export const DEFAULT_LAVA_VOLUME = 36;
 export const VOLCANO_ROCK_HARDNESS = 20;
 
 /** How far below MAX_ELEVATION (the crater rim) applyVolcano's own crater floor and outer slope sit — see its doc comment. */
@@ -409,9 +419,11 @@ export function applyVolcano(
   centerY: number,
   radius: number = DEFAULT_VOLCANO_RADIUS,
   hardness: number = VOLCANO_ROCK_HARDNESS,
-): void {
+  lavaVolume: number = DEFAULT_LAVA_VOLUME,
+): { x: number; y: number }[] {
   const cx = Math.round(centerX);
   const cy = Math.round(centerY);
+  const covered: { x: number; y: number }[] = [];
 
   for (let dy = -radius; dy <= radius; dy++) {
     const vy = cy + dy;
@@ -430,8 +442,96 @@ export function applyVolcano(
             : MAX_ELEVATION - VOLCANO_OUTER_DROP;
       heightmap.vertices[vy][vx] = elevation;
       heightmap.rockHardness[vy][vx] = hardness;
+      covered.push({ x: vx, y: vy });
     }
   }
+
+  covered.push(...flowLava(heightmap, cx, cy, radius, hardness, lavaVolume));
+  return covered;
+}
+
+/**
+ * Runs lava out of the crater and downhill until it runs out — the
+ * original's "火口から溶岩を流します。溶岩は土地を建築不能な状態へ変え、
+ * 水地形で止まります" (docs/original-miracles.md #24).
+ *
+ * Always takes the *lowest* vertex on its frontier next, which is what
+ * makes it run down valleys and pool in hollows rather than expand as a
+ * disc. The old volcano had no flow at all: it raised a cone, covered
+ * exactly that cone in rock, and stopped — so it denied a fixed patch of
+ * land regardless of what the land around it looked like.
+ *
+ * **Water stops it.** That is the interaction the miracle is played
+ * around: a channel or a lake is a firebreak, and higher ground is not —
+ * lava climbs nothing, but it will happily go around.
+ *
+ * Not implemented: the original also notes lava can push further out once
+ * the water it stopped against is filled in. That needs the flow to be a
+ * living thing that resumes later, rather than resolved at cast time, and
+ * is deliberately left for when there is a reason to build it.
+ */
+function flowLava(
+  heightmap: Heightmap,
+  centerX: number,
+  centerY: number,
+  radius: number,
+  hardness: number,
+  volume: number,
+): { x: number; y: number }[] {
+  const covered: { x: number; y: number }[] = [];
+  const key = (x: number, y: number) => y * (heightmap.width + 1) + x;
+  const seen = new Set<number>();
+  const frontier: { x: number; y: number }[] = [];
+
+  const consider = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x > heightmap.width || y > heightmap.height) return;
+    if (seen.has(key(x, y))) return;
+    seen.add(key(x, y));
+    // Water is where the flow ends: marked seen so it is never
+    // reconsidered, never taken, and never crossed.
+    if (heightmap.vertices[y][x] <= heightmap.waterLevel) return;
+    frontier.push({ x, y });
+  };
+
+  // Seed from the cone's own footprint, so lava leaves the mountain from
+  // every side rather than squeezing out of one vertex.
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      const x = centerX + dx;
+      const y = centerY + dy;
+      if (x < 0 || y < 0 || x > heightmap.width || y > heightmap.height) continue;
+      seen.add(key(x, y));
+      consider(x + 1, y);
+      consider(x - 1, y);
+      consider(x, y + 1);
+      consider(x, y - 1);
+    }
+  }
+
+  // One vertex at a time, always the lowest on the whole frontier — never
+  // a ring at a time. Expanding by rings looked equivalent but is not: with
+  // a modest volume the flow spent its whole budget on the first ring and
+  // never got anywhere, so lava could not run *down a valley*, which is the
+  // one thing this simulation exists to do.
+  for (let remaining = volume; remaining > 0 && frontier.length > 0; remaining--) {
+    let lowest = 0;
+    for (let i = 1; i < frontier.length; i++) {
+      if (heightmap.vertices[frontier[i].y][frontier[i].x] < heightmap.vertices[frontier[lowest].y][frontier[lowest].x]) {
+        lowest = i;
+      }
+    }
+    const { x, y } = frontier.splice(lowest, 1)[0];
+
+    heightmap.rockHardness[y][x] = hardness;
+    covered.push({ x, y });
+
+    consider(x + 1, y);
+    consider(x - 1, y);
+    consider(x, y + 1);
+    consider(x, y - 1);
+  }
+
+  return covered;
 }
 
 

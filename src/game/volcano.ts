@@ -2,35 +2,34 @@ import type { World } from "../ecs";
 import { House, Position, Walker } from "./components";
 
 /**
- * The land within `radius` of (x, y) is gone — buried under the new
- * peak — so any house or walker standing there is destroyed along with
- * it. Call this once, alongside `applyVolcano` on the heightmap, when a
- * volcano is cast; it isn't a per-tick system.
+ * Destroys every house and walker standing on ground the eruption covered
+ * — the cone itself and everything the lava reached. Call this once,
+ * alongside `applyVolcano` on the heightmap, passing the vertices that
+ * returned; it isn't a per-tick system.
  *
- * Uses the same square footprint as applyVolcano's vertex loop (Chebyshev
- * distance on the *rounded* vertex each position sits on, not a Euclidean
- * distance on raw coordinates) — matching how heightmap.ts's `isRock`
- * itself samples rockHardness by rounding to the nearest vertex. A
- * circular or unrounded check could mark a position's nearest vertex as
- * rock (via applyVolcano) without this function agreeing that the entity
- * standing there was destroyed, leaving a settled house on unbuildable
- * land.
+ * Takes the covered vertices rather than a centre and radius. It used to
+ * recompute a square footprint from the radius, which worked only while
+ * the eruption *was* that square. Lava runs downhill now
+ * (docs/original-miracles.md #24), so its footprint is a long irregular
+ * tongue that no radius describes — and a mismatch here is not cosmetic:
+ * it leaves a settled house sitting on unbuildable rock, or kills someone
+ * standing on clean ground.
+ *
+ * Positions are matched by their nearest vertex, the same rounding
+ * heightmap.ts's own `isRock` uses to sample rockHardness, so "this
+ * position reads as rock" and "this position was destroyed" cannot
+ * disagree.
  */
-export function eruptVolcano(world: World, x: number, y: number, radius: number): void {
-  const cx = Math.round(x);
-  const cy = Math.round(y);
-  const withinFootprint = (position: { x: number; y: number }) =>
-    Math.abs(Math.round(position.x) - cx) <= radius && Math.abs(Math.round(position.y) - cy) <= radius;
+export function eruptVolcano(world: World, covered: readonly { x: number; y: number }[]): void {
+  const buried = new Set(covered.map(({ x, y }) => `${x},${y}`));
+  const isBuried = (position: { x: number; y: number }) =>
+    buried.has(`${Math.round(position.x)},${Math.round(position.y)}`);
 
   for (const entity of world.query(Position, House)) {
-    if (withinFootprint(world.get(entity, Position)!)) {
-      world.destroyEntity(entity);
-    }
+    if (isBuried(world.get(entity, Position)!)) world.destroyEntity(entity);
   }
 
   for (const entity of world.query(Position, Walker)) {
-    if (withinFootprint(world.get(entity, Position)!)) {
-      world.destroyEntity(entity);
-    }
+    if (isBuried(world.get(entity, Position)!)) world.destroyEntity(entity);
   }
 }

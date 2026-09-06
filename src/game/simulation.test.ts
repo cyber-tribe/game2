@@ -628,10 +628,9 @@ describe("Simulation", () => {
     const [house] = sim.world.query(House, Position);
     const pos = sim.world.get(house, Position)!;
 
-    eruptVolcano(sim.world, pos.x, pos.y, 1);
-    expect(sim.world.isAlive(house)).toBe(false);
+    eruptVolcano(sim.world, applyVolcano(heightmap, pos.x, pos.y, 1));
 
-    applyVolcano(heightmap, pos.x, pos.y, 1);
+    expect(sim.world.isAlive(house)).toBe(false);
     expect(isBuildable(heightmap, pos.x, pos.y)).toBe(false);
     expect(isRock(heightmap, pos.x, pos.y)).toBe(true);
   });

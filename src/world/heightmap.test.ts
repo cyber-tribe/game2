@@ -463,7 +463,10 @@ describe("applyVolcano", () => {
   it("shapes a cone-with-crater within radius, and marks every affected vertex as rock", () => {
     const heightmap = flatHeightmap(10, 10, 3);
 
-    applyVolcano(heightmap, 5, 5, 1, 7);
+    // lavaVolume 0: the cone in isolation. The flow gets its own tests
+    // below, and letting it run here would bury the very vertices this one
+    // checks are untouched.
+    applyVolcano(heightmap, 5, 5, 1, 7, 0);
 
     // Rim (the 4 orthogonal neighbors, exactly `radius` out) is the peak.
     for (const [dy, dx] of [
@@ -497,10 +500,19 @@ describe("applyVolcano", () => {
     expect(heightmap.rockHardness[5][7]).toBe(0);
   });
 
+  it("returns every vertex it covered, so the ECS side can bury what stood there", () => {
+    const heightmap = flatHeightmap(10, 10, 3);
+
+    const covered = applyVolcano(heightmap, 5, 5, 1, 7, 0);
+
+    expect(covered).toHaveLength(9); // the 3x3 cone footprint
+    expect(covered).toContainEqual({ x: 5, y: 5 });
+  });
+
   it("makes the affected area unbuildable", () => {
     const heightmap = flatHeightmap(6, 6, 3);
 
-    applyVolcano(heightmap, 3, 3, 0);
+    applyVolcano(heightmap, 3, 3, 0, VOLCANO_ROCK_HARDNESS, 0);
 
     expect(isBuildable(heightmap, 3, 3)).toBe(false);
   });
@@ -508,14 +520,14 @@ describe("applyVolcano", () => {
   it("uses VOLCANO_ROCK_HARDNESS by default", () => {
     const heightmap = flatHeightmap(6, 6, 3);
 
-    applyVolcano(heightmap, 3, 3, 0);
+    applyVolcano(heightmap, 3, 3, 0, undefined, 0);
 
     expect(heightmap.rockHardness[3][3]).toBe(VOLCANO_ROCK_HARDNESS);
   });
 
   it("eventually clears once enough terrain edits chip the hardness away", () => {
     const heightmap = flatHeightmap(6, 6, 3);
-    applyVolcano(heightmap, 3, 3, 0, 2);
+    applyVolcano(heightmap, 3, 3, 0, 2, 0);
 
     raiseVertex(heightmap, 3, 3, -1);
     expect(isRock(heightmap, 3, 3)).toBe(true);
@@ -524,10 +536,59 @@ describe("applyVolcano", () => {
     expect(isRock(heightmap, 3, 3)).toBe(false);
   });
 
+  it("floods lava beyond the cone, covering far more ground than the cone itself", () => {
+    const heightmap = flatHeightmap(30, 30, 3);
+
+    const covered = applyVolcano(heightmap, 15, 15, 1, 7, 20);
+
+    expect(covered.length).toBe(9 + 20);
+    expect(covered.filter(({ x, y }) => Math.abs(x - 15) > 1 || Math.abs(y - 15) > 1).length).toBe(20);
+  });
+
+  /**
+   * The interaction the miracle is played around
+   * (docs/original-miracles.md #24): "溶岩は……水地形で止まります". A
+   * channel is a firebreak; high ground is not.
+   */
+  it("stops at water instead of crossing it", () => {
+    const heightmap = flatHeightmap(30, 30, 3);
+    // A moat two vertices thick, all the way around the volcano.
+    for (let y = 0; y <= 30; y++) {
+      for (let x = 0; x <= 30; x++) {
+        const ring = Math.max(Math.abs(x - 15), Math.abs(y - 15));
+        if (ring === 4 || ring === 5) heightmap.vertices[y][x] = MIN_ELEVATION;
+      }
+    }
+
+    applyVolcano(heightmap, 15, 15, 1, 7, 200);
+
+    expect(heightmap.rockHardness[15][21]).toBe(0); // beyond the moat
+    expect(heightmap.rockHardness[19][15]).toBe(0);
+  });
+
+  it("runs downhill, taking the low ground before the high", () => {
+    const heightmap = flatHeightmap(30, 30, 8);
+    // A valley running east from the volcano.
+    for (let x = 16; x <= 26; x++) heightmap.vertices[15][x] = 1;
+
+    applyVolcano(heightmap, 15, 15, 1, 7, 8);
+
+    expect(heightmap.rockHardness[15][22]).toBeGreaterThan(0); // down the valley
+    expect(heightmap.rockHardness[22][15]).toBe(0); // across the plateau
+  });
+
+  it("spends exactly its volume, no more", () => {
+    const heightmap = flatHeightmap(30, 30, 3);
+
+    const covered = applyVolcano(heightmap, 15, 15, 0, 7, 5);
+
+    expect(covered.length).toBe(1 + 5);
+  });
+
   it("does not touch vertices outside the map bounds", () => {
     const heightmap = flatHeightmap(4, 4, 3);
 
-    expect(() => applyVolcano(heightmap, 0, 0, 3)).not.toThrow();
+    expect(() => applyVolcano(heightmap, 0, 0, 3, undefined, 0)).not.toThrow();
     // (0, 0) is the volcano's own center, which — with a real rim to sit
     // below (radius >= 1) — is the crater floor, not the rim itself.
     expect(heightmap.vertices[0][0]).toBe(MAX_ELEVATION - VOLCANO_CRATER_DEPTH);
