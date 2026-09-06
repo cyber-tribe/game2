@@ -15,6 +15,13 @@ export interface FungusConfig {
   onImpact: OnImpactEffect;
   /** Called after a growth step that changed the map, so the caller can redraw. */
   onSpread: () => void;
+  /**
+   * The randomness spreadFungus draws on, injectable for the same reason
+   * applyEarthquake takes one: growth is genuinely stochastic, so a test
+   * that leaves it to Math.random is asserting on a coin flip. (One did,
+   * and duly failed in CI at exactly 25 vertices out of 25.)
+   */
+  rng: () => number;
 }
 
 /**
@@ -36,6 +43,7 @@ export function createFungusSystem(config: Partial<FungusConfig> = {}): System {
   const onImpact = config.onImpact ?? (() => {});
   const onSpread = config.onSpread ?? (() => {});
   const heightmap = config.heightmap;
+  const rng = config.rng ?? Math.random;
   let sinceGrowth = 0;
 
   return (world, deltaSeconds) => {
@@ -44,7 +52,7 @@ export function createFungusSystem(config: Partial<FungusConfig> = {}): System {
     sinceGrowth += deltaSeconds;
     if (sinceGrowth >= FUNGUS_GROWTH_INTERVAL) {
       sinceGrowth = 0;
-      const { grown, withered } = spreadFungus(heightmap);
+      const { grown, withered } = spreadFungus(heightmap, rng);
       if (grown.length > 0 || withered.length > 0) onSpread();
     }
 
