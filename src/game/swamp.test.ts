@@ -53,3 +53,25 @@ describe("collapseSwampsNear", () => {
     expect(world.isAlive(far)).toBe(true);
   });
 });
+
+describe("collapseSwampsNear's return value", () => {
+  /**
+   * Reported so a caster can tell whether the cast did anything. The
+   * flower (docs/original-miracles.md #7) repairs swamps as well as torn
+   * terrain, and refuses — without charging mana — when it finds neither.
+   */
+  it("counts the swamps it removed", () => {
+    const world = new World();
+    createSwamp(world, 5, 5);
+    createSwamp(world, 5.5, 5);
+
+    expect(collapseSwampsNear(world, 5, 5, 1)).toBe(2);
+  });
+
+  it("reports zero when nothing was in reach", () => {
+    const world = new World();
+    createSwamp(world, 30, 30);
+
+    expect(collapseSwampsNear(world, 5, 5, 1)).toBe(0);
+  });
+});
