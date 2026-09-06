@@ -978,9 +978,9 @@ describe("applyFungus", () => {
 describe("spreadFungus", () => {
   /**
    * Below every threshold: every reachable vertex is taken, and every
-   * under-supported vertex also withers. Tests that only care about where
-   * the rot can reach seed a solid 3x3 block, whose vertices all have at
-   * least FUNGUS_WITHER_NEIGHBORS neighbours and so never die back.
+   * vertex with any exposure at all also withers. Tests that only care
+   * about where the rot can reach seed a solid 3x3 block, so the front
+   * keeps advancing even while the old fringe dies back behind it.
    */
   const spreadsEverywhere = () => 0;
   /** At or above the spread threshold, below the wither one: nothing grows, the fringe dies. */
@@ -1046,6 +1046,21 @@ describe("spreadFungus", () => {
     spreadFungus(heightmap, alwaysWithers);
 
     expect(isFungus(heightmap, 10, 10)).toBe(true);
+  });
+
+  /**
+   * The die-back is graded by exposure rather than a threshold — a vertex
+   * walled in on all four sides is safe however unlucky the roll, which is
+   * what lets a dense outbreak persist while a thin one frays away.
+   */
+  it("never withers a vertex surrounded on all four sides, however bad the roll", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    for (let y = 9; y <= 11; y++) for (let x = 9; x <= 11; x++) heightmap.fungus[y][x] = true;
+
+    const { withered } = spreadFungus(heightmap, () => 0);
+
+    expect(withered).not.toContainEqual({ x: 10, y: 10 });
+    expect(withered.length).toBeGreaterThan(0);
   });
 
   /**

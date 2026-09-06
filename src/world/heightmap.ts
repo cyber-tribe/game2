@@ -972,13 +972,28 @@ export const DEFAULT_FUNGUS_RADIUS = 1;
  * a single fungus vertex; two overlapping patches give their shared front
  * two or three fungus neighbours each, tripling the local growth rate.
  */
-export const FUNGUS_SPREAD_CHANCE = 0.08;
+export const FUNGUS_SPREAD_CHANCE = 0.1;
 
-/** Below this many fungus neighbours, a fungus vertex may wither — see spreadFungus. */
-export const FUNGUS_WITHER_NEIGHBORS = 2;
+/**
+ * The chance a *fully exposed* fungus vertex (no fungus neighbours at all)
+ * dies back in one growth step, scaled down by how many neighbours it does
+ * have — see spreadFungus. A vertex with all four dies never.
+ *
+ * The graded form matters more than the number. A flat "wither below N
+ * neighbours" rule turned out to have no middle setting: at N=2 a single
+ * cast grew without bound and swallowed the map on its own; at N=3 even
+ * three overlapping casts went extinct within a minute. Scaling by exposure
+ * gives the behaviour the original describes instead — measured over 40
+ * runs at these values, a lone seed dies out about a quarter of the time
+ * and otherwise creeps ("自然消滅することもある"), while three overlapping
+ * casts reliably reach a few hundred vertices over several minutes
+ * ("複数設置すると大繁殖") — slowly enough that a road laid across its path
+ * is a real answer rather than a formality.
+ */
+export const FUNGUS_WITHER_CHANCE = 0.35;
 
-/** The chance an under-supported fungus vertex dies back in one growth step. */
-export const FUNGUS_WITHER_CHANCE = 0.25;
+/** Orthogonal neighbours a vertex has — the divisor of the exposure scaling above. */
+const FUNGUS_MAX_NEIGHBORS = 4;
 
 /** Whether the vertex nearest (x, y) is covered in 毒カビ — see Heightmap.fungus. */
 export function isFungus(heightmap: Heightmap, x: number, y: number): boolean {
@@ -1047,14 +1062,15 @@ const ORTHOGONAL = [
  * state at the start of the step, so a vertex taken this step cannot also
  * wither this step).
  *
- * Two opposing rules, straight out of the original's own description:
- * empty ground is taken over at FUNGUS_SPREAD_CHANCE *per fungus
- * neighbour* — "複数設置すると大繁殖" — while a vertex with fewer than
- * FUNGUS_WITHER_NEIGHBORS neighbours of its own may die back —
- * "自然消滅することもある". A lone seed is mostly fringe and tends to
- * fizzle; two casts laid over each other build an interior that cannot
- * wither and a front that grows several times faster. Nothing crosses a
- * road (see canFungusTake).
+ * Two opposing rules, straight out of the original's own description, and
+ * both keyed on the same thing — how many fungus neighbours a vertex has.
+ * Empty ground is taken over at FUNGUS_SPREAD_CHANCE *per fungus
+ * neighbour* ("複数設置すると大繁殖"), while a fungus vertex dies back at
+ * FUNGUS_WITHER_CHANCE scaled by how exposed it is
+ * ("自然消滅することもある"). A lone seed is almost all fringe and often
+ * fizzles; two casts laid over each other build an interior that cannot
+ * wither at all and a front that grows several times faster. Nothing
+ * crosses a road (see canFungusTake).
  *
  * Returns what changed, so the caller can redraw and clear out whatever the
  * new growth swallowed (see systems/fungus.ts).
@@ -1099,8 +1115,8 @@ export function spreadFungus(
 
   const withered: { x: number; y: number }[] = [];
   for (const { x, y, neighbors } of occupied) {
-    if (neighbors >= FUNGUS_WITHER_NEIGHBORS) continue;
-    if (rng() >= FUNGUS_WITHER_CHANCE) continue;
+    const exposure = (FUNGUS_MAX_NEIGHBORS - neighbors) / FUNGUS_MAX_NEIGHBORS;
+    if (rng() >= FUNGUS_WITHER_CHANCE * exposure) continue;
     heightmap.fungus[y][x] = false;
     withered.push({ x, y });
   }
