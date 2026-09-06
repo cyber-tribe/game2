@@ -68,6 +68,23 @@ export interface Heightmap {
    */
   fungus: boolean[][];
   /**
+   * Per-vertex: does a 城壁 stand here?
+   *
+   * The original's 城壁 (docs/original-miracles.md #12) is 「信者の進行を
+   * 遮る壁。英雄以外は越えられない」 — the only piece of terrain in this
+   * game whose whole purpose is to *not* be walked over. Every other layer
+   * changes what standing somewhere costs; this one changes where walking
+   * can go at all (see systems/movement.ts).
+   *
+   * A boolean rather than a height threshold even though applyWall also
+   * raises the ground it stands on: elevation is what a wall *looks* like,
+   * and steep ground has never stopped anyone in this game. Keeping the
+   * barrier as its own layer is also what lets a crevice or a lava flow
+   * cut a wall down (see tearCrevice/applyVolcano) by clearing one flag,
+   * without having to remember what the ground under it used to be.
+   */
+  wall: boolean[][];
+  /**
    * Current sea level — starts at MIN_ELEVATION and only ever rises, via
    * applyFlood. Anything at or below it is water, per docs/game-system.md's
    * 洪水, "海面を1段上昇させる".
@@ -131,7 +148,8 @@ export function createHeightmap(
   const scorched = Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
   const road = Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
   const fungus = Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
-  return { width, height, terrain, vertices, rockHardness, forest, crevice, scorched, road, fungus, waterLevel: MIN_ELEVATION };
+  const wall = Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
+  return { width, height, terrain, vertices, rockHardness, forest, crevice, scorched, road, fungus, wall, waterLevel: MIN_ELEVATION };
 }
 
 /**
@@ -297,7 +315,8 @@ export function isBuildable(heightmap: Heightmap, x: number, y: number): boolean
     !isRock(heightmap, x, y) &&
     !isCrevice(heightmap, x, y) &&
     !isFungus(heightmap, x, y) &&
-    !isScorched(heightmap, x, y)
+    !isScorched(heightmap, x, y) &&
+    !isWall(heightmap, x, y)
   );
 }
 
@@ -547,6 +566,11 @@ function tearCrevice(heightmap: Heightmap, x: number, y: number): void {
   if (x < 0 || y < 0 || x > heightmap.width || y > heightmap.height) return;
   heightmap.vertices[y][x] = MIN_ELEVATION;
   heightmap.crevice[y][x] = true;
+  // A fissure opening under a 城壁 takes the wall down with it — the ground
+  // it stood on is gone. This is the answer to a wall, and the reason one
+  // can be cast at all: 地震 has a direction (see applyEarthquake), so a
+  // wall is broken by aiming a crack *through* it, not by out-spending it.
+  heightmap.wall[y][x] = false;
 }
 
 export const DEFAULT_VOLCANO_RADIUS = 1;
@@ -614,6 +638,9 @@ export function applyVolcano(
             : MAX_ELEVATION - VOLCANO_OUTER_DROP;
       heightmap.vertices[vy][vx] = elevation;
       heightmap.rockHardness[vy][vx] = hardness;
+      // Nothing built survives being the side of a volcano — see wall's
+      // own doc comment on why a barrier has to be breakable at all.
+      heightmap.wall[vy][vx] = false;
       covered.push({ x: vx, y: vy });
     }
   }
@@ -695,6 +722,8 @@ function flowLava(
     const { x, y } = frontier.splice(lowest, 1)[0];
 
     heightmap.rockHardness[y][x] = hardness;
+    // Lava buries a 城壁 the same way the cone does.
+    heightmap.wall[y][x] = false;
     covered.push({ x, y });
 
     consider(x + 1, y);
@@ -1244,4 +1273,83 @@ export function spreadFungus(
   }
 
   return { grown, withered };
+}
+
+/**
+ * How far from its cast point one 城壁 cast raises stone, in vertices.
+ *
+ * One, deliberately — a cast is a *block* of wall (five vertices, a plus
+ * shape), not a finished rampart. The original places wall pieces and lets
+ * the player chain them into whatever line the ground needs, and a
+ * single-tap wall long enough to matter would have to guess a direction
+ * the player never gave it. Chaining also makes a wall's real cost its
+ * length, which is what turns "wall the enemy in" from an obvious move
+ * into an expensive one.
+ */
+export const DEFAULT_WALL_RADIUS = 1;
+
+/**
+ * How much a 城壁 raises the ground it stands on.
+ *
+ * Purely so it reads as a wall: the barrier itself is the `wall` flag (see
+ * Heightmap.wall), and nothing in this game has ever been stopped by steep
+ * ground. Three units is enough to throw a clear shaded face at this
+ * renderer's lighting (see IsoRenderer's mesh) without punching a spike
+ * through the skyline at MAX_ELEVATION.
+ */
+export const WALL_ELEVATION_RISE = 3;
+
+/** Whether the vertex nearest (x, y) is walled — see Heightmap.wall. */
+export function isWall(heightmap: Heightmap, x: number, y: number): boolean {
+  const vx = Math.round(x);
+  const vy = Math.round(y);
+  if (vx < 0 || vy < 0 || vx > heightmap.width || vy > heightmap.height) return false;
+  return heightmap.wall[vy][vx];
+}
+
+/**
+ * The original's 城壁 (docs/original-miracles.md #12): raises a block of
+ * stone that ordinary walkers cannot cross — 「信者の進行を遮る壁。英雄
+ * 以外は越えられない」. The crossing rule itself lives in
+ * systems/movement.ts, which is the only place that can act on it.
+ *
+ * Refused on water and on a crevice (nothing to stand on), on ground
+ * already walled, and — same rule as applyRoad — on 毒カビ: rot is not a
+ * foundation, and you raise a wall ahead of an outbreak rather than over
+ * it. Woodland is felled where the wall goes up; a forest is exactly the
+ * kind of thing masons clear.
+ *
+ * Returns the vertices raised, so a cast that would do nothing can be
+ * refused rather than silently charged for.
+ */
+export function applyWall(
+  heightmap: Heightmap,
+  centerX: number,
+  centerY: number,
+  radius: number = DEFAULT_WALL_RADIUS,
+): { x: number; y: number }[] {
+  const cx = Math.round(centerX);
+  const cy = Math.round(centerY);
+  const raised: { x: number; y: number }[] = [];
+
+  for (let dy = -radius; dy <= radius; dy++) {
+    const vy = cy + dy;
+    if (vy < 0 || vy > heightmap.height) continue;
+    for (let dx = -radius; dx <= radius; dx++) {
+      const vx = cx + dx;
+      if (vx < 0 || vx > heightmap.width) continue;
+      if (Math.hypot(dx, dy) > radius) continue;
+      if (heightmap.wall[vy][vx]) continue;
+      if (heightmap.crevice[vy][vx]) continue;
+      if (heightmap.fungus[vy][vx]) continue;
+      if (heightmap.vertices[vy][vx] <= heightmap.waterLevel) continue;
+
+      heightmap.wall[vy][vx] = true;
+      heightmap.forest[vy][vx] = false;
+      heightmap.vertices[vy][vx] = Math.min(MAX_ELEVATION, heightmap.vertices[vy][vx] + WALL_ELEVATION_RISE);
+      raised.push({ x: vx, y: vy });
+    }
+  }
+
+  return raised;
 }

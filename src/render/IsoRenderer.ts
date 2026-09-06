@@ -160,6 +160,23 @@ const WATER_COLOR = GAME_PALETTE.waterMid;
 const CREVICE_COLOR = 0x120e08;
 
 /**
+ * A 城壁 (see Heightmap.wall). A cold grey, and the one terrain color here
+ * taken from outside GAME_PALETTE's own stone family on purpose: that
+ * family is the warm khaki this world is *made of* — soilLight (desert
+ * terrain) is 0x9f8c6d and stoneLight is 0xa1916f, four values apart
+ * across all three channels — so a wall painted in it disappears into
+ * desert ground entirely, which was exactly what the first build of this
+ * did. A wall is the one piece of the map a player has to recognize
+ * without looking twice: walking into it is the difference between a plan
+ * working and not. Cold grey reads as masonry against every terrain here
+ * (olive grass, khaki soil, dark volcanic stone) and stays clearly darker
+ * than the cold off-white of snow. Undithered like rock and crevices (see
+ * hasOwnColor); applyWall's own elevation bump gives it a lit face and a
+ * shadowed one.
+ */
+const WALL_COLOR = 0x8d8f96;
+
+/**
  * A single flat solid color read as "のっぺり" (flat, lifeless) next to the
  * original game's turf, which dithers between two tones in a fine speckle
  * rather than one uniform fill — see createDitherTexture. Originally only
@@ -700,7 +717,7 @@ export class IsoRenderer {
    * initial full-map render before any camera/viewport exists yet.
    */
   redraw(bounds?: TileBounds): void {
-    const { width, height, rockHardness, forest, crevice, scorched, road, fungus, waterLevel, terrain } = this.heightmap;
+    const { width, height, rockHardness, forest, crevice, scorched, road, fungus, wall, waterLevel, terrain } = this.heightmap;
     const vertices = this.displayVertices;
     const graphics = this.graphics;
     graphics.clear();
@@ -762,6 +779,7 @@ export class IsoRenderer {
         const isWater = avgElevation <= waterLevel;
         const isRock = isRockTile[y - minY][x - minX];
         const isCreviceTile = crevice[y][x] || crevice[y][x + 1] || crevice[y + 1][x + 1] || crevice[y + 1][x];
+        const isWallTile = wall[y][x] || wall[y][x + 1] || wall[y + 1][x + 1] || wall[y + 1][x];
         // Woodland, paving and rot are all ordinary ground wearing a
         // different surface, so they lose to every kind of ground that is
         // *not* ordinary — a crevice torn through a forest is a hole, not
@@ -771,7 +789,7 @@ export class IsoRenderer {
         // seeing there is the 毒カビ.
         const anyCorner = (layer: boolean[][]) =>
           layer[y][x] || layer[y][x + 1] || layer[y + 1][x + 1] || layer[y + 1][x];
-        const isOrdinaryGround = !isCreviceTile && !isWater && !isRock;
+        const isOrdinaryGround = !isCreviceTile && !isWater && !isRock && !isWallTile;
         // Ash beats paving and canopy — both burned away when the pillar
         // crossed them — but loses to rot, which is the one that kills.
         const surface: GroundSurface = !isOrdinaryGround
@@ -785,15 +803,21 @@ export class IsoRenderer {
                 : anyCorner(forest)
                   ? "forest"
                   : "terrain";
+        // A wall loses only to the two things that destroy it (a crevice
+        // torn under it, a flood risen over it) and to the lava that buries
+        // it — everything below is ground it stands on rather than
+        // something that replaces it.
         const baseColor = isCreviceTile
           ? CREVICE_COLOR
           : isWater
             ? WATER_COLOR
             : isRock
               ? VOLCANO_ROCK_COLOR
-              : surface === "terrain"
-                ? TERRAIN_COLOR[terrain]
-                : SURFACE_COLOR[surface];
+              : isWallTile
+                ? WALL_COLOR
+                : surface === "terrain"
+                  ? TERRAIN_COLOR[terrain]
+                  : SURFACE_COLOR[surface];
 
         if (isWater && !isCreviceTile) {
           // Water always reads as a single flat, unshaded plane — never a
@@ -820,8 +844,9 @@ export class IsoRenderer {
           // 3 points are always planar, so each triangle (unlike the full
           // 4-corner quad, which can warp into a non-planar "saddle" when
           // all 4 corners differ) has one well-defined normal to shade by.
-          this.fillTerrainTriangle(graphics, a, b, c, baseColor, terrain, isRock || isCreviceTile, surface);
-          this.fillTerrainTriangle(graphics, a, c, d2, baseColor, terrain, isRock || isCreviceTile, surface);
+          const hasOwnColor = isRock || isCreviceTile || isWallTile;
+          this.fillTerrainTriangle(graphics, a, b, c, baseColor, terrain, hasOwnColor, surface);
+          this.fillTerrainTriangle(graphics, a, c, d2, baseColor, terrain, hasOwnColor, surface);
         }
 
         // The map's own outer edge always gets a genuine vertical wall

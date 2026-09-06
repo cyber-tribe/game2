@@ -15,6 +15,9 @@ import {
   applyForest,
   applyFungus,
   applyRoad,
+  applyWall,
+  isWall,
+  WALL_ELEVATION_RISE,
   spreadFungus,
   FUNGUS_SPREAD_CHANCE,
   FUNGUS_WITHER_CHANCE,
@@ -52,7 +55,7 @@ function flatHeightmap(
   const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
   const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
   return { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
-      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), waterLevel };
+      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), wall: blankLayer(width, height), waterLevel };
 }
 
 describe("createHeightmap", () => {
@@ -1005,6 +1008,88 @@ describe("applyRoad", () => {
     applyRoad(heightmap, 10, 10, 1);
 
     expect(applyRoad(heightmap, 10, 10, 1)).toEqual([]);
+  });
+});
+
+describe("applyWall", () => {
+  it("raises stone around the cast point", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    applyWall(heightmap, 10, 10, 1);
+
+    expect(isWall(heightmap, 10, 10)).toBe(true);
+    expect(isWall(heightmap, 11, 10)).toBe(true);
+    expect(isWall(heightmap, 12, 10)).toBe(false);
+  });
+
+  it("lifts the ground it stands on, so the wall reads as a wall", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    applyWall(heightmap, 10, 10, 0);
+
+    expect(heightmap.vertices[10][10]).toBe(5 + WALL_ELEVATION_RISE);
+  });
+
+  it("does not stand on water or on a crevice", () => {
+    const flooded = flatHeightmap(20, 20, MIN_ELEVATION);
+    const torn = flatHeightmap(20, 20, 5);
+    torn.crevice[10][10] = true;
+
+    expect(applyWall(flooded, 10, 10, 1)).toEqual([]);
+    expect(applyWall(torn, 10, 10, 0)).toEqual([]);
+  });
+
+  it("does not stand on 毒カビ — rot is not a foundation, same rule as a road", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    heightmap.fungus[10][10] = true;
+
+    expect(applyWall(heightmap, 10, 10, 0)).toEqual([]);
+  });
+
+  it("fells the woodland it goes up through", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyForest(heightmap, 10, 10, 1);
+
+    applyWall(heightmap, 10, 10, 0);
+
+    expect(isForest(heightmap, 10, 10)).toBe(false);
+  });
+
+  it("cannot be built on — a house needs open ground, not a rampart", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    applyWall(heightmap, 10, 10, 0);
+
+    expect(isBuildable(heightmap, 10, 10)).toBe(false);
+  });
+
+  it("reports nothing raised when it raises nothing, so the caller can refuse the cast", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyWall(heightmap, 10, 10, 1);
+
+    expect(applyWall(heightmap, 10, 10, 1)).toEqual([]);
+  });
+
+  /**
+   * The counter to a wall, and the reason one can be cast at all — see
+   * WALL_MANA_COST's own doc comment on the asymmetry.
+   */
+  it("is cut by a crevice torn through it", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyWall(heightmap, 10, 10, 1);
+
+    applyEarthquake(heightmap, 10, 10, 1, 0, 6, () => 0.5);
+
+    expect(isWall(heightmap, 11, 10)).toBe(false);
+  });
+
+  it("is buried by a volcano", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyWall(heightmap, 10, 10, 1);
+
+    applyVolcano(heightmap, 10, 10, 1, 20, 0);
+
+    expect(isWall(heightmap, 10, 10)).toBe(false);
   });
 });
 

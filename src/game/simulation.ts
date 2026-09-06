@@ -188,6 +188,7 @@ export type MatchEventType =
   | "tsunami"
   | "reef"
   | "road"
+  | "wall"
   | "fungus"
   | "houseCaptured"
   | "houseBurned"

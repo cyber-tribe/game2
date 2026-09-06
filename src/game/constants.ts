@@ -649,6 +649,18 @@ export const ROAD_SPEED_MULTIPLIER = 1.6;
 export const ROAD_MANA_COST = 8;
 
 /**
+ * Mana cost of one block of 城壁 (five vertices — see DEFAULT_WALL_RADIUS).
+ *
+ * Priced per block, so a wall long enough to shut a settlement in costs
+ * several times what breaking it does: 地震 is 20 and tears a crack ten
+ * vertices long straight through one (see tearCrevice). That asymmetry is
+ * deliberate and it is what keeps a wall from ending matches — walling an
+ * enemy in has to be a way of buying time, never a way of winning without
+ * fighting.
+ */
+export const WALL_MANA_COST = 12;
+
+/**
  * Mana cost of one 毒カビ outbreak. Cheap on purpose, and the price is a
  * design statement: the original's "複数設置すると大繁殖" only means
  * anything if casting several in one place is a real option, so this is

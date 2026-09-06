@@ -9,6 +9,7 @@ import {
   FLOWER_MANA_COST,
   FOREST_MANA_COST,
   ROAD_MANA_COST,
+  WALL_MANA_COST,
   FUNGUS_MANA_COST,
   TSUNAMI_MANA_COST,
   GUARDIAN_MANA_COST,
@@ -76,7 +77,7 @@ import { mountCommandIcons } from "./ui/commandIcons";
 import { loadCommandIcons } from "./ui/pixelIcons";
 import { StatusPanel } from "./ui/statusPanel";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
-import { DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyFlower, applyForest, applyFungus, DEFAULT_FLOWER_RADIUS, applyReef, applyRoad, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
+import { DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyFlower, applyForest, applyFungus, DEFAULT_FLOWER_RADIUS, applyReef, applyRoad, applyWall, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
 
 /**
  * The camera's fixed base scale — see layout()'s doc comment for why this
@@ -466,8 +467,8 @@ async function bootstrap(world: WorldDefinition) {
   /**
    * The same check without spending anything, for the miracles that have
    * to *apply themselves* to find out whether they did anything at all —
-   * applyForest/applyRoad/applyFungus each return the vertices they
-   * changed, and a cast that changes nothing is refused rather than
+   * applyForest/applyRoad/applyWall/applyFungus each return the vertices
+   * they changed, and a cast that changes nothing is refused rather than
    * charged for. Those have to ask before they act: mutating the terrain
    * and only then discovering the mana was short handed the player the
    * whole effect for free.
@@ -853,6 +854,23 @@ async function bootstrap(world: WorldDefinition) {
       return;
     }
 
+    if (toolMode === "wall") {
+      // Same order as the road: pay only once the stone actually goes up,
+      // and refuse the cast outright where a wall cannot stand (water, a
+      // crevice, 毒カビ, or ground already walled — see applyWall).
+      if (!canAffordPlayerMana(WALL_MANA_COST)) return;
+      if (applyWall(heightmap, vertex.x, vertex.y).length === 0) {
+        showEntityInfo("ここには城壁を築けません", "warning");
+        return;
+      }
+      trySpendPlayerMana(WALL_MANA_COST);
+      renderer.redraw(visibleBounds());
+      simulation.recordEvent("player", "wall");
+      vibrate(20);
+      playMiracleSound("wall");
+      return;
+    }
+
     if (toolMode === "fungus") {
       // Nothing takes root on water, rock, a crevice or a road.
       if (!canAffordPlayerMana(FUNGUS_MANA_COST)) return;
@@ -1220,6 +1238,7 @@ async function bootstrap(world: WorldDefinition) {
     forest: FOREST_MANA_COST,
     flower: FLOWER_MANA_COST,
     road: ROAD_MANA_COST,
+    wall: WALL_MANA_COST,
     fungus: FUNGUS_MANA_COST,
     fireRain: FIRE_RAIN_MANA_COST,
     reef: REEF_MANA_COST,

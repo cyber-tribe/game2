@@ -8,7 +8,7 @@
  * later — see main.ts's onEnemyAction, which already does this for the
  * screen-shake/toast but had no audio equivalent before this.
  */
-export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "holyWater" | "tornado" | "firePillar" | "lightning" | "storm" | "plague" | "hurricane" | "volcano" | "perseus" | "hercules" | "odysseus" | "achilles" | "adonis" | "helen" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "fungus";
+export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "holyWater" | "tornado" | "firePillar" | "lightning" | "storm" | "plague" | "hurricane" | "volcano" | "perseus" | "hercules" | "odysseus" | "achilles" | "adonis" | "helen" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "wall" | "fungus";
 
 /** Every MiracleSoundType, for tests and any future UI that wants to list them. */
 export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
@@ -37,6 +37,7 @@ export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
   "fireRain",
   "reef",
   "road",
+  "wall",
   "fungus",
 ];
 
@@ -238,6 +239,13 @@ export const RECIPES: Record<MiracleSoundType, MiracleSoundRecipe> = {
       { waveform: "square", startFrequency: 240, endFrequency: 240, delay: 0, duration: 0.08, peakGain: 0.1 },
       { waveform: "square", startFrequency: 240, endFrequency: 240, delay: 0.12, duration: 0.08, peakGain: 0.1 },
     ],
+  },
+  // Heavy stone dropped into place: one low thud with a short scrape of
+  // noise over it. Deliberately blunter and lower than the road's two even
+  // taps — that one is paving, this one is a block landing.
+  wall: {
+    tones: [{ waveform: "square", startFrequency: 130, endFrequency: 80, delay: 0, duration: 0.16, peakGain: 0.16 }],
+    noise: { delay: 0.02, duration: 0.18, peakGain: 0.12, filterFrequency: 1400 },
   },
   // A wet, sagging note under a dull hiss — something spreading, not
   // striking. Low-passed hard so it never sounds like the fire's crackle.

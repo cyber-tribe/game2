@@ -28,6 +28,7 @@ const ALL_KINDS: IconKind[] = [
   "volcano",
   "reef",
   "road",
+  "wall",
   "fungus",
   "tsunami",
   "armageddon",

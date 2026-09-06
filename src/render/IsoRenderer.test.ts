@@ -20,7 +20,7 @@ function flatHeightmap(width: number, height: number, elevation: number): Height
   const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
   const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
   return { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
-      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), waterLevel: 0 };
+      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), wall: blankLayer(width, height), waterLevel: 0 };
 }
 
 /**

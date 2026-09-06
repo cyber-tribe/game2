@@ -28,6 +28,7 @@ export type ToolMode =
   | "tsunami"
   | "reef"
   | "road"
+  | "wall"
   | "fungus"
   | "armageddon"
   | "inspect";

@@ -32,6 +32,7 @@ const MATCH_EVENT_TEMPLATE: Record<MatchEventType, string> = {
   fireRain: "{subject}が火の雨を降らせた",
   reef: "{subject}が岩礁を生み出した",
   road: "{subject}が道を敷いた",
+  wall: "{subject}が城壁を築いた",
   fungus: "{subject}が毒カビを撒いた",
   houseCaptured: "{subject}が{opponent}の家を奪った",
   houseBurned: "{subject}が{opponent}の家を焼き払った",

@@ -35,6 +35,7 @@ export type IconKind =
   | "tsunami"
   | "reef"
   | "road"
+  | "wall"
   | "fungus"
   | "armageddon"
   | "inspect"
