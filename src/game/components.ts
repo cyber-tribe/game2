@@ -167,6 +167,48 @@ export interface Swamp {
 }
 
 /**
+ * The original's 竜巻 (docs/original-miracles.md #17): 「一定時間ランダムに
+ * 移動し被害を与える。信者を巻き込んで運び体力を減らす。**水地形へ入ると
+ * 渦巻きへ変化する**」.
+ *
+ * The first hazard in game2 that *moves*. Every other one is a place —
+ * a swamp, a crevice, a patch of rot — and the player's decision about it
+ * is where to put it. A tornado's decision is where to aim it and then
+ * living with the fact that it wanders, which is a different kind of
+ * miracle and the reason both this and Whirlpool below are worth the
+ * machinery.
+ *
+ * `heading` is kept between ticks so the wander reads as a path rather
+ * than a jitter — see systems/tornado.ts.
+ */
+export interface Tornado {
+  /** Seconds of life left; the tornado is removed at zero. */
+  remaining: number;
+  headingX: number;
+  headingY: number;
+}
+
+/**
+ * The original's 渦巻き (docs/original-miracles.md #26): 「海上を移動しながら
+ * 陸地を削って水へ戻す。一定時間で分裂して被害範囲が広がる」.
+ *
+ * Only ever born from a Tornado that reached water (the original's own
+ * 竜巻 → 渦巻き, "属性をまたぐ連鎖") — there is no 渦巻き miracle of its
+ * own here, because casting one directly would throw away the interaction
+ * that is the whole reason it exists.
+ */
+export interface Whirlpool {
+  /** Seconds of life left; the whirlpool is removed at zero. */
+  remaining: number;
+  /** Seconds until it splits in two; splitting is what makes it spread. */
+  untilSplit: number;
+  /** How many more times this whirlpool (and its children) may split. */
+  splitsLeft: number;
+  headingX: number;
+  headingY: number;
+}
+
+/**
  * The original's 聖水の泉 (docs/original-miracles.md #27): 「落ちた信者が
  * 敵側へ寝返る。英雄まで寝返る可能性があり、強い英雄を奪えば形勢逆転できる。
  * 再度落ちると元へ戻る場合もある」.
@@ -207,5 +249,7 @@ export const House = defineComponent<House>("House");
 export const FactionState = defineComponent<FactionState>("FactionState");
 export const Swamp = defineComponent<Swamp>("Swamp");
 export const HolyWater = defineComponent<HolyWater>("HolyWater");
+export const Tornado = defineComponent<Tornado>("Tornado");
+export const Whirlpool = defineComponent<Whirlpool>("Whirlpool");
 export const HeroCooldown = defineComponent<HeroCooldown>("HeroCooldown");
 export const Drowning = defineComponent<Drowning>("Drowning");

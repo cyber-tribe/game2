@@ -9,6 +9,7 @@ const ALL_KINDS: IconKind[] = [
   "earthquake",
   "swamp",
   "holyWater",
+  "tornado",
   "perseus",
   "hercules",
   "odysseus",

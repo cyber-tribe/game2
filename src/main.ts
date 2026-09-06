@@ -20,6 +20,7 @@ import {
   SHRINE_MOVE_MANA_COST,
   SWAMP_MANA_COST,
   HOLY_WATER_MANA_COST,
+  TORNADO_MANA_COST,
   TERRAIN_EDIT_MANA_COST,
   TERRAIN_EDIT_RULE_LABELS,
   TERRAIN_LABELS,
@@ -45,6 +46,7 @@ const HERO_MANA_COST: Record<HeroKind, number> = {
   guardian: GUARDIAN_MANA_COST,
 };
 import { createHolyWater } from "./game/holyWater";
+import { createTornado } from "./game/tornado";
 import { collapseSwampsNear, createSwamp } from "./game/swamp";
 import { burnFire } from "./game/fire";
 import { eruptVolcano } from "./game/volcano";
@@ -695,6 +697,21 @@ async function bootstrap(world: WorldDefinition) {
       return;
     }
 
+    if (toolMode === "tornado") {
+      if (!trySpendPlayerMana(TORNADO_MANA_COST)) return;
+      // Aimed away from the caster's own shrine, exactly like an
+      // earthquake's fissure: a tap carries no second axis to point with,
+      // and "from where I am, through where I struck" gives one for free —
+      // and never sets a wandering hazard off toward your own people.
+      const from = simulation.getShrinePosition("player") ?? vertex;
+      createTornado(simulation.world, vertex.x, vertex.y, vertex.x - from.x, vertex.y - from.y);
+      simulation.recordEvent("player", "tornado");
+      triggerShake(4);
+      vibrate([20, 20, 20]);
+      playMiracleSound("tornado");
+      return;
+    }
+
     if (toolMode === "forest") {
       // Affordability first, then whether it would do anything: a forest
       // only takes on buildable land, and charging for a cast that plants
@@ -1110,6 +1127,7 @@ async function bootstrap(world: WorldDefinition) {
     earthquake: EARTHQUAKE_MANA_COST,
     swamp: SWAMP_MANA_COST,
     holyWater: HOLY_WATER_MANA_COST,
+    tornado: TORNADO_MANA_COST,
     ...HERO_MANA_COST,
     volcano: VOLCANO_MANA_COST,
     forest: FOREST_MANA_COST,

@@ -1,5 +1,5 @@
 import { Container, Graphics, Sprite } from "pixi.js";
-import { Drowning, FactionState, HolyWater, House, MoveTarget, Owner, Position, Swamp, Walker, isHeroState, type FactionId, type HeroKind } from "../game/components";
+import { Drowning, FactionState, HolyWater, House, MoveTarget, Owner, Position, Swamp, Tornado, Walker, Whirlpool, isHeroState, type FactionId, type HeroKind } from "../game/components";
 import type { Entity, World } from "../ecs";
 import { FARMLAND_RADIUS, IMPACT_EFFECT_DURATION } from "../game/constants";
 import { distance, type Point } from "../game/systems/geometry";
@@ -105,6 +105,31 @@ const HOLY_WATER_FILL = {
   textureSpace: "global" as const,
 };
 const HOLY_WATER_RIM_WIDTH = 2;
+/**
+ * 竜巻 and 渦巻き (see the Tornado/Whirlpool components) are the only
+ * hazards on the map that move, so unlike the swamp or the spring they are
+ * drawn as *objects standing on* the ground rather than as ground. Both are
+ * built from stacked ellipses whose horizontal offset is driven by
+ * elapsedTime: at this scale a spin reads as a wobble, and a wobble is what
+ * says "this is still happening" from across the map.
+ */
+const TORNADO_COLOR = 0x9a927f;
+const TORNADO_SHADE_COLOR = 0x2e2a22;
+const TORNADO_DUST_COLOR = 0xd8cfb4;
+/**
+ * Screen px the funnel rises above the ground it stands on. Tall — nearly
+ * three walkers — because a moving hazard is only avoidable if it can be
+ * seen coming, and the first version, at the height of a house, read as a
+ * puff of smoke against this terrain.
+ */
+const TORNADO_HEIGHT = 48;
+const TORNADO_BANDS = 8;
+/** Rotations per second of the funnel's wobble — fast enough to read as violent, slow enough not to strobe. */
+const TORNADO_SPIN = 1.4;
+const WHIRLPOOL_COLOR = 0x0b4f66;
+const WHIRLPOOL_FOAM_COLOR = 0xa8d8e8;
+const WHIRLPOOL_RINGS = 3;
+const WHIRLPOOL_SPIN = 0.9;
 const SWAMP_HOLE_COLOR = 0x0d070d;
 const SWAMP_BUBBLE_COLOR = 0x6a8f5a;
 /** Seconds per bubble on/off half-cycle — slow enough to read as "still water occasionally bubbling", not a strobe. */
@@ -212,7 +237,7 @@ export function impactEffectVisual(
   };
 }
 
-/** Draws every Swamp/HolyWater/Walker/House in the ECS world onto the isometric map. */
+/** Draws every Swamp/HolyWater/Tornado/Whirlpool/Walker/House in the ECS world onto the isometric map. */
 export class EntityLayer {
   readonly view = new Container();
   /** Farmland, swamp and houses — everything drawn *under* the walkers. */
@@ -371,6 +396,44 @@ export class EntityLayer {
         g.poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy])
           .fill(HOLY_WATER_FILL)
           .stroke({ width: HOLY_WATER_RIM_WIDTH, color: FACTION_COLOR[faction], alpha: 0.9 });
+      }
+    }
+
+    // 渦巻き first, then 竜巻: one is a hole in the sea and the other a
+    // column standing above the ground, so they layer that way.
+    for (const entity of world.query(Position, Whirlpool)) {
+      const pos = world.get(entity, Position)!;
+      const { sx, sy } = this.iso.project(pos.x, pos.y);
+      const spin = this.elapsedTime * WHIRLPOOL_SPIN * Math.PI * 2;
+
+      for (let ring = WHIRLPOOL_RINGS; ring >= 1; ring--) {
+        const scale = ring / WHIRLPOOL_RINGS;
+        const wobble = Math.cos(spin + ring) * 3 * scale;
+        g.ellipse(sx + wobble, sy, 22 * scale, 11 * scale)
+          .fill({ color: WHIRLPOOL_COLOR, alpha: 0.35 + 0.2 * (1 - scale) })
+          .stroke({ width: 1, color: WHIRLPOOL_FOAM_COLOR, alpha: 0.5 * scale });
+      }
+    }
+
+    for (const entity of world.query(Position, Tornado)) {
+      const pos = world.get(entity, Position)!;
+      const { sx, sy } = this.iso.project(pos.x, pos.y);
+      const spin = this.elapsedTime * TORNADO_SPIN * Math.PI * 2;
+
+      // A ring of kicked-up dust at the foot, so the funnel is anchored to
+      // a spot on the ground rather than floating over it.
+      g.ellipse(sx, sy, 13, 6).fill({ color: TORNADO_DUST_COLOR, alpha: 0.3 });
+
+      for (let band = 0; band < TORNADO_BANDS; band++) {
+        // 0 at the ground, 1 at the top — the funnel widens as it rises.
+        const t = band / (TORNADO_BANDS - 1);
+        const radius = 2.5 + t * t * 15;
+        const wobble = Math.sin(spin + band * 0.8) * (1.5 + t * 5);
+        // Dark core, pale edge: on this terrain a mid-tan funnel
+        // disappeared into the ground it was standing on.
+        g.ellipse(sx + wobble, sy - TORNADO_HEIGHT * t, radius, radius * 0.45)
+          .fill({ color: band % 2 === 0 ? TORNADO_SHADE_COLOR : TORNADO_COLOR, alpha: 0.85 })
+          .stroke({ width: 1, color: TORNADO_DUST_COLOR, alpha: 0.35 });
       }
     }
 
