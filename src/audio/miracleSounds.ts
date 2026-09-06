@@ -8,7 +8,7 @@
  * later — see main.ts's onEnemyAction, which already does this for the
  * screen-shake/toast but had no audio equivalent before this.
  */
-export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "volcano" | "knight" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "fungus";
+export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "volcano" | "perseus" | "hercules" | "odysseus" | "achilles" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "fungus";
 
 /** Every MiracleSoundType, for tests and any future UI that wants to list them. */
 export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
@@ -16,7 +16,10 @@ export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
   "earthquake",
   "swamp",
   "volcano",
-  "knight",
+  "perseus",
+  "hercules",
+  "odysseus",
+  "achilles",
   "guardian",
   "armageddon",
   "tsunami",
@@ -76,11 +79,39 @@ export const RECIPES: Record<MiracleSoundType, MiracleSoundRecipe> = {
     tones: [{ waveform: "sine", startFrequency: 80, endFrequency: 35, delay: 0, duration: 0.6, peakGain: 0.3 }],
     noise: { delay: 0, duration: 0.5, peakGain: 0.3, filterFrequency: 800 },
   },
-  knight: {
+  // The four attacking heroes share one shape — two bright struck notes,
+  // "a blade drawn" — and differ only in pitch and weight, because they
+  // are one action heard five times a match. A player has to be able to
+  // tell "the enemy promoted" from "the enemy erupted a volcano" instantly;
+  // telling ヘラクレス from アキレス by ear can wait for the toast that
+  // names it.
+  perseus: {
     tones: [
       { waveform: "square", startFrequency: 700, endFrequency: 500, delay: 0, duration: 0.12, peakGain: 0.22 },
       { waveform: "square", startFrequency: 900, endFrequency: 600, delay: 0.08, duration: 0.1, peakGain: 0.15 },
     ],
+  },
+  // Lower and heavier: the strongest hero.
+  hercules: {
+    tones: [
+      { waveform: "square", startFrequency: 420, endFrequency: 300, delay: 0, duration: 0.16, peakGain: 0.24 },
+      { waveform: "square", startFrequency: 560, endFrequency: 360, delay: 0.1, duration: 0.14, peakGain: 0.18 },
+    ],
+  },
+  // Higher and quicker: the fast one.
+  odysseus: {
+    tones: [
+      { waveform: "square", startFrequency: 900, endFrequency: 720, delay: 0, duration: 0.08, peakGain: 0.18 },
+      { waveform: "square", startFrequency: 1180, endFrequency: 880, delay: 0.06, duration: 0.07, peakGain: 0.14 },
+    ],
+  },
+  // The same two notes with a breath of fire under them.
+  achilles: {
+    tones: [
+      { waveform: "square", startFrequency: 700, endFrequency: 520, delay: 0, duration: 0.12, peakGain: 0.2 },
+      { waveform: "square", startFrequency: 940, endFrequency: 640, delay: 0.08, duration: 0.1, peakGain: 0.15 },
+    ],
+    noise: { delay: 0.04, duration: 0.3, peakGain: 0.12, filterFrequency: 2600 },
   },
   // A low, steady triangle tone plus a short thud — a "shield raised"
   // sound, deliberately calmer than knight's sharp rising-square "clang"

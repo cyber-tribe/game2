@@ -60,7 +60,7 @@ describe("swampSystem", () => {
   it("drowns a knight in a swamp just like any other walker", () => {
     const world = new World();
     const swamp = createSwamp(world, 5, 5, 1, 3);
-    const knight = createWalker(world, 5, 5, "knight");
+    const knight = createWalker(world, 5, 5, "perseus");
 
     createSwampSystem()(world, 0);
 
@@ -93,7 +93,7 @@ describe("swampSystem", () => {
   it("reports a drowned impact for a knight caught in a swamp too", () => {
     const world = new World();
     createSwamp(world, 5, 5, 1, 3);
-    createWalker(world, 5, 5, "knight");
+    createWalker(world, 5, 5, "perseus");
 
     const impacts: ImpactEffectEvent[] = [];
     createSwampSystem({ onImpact: (event) => impacts.push(event) })(world, 0);

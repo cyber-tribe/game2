@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { FactionId } from "../game/components";
+import { HERO_KINDS, type FactionId } from "../game/components";
 import {
   ATLAS_FRAME_KEYS,
   WALK_FRAMES,
@@ -14,7 +14,20 @@ import {
 
 const FACTIONS: FactionId[] = ["player", "enemy"];
 const FACINGS: Facing[] = ["NE", "NW", "SE", "SW"];
-const POSES: WalkerPose[] = ["plain", "leader", "knight", "guardian", "leaderKnight", "leaderGuardian"];
+const POSES: WalkerPose[] = [
+  "plain",
+  "leader",
+  "perseus",
+  "hercules",
+  "odysseus",
+  "achilles",
+  "guardian",
+  "leaderPerseus",
+  "leaderHercules",
+  "leaderOdysseus",
+  "leaderAchilles",
+  "leaderGuardian",
+];
 const ACTIONS: WalkerAction[] = ["walk", "fight", "drown"];
 const FRAMES = Array.from({ length: WALK_FRAMES }, (_, i) => i);
 
@@ -25,19 +38,19 @@ describe("walkerPose", () => {
   });
 
   it("maps each hero kind", () => {
-    expect(walkerPose(false, "knight")).toBe("knight");
-    expect(walkerPose(false, "guardian")).toBe("guardian");
+    for (const kind of HERO_KINDS) expect(walkerPose(false, kind)).toBe(kind);
   });
 
   it("keeps leader and hero independent — a promoted leader gets both marks", () => {
-    expect(walkerPose(true, "knight")).toBe("leaderKnight");
+    expect(walkerPose(true, "perseus")).toBe("leaderPerseus");
+    expect(walkerPose(true, "hercules")).toBe("leaderHercules");
     expect(walkerPose(true, "guardian")).toBe("leaderGuardian");
   });
 
   it("covers every pose the atlas carries, with nothing left over", () => {
     const reachable = new Set<WalkerPose>();
     for (const isLeader of [false, true]) {
-      for (const hero of [undefined, "knight", "guardian"] as (HeroKind | undefined)[]) {
+      for (const hero of [undefined, ...HERO_KINDS] as (HeroKind | undefined)[]) {
         reachable.add(walkerPose(isLeader, hero));
       }
     }
@@ -109,14 +122,14 @@ describe("walkerAction", () => {
   });
 
   it("keeps heroes on the walking art — their gear is what marks them, not their gait", () => {
-    expect(walkerAction("knight", false)).toBe("walk");
+    expect(walkerAction("perseus", false)).toBe("walk");
     expect(walkerAction("guardian", false)).toBe("walk");
   });
 
   it("lets drowning win over every other state, fighting included", () => {
     // A walker going under has stopped being a combatant, and that is the
     // more urgent thing for the player to see.
-    for (const state of ["seeking", "traveling", "fighting", "knight", "guardian"] as const) {
+    for (const state of ["seeking", "traveling", "fighting", "perseus", "guardian"] as const) {
       expect(walkerAction(state, true)).toBe("drown");
     }
   });

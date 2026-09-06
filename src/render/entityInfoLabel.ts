@@ -7,7 +7,10 @@ const WALKER_STATE_LABELS: Record<WalkerState, string> = {
   seeking: "定住地を探索中",
   traveling: "移動中",
   fighting: "交戦中",
-  knight: "騎士化済み",
+  perseus: "ペルセウス",
+  hercules: "ヘラクレス",
+  odysseus: "オディッセウス",
+  achilles: "アキレス",
   guardian: "守護者化済み",
 };
 

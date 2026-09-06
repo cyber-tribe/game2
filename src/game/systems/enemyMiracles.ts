@@ -14,13 +14,13 @@ import {
   EARTHQUAKE_MANA_COST,
   ENEMY_PERSONALITY_TUNING,
   GUARDIAN_MANA_COST,
-  KNIGHT_MANA_COST,
+  PERSEUS_MANA_COST,
   MIN_ARMAGEDDON_TIME,
   VOLCANO_MANA_COST,
   VOLCANO_POPULATION_RATIO,
 } from "../constants";
 import { findFactionEntity, trySpendMana } from "../faction";
-import { guardianify, knightify } from "../hero";
+import { promoteHero } from "../hero";
 import { totalPopulation } from "../population";
 import { collapseSwampsNear } from "../swamp";
 import { eruptVolcano } from "../volcano";
@@ -37,7 +37,7 @@ import { distance, type Point } from "./geometry";
 export type EnemyMiracleEvent =
   | { type: "earthquake"; position: Point }
   | { type: "volcano"; position: Point }
-  | { type: "knight" }
+  | { type: "perseus" }
   | { type: "guardian" }
   | { type: "armageddon" };
 
@@ -90,7 +90,7 @@ export interface EnemyMiracleConfig {
  *    (a real, measurable deficit — see preferredHeroKind below) picks
  *    guardian, so a losing enemy digs in and defends its own houses
  *    instead of marching its one hero off the map; otherwise (ahead, even,
- *    or too early to tell) picks knight, the unconditional attacker.
+ *    or too early to tell) picks ペルセウス, the unconditional attacker.
  * 3. A real but not-yet-decisive population lead (VOLCANO_POPULATION_
  *    RATIO or more) → escalate to a volcano, permanently denying the
  *    opponent's most valuable target rather than just disrupting it.
@@ -114,7 +114,7 @@ export interface EnemyMiracleConfig {
  * through to a cheaper one (or does nothing) rather than acting for
  * free — and a branch this world's allowedMiracles hasn't unlocked
  * falls through the exact same way, so an early world that's only
- * unlocked earthquake never sees the enemy volcano/knight/armageddon
+ * unlocked earthquake never sees the enemy volcano/ペルセウス/armageddon
  * it either. Skips everything once finalBattle is set, same as
  * createEnemyAiSystem.
  *
@@ -173,13 +173,18 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
       // population recorded yet", which populationRatio also reads as 0)
       // means the enemy is actually losing — dig in with a guardian rather
       // than sending its one hero off to hunt while its own houses burn.
-      const preferredHeroKind = theirPopulation > 0 && populationRatio < 1 + tuning.heroPreferenceBias ? "guardian" : "knight";
-      const heroCost = preferredHeroKind === "guardian" ? GUARDIAN_MANA_COST : KNIGHT_MANA_COST;
+      // ペルセウス, not one of the three specialists: the enemy god plays
+      // by recognizable rules ("行動パターン自体は比較的予測可能"), and
+      // picking ヘラクレス or アキレス well means reading the map for
+      // crevices or forests — a genuinely different AI, and a difficulty
+      // change, which belongs in its own measured change rather than
+      // riding along with the heroes existing at all.
+      const preferredHeroKind = theirPopulation > 0 && populationRatio < 1 + tuning.heroPreferenceBias ? "guardian" : "perseus";
+      const heroCost = preferredHeroKind === "guardian" ? GUARDIAN_MANA_COST : PERSEUS_MANA_COST;
       const leader = world.get(state.leaderId, Walker);
 
       if (allowedMiracles.includes(preferredHeroKind) && leader && leader.state !== preferredHeroKind && trySpendMana(world, factionId, heroCost)) {
-        if (preferredHeroKind === "guardian") guardianify(world, factionId);
-        else knightify(world, factionId);
+        promoteHero(world, factionId, preferredHeroKind);
         onAction({ type: preferredHeroKind });
         return;
       }

@@ -29,6 +29,12 @@ export function burnFire(
   }
 
   for (const entity of world.query(Position, Walker)) {
+    // アキレス 「火が効かず焼死しない」 (docs/original-miracles.md #23) —
+    // the other half of fire rain, and the reason a hero is worth casting
+    // *before* an enemy answers your forest with a torch. Houses have no
+    // such exemption: the hero survives, what they were defending does not.
+    if (world.get(entity, Walker)!.state === "achilles") continue;
+
     const pos = world.get(entity, Position)!;
     if (!isScorched(pos)) continue;
     world.destroyEntity(entity);

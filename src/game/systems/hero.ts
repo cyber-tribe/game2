@@ -1,27 +1,34 @@
 import type { System, World } from "../../ecs";
-import { HeroCooldown, House, MoveTarget, Owner, Position, Walker, type FactionId } from "../components";
+import { HeroCooldown, House, MoveTarget, Owner, Position, Walker, isAdvancingHeroState, type FactionId } from "../components";
 import { GUARDIAN_DEFENSE_RADIUS } from "../constants";
 import { distance, type Point } from "./geometry";
 import { findNearestEnemyPosition } from "./fightTargeting";
 
 /**
- * A knight always seeks out the nearest enemy walker or house, regardless
- * of its faction's behaviorMode — per docs/game-system.md, "指示に
- * 依存せず戦い続ける". Unlike fightTargetingSystem (which only acts on
- * "seeking" walkers under "fight" mode), this targets every "knight"-state
- * walker unconditionally, anywhere on the map — the opposite extreme from
+ * An attacking hero (see ADVANCING_HERO_KINDS — the original's own four)
+ * always seeks out the nearest enemy walker or house, regardless of its
+ * faction's behaviorMode — per docs/game-system.md, "指示に依存せず戦い
+ * 続ける". Unlike fightTargetingSystem (which only acts on "seeking"
+ * walkers under "fight" mode), this targets every such hero
+ * unconditionally, anywhere on the map — the opposite extreme from
  * guardianTargetingSystem's home-turf-only reach below.
  *
- * Skips a knight currently under HeroCooldown (see its doc comment):
- * without a pause after each burn, a knight instantly retargets and
- * marches the moment it arrives, so one knight could level a whole
- * undefended settlement in seconds — collapsing a match's
- * "小競り合い→復興/逆転" phases into a single instant.
+ * All four share this one behaviour on purpose. ペルセウス is the original's
+ * "基準の英雄" and the other three are described as differing from it in
+ * exactly one respect each (strength, speed, fire) — so what separates them
+ * lives in HERO_TRAITS and in the systems that own those rules, never in a
+ * second copy of this loop.
+ *
+ * Skips a hero currently under HeroCooldown (see its doc comment): without
+ * a pause after each burn, one instantly retargets and marches the moment
+ * it arrives, so a single hero could level a whole undefended settlement in
+ * seconds — collapsing a match's "小競り合い→復興/逆転" phases into a
+ * single instant.
  */
-export const knightTargetingSystem: System = (world) => {
+export const heroAdvanceTargetingSystem: System = (world) => {
   for (const entity of world.query(Position, Walker, Owner)) {
     const walker = world.get(entity, Walker)!;
-    if (walker.state !== "knight") continue;
+    if (!isAdvancingHeroState(walker.state)) continue;
     if (world.has(entity, MoveTarget)) continue;
     if (world.has(entity, HeroCooldown)) continue;
 
@@ -32,7 +39,7 @@ export const knightTargetingSystem: System = (world) => {
 };
 
 /**
- * A guardian, unlike a knight, doesn't roam the map hunting — it only
+ * A guardian, unlike the attacking heroes, doesn't roam the map hunting — it only
  * engages an enemy walker/house that's within GUARDIAN_DEFENSE_RADIUS of
  * one of its OWN faction's houses, i.e. an actual threat to home turf.
  * With nothing threatening any of its houses (including having none left
@@ -40,7 +47,7 @@ export const knightTargetingSystem: System = (world) => {
  * chasing — the "守護者" is a defender, not a raider.
  *
  * Also skipped while under HeroCooldown, same reasoning as
- * knightTargetingSystem above (a guardian survives a successful capture —
+ * heroAdvanceTargetingSystem above (a guardian survives a successful capture —
  * see houseCaptureSystem — so without this it could otherwise capture
  * through an entire undefended cluster the instant it arrives at each).
  */

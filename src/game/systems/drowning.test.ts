@@ -135,7 +135,7 @@ describe("createDrowningSystem", () => {
     const world = new World();
     const heightmap = flatHeightmap(10, 10, 5);
     digPool(heightmap, 5, 5);
-    const knight = createWalker(world, 5.5, 5.5, "knight");
+    const knight = createWalker(world, 5.5, 5.5, "perseus");
     const system = createDrowningSystem({ heightmap });
 
     for (let i = 0; i < 20; i++) system(world, 1);

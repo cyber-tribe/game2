@@ -41,11 +41,11 @@ describe("triggerArmageddon", () => {
     const walker = world.createEntity();
     world.add(walker, Position, { x: 1, y: 1 });
     world.add(walker, Owner, { faction: "player" });
-    world.add(walker, Walker, { strength: 42, state: "knight", speed: 1 });
+    world.add(walker, Walker, { strength: 42, state: "perseus", speed: 1 });
 
     triggerArmageddon(world, { x: 5, y: 5 });
 
-    expect(world.get(walker, Walker)).toEqual({ strength: 42, state: "knight", speed: FINAL_BATTLE_WALKER_SPEED });
+    expect(world.get(walker, Walker)).toEqual({ strength: 42, state: "perseus", speed: FINAL_BATTLE_WALKER_SPEED });
   });
 
   it("moves both factions' shrinePosition to the given center and switches both to goToShrine", () => {
