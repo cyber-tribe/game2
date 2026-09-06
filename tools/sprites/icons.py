@@ -229,6 +229,27 @@ ICONS: dict[str, list[str]] = {
         ".....o...o......",
     ],
     # 火の雨: flame falling, over ground that is already alight.
+    # 竜巻: a funnel, wide at the top and narrow at the ground, banded so it
+    # reads as spinning rather than as a cone. The only icon in the panel
+    # whose subject keeps moving after the cast.
+    "tornado": [
+        "................",
+        "...oooooooooo...",
+        "..odssssssssSd..",
+        "..ossssssssssod.",
+        "...odssssssSd...",
+        "...osssssssso...",
+        "....odssssSo....",
+        "....osssssso....",
+        ".....odssSo.....",
+        ".....osssso.....",
+        "......odsSo.....",
+        "......osso......",
+        "......odSo......",
+        "......osso......",
+        ".......oo.......",
+        "................",
+    ],
     "fireRain": [
         "................",
         "..o....o....o...",
@@ -704,6 +725,7 @@ ICON_KINDS = (
     "guardian",
     "forest",
     "flower",
+    "tornado",
     "fireRain",
     "volcano",
     "reef",

@@ -8,7 +8,7 @@
  * later — see main.ts's onEnemyAction, which already does this for the
  * screen-shake/toast but had no audio equivalent before this.
  */
-export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "holyWater" | "volcano" | "perseus" | "hercules" | "odysseus" | "achilles" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "fungus";
+export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "holyWater" | "tornado" | "volcano" | "perseus" | "hercules" | "odysseus" | "achilles" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "fungus";
 
 /** Every MiracleSoundType, for tests and any future UI that wants to list them. */
 export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
@@ -16,6 +16,7 @@ export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
   "earthquake",
   "swamp",
   "holyWater",
+  "tornado",
   "volcano",
   "perseus",
   "hercules",
@@ -85,6 +86,14 @@ export const RECIPES: Record<MiracleSoundType, MiracleSoundRecipe> = {
       { waveform: "sine", startFrequency: 780, endFrequency: 1040, delay: 0.14, duration: 0.45, peakGain: 0.1 },
     ],
     noise: { delay: 0, duration: 0.5, peakGain: 0.06, filterFrequency: 5200 },
+  },
+  // A long rush of filtered noise with a rising tone inside it — wind, and
+  // the only sound here that keeps climbing rather than falling, because
+  // the tornado is the only miracle that is still happening a few seconds
+  // after it is cast.
+  tornado: {
+    tones: [{ waveform: "sawtooth", startFrequency: 120, endFrequency: 260, delay: 0, duration: 1.1, peakGain: 0.1 }],
+    noise: { delay: 0, duration: 1.3, peakGain: 0.28, filterFrequency: 1400 },
   },
   volcano: {
     tones: [{ waveform: "sine", startFrequency: 80, endFrequency: 35, delay: 0, duration: 0.6, peakGain: 0.3 }],

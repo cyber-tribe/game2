@@ -38,6 +38,8 @@ import { createSettleSystem } from "./systems/settle";
 import { createCreviceSystem } from "./systems/crevice";
 import { createFungusSystem } from "./systems/fungus";
 import { createHolyWaterSystem } from "./systems/holyWater";
+import { createTornadoSystem } from "./systems/tornado";
+import { createWhirlpoolSystem } from "./systems/whirlpool";
 import { createSwampSystem } from "./systems/swamp";
 import { createWanderTargetSystem } from "./systems/wanderTarget";
 import { ALL_MIRACLES, type EnemyPersonality, type MiracleId } from "./worlds";
@@ -159,6 +161,7 @@ export type MatchEventType =
   | "earthquake"
   | "swamp"
   | "holyWater"
+  | "tornado"
   | "volcano"
   | "forest"
   | "flower"
@@ -209,8 +212,9 @@ export class Simulation {
   private readonly matchEvents: MatchEvent[] = [];
   private elapsedTime = 0;
   /**
-   * Set whenever a system changes the terrain on its own — today only
-   * 毒カビ's growth (see systems/fungus.ts). Read and cleared by
+   * Set whenever a system changes the terrain on its own — 毒カビ's
+   * growth (see systems/fungus.ts) and a 渦巻き eating the coast (see
+   * systems/whirlpool.ts). Read and cleared by
    * consumeTerrainChanged; see its doc comment for why the renderer cannot
    * simply notice by itself.
    */
@@ -263,6 +267,21 @@ export class Simulation {
       .add(gatherSystem)
       .add(createSwampSystem({ onImpact: (event) => this.recordImpactEffect(event) }))
       .add(createHolyWaterSystem({ onImpact: (event) => this.recordImpactEffect(event) }))
+      .add(
+        createTornadoSystem({
+          heightmap: config.heightmap,
+          onImpact: (event) => this.recordImpactEffect(event),
+        }),
+      )
+      .add(
+        createWhirlpoolSystem({
+          heightmap: config.heightmap,
+          onImpact: (event) => this.recordImpactEffect(event),
+          onErode: () => {
+            this.terrainChanged = true;
+          },
+        }),
+      )
       .add(createCreviceSystem({ heightmap: config.heightmap, onImpact: (event) => this.recordImpactEffect(event) }))
       .add(
         createFungusSystem({

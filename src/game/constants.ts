@@ -564,3 +564,66 @@ export const FUNGUS_MANA_COST = 14;
  * answers it.
  */
 export const FUNGUS_GROWTH_INTERVAL = 1.5;
+
+/**
+ * How long a 竜巻 lives, in seconds — the original's 「一定時間ランダムに
+ * 移動し」 (docs/original-miracles.md #17).
+ *
+ * Long enough that where it *ends up* is genuinely uncertain, which is the
+ * point of a wandering hazard: a tornado you can aim precisely is just a
+ * slow fire rain.
+ */
+export const TORNADO_LIFETIME = 14;
+
+/** Tiles per second a 竜巻 drifts. Slower than a walker (DEFAULT_WALKER_SPEED), so people can outrun it if they notice it. */
+export const TORNADO_SPEED = 1;
+
+/** How far from its centre a 竜巻 catches walkers, in tiles. */
+export const TORNADO_RADIUS = 1.5;
+
+/**
+ * How much strength a caught walker loses per second — the original's
+ * 「信者を巻き込んで運び体力を減らす」.
+ *
+ * Damage over time rather than an instant kill, because the other half of
+ * that sentence is *carrying*: a tornado that killed on contact would
+ * never get to drag anyone anywhere, and dragging is what makes it a
+ * different threat from fire rain. A full-strength walker survives a few
+ * seconds inside one.
+ */
+export const TORNADO_DAMAGE_PER_SECOND = 0.5;
+
+/** How fast a caught walker is dragged toward the 竜巻's centre, in tiles per second. */
+export const TORNADO_DRAG_SPEED = 1.2;
+
+/**
+ * How sharply a 竜巻 wanders: the fraction of a right-angle turn it may
+ * take per second. Low enough that its path reads as a drifting curve
+ * rather than a random-number generator on legs.
+ */
+export const TORNADO_WANDER = 0.9;
+
+/** Mana cost of a 竜巻 — "中" tier. Cheaper than fire rain: it is slower, avoidable, and where it goes is not entirely up to the caster. */
+export const TORNADO_MANA_COST = 22;
+
+/** How long a 渦巻き lives once a 竜巻 reaches water, in seconds. */
+export const WHIRLPOOL_LIFETIME = 16;
+
+/** Tiles per second a 渦巻き moves over water. */
+export const WHIRLPOOL_SPEED = 0.8;
+
+/** How far from its centre a 渦巻き eats away at the coast, in tiles. */
+export const WHIRLPOOL_RADIUS = 1.5;
+
+/** Seconds between a 渦巻き splitting in two — the original's 「一定時間で分裂して被害範囲が広がる」. */
+export const WHIRLPOOL_SPLIT_INTERVAL = 5;
+
+/**
+ * How many times a 渦巻き may split.
+ *
+ * Bounded, and low. Unbounded splitting is exponential: at 2 splits one
+ * tornado that happens to reach the sea ends with 4 whirlpools, which is
+ * already a coastline redrawn; at 5 it would be 32 and the map itself
+ * would be the casualty regardless of what either side did afterwards.
+ */
+export const WHIRLPOOL_MAX_SPLITS = 2;
