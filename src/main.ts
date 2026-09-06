@@ -161,6 +161,10 @@ async function bootstrap(world: WorldDefinition) {
     shakeMagnitude = magnitude;
   };
 
+  // Awaited before the first frame so walkers have textures from the start;
+  // EntityLayer skips drawing them until this resolves, so a slow parse would
+  // show an empty map rather than crash.
+  await EntityLayer.loadAssets();
   const entityLayer = new EntityLayer(renderer);
   renderer.view.addChild(entityLayer.view);
 

@@ -20,12 +20,27 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      # The sprite atlas check below runs the Python generators, which need
+      # Pillow. Nothing else in the build does — the atlas itself is
+      # committed — so this is only here to let the staleness check run.
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install sprite tooling dependencies
+        run: pip install -r tools/requirements.txt
       # The colors in src/render/palette.ts and index.html are generated from
       # tools/palette.json (see plan/0089). Committing a hand-edit to either
       # generated file would silently be undone by the next regeneration, so
       # fail here instead.
       - name: Check generated palette is current
         run: npm run palette:check
+      # The walker sprite atlas is generated from tools/sprites/ (see
+      # plan/0090). A PNG is opaque in a diff, so the reviewable artifact is
+      # the Python that draws it — this check is what makes trusting the
+      # committed binary safe.
+      - name: Check generated sprite atlas is current
+        run: npm run sprites:check
       - name: Typecheck
         run: npm run typecheck
       - name: Test
