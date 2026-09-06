@@ -627,3 +627,39 @@ export const WHIRLPOOL_SPLIT_INTERVAL = 5;
  * would be the casualty regardless of what either side did afterwards.
  */
 export const WHIRLPOOL_MAX_SPLITS = 2;
+
+/**
+ * How far a ハリケーン's gust reaches from its origin, in tiles — the
+ * original's 「指定方向へ強風」 (docs/original-miracles.md #20).
+ *
+ * Long and narrow rather than a disc: this miracle is the one that *has* a
+ * direction, and a wide blast would make aiming it pointless. The shape is
+ * the miracle.
+ */
+export const HURRICANE_LENGTH = 12;
+
+/** How far to either side of its axis the gust catches things, in tiles. */
+export const HURRICANE_WIDTH = 2;
+
+/**
+ * How far a caught walker is thrown along the wind, in tiles.
+ *
+ * The whole point of the number: 「吹き飛ばす先に沼や亀裂を用意して即死地形
+ * へ押し込む」 (docs/original-miracles.md's interaction table). Far enough
+ * that a swamp or a crevice laid a few tiles downwind is a real plan, short
+ * enough that the plan has to be laid in advance rather than improvised
+ * mid-gust.
+ */
+export const HURRICANE_PUSH = 4;
+
+/**
+ * Mana cost of a ハリケーン — "中〜大".
+ *
+ * On its own it flattens a line of houses and scatters whoever was in it,
+ * which is worth about a fire rain. What it is actually priced for is the
+ * combination: with a swamp or an earthquake's crevice already downwind it
+ * is a kill, and both of those cost mana of their own. Charging blast-tier
+ * for it as well would make the combination cost more than the two
+ * miracles it is made of.
+ */
+export const HURRICANE_MANA_COST = 28;

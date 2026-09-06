@@ -250,6 +250,27 @@ ICONS: dict[str, list[str]] = {
         ".......oo.......",
         "................",
     ],
+    # ハリケーン: three swept gusts blowing right, each curling at its end.
+    # Horizontal where the tornado's icon is vertical, because the one thing
+    # a player has to read off this miracle is that it has a direction.
+    "hurricane": [
+        "................",
+        "................",
+        "...ooooooooo....",
+        "..oSSSSSSSSSo...",
+        "...oooooooooSo..",
+        "..........oSo...",
+        ".oooooooooooo...",
+        "oSSSSSSSSSSSSo..",
+        ".ooooooooooooSo.",
+        "..........oSSo..",
+        "...oooooooooo...",
+        "..oSSSSSSSSo....",
+        "...ooooooooSo...",
+        ".........oSo....",
+        "..........o.....",
+        "................",
+    ],
     "fireRain": [
         "................",
         "..o....o....o...",
@@ -726,6 +747,7 @@ ICON_KINDS = (
     "forest",
     "flower",
     "tornado",
+    "hurricane",
     "fireRain",
     "volcano",
     "reef",
