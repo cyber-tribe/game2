@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyFlood, applyVolcano, isBuildable, isRock, type Heightmap } from "../world/heightmap";
+import { applyTsunami, applyVolcano, isBuildable, isRock, type Heightmap } from "../world/heightmap";
 import { FactionState, House, Owner, Position, Swamp, Walker } from "./components";
 import { ARMAGEDDON_MANA_COST, HOUSE_LEVELS, MAX_MANA } from "./constants";
 import { drownFlood } from "./flood";
@@ -752,7 +752,7 @@ describe("Simulation", () => {
     expect(sim.getOutcome().over).toBe(true);
   });
 
-  it("a flood submerges settled houses across the whole map, for both factions", () => {
+  it("a tsunami sweeps away the settled houses it reaches, for both factions", () => {
     const width = 20;
     const height = 20;
     const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(1)); // uniformly low land
@@ -765,14 +765,38 @@ describe("Simulation", () => {
     expect(sim.world.query(House).length).toBeGreaterThan(0);
 
     // The enemy's own earthquake sabotage (see enemyMiracles.ts) can have
-    // heaved a few vertices above 1 by now — re-flatten before flooding so
-    // this test only exercises "flood submerges land at/below the new
-    // water level", not incidental high ground from unrelated AI behavior.
+    // heaved a few vertices above 1 by now — re-flatten first so this test
+    // only exercises "the wave erodes low land and drownFlood sweeps what
+    // stood on it", not incidental high ground from unrelated AI behavior.
     for (const row of heightmap.vertices) row.fill(1);
 
-    applyFlood(heightmap, 1); // water level now matches the land height everywhere
+    // A radius covering the whole 20x20 map, so every house is in reach.
+    applyTsunami(heightmap, 10, 10, 32, 4);
     drownFlood(sim.world, heightmap);
 
     expect(sim.world.query(House)).toHaveLength(0);
+  });
+
+  it("spares the houses a tsunami cannot reach, unlike the global flood it replaced", () => {
+    const width = 20;
+    const height = 20;
+    const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(1));
+    const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
+    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness, waterLevel: 0 };
+
+    const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
+    for (let i = 0; i < 200; i++) sim.update(0.1);
+    for (const row of heightmap.vertices) row.fill(1);
+
+    const before = sim.world.query(House).length;
+    expect(before).toBeGreaterThan(0);
+
+    // Aimed at one corner with a small radius: this is the whole point of
+    // the rework — a tsunami is a move against a place, not a coin flip
+    // that hits the caster as hard as the target.
+    applyTsunami(heightmap, 0, 0, 3, 4);
+    drownFlood(sim.world, heightmap);
+
+    expect(sim.world.query(House).length).toBeGreaterThan(0);
   });
 });

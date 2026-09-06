@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { HOUSE_LEVEL_FLATNESS_REQUIREMENT, HOUSE_UPGRADE_FLATNESS_RADIUS } from "../game/constants";
 import {
-  FLOOD_ROCK_COOLING,
+  DEFAULT_TSUNAMI_HEIGHT,
   MAX_ELEVATION,
   MIN_ELEVATION,
   VOLCANO_CRATER_DEPTH,
   VOLCANO_OUTER_DROP,
   VOLCANO_ROCK_HARDNESS,
   applyEarthquake,
-  applyFlood,
+  applyReef,
+  applyTsunami,
   applyVolcano,
   countFlatNeighbors,
   createHeightmap,
@@ -17,6 +18,7 @@ import {
   isBuildable,
   isInWaterPool,
   isRock,
+  REEF_HEIGHT,
   isTerrainEditAllowed,
   pickTerrainEditRule,
   raiseTile,
@@ -532,76 +534,6 @@ describe("applyVolcano", () => {
   });
 });
 
-describe("applyFlood", () => {
-  it("raises the water level by the given amount", () => {
-    const heightmap = flatHeightmap(4, 4, 5);
-
-    applyFlood(heightmap, 2);
-
-    expect(heightmap.waterLevel).toBe(MIN_ELEVATION + 2);
-  });
-
-  it("defaults to raising it by 1", () => {
-    const heightmap = flatHeightmap(4, 4, 5);
-
-    applyFlood(heightmap);
-
-    expect(heightmap.waterLevel).toBe(MIN_ELEVATION + 1);
-  });
-
-  it("is cumulative across multiple casts", () => {
-    const heightmap = flatHeightmap(4, 4, 5);
-
-    applyFlood(heightmap);
-    applyFlood(heightmap);
-
-    expect(heightmap.waterLevel).toBe(MIN_ELEVATION + 2);
-  });
-
-  it("clamps at MAX_ELEVATION", () => {
-    const heightmap = flatHeightmap(4, 4, 5, MAX_ELEVATION - 1);
-
-    applyFlood(heightmap, 5);
-
-    expect(heightmap.waterLevel).toBe(MAX_ELEVATION);
-  });
-
-  it("does not touch the terrain vertices themselves", () => {
-    const heightmap = flatHeightmap(4, 4, 5);
-
-    applyFlood(heightmap, 3);
-
-    expect(heightmap.vertices[2][2]).toBe(5);
-  });
-
-  it("cools every existing volcanic rock vertex by FLOOD_ROCK_COOLING", () => {
-    const heightmap = flatHeightmap(4, 4, 5);
-    applyVolcano(heightmap, 1, 1, 0);
-    const before = heightmap.rockHardness[1][1];
-
-    applyFlood(heightmap);
-
-    expect(heightmap.rockHardness[1][1]).toBe(before - FLOOD_ROCK_COOLING);
-  });
-
-  it("never cools rock hardness below zero", () => {
-    const heightmap = flatHeightmap(4, 4, 5);
-    applyVolcano(heightmap, 1, 1, 0, FLOOD_ROCK_COOLING - 0.5);
-
-    applyFlood(heightmap);
-
-    expect(heightmap.rockHardness[1][1]).toBe(0);
-  });
-
-  it("leaves ordinary (non-rock) vertices untouched", () => {
-    const heightmap = flatHeightmap(4, 4, 5);
-
-    applyFlood(heightmap);
-
-    expect(heightmap.rockHardness[2][2]).toBe(0);
-  });
-});
-
 describe("isTerrainEditAllowed", () => {
   it("allows both directions under 'both'", () => {
     expect(isTerrainEditAllowed("both", 1)).toBe(true);
@@ -639,5 +571,141 @@ describe("pickTerrainEditRule", () => {
 
   it("defaults to Math.random when no rng is given", () => {
     expect(["both", "raiseOnly", "lowerOnly"]).toContain(pickTerrainEditRule(weights));
+  });
+});
+
+describe("applyTsunami", () => {
+  it("erodes low ground near the origin down to sea level", () => {
+    const heightmap = flatHeightmap(20, 20, 2);
+
+    applyTsunami(heightmap, 10, 10);
+
+    expect(heightmap.vertices[10][10]).toBe(heightmap.waterLevel);
+  });
+
+  it("leaves ground standing above the wave's crest alone", () => {
+    const heightmap = flatHeightmap(20, 20, 2);
+    heightmap.vertices[10][12] = DEFAULT_TSUNAMI_HEIGHT + 5;
+
+    applyTsunami(heightmap, 10, 10);
+
+    expect(heightmap.vertices[10][12]).toBe(DEFAULT_TSUNAMI_HEIGHT + 5);
+  });
+
+  it("does not move the sea level — this is a local wave, not a flood", () => {
+    const heightmap = flatHeightmap(20, 20, 2);
+    const before = heightmap.waterLevel;
+
+    applyTsunami(heightmap, 10, 10);
+
+    expect(heightmap.waterLevel).toBe(before);
+  });
+
+  it("leaves ground beyond the radius untouched", () => {
+    const heightmap = flatHeightmap(40, 40, 2);
+
+    applyTsunami(heightmap, 5, 5, 4);
+
+    expect(heightmap.vertices[5][30]).toBe(2);
+  });
+
+  it("weakens with distance, so ground the crest clears near the origin survives further out", () => {
+    // At the rim the crest is 0, so anything above sea level survives there
+    // however low it is — the wave is a cone, not a cylinder.
+    const heightmap = flatHeightmap(40, 40, 1);
+
+    applyTsunami(heightmap, 20, 20, 10, 4);
+
+    expect(heightmap.vertices[20][20]).toBe(heightmap.waterLevel);
+    expect(heightmap.vertices[20][29]).toBe(1);
+  });
+
+  /**
+   * The interaction the whole rework exists for. docs/original-miracles.md:
+   * "山や崖を防波堤として作っておけば、その背後を守れます" — a ridge does
+   * not merely survive the wave, it shelters what is behind it.
+   */
+  it("is stopped by a ridge, sheltering the ground behind it", () => {
+    const heightmap = flatHeightmap(40, 40, 1);
+    for (let y = 0; y <= 40; y++) heightmap.vertices[y][24] = MAX_ELEVATION;
+
+    applyTsunami(heightmap, 20, 20, 12, 6);
+
+    expect(heightmap.vertices[20][22]).toBe(heightmap.waterLevel);
+    expect(heightmap.vertices[20][26]).toBe(1);
+  });
+
+  /**
+   * A reef sits at sea level by construction, so it can never out-top a
+   * strong wave — it stops one because rock breaks the wave outright.
+   * Without that rule a reef would only defend against the weakest
+   * tsunamis, which are exactly the ones nobody needs defending against,
+   * and the original's "岩礁にも津波を食い止める効果があります" would be a
+   * dead mechanic.
+   */
+  it("is stopped by a reef wall even though the reef is far shorter than the wave", () => {
+    const heightmap = flatHeightmap(40, 40, 1);
+    // Spanning the wave's whole reach: anything shorter is flowed around
+    // (see the next test), and beyond this span the radius stops it anyway.
+    for (let y = 8; y <= 32; y++) {
+      heightmap.vertices[y][24] = MIN_ELEVATION;
+      applyReef(heightmap, 24, y);
+    }
+
+    applyTsunami(heightmap, 20, 20, 12, 6);
+
+    expect(heightmap.vertices[20][26]).toBe(1);
+  });
+
+  /**
+   * The flip side, and a deliberate design choice rather than an accident:
+   * the wave is a spreading front, so it flows *around* a partial barrier.
+   * A breakwater has to actually be built as a wall to shelter anything —
+   * dropping one reef in the water is not a defence. This is what keeps
+   * "build a seawall" a real decision instead of a single cheap cast that
+   * switches the enemy's most expensive miracle off.
+   */
+  it("flows around a reef too short to span the wave, sheltering nothing", () => {
+    const heightmap = flatHeightmap(40, 40, 1);
+    for (let y = 19; y <= 21; y++) {
+      heightmap.vertices[y][24] = MIN_ELEVATION;
+      applyReef(heightmap, 24, y);
+    }
+
+    applyTsunami(heightmap, 20, 20, 12, 6);
+
+    expect(heightmap.vertices[20][26]).toBe(heightmap.waterLevel);
+  });
+});
+
+describe("applyReef", () => {
+  it("raises rock just above sea level on a water vertex", () => {
+    const heightmap = flatHeightmap(10, 10, MIN_ELEVATION);
+
+    expect(applyReef(heightmap, 5, 5)).toBe(true);
+    expect(heightmap.vertices[5][5]).toBe(heightmap.waterLevel + REEF_HEIGHT);
+    expect(isRock(heightmap, 5, 5)).toBe(true);
+  });
+
+  it("is not buildable land — that is the point of a reef", () => {
+    const heightmap = flatHeightmap(10, 10, MIN_ELEVATION);
+
+    applyReef(heightmap, 5, 5);
+
+    expect(isBuildable(heightmap, 5, 5)).toBe(false);
+  });
+
+  it("refuses dry land, where it would just be a pointless volcano", () => {
+    const heightmap = flatHeightmap(10, 10, 5);
+
+    expect(applyReef(heightmap, 5, 5)).toBe(false);
+    expect(heightmap.vertices[5][5]).toBe(5);
+  });
+
+  it("refuses vertices outside the map", () => {
+    const heightmap = flatHeightmap(10, 10, MIN_ELEVATION);
+
+    expect(applyReef(heightmap, -1, 5)).toBe(false);
+    expect(applyReef(heightmap, 5, 99)).toBe(false);
   });
 });

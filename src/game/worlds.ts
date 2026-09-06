@@ -9,17 +9,27 @@ import type { TerrainEditRule, TerrainType } from "../world/heightmap";
  * reusing ui/toolbar.ts's ToolMode so game/ doesn't depend on ui/ — main.ts
  * bridges the two.
  */
-export type MiracleId = "shrine" | "earthquake" | "swamp" | "knight" | "guardian" | "volcano" | "flood" | "armageddon";
+export type MiracleId =
+  | "shrine"
+  | "earthquake"
+  | "swamp"
+  | "reef"
+  | "knight"
+  | "guardian"
+  | "volcano"
+  | "tsunami"
+  | "armageddon";
 
 /** Every discretionary miracle — see MiracleId. */
 export const ALL_MIRACLES: readonly MiracleId[] = [
   "shrine",
   "earthquake",
   "swamp",
+  "reef",
   "knight",
   "guardian",
   "volcano",
-  "flood",
+  "tsunami",
   "armageddon",
 ];
 
@@ -90,7 +100,7 @@ export interface WorldDefinition {
    * per docs/game-system.md 10節's "使用可能な奇跡の制限" — checked
    * equally for the player's own taps (main.ts) and the enemy's own
    * casting (enemyMiracles.ts only ever casts earthquake/volcano/knight/
-   * guardian/armageddon, so swamp/flood/shrine restrictions only affect
+   * guardian/armageddon, so swamp/tsunami/shrine restrictions only affect
    * the player). Earlier worlds unlock fewer, later ones unlock more, same
    * monotonic "never relaxing" curve as terrain/terrainEditRule/enemy AI
    * speed — see WORLDS' own doc comment.
