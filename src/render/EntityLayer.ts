@@ -1,5 +1,5 @@
 import { Container, Graphics, Sprite } from "pixi.js";
-import { Drowning, FactionState, HolyWater, House, MoveTarget, Owner, Position, Swamp, Tornado, Walker, Whirlpool, isHeroState, type FactionId, type HeroKind } from "../game/components";
+import { Drowning, FirePillar, FactionState, HolyWater, House, MoveTarget, Owner, Position, Swamp, Tornado, Walker, Whirlpool, isHeroState, type FactionId, type HeroKind } from "../game/components";
 import type { Entity, World } from "../ecs";
 import { FARMLAND_RADIUS, IMPACT_EFFECT_DURATION } from "../game/constants";
 import { distance, type Point } from "../game/systems/geometry";
@@ -126,6 +126,17 @@ const TORNADO_HEIGHT = 48;
 const TORNADO_BANDS = 8;
 /** Rotations per second of the funnel's wobble — fast enough to read as violent, slow enough not to strobe. */
 const TORNADO_SPIN = 1.4;
+/**
+ * 火柱 — the same stacked-ellipse column the 竜巻 uses, in fire tones and
+ * the other way up: a tornado is wide at the top and this is wide at the
+ * bottom, so the two never read as the same hazard even at a glance.
+ */
+const FIRE_PILLAR_CORE_COLOR = 0xffe08a;
+const FIRE_PILLAR_FLAME_COLOR = 0xe0762a;
+const FIRE_PILLAR_EMBER_COLOR = 0x8c2a12;
+const FIRE_PILLAR_HEIGHT = 40;
+const FIRE_PILLAR_BANDS = 7;
+const FIRE_PILLAR_FLICKER = 3.1;
 const WHIRLPOOL_COLOR = 0x0b4f66;
 const WHIRLPOOL_FOAM_COLOR = 0xa8d8e8;
 const WHIRLPOOL_RINGS = 3;
@@ -416,6 +427,22 @@ export class EntityLayer {
         g.ellipse(sx + wobble, sy, 22 * scale, 11 * scale)
           .fill({ color: WHIRLPOOL_COLOR, alpha: 0.35 + 0.2 * (1 - scale) })
           .stroke({ width: 1, color: WHIRLPOOL_FOAM_COLOR, alpha: 0.5 * scale });
+      }
+    }
+
+    for (const entity of world.query(Position, FirePillar)) {
+      const pos = world.get(entity, Position)!;
+      const { sx, sy } = this.iso.project(pos.x, pos.y);
+      const flicker = this.elapsedTime * FIRE_PILLAR_FLICKER * Math.PI * 2;
+
+      for (let band = 0; band < FIRE_PILLAR_BANDS; band++) {
+        // 0 at the ground, 1 at the top — narrowing as it rises, the
+        // inverse of the tornado's funnel.
+        const t = band / (FIRE_PILLAR_BANDS - 1);
+        const radius = 11 * (1 - t) + 2;
+        const wobble = Math.sin(flicker + band) * (1 + t * 3);
+        const color = band === 0 ? FIRE_PILLAR_EMBER_COLOR : band < FIRE_PILLAR_BANDS - 2 ? FIRE_PILLAR_FLAME_COLOR : FIRE_PILLAR_CORE_COLOR;
+        g.ellipse(sx + wobble, sy - FIRE_PILLAR_HEIGHT * t, radius, radius * 0.5).fill({ color, alpha: 0.85 });
       }
     }
 

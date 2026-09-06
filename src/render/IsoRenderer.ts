@@ -197,6 +197,15 @@ const ROAD_DITHER_DENSITY = 0.3;
  * every tick a walker spends standing in it is fatal, and the player is
  * usually looking at the whole map rather than at their own feet.
  */
+/**
+ * Ground a 火柱 burned barren (see Heightmap.scorched). Ash: darker than
+ * any terrain but not the near-black of a crevice, because a crevice is a
+ * hole you fall into and this is ground you can still walk on — you just
+ * cannot build on it until a 花 brings it back.
+ */
+const SCORCHED_COLOR = 0x2b2119;
+const SCORCHED_SPECKLE_COLOR = 0x4a3a2c;
+const SCORCHED_DITHER_DENSITY = 0.3;
 const FUNGUS_COLOR = GAME_PALETTE.manaAccent;
 const FUNGUS_SPECKLE_COLOR = GAME_PALETTE.manaHighlight;
 const FUNGUS_DITHER_DENSITY = 0.45;
@@ -322,6 +331,11 @@ const FOREST_FILL = {
   textureSpace: "global",
 } as const;
 
+const SCORCHED_FILL = {
+  texture: createDitherTexture(DITHER_SIZE, SCORCHED_COLOR, SCORCHED_SPECKLE_COLOR, SCORCHED_DITHER_DENSITY),
+  textureSpace: "global",
+} as const;
+
 const ROAD_FILL = {
   texture: createDitherTexture(DITHER_SIZE, ROAD_COLOR, ROAD_SPECKLE_COLOR, ROAD_DITHER_DENSITY),
   textureSpace: "global",
@@ -339,18 +353,20 @@ const FUNGUS_FILL = {
  * here; water, rock and crevices replace the ground entirely and are
  * handled by hasOwnColor instead.
  */
-type GroundSurface = "terrain" | "forest" | "road" | "fungus";
+type GroundSurface = "terrain" | "forest" | "road" | "fungus" | "scorched";
 
 const SURFACE_COLOR: Record<Exclude<GroundSurface, "terrain">, number> = {
   forest: FOREST_COLOR,
   road: ROAD_COLOR,
   fungus: FUNGUS_COLOR,
+  scorched: SCORCHED_COLOR,
 };
 
 const SURFACE_FILL: Record<Exclude<GroundSurface, "terrain">, { texture: Texture; textureSpace: "global" }> = {
   forest: FOREST_FILL,
   road: ROAD_FILL,
   fungus: FUNGUS_FILL,
+  scorched: SCORCHED_FILL,
 };
 
 const TERRAIN_FILL: Record<Heightmap["terrain"], { texture: Texture; textureSpace: "global" }> = {
@@ -684,7 +700,7 @@ export class IsoRenderer {
    * initial full-map render before any camera/viewport exists yet.
    */
   redraw(bounds?: TileBounds): void {
-    const { width, height, rockHardness, forest, crevice, road, fungus, waterLevel, terrain } = this.heightmap;
+    const { width, height, rockHardness, forest, crevice, scorched, road, fungus, waterLevel, terrain } = this.heightmap;
     const vertices = this.displayVertices;
     const graphics = this.graphics;
     graphics.clear();
@@ -756,15 +772,19 @@ export class IsoRenderer {
         const anyCorner = (layer: boolean[][]) =>
           layer[y][x] || layer[y][x + 1] || layer[y + 1][x + 1] || layer[y + 1][x];
         const isOrdinaryGround = !isCreviceTile && !isWater && !isRock;
+        // Ash beats paving and canopy — both burned away when the pillar
+        // crossed them — but loses to rot, which is the one that kills.
         const surface: GroundSurface = !isOrdinaryGround
           ? "terrain"
           : anyCorner(fungus)
             ? "fungus"
-            : anyCorner(road)
-              ? "road"
-              : anyCorner(forest)
-                ? "forest"
-                : "terrain";
+            : anyCorner(scorched)
+              ? "scorched"
+              : anyCorner(road)
+                ? "road"
+                : anyCorner(forest)
+                  ? "forest"
+                  : "terrain";
         const baseColor = isCreviceTile
           ? CREVICE_COLOR
           : isWater

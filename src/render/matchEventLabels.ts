@@ -11,6 +11,7 @@ const MATCH_EVENT_TEMPLATE: Record<MatchEventType, string> = {
   swamp: "{subject}が沼を作った",
   holyWater: "{subject}が聖水の泉を湧かせた",
   tornado: "{subject}が竜巻を起こした",
+  firePillar: "{subject}が火柱を立てた",
   hurricane: "{subject}がハリケーンを起こした",
   volcano: "{subject}が火山を起こした",
   perseus: "{subject}のリーダーがペルセウスになった",

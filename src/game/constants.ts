@@ -683,6 +683,35 @@ export const TORNADO_DRAG_SPEED = 1.2;
  */
 export const TORNADO_WANDER = 0.9;
 
+/**
+ * How long a 火柱 burns, in seconds.
+ *
+ * Shorter than a 竜巻's life. A tornado that wanders for a while and then
+ * leaves is a scare; a pillar of fire that wanders for the same time
+ * leaves a permanent scar the length of its path, and 「地面を荒地化」 has
+ * to stay a wound rather than become the shape of the map.
+ */
+export const FIRE_PILLAR_LIFETIME = 9;
+
+/** Tiles per second a 火柱 drifts. Slower than a walker, like the 竜巻 — it can be outrun. */
+export const FIRE_PILLAR_SPEED = 0.9;
+
+/** How far from its centre a 火柱 burns, in tiles. */
+export const FIRE_PILLAR_RADIUS = 1.2;
+
+/** How sharply a 火柱 wanders — see TORNADO_WANDER, same rule and the same reason. */
+export const FIRE_PILLAR_WANDER = 1.1;
+
+/**
+ * Mana cost of a 火柱 — above fire rain.
+ *
+ * Fire rain is a bigger circle *once*; this is a smaller circle that keeps
+ * moving for nine seconds, kills what it touches outright, and leaves the
+ * ground it crossed unbuildable until somebody spends a 花 on it. The
+ * lasting damage is what the extra mana buys.
+ */
+export const FIRE_PILLAR_MANA_COST = 32;
+
 /** Mana cost of a 竜巻 — "中" tier. Cheaper than fire rain: it is slower, avoidable, and where it goes is not entirely up to the caster. */
 export const TORNADO_MANA_COST = 22;
 
