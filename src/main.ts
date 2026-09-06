@@ -34,7 +34,7 @@ import { mountCommandIcons } from "./ui/commandIcons";
 import { loadCommandIcons } from "./ui/pixelIcons";
 import { StatusPanel } from "./ui/statusPanel";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
-import { DEFAULT_EARTHQUAKE_RADIUS, DEFAULT_VOLCANO_RADIUS, applyEarthquake, applyReef, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
+import { DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyReef, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
 
 /**
  * The camera's fixed base scale — see layout()'s doc comment for why this
@@ -644,8 +644,7 @@ async function bootstrap(world: WorldDefinition) {
 
     if (toolMode === "volcano") {
       if (!trySpendPlayerMana(VOLCANO_MANA_COST)) return;
-      applyVolcano(heightmap, vertex.x, vertex.y);
-      eruptVolcano(simulation.world, vertex.x, vertex.y, DEFAULT_VOLCANO_RADIUS);
+      eruptVolcano(simulation.world, applyVolcano(heightmap, vertex.x, vertex.y));
       renderer.redraw(visibleBounds());
       simulation.recordEvent("player", "volcano");
       triggerShake(8);
