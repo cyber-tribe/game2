@@ -1,5 +1,5 @@
 import type { World } from "../ecs";
-import { FactionState, House, Owner, Position, Walker } from "./components";
+import { FactionState, House, Infected, Owner, Position, Walker } from "./components";
 import { FINAL_BATTLE_WALKER_SPEED, HOUSE_LEVELS } from "./constants";
 import type { Point } from "./systems/geometry";
 
@@ -29,6 +29,12 @@ export function triggerArmageddon(world: World, center: Point): void {
     const house = world.get(entity, House)!;
     const owner = world.get(entity, Owner)!;
     const pos = world.get(entity, Position)!;
+    // 病原菌 「ハルマゲドンにも参加できない」 (docs/original-miracles.md
+    // #4). A sick house is left standing with its people inside instead of
+    // emptying into the war: they sit it out. Not destroyed — this miracle
+    // 「即死ではなく」 takes nobody's life, and a faction whose houses are
+    // all sick must still be alive to lose the fight it cannot join.
+    if (world.has(entity, Infected)) continue;
     world.destroyEntity(entity);
 
     const walker = world.createEntity();
@@ -46,6 +52,9 @@ export function triggerArmageddon(world: World, center: Point): void {
   // just the ones just converted above — see FINAL_BATTLE_WALKER_SPEED's
   // doc comment for why.
   for (const entity of world.query(Walker)) {
+    // The sick keep their own pace and, via goToShrine.ts, their own
+    // orders: they do not march to the middle with everyone else.
+    if (world.has(entity, Infected)) continue;
     const walker = world.get(entity, Walker)!;
     world.add(entity, Walker, { ...walker, speed: FINAL_BATTLE_WALKER_SPEED });
   }

@@ -12,6 +12,7 @@ export type ToolMode =
   | "firePillar"
   | "lightning"
   | "storm"
+  | "plague"
   | "hurricane"
   | "perseus"
   | "hercules"

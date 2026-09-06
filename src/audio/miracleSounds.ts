@@ -8,7 +8,7 @@
  * later — see main.ts's onEnemyAction, which already does this for the
  * screen-shake/toast but had no audio equivalent before this.
  */
-export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "holyWater" | "tornado" | "firePillar" | "lightning" | "storm" | "hurricane" | "volcano" | "perseus" | "hercules" | "odysseus" | "achilles" | "adonis" | "helen" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "fungus";
+export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "holyWater" | "tornado" | "firePillar" | "lightning" | "storm" | "plague" | "hurricane" | "volcano" | "perseus" | "hercules" | "odysseus" | "achilles" | "adonis" | "helen" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "fungus";
 
 /** Every MiracleSoundType, for tests and any future UI that wants to list them. */
 export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
@@ -20,6 +20,7 @@ export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
   "firePillar",
   "lightning",
   "storm",
+  "plague",
   "hurricane",
   "volcano",
   "perseus",
@@ -117,6 +118,15 @@ export const RECIPES: Record<MiracleSoundType, MiracleSoundRecipe> = {
   storm: {
     tones: [{ waveform: "sine", startFrequency: 90, endFrequency: 60, delay: 0, duration: 1.2, peakGain: 0.14 }],
     noise: { delay: 0, duration: 1.4, peakGain: 0.2, filterFrequency: 600 },
+  },
+  // A low, unpleasant buzz that goes nowhere — no strike, no impact, no
+  // resolution. The only miracle whose sound is meant to be unsatisfying,
+  // because nothing visibly happens when it lands.
+  plague: {
+    tones: [
+      { waveform: "sawtooth", startFrequency: 70, endFrequency: 66, delay: 0, duration: 0.9, peakGain: 0.1 },
+      { waveform: "sawtooth", startFrequency: 104, endFrequency: 99, delay: 0.05, duration: 0.85, peakGain: 0.07 },
+    ],
   },
   // One hard gust: bright noise that arrives at full strength and falls
   // away. Where the tornado's wind keeps climbing, this one is over by the

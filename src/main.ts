@@ -26,6 +26,7 @@ import {
   FIRE_PILLAR_MANA_COST,
   LIGHTNING_MANA_COST,
   STORM_MANA_COST,
+  PLAGUE_MANA_COST,
   HURRICANE_MANA_COST,
   TERRAIN_EDIT_MANA_COST,
   TERRAIN_EDIT_RULE_LABELS,
@@ -57,6 +58,7 @@ import { createHolyWater } from "./game/holyWater";
 import { applyHurricane } from "./game/hurricane";
 import { createFirePillar } from "./game/firePillar";
 import { strikeLightning } from "./game/lightning";
+import { seedPlague } from "./game/plague";
 import { createStorm } from "./game/storm";
 import { createTornado } from "./game/tornado";
 import { collapseSwampsNear, createSwamp } from "./game/swamp";
@@ -737,6 +739,21 @@ async function bootstrap(world: WorldDefinition) {
       return;
     }
 
+    if (toolMode === "plague") {
+      // Checked before spending: a plague needs someone to infect, and
+      // charging for a cast on empty ground reads as the game being broken.
+      if (!canAffordPlayerMana(PLAGUE_MANA_COST)) return;
+      if (seedPlague(simulation.world, vertex) === 0) {
+        showEntityInfo("ここには感染させる相手がいません", "warning");
+        return;
+      }
+      trySpendPlayerMana(PLAGUE_MANA_COST);
+      simulation.recordEvent("player", "plague");
+      vibrate(25);
+      playMiracleSound("plague");
+      return;
+    }
+
     if (toolMode === "storm") {
       if (!trySpendPlayerMana(STORM_MANA_COST)) return;
       createStorm(simulation.world, vertex.x, vertex.y);
@@ -1196,6 +1213,7 @@ async function bootstrap(world: WorldDefinition) {
     firePillar: FIRE_PILLAR_MANA_COST,
     lightning: LIGHTNING_MANA_COST,
     storm: STORM_MANA_COST,
+    plague: PLAGUE_MANA_COST,
     hurricane: HURRICANE_MANA_COST,
     ...HERO_MANA_COST,
     volcano: VOLCANO_MANA_COST,

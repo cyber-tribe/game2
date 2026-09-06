@@ -1,5 +1,5 @@
 import { Container, Graphics, Sprite } from "pixi.js";
-import { Drowning, FirePillar, Storm, FactionState, HolyWater, House, MoveTarget, Owner, Position, Swamp, Tornado, Walker, Whirlpool, isHeroState, type FactionId, type HeroKind } from "../game/components";
+import { Drowning, FirePillar, Infected, Storm, FactionState, HolyWater, House, MoveTarget, Owner, Position, Swamp, Tornado, Walker, Whirlpool, isHeroState, type FactionId, type HeroKind } from "../game/components";
 import type { Entity, World } from "../ecs";
 import { FARMLAND_RADIUS, IMPACT_EFFECT_DURATION } from "../game/constants";
 import { distance, type Point } from "../game/systems/geometry";
@@ -152,6 +152,19 @@ const STORM_CLOUD_HEIGHT = 26;
 const STORM_PUFFS = 5;
 /** Flashes per second — irregular enough to read as lightning rather than a blinking light. */
 const STORM_FLASH_RATE = 2.7;
+/**
+ * 病原菌 (see the Infected component) is the one miracle with nothing to
+ * look at: nobody dies, nothing falls, the ground is untouched. Without a
+ * mark, a player whose economy has quietly stopped has no way to find out
+ * why — so every infected walker and house gets a small sickly bead over
+ * it. Small on purpose: the settlement should still look alive, because it
+ * is.
+ */
+const INFECTED_MARK_COLOR = 0x6f9c3a;
+const INFECTED_MARK_EDGE = 0x24200f;
+const INFECTED_MARK_RADIUS = 2.5;
+/** Screen px above the entity's own tile the bead floats. */
+const INFECTED_MARK_LIFT = 20;
 const WHIRLPOOL_COLOR = 0x0b4f66;
 const WHIRLPOOL_FOAM_COLOR = 0xa8d8e8;
 const WHIRLPOOL_RINGS = 3;
@@ -443,6 +456,14 @@ export class EntityLayer {
           .fill({ color: WHIRLPOOL_COLOR, alpha: 0.35 + 0.2 * (1 - scale) })
           .stroke({ width: 1, color: WHIRLPOOL_FOAM_COLOR, alpha: 0.5 * scale });
       }
+    }
+
+    for (const entity of world.query(Position, Infected)) {
+      const pos = world.get(entity, Position)!;
+      const { sx, sy } = this.iso.project(pos.x, pos.y);
+      g.circle(sx, sy - INFECTED_MARK_LIFT, INFECTED_MARK_RADIUS)
+        .fill(INFECTED_MARK_COLOR)
+        .stroke({ width: 1, color: INFECTED_MARK_EDGE, alpha: 0.8 });
     }
 
     for (const entity of world.query(Position, Storm)) {

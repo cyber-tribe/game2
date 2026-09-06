@@ -40,7 +40,7 @@ sized around a 16px icon, and this pass is about legibility, not scale."""
 #
 #   o ink outline    S stone highlight   s stone light    d stone dark
 #   b bronze light   B bronze mid        w water light    W water mid
-#   g grass          r warning red       m mana           M mana highlight
+#   g grass          G grass dark        r warning red       m mana           M mana highlight
 #   k skin           f faction blue
 LEGEND = {
     "o": "ink",
@@ -52,6 +52,7 @@ LEGEND = {
     "w": "waterLight",
     "W": "waterMid",
     "g": "grassMid",
+    "G": "grassDark",
     "r": "warning",
     "m": "manaAccent",
     "M": "manaHighlight",
@@ -312,6 +313,27 @@ ICONS: dict[str, list[str]] = {
         "................",
         "................",
         "................",
+    ],
+    # 病原菌: a microbe. Sickly green where 毒カビ is purple — the two are
+    # both "something spreads", and a player must never mistake the one that
+    # eats their land for the one that quietly stops their economy.
+    "plague": [
+        ".......ooo......",
+        ".......oGo......",
+        "..ooo..oGo..ooo.",
+        "..oGoooooooooGo.",
+        "..ooGoGGGGGoGoo.",
+        "...ooGGgggGGoo..",
+        "...oGGoggggGGo..",
+        "ooooGgggggogGooo",
+        "oGGoGgggggggGoGG",
+        "ooooGgogggggGooo",
+        "...oGGgogogGGo..",
+        "...ooGGgggGGoo..",
+        "..ooGoGGGGGoGoo.",
+        "..oGoooooooooGo.",
+        "..ooo..oGo..ooo.",
+        ".......oGo......",
     ],
     "hurricane": [
         "................",
@@ -854,6 +876,7 @@ ICON_KINDS = (
     "firePillar",
     "lightning",
     "storm",
+    "plague",
     "hurricane",
     "fireRain",
     "volcano",

@@ -18,6 +18,7 @@ export type MiracleId =
   | "firePillar"
   | "lightning"
   | "storm"
+  | "plague"
   | "hurricane"
   | "reef"
   | "road"
@@ -46,6 +47,7 @@ export const ALL_MIRACLES: readonly MiracleId[] = [
   "firePillar",
   "lightning",
   "storm",
+  "plague",
   "hurricane",
   "reef",
   "road",

@@ -797,6 +797,44 @@ export const HURRICANE_PUSH = 4;
 export const HURRICANE_MANA_COST = 28;
 
 /**
+ * How long one case of 病原菌 lasts before the carrier recovers, in
+ * seconds — see the Infected component.
+ *
+ * The original does not mention recovery, but without it a plague only
+ * ever grows: every walker and house on the map ends up infected, nobody
+ * earns mana, and the match becomes two sides staring at each other. A
+ * disease that burns out keeps the miracle's real shape —
+ * 「即死ではなく国力を長期的に削る」 — while leaving a way back.
+ */
+export const PLAGUE_DURATION = 25;
+
+/** How far 病原菌 reaches when first cast, in tiles. */
+export const PLAGUE_RADIUS = 2.5;
+
+/** How far an existing case can spread to someone else, in tiles. */
+export const PLAGUE_SPREAD_RADIUS = 2;
+
+/**
+ * Chance per second that one infected walker or house passes it to a
+ * particular healthy neighbour within PLAGUE_SPREAD_RADIUS.
+ *
+ * Low, and deliberately not the runaway 毒カビ's neighbour-scaled rate: a
+ * plague that swept a settlement in seconds would be an area attack with
+ * extra steps. Slow spread is what makes this the miracle you cast early
+ * and forget about, and the one whose damage the other side notices late.
+ */
+export const PLAGUE_SPREAD_CHANCE = 0.12;
+
+/**
+ * Mana cost of 病原菌 — mid tier.
+ *
+ * It kills nothing and destroys nothing, so it can never win a fight on
+ * its own; what it buys is the other side's economy for the next half
+ * minute. Priced below the miracles that take something permanently.
+ */
+export const PLAGUE_MANA_COST = 26;
+
+/**
  * How many bolts one 雷 throws — the original's 「指定地点周辺へ落雷」
  * (docs/original-miracles.md #16).
  *

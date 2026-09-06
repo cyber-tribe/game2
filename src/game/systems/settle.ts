@@ -1,6 +1,6 @@
 import type { Entity, System, World } from "../../ecs";
 import { isBuildable, type Heightmap } from "../../world/heightmap";
-import { Charmed, FactionState, House, MoveTarget, Owner, Position, Walker, type FactionId } from "../components";
+import { Charmed, FactionState, House, Infected, MoveTarget, Owner, Position, Walker, type FactionId } from "../components";
 import { HOUSE_SPACING } from "../constants";
 import { hasOtherSeekingWalkers } from "./gatherTargeting";
 import { distance } from "./geometry";
@@ -89,6 +89,11 @@ export function createSettleSystem(config: Partial<SettleConfig> = {}): System {
       world.add(house, Position, { x: pos.x, y: pos.y });
       world.add(house, Owner, { faction: owner.faction });
       world.add(house, House, { level: "hut", population: 0 });
+      // 病原菌 travels home with whoever carries it: a sick walker founds a
+      // sick house, which is how one case outlives the person who had it
+      // and keeps costing its faction mana (systems/mana.ts).
+      const infection = world.get(entity, Infected);
+      if (infection) world.add(house, Infected, { ...infection });
 
       world.destroyEntity(entity);
       occupied.push({ x: pos.x, y: pos.y });

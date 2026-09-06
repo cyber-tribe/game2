@@ -1,5 +1,5 @@
 import type { Entity, System, World } from "../../ecs";
-import { Charmed, FactionState, MoveTarget, Owner, Position, Walker } from "../components";
+import { Infected, Charmed, FactionState, MoveTarget, Owner, Position, Walker } from "../components";
 import type { Point } from "./geometry";
 
 /**
@@ -23,6 +23,9 @@ export const goToShrineSystem: System = (world) => {
 
     for (const entity of world.query(Position, Walker, Owner)) {
       if (world.has(entity, Charmed)) continue;
+      // 病原菌 「ハルマゲドンにも参加できない」 — the sick do not answer the
+      // call to the middle. See armageddon.ts, which sets this mode.
+      if (world.has(entity, Infected)) continue;
       if (entity === state.leaderId) continue;
       if (world.get(entity, Owner)!.faction !== state.id) continue;
 

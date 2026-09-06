@@ -19,6 +19,7 @@ export type IconKind =
   | "firePillar"
   | "lightning"
   | "storm"
+  | "plague"
   | "hurricane"
   | "perseus"
   | "hercules"
