@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
-import { createHeightmap } from "../../world/heightmap";
+import { applyForest, createHeightmap, type Heightmap } from "../../world/heightmap";
 import { House, Owner, Position, Walker } from "../components";
 import { HOUSE_LEVELS, TERRAIN_GROWTH_MULTIPLIER } from "../constants";
 import { createHouseGrowthSystem } from "./houseGrowth";
@@ -152,5 +152,35 @@ describe("createHouseGrowthSystem", () => {
     system(world, 2);
 
     expect(world.get(house, House)!.population).toBe(2);
+  });
+});
+
+describe("forest growth bonus", () => {
+  /**
+   * The forest's standalone half (docs/original-miracles.md #6, "信者の
+   * 成長を促進する効果"). Without it nobody would ever plant one, and the
+   * 森 -> 火の雨 interaction would have no forests to burn.
+   */
+  it("grows a house standing in woodland faster than one on bare ground", () => {
+    const flat = (): Heightmap => {
+      const heightmap = createHeightmap(10, 10, "grass");
+      for (const row of heightmap.vertices) row.fill(5);
+      return heightmap;
+    };
+    const bare = flat();
+    const wooded = flat();
+    applyForest(wooded, 5, 5, 1);
+
+    const grow = (heightmap: Heightmap) => {
+      const world = new World();
+      const entity = world.createEntity();
+      world.add(entity, Position, { x: 5, y: 5 });
+      world.add(entity, Owner, { faction: "player" });
+      world.add(entity, House, { level: "hut", population: 0 });
+      createHouseGrowthSystem({ heightmap })(world, 1);
+      return world.get(entity, House)!.population;
+    };
+
+    expect(grow(wooded)).toBeGreaterThan(grow(bare));
   });
 });

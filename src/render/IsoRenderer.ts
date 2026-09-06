@@ -164,6 +164,17 @@ const WATER_COLOR = GAME_PALETTE.waterMid;
  */
 const GRASS_SPECKLE_COLOR = GAME_PALETTE.grassDark;
 /**
+ * Woodland (see Heightmap.forest). Read from above, a forest is canopy —
+ * darker and denser than the turf around it — so it gets its own base
+ * colour and its own, much denser dither rather than a tint of grass.
+ * Being obviously distinct matters for play, not just looks: a forest is
+ * fuel, and the player has to see at a glance what a fire would run
+ * through.
+ */
+const FOREST_COLOR = GAME_PALETTE.grassDark;
+const FOREST_SPECKLE_COLOR = 0x1e3a12;
+const FOREST_DITHER_DENSITY = 0.55;
+/**
  * Size (px, at scale 1) of one repeat of a terrain's dither texture — see
  * createDitherTexture. Small relative to a tile (64x32px) so it tiles
  * several times across each tile, reading as a fine even stipple like the
@@ -280,6 +291,11 @@ function createWaveTexture(size: number, baseColor: number, waveColor: number, p
  * actually painted onto it, rather than sliding around as if it were laid
  * over the screen.
  */
+const FOREST_FILL = {
+  texture: createDitherTexture(DITHER_SIZE, FOREST_COLOR, FOREST_SPECKLE_COLOR, FOREST_DITHER_DENSITY),
+  textureSpace: "global",
+} as const;
+
 const TERRAIN_FILL: Record<Heightmap["terrain"], { texture: Texture; textureSpace: "global" }> = {
   grass: {
     texture: createDitherTexture(DITHER_SIZE, TERRAIN_COLOR.grass, GRASS_SPECKLE_COLOR, GRASS_SPECKLE_DENSITY),
@@ -611,7 +627,7 @@ export class IsoRenderer {
    * initial full-map render before any camera/viewport exists yet.
    */
   redraw(bounds?: TileBounds): void {
-    const { width, height, rockHardness, waterLevel, terrain } = this.heightmap;
+    const { width, height, rockHardness, forest, waterLevel, terrain } = this.heightmap;
     const vertices = this.displayVertices;
     const graphics = this.graphics;
     graphics.clear();
@@ -672,7 +688,9 @@ export class IsoRenderer {
 
         const isWater = avgElevation <= waterLevel;
         const isRock = isRockTile[y - minY][x - minX];
-        const baseColor = isWater ? WATER_COLOR : isRock ? VOLCANO_ROCK_COLOR : TERRAIN_COLOR[terrain];
+        const isForestTile =
+          !isWater && !isRock && (forest[y][x] || forest[y][x + 1] || forest[y + 1][x + 1] || forest[y + 1][x]);
+        const baseColor = isWater ? WATER_COLOR : isRock ? VOLCANO_ROCK_COLOR : isForestTile ? FOREST_COLOR : TERRAIN_COLOR[terrain];
 
         if (isWater) {
           // Water always reads as a single flat, unshaded plane — never a
@@ -699,8 +717,8 @@ export class IsoRenderer {
           // 3 points are always planar, so each triangle (unlike the full
           // 4-corner quad, which can warp into a non-planar "saddle" when
           // all 4 corners differ) has one well-defined normal to shade by.
-          this.fillTerrainTriangle(graphics, a, b, c, baseColor, terrain, isRock);
-          this.fillTerrainTriangle(graphics, a, c, d2, baseColor, terrain, isRock);
+          this.fillTerrainTriangle(graphics, a, b, c, baseColor, terrain, isRock, isForestTile);
+          this.fillTerrainTriangle(graphics, a, c, d2, baseColor, terrain, isRock, isForestTile);
         }
 
         // The map's own outer edge always gets a genuine vertical wall
@@ -782,13 +800,17 @@ export class IsoRenderer {
     baseColor: number,
     terrain: Heightmap["terrain"],
     isRock: boolean,
+    isForest = false,
   ): void {
     const pa = this.toScreen(a.x, a.y, a.z);
     const pb = this.toScreen(b.x, b.y, b.z);
     const pc = this.toScreen(c.x, c.y, c.z);
     const isFlat = Math.abs(a.z - b.z) < FLAT_EPSILON && Math.abs(b.z - c.z) < FLAT_EPSILON;
 
-    const fill = isFlat && !isRock ? TERRAIN_FILL[terrain] : shadeColor(baseColor, isFlat ? 1 : triangleBrightness(a, b, c));
+    // Flat ground takes a dither texture (canopy for woodland, the
+    // terrain's own otherwise); anything sloped or rocky is shaded flat
+    // colour, since a global-space texture cannot follow a slope.
+    const fill = isFlat && !isRock ? (isForest ? FOREST_FILL : TERRAIN_FILL[terrain]) : shadeColor(baseColor, isFlat ? 1 : triangleBrightness(a, b, c));
 
     graphics.poly([pa.sx, pa.sy, pb.sx, pb.sy, pc.sx, pc.sy]).fill(fill);
   }

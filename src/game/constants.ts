@@ -295,6 +295,21 @@ export const HERO_ACTION_COOLDOWN = 6;
 export const VOLCANO_MANA_COST = 40;
 
 /**
+ * How much faster a house surrounded by woodland grows — the original's 森
+ * (docs/original-miracles.md #6). Deliberately worth casting but not
+ * decisive on its own: the forest's other half is that it burns, and a
+ * growth bonus so large that nobody would ever risk losing it would kill
+ * the 森 -> 火の雨 interaction the miracle exists for.
+ */
+export const FOREST_GROWTH_MULTIPLIER = 1.5;
+
+/** Mana cost of planting a forest — cheap, since its payoff is slow and it can be turned against its owner. */
+export const FOREST_MANA_COST = 10;
+
+/** Mana cost of fire rain — mid-tier on its own, but a forest multiplies what it reaches. */
+export const FIRE_RAIN_MANA_COST = 25;
+
+/**
  * Mana cost of a tsunami — "特大" tier, the priciest miracle short of the
  * final battle. It no longer endangers the caster's own land automatically
  * (it is aimed now, see applyTsunami), but it can erase a whole coastal

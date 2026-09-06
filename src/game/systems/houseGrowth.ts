@@ -1,6 +1,12 @@
 import type { System, World } from "../../ecs";
-import type { Heightmap } from "../../world/heightmap";
-import { DEFAULT_POPULATION_GROWTH_RATE, DEFAULT_WALKER_SPEED, HOUSE_LEVELS, TERRAIN_GROWTH_MULTIPLIER } from "../constants";
+import { isForest, type Heightmap } from "../../world/heightmap";
+import {
+  DEFAULT_POPULATION_GROWTH_RATE,
+  DEFAULT_WALKER_SPEED,
+  FOREST_GROWTH_MULTIPLIER,
+  HOUSE_LEVELS,
+  TERRAIN_GROWTH_MULTIPLIER,
+} from "../constants";
 import { House, Owner, Position, type FactionId, Walker } from "../components";
 
 export interface HouseGrowthConfig {
@@ -39,7 +45,10 @@ export function createHouseGrowthSystem(config: Partial<HouseGrowthConfig> = {})
       const owner = world.get(entity, Owner)!;
       const capacity = HOUSE_LEVELS[house.level].capacity;
 
-      let population = house.population + growthRate * deltaSeconds;
+      // Woodland around a house speeds its growth — the original's 森
+      // (docs/original-miracles.md #6), "信者の成長を促進する効果".
+      const woodland = config.heightmap && isForest(config.heightmap, pos.x, pos.y) ? FOREST_GROWTH_MULTIPLIER : 1;
+      let population = house.population + growthRate * woodland * deltaSeconds;
 
       while (
         population >= capacity &&

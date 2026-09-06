@@ -155,6 +155,8 @@ export type MatchEventType =
   | "earthquake"
   | "swamp"
   | "volcano"
+  | "forest"
+  | "fireRain"
   | "knight"
   | "guardian"
   | "armageddon"

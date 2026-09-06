@@ -14,6 +14,16 @@ export interface Heightmap {
    */
   rockHardness: number[][];
   /**
+   * Per-vertex: does woodland stand here?
+   *
+   * The original's 森 (docs/original-miracles.md #6) speeds the growth of
+   * the people near it — and burns. Both halves matter: on its own a
+   * forest is a modest economic buff, but it is also the fuel that turns
+   * 火の雨 from a small circle into a firestorm, which is the first
+   * interaction the original's design actually asks for.
+   */
+  forest: boolean[][];
+  /**
    * Current sea level — starts at MIN_ELEVATION and only ever rises, via
    * applyFlood. Anything at or below it is water, per docs/game-system.md's
    * 洪水, "海面を1段上昇させる".
@@ -72,7 +82,8 @@ export function createHeightmap(
     vertices.push(row);
     rockHardness.push(new Array(width + 1).fill(0));
   }
-  return { width, height, terrain, vertices, rockHardness, waterLevel: MIN_ELEVATION };
+  const forest = Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
+  return { width, height, terrain, vertices, rockHardness, forest, waterLevel: MIN_ELEVATION };
 }
 
 /**
@@ -585,4 +596,111 @@ export function applyReef(heightmap: Heightmap, x: number, y: number, hardness: 
   heightmap.vertices[vy][vx] = Math.min(MAX_ELEVATION, heightmap.waterLevel + REEF_HEIGHT);
   heightmap.rockHardness[vy][vx] = hardness;
   return true;
+}
+
+/** How far from its cast point a forest plants trees, in vertices. */
+export const DEFAULT_FOREST_RADIUS = 3;
+
+/** Whether woodland stands at the vertex nearest (x, y) — see Heightmap.forest. */
+export function isForest(heightmap: Heightmap, x: number, y: number): boolean {
+  const vx = Math.round(x);
+  const vy = Math.round(y);
+  if (vx < 0 || vy < 0 || vx > heightmap.width || vy > heightmap.height) return false;
+  return heightmap.forest[vy][vx];
+}
+
+/**
+ * The original's 森 (docs/original-miracles.md #6): trees over the ground
+ * around a point.
+ *
+ * Only on land that could be built on — trees do not grow on water, on
+ * volcanic rock, or below the sea. Returns the vertices planted, so the
+ * caller can tell whether the cast did anything at all.
+ */
+export function applyForest(
+  heightmap: Heightmap,
+  centerX: number,
+  centerY: number,
+  radius: number = DEFAULT_FOREST_RADIUS,
+): { x: number; y: number }[] {
+  const cx = Math.round(centerX);
+  const cy = Math.round(centerY);
+  const planted: { x: number; y: number }[] = [];
+
+  for (let dy = -radius; dy <= radius; dy++) {
+    const vy = cy + dy;
+    if (vy < 0 || vy > heightmap.height) continue;
+    for (let dx = -radius; dx <= radius; dx++) {
+      const vx = cx + dx;
+      if (vx < 0 || vx > heightmap.width) continue;
+      if (Math.hypot(dx, dy) > radius) continue;
+      if (heightmap.forest[vy][vx]) continue;
+      if (!isBuildable(heightmap, vx, vy)) continue;
+
+      heightmap.forest[vy][vx] = true;
+      planted.push({ x: vx, y: vy });
+    }
+  }
+
+  return planted;
+}
+
+/** How far from its cast point fire rain falls, before any spread through woodland. */
+export const DEFAULT_FIRE_RAIN_RADIUS = 3;
+
+/**
+ * The original's 火の雨 (docs/original-miracles.md #22): fire over an area
+ * — and, through woodland, far beyond it.
+ *
+ * "森を作ってから火の雨を使うと広範囲へ延焼する" is the first interaction
+ * the original's own design asks for, and it is the reason both of these
+ * exist in the same change. On bare ground this is a small circle. Dropped
+ * on a forest it runs the length of the woodland, burning it away as it
+ * goes — so a forest is an investment that can be turned against its
+ * owner, which is exactly the sort of thing that makes 29 miracles worth
+ * having rather than 29 damage numbers.
+ *
+ * Returns every vertex that burned, for the caller to clear of houses and
+ * walkers (see game/fire.ts).
+ */
+export function applyFireRain(
+  heightmap: Heightmap,
+  centerX: number,
+  centerY: number,
+  radius: number = DEFAULT_FIRE_RAIN_RADIUS,
+): { x: number; y: number }[] {
+  const cx = Math.round(centerX);
+  const cy = Math.round(centerY);
+  const key = (x: number, y: number) => y * (heightmap.width + 1) + x;
+  const burned = new Map<number, { x: number; y: number }>();
+  const queue: { x: number; y: number }[] = [];
+
+  const burn = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x > heightmap.width || y > heightmap.height) return;
+    if (burned.has(key(x, y))) return;
+    burned.set(key(x, y), { x, y });
+    // Woodland carries the fire onward; bare ground does not. Burnt trees
+    // are gone, which also stops the fire from looping back on itself.
+    if (heightmap.forest[y][x]) {
+      heightmap.forest[y][x] = false;
+      queue.push({ x, y });
+    }
+  };
+
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      if (Math.hypot(dx, dy) > radius) continue;
+      burn(cx + dx, cy + dy);
+    }
+  }
+
+  while (queue.length > 0) {
+    const { x, y } = queue.shift()!;
+    burn(x + 1, y);
+    burn(x - 1, y);
+    burn(x, y + 1);
+    burn(x, y - 1);
+  }
+
+  return [...burned.values()];
 }

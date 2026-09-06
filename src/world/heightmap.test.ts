@@ -10,6 +10,8 @@ import {
   applyEarthquake,
   applyReef,
   applyTsunami,
+  applyFireRain,
+  applyForest,
   applyVolcano,
   countFlatNeighbors,
   createHeightmap,
@@ -17,6 +19,7 @@ import {
   flattenTile,
   isBuildable,
   isInWaterPool,
+  isForest,
   isRock,
   REEF_HEIGHT,
   isTerrainEditAllowed,
@@ -28,6 +31,10 @@ import {
   type TerrainEditRule,
 } from "./heightmap";
 
+function blankLayer(width: number, height: number): boolean[][] {
+  return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
+}
+
 function flatHeightmap(
   width: number,
   height: number,
@@ -36,7 +43,7 @@ function flatHeightmap(
 ): Heightmap {
   const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
   const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
-  return { width, height, terrain: "grass", vertices, rockHardness, waterLevel };
+  return { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height), waterLevel };
 }
 
 describe("createHeightmap", () => {
@@ -707,5 +714,91 @@ describe("applyReef", () => {
 
     expect(applyReef(heightmap, -1, 5)).toBe(false);
     expect(applyReef(heightmap, 5, 99)).toBe(false);
+  });
+});
+
+describe("applyForest", () => {
+  it("plants woodland around the cast point", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    applyForest(heightmap, 10, 10, 2);
+
+    expect(isForest(heightmap, 10, 10)).toBe(true);
+    expect(isForest(heightmap, 11, 10)).toBe(true);
+  });
+
+  it("leaves ground beyond the radius bare", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    applyForest(heightmap, 10, 10, 2);
+
+    expect(isForest(heightmap, 15, 10)).toBe(false);
+  });
+
+  it("does not grow on water", () => {
+    const heightmap = flatHeightmap(20, 20, MIN_ELEVATION);
+
+    expect(applyForest(heightmap, 10, 10, 2)).toEqual([]);
+  });
+
+  it("does not grow on volcanic rock", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyVolcano(heightmap, 10, 10, 0);
+
+    applyForest(heightmap, 10, 10, 0);
+
+    expect(isForest(heightmap, 10, 10)).toBe(false);
+  });
+
+  it("reports nothing planted when it plants nothing, so the caller can refuse the cast", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyForest(heightmap, 10, 10, 1);
+
+    expect(applyForest(heightmap, 10, 10, 1)).toEqual([]);
+  });
+});
+
+describe("applyFireRain", () => {
+  it("burns a circle of bare ground and stops there", () => {
+    const heightmap = flatHeightmap(30, 30, 5);
+
+    const burned = applyFireRain(heightmap, 15, 15, 2);
+
+    expect(burned).toContainEqual({ x: 15, y: 15 });
+    expect(burned.some(({ x, y }) => Math.hypot(x - 15, y - 15) > 2)).toBe(false);
+  });
+
+  /**
+   * The interaction both of these exist for
+   * (docs/original-miracles.md): "森を作ってから火の雨を使うと広範囲へ
+   * 延焼する". Without it, a forest is a plain growth buff and fire rain is
+   * a plain circle — and 29 miracles would just be 29 damage numbers.
+   */
+  it("runs the length of a forest, far beyond where it fell", () => {
+    const heightmap = flatHeightmap(40, 40, 5);
+    for (let x = 15; x <= 35; x++) heightmap.forest[20][x] = true;
+
+    const burned = applyFireRain(heightmap, 16, 20, 1);
+
+    expect(burned).toContainEqual({ x: 35, y: 20 });
+  });
+
+  it("consumes the woodland it burns through", () => {
+    const heightmap = flatHeightmap(40, 40, 5);
+    for (let x = 15; x <= 35; x++) heightmap.forest[20][x] = true;
+
+    applyFireRain(heightmap, 16, 20, 1);
+
+    expect(heightmap.forest[20].some(Boolean)).toBe(false);
+  });
+
+  it("does not jump a gap in the woodland — the fire needs fuel to carry it", () => {
+    const heightmap = flatHeightmap(40, 40, 5);
+    for (let x = 15; x <= 20; x++) heightmap.forest[20][x] = true;
+    for (let x = 25; x <= 35; x++) heightmap.forest[20][x] = true;
+
+    applyFireRain(heightmap, 16, 20, 1);
+
+    expect(heightmap.forest[20][30]).toBe(true);
   });
 });

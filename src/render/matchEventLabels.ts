@@ -14,6 +14,8 @@ const MATCH_EVENT_TEMPLATE: Record<MatchEventType, string> = {
   guardian: "{subject}がリーダーを守護者化した",
   armageddon: "{subject}が最終決戦を発動した",
   tsunami: "{subject}が津波を起こした",
+  forest: "{subject}が森を生やした",
+  fireRain: "{subject}が火の雨を降らせた",
   reef: "{subject}が岩礁を生み出した",
   houseCaptured: "{subject}が{opponent}の家を奪った",
   houseBurned: "{subject}が{opponent}の家を焼き払った",

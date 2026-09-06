@@ -10,6 +10,8 @@ const ALL_KINDS: IconKind[] = [
   "swamp",
   "knight",
   "guardian",
+  "forest",
+  "fireRain",
   "volcano",
   "reef",
   "tsunami",
