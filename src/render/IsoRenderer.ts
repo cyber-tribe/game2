@@ -151,6 +151,13 @@ export const TERRAIN_COLOR: Record<Heightmap["terrain"], number> = {
 };
 
 const WATER_COLOR = GAME_PALETTE.waterMid;
+/**
+ * Torn ground (see Heightmap.crevice). Near-black, and deliberately darker
+ * than anything else on the map: a crevice kills whoever walks into it, so
+ * it has to read as a hole at a glance rather than as one more shade of
+ * terrain.
+ */
+const CREVICE_COLOR = 0x120e08;
 
 /**
  * A single flat solid color read as "のっぺり" (flat, lifeless) next to the
@@ -611,7 +618,7 @@ export class IsoRenderer {
    * initial full-map render before any camera/viewport exists yet.
    */
   redraw(bounds?: TileBounds): void {
-    const { width, height, rockHardness, waterLevel, terrain } = this.heightmap;
+    const { width, height, rockHardness, crevice, waterLevel, terrain } = this.heightmap;
     const vertices = this.displayVertices;
     const graphics = this.graphics;
     graphics.clear();
@@ -672,9 +679,17 @@ export class IsoRenderer {
 
         const isWater = avgElevation <= waterLevel;
         const isRock = isRockTile[y - minY][x - minX];
-        const baseColor = isWater ? WATER_COLOR : isRock ? VOLCANO_ROCK_COLOR : TERRAIN_COLOR[terrain];
+        const isCreviceTile =
+          crevice[y][x] || crevice[y][x + 1] || crevice[y + 1][x + 1] || crevice[y + 1][x];
+        const baseColor = isCreviceTile
+          ? CREVICE_COLOR
+          : isWater
+            ? WATER_COLOR
+            : isRock
+              ? VOLCANO_ROCK_COLOR
+              : TERRAIN_COLOR[terrain];
 
-        if (isWater) {
+        if (isWater && !isCreviceTile) {
           // Water always reads as a single flat, unshaded plane — never a
           // sloped/shaded seabed showing through — at its own tile's
           // average depth, same as before this became a per-vertex mesh.
@@ -699,8 +714,8 @@ export class IsoRenderer {
           // 3 points are always planar, so each triangle (unlike the full
           // 4-corner quad, which can warp into a non-planar "saddle" when
           // all 4 corners differ) has one well-defined normal to shade by.
-          this.fillTerrainTriangle(graphics, a, b, c, baseColor, terrain, isRock);
-          this.fillTerrainTriangle(graphics, a, c, d2, baseColor, terrain, isRock);
+          this.fillTerrainTriangle(graphics, a, b, c, baseColor, terrain, isRock || isCreviceTile);
+          this.fillTerrainTriangle(graphics, a, c, d2, baseColor, terrain, isRock || isCreviceTile);
         }
 
         // The map's own outer edge always gets a genuine vertical wall
@@ -781,14 +796,20 @@ export class IsoRenderer {
     c: Vec3,
     baseColor: number,
     terrain: Heightmap["terrain"],
-    isRock: boolean,
+    hasOwnColor: boolean,
   ): void {
     const pa = this.toScreen(a.x, a.y, a.z);
     const pb = this.toScreen(b.x, b.y, b.z);
     const pc = this.toScreen(c.x, c.y, c.z);
     const isFlat = Math.abs(a.z - b.z) < FLAT_EPSILON && Math.abs(b.z - c.z) < FLAT_EPSILON;
 
-    const fill = isFlat && !isRock ? TERRAIN_FILL[terrain] : shadeColor(baseColor, isFlat ? 1 : triangleBrightness(a, b, c));
+    // `hasOwnColor` is what keeps the flat-tile shortcut from swallowing
+    // tiles that are not ordinary ground. A flat triangle normally takes
+    // the terrain's dither texture and ignores baseColor entirely — which
+    // silently painted freshly-torn crevices as grass, since a crevice is
+    // carved dead flat to the floor and so hit that path every time.
+    const fill =
+      isFlat && !hasOwnColor ? TERRAIN_FILL[terrain] : shadeColor(baseColor, isFlat ? 1 : triangleBrightness(a, b, c));
 
     graphics.poly([pa.sx, pa.sy, pb.sx, pb.sy, pc.sx, pc.sy]).fill(fill);
   }

@@ -14,6 +14,7 @@ export { createEnemyAiSystem, type EnemyAiConfig } from "./systems/enemyAi";
 export { leaderSystem } from "./systems/leader";
 export { goToShrineSystem } from "./systems/goToShrine";
 export { createSwamp } from "./swamp";
+export { createCreviceSystem, type CreviceConfig } from "./systems/crevice";
 export { createSwampSystem, type SwampConfig } from "./systems/swamp";
 export type { ImpactEffectEvent, ImpactEffectSnapshot, ImpactEffectType, OnImpactEffect } from "./systems/effects";
 export { eruptVolcano } from "./volcano";

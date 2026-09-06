@@ -34,6 +34,7 @@ import { leaderSystem } from "./systems/leader";
 import { manaSystem } from "./systems/mana";
 import { movementSystem } from "./systems/movement";
 import { createSettleSystem } from "./systems/settle";
+import { createCreviceSystem } from "./systems/crevice";
 import { createSwampSystem } from "./systems/swamp";
 import { createWanderTargetSystem } from "./systems/wanderTarget";
 import { ALL_MIRACLES, type EnemyPersonality, type MiracleId } from "./worlds";
@@ -242,6 +243,7 @@ export class Simulation {
       .add(movementSystem)
       .add(gatherSystem)
       .add(createSwampSystem({ onImpact: (event) => this.recordImpactEffect(event) }))
+      .add(createCreviceSystem({ heightmap: config.heightmap, onImpact: (event) => this.recordImpactEffect(event) }))
       .add(
         createDrowningSystem({
           heightmap: config.heightmap,

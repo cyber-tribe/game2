@@ -14,6 +14,17 @@ export interface Heightmap {
    */
   rockHardness: number[][];
   /**
+   * Per-vertex: is this a crevice torn open by an earthquake?
+   *
+   * Separate from elevation on purpose. A crevice is not merely low ground
+   * — the original's 地震 (docs/original-miracles.md #13) opens a fissure
+   * that kills anyone who falls in and stays until it is repaired, and a
+   * later 花 will close it while ヘラクレス walks over it unharmed. None of
+   * that is expressible as "this vertex is at elevation 0"; low ground is
+   * something walkers stand on quite happily.
+   */
+  crevice: boolean[][];
+  /**
    * Current sea level — starts at MIN_ELEVATION and only ever rises, via
    * applyFlood. Anything at or below it is water, per docs/game-system.md's
    * 洪水, "海面を1段上昇させる".
@@ -72,7 +83,8 @@ export function createHeightmap(
     vertices.push(row);
     rockHardness.push(new Array(width + 1).fill(0));
   }
-  return { width, height, terrain, vertices, rockHardness, waterLevel: MIN_ELEVATION };
+  const crevice = Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
+  return { width, height, terrain, vertices, rockHardness, crevice, waterLevel: MIN_ELEVATION };
 }
 
 /**
@@ -134,6 +146,11 @@ export function raiseVertex(heightmap: Heightmap, x: number, y: number, delta: n
 
   const hardnessRow = heightmap.rockHardness[y];
   if (hardnessRow[x] > 0) hardnessRow[x] -= 1;
+  // Filling a fissure back in closes it. The original has 花 (#7) for
+  // repairing torn ground and this will move there when that exists; until
+  // then, terraforming is the only repair the game has, and a crevice
+  // nothing can ever close would be a permanent hole in the map.
+  if (heightmap.crevice[y][x] && heightmap.vertices[y][x] > MIN_ELEVATION) heightmap.crevice[y][x] = false;
 }
 
 /**
@@ -225,7 +242,15 @@ export function isRock(heightmap: Heightmap, x: number, y: number): boolean {
  * "岩の上には建築できない".
  */
 export function isBuildable(heightmap: Heightmap, x: number, y: number): boolean {
-  return sampleElevation(heightmap, x, y) > heightmap.waterLevel && !isRock(heightmap, x, y);
+  return sampleElevation(heightmap, x, y) > heightmap.waterLevel && !isRock(heightmap, x, y) && !isCrevice(heightmap, x, y);
+}
+
+/** Whether the vertex nearest (x, y) is a crevice — see Heightmap.crevice and applyEarthquake. */
+export function isCrevice(heightmap: Heightmap, x: number, y: number): boolean {
+  const vx = Math.round(x);
+  const vy = Math.round(y);
+  if (vx < 0 || vy < 0 || vx > heightmap.width || vy > heightmap.height) return false;
+  return heightmap.crevice[vy][vx];
 }
 
 /** Whether tile (tileX, tileY) itself — not just one corner — sits at/below sea level, same test IsoRenderer's redraw() uses to pick a water tile's fill. */
@@ -342,41 +367,84 @@ export function findLeastFlatVertex(
  * radius despite costing half as much, letting one cheap cast wreck
  * several houses' flatness at once.
  */
-export const DEFAULT_EARTHQUAKE_RADIUS = 2;
-export const DEFAULT_EARTHQUAKE_MAX_DELTA = 4;
+/** How many vertices long a crevice runs, before its own random wander. */
+export const DEFAULT_EARTHQUAKE_LENGTH = 10;
 
 /**
- * Randomly heaves or drops every vertex within `radius` of (centerX,
- * centerY), each by an independent delta in [-maxDelta, maxDelta] —
- * docs/game-system.md's "対象範囲の地形をランダムに隆起・陥没させ、
- * 平地を壊す". Breaking up flat land this way is what makes earthquake
- * useful against enemy settlements: createHouseUpgradeSystem reacts to
- * the resulting drop in flatness by downgrading houses caught in it.
+ * How far the crack may wander sideways from its nominal heading, per step,
+ * in vertices. Zero would draw a ruler line; this is what makes it read as
+ * ground tearing rather than a trench being dug.
+ */
+const EARTHQUAKE_WANDER = 0.3;
+
+/**
+ * Radius still used by callers that need "roughly how much ground an
+ * earthquake disturbs" — the enemy AI's target picking and the swamp
+ * collapse it triggers. The crevice itself is a line, not a disc, so this
+ * is only ever an approximation of its footprint.
+ */
+export const DEFAULT_EARTHQUAKE_RADIUS = 2;
+
+/**
+ * The original's 地震 (docs/original-miracles.md #13): a long fissure torn
+ * from a point in a chosen direction.
+ *
+ * This replaces a circular patch of random raise/lower. The original is
+ * explicit that the direction is aimed — "方向はポインタで示される" — and
+ * that what it leaves behind is a crevice that kills whoever falls in and
+ * persists until repaired, not merely churned ground. Randomly nudging a
+ * disc up and down gave neither: it had no direction to aim, and its only
+ * lasting effect was to make the area briefly unflat.
+ *
+ * The crack is carved to MIN_ELEVATION and marked in `crevice`, which is
+ * what makes it lethal (see systems/crevice.ts) and unbuildable (see
+ * isBuildable). It wanders as it runs, so it reads as torn ground.
  */
 export function applyEarthquake(
   heightmap: Heightmap,
-  centerX: number,
-  centerY: number,
-  radius: number = DEFAULT_EARTHQUAKE_RADIUS,
-  maxDelta: number = DEFAULT_EARTHQUAKE_MAX_DELTA,
+  originX: number,
+  originY: number,
+  directionX: number,
+  directionY: number,
+  length: number = DEFAULT_EARTHQUAKE_LENGTH,
   rng: () => number = Math.random,
 ): void {
-  const cx = Math.round(centerX);
-  const cy = Math.round(centerY);
+  const magnitude = Math.hypot(directionX, directionY);
+  // A cast with no direction at all still has to do something rather than
+  // silently no-op; east is as good as any other arbitrary choice.
+  const stepX = magnitude === 0 ? 1 : directionX / magnitude;
+  const stepY = magnitude === 0 ? 0 : directionY / magnitude;
 
-  for (let dy = -radius; dy <= radius; dy++) {
-    const vy = cy + dy;
-    if (vy < 0 || vy > heightmap.height) continue;
-    for (let dx = -radius; dx <= radius; dx++) {
-      const vx = cx + dx;
-      if (vx < 0 || vx > heightmap.width) continue;
-      const delta = Math.round((rng() * 2 - 1) * maxDelta);
-      raiseVertex(heightmap, vx, vy, delta);
-    }
+  let x = originX;
+  let y = originY;
+
+  for (let step = 0; step < length; step++) {
+    // Perpendicular wander, so the crack drifts off its heading without
+    // ever doubling back along it.
+    const wander = (rng() * 2 - 1) * EARTHQUAKE_WANDER;
+    x += stepX + -stepY * wander;
+    y += stepY + stepX * wander;
+
+    const vx = Math.round(x);
+    const vy = Math.round(y);
+    if (vx < 0 || vy < 0 || vx > heightmap.width || vy > heightmap.height) return;
+
+    // The centreline only. A tile renders as torn if any of its four
+    // corners is, so one marked vertex already reads as a crack a couple of
+    // tiles wide on screen; marking a second, perpendicular vertex per step
+    // turned it into a black blob rather than a fissure. Lethality does not
+    // need the extra width either — creviceSystem samples every tick, and a
+    // walker crossing a one-vertex band is inside it for tens of ticks.
+    tearCrevice(heightmap, vx, vy);
   }
 }
 
-/** Radius (in vertices) and rock hardness of a default volcano. */
+function tearCrevice(heightmap: Heightmap, x: number, y: number): void {
+  if (x < 0 || y < 0 || x > heightmap.width || y > heightmap.height) return;
+  heightmap.vertices[y][x] = MIN_ELEVATION;
+  heightmap.crevice[y][x] = true;
+}
+
 export const DEFAULT_VOLCANO_RADIUS = 1;
 export const VOLCANO_ROCK_HARDNESS = 20;
 
