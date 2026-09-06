@@ -23,6 +23,7 @@ const TOOL_ICON: Record<ToolMode, IconKind> = {
   firePillar: "firePillar",
   lightning: "lightning",
   storm: "storm",
+  plague: "plague",
   hurricane: "hurricane",
   perseus: "perseus",
   hercules: "hercules",

@@ -1,6 +1,6 @@
 import type { System } from "../../ecs";
 import { HOUSE_LEVELS, HUT_MANA_RATE_CAP, MAX_MANA } from "../constants";
-import { FactionState, House, Owner } from "../components";
+import { FactionState, House, Infected, Owner } from "../components";
 
 /**
  * Each faction's mana grows at the combined mana rate of every house it
@@ -31,6 +31,10 @@ export const manaSystem: System = (world, deltaSeconds) => {
     for (const houseEntity of world.query(House, Owner)) {
       const owner = world.get(houseEntity, Owner)!;
       if (owner.faction !== faction.id) continue;
+      // 病原菌 「感染者はマナを供給できず」 (docs/original-miracles.md #4).
+      // The house still stands, still holds its people, still counts for
+      // survival — it simply stops paying, which is the whole miracle.
+      if (world.has(houseEntity, Infected)) continue;
       const house = world.get(houseEntity, House)!;
       const { capacity, manaRate: levelManaRate } = HOUSE_LEVELS[house.level];
       const rate = levelManaRate * (house.population / capacity);

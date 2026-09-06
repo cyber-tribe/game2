@@ -216,6 +216,28 @@ export interface Tornado {
 }
 
 /**
+ * The original's 病原菌 (docs/original-miracles.md #4): 「信者を感染させ
+ * 周囲へ広げる。感染者はマナを供給できず、ハルマゲドンにも参加できない。
+ * **即死ではなく国力を長期的に削る**」.
+ *
+ * The only miracle in the game that takes nothing away — no walker dies,
+ * no house falls, no ground is ruined. It simply makes what a faction owns
+ * stop *working*: an infected house earns nothing (systems/mana.ts) and an
+ * infected walker will not answer the final battle (armageddon.ts). Cast
+ * on a thriving settlement it does not look like an attack at all for the
+ * first half-minute, which is exactly what 「国力を長期的に削る」 means.
+ *
+ * Carried by both walkers and houses — a sick person who settles builds a
+ * sick house — and it burns out on its own after PLAGUE_DURATION, which is
+ * what keeps a plague from ending every match in a stalemate where nobody
+ * can afford anything.
+ */
+export interface Infected {
+  /** Seconds until this one recovers. */
+  remaining: number;
+}
+
+/**
  * The original's 嵐 (docs/original-miracles.md #18): 「雷雲を発生させ周辺へ
  * 継続的に落雷。単発の雷と違い**範囲持続型**。この雷は**人には直接
  * 当たらない**」.
@@ -316,6 +338,7 @@ export const Tornado = defineComponent<Tornado>("Tornado");
 export const Whirlpool = defineComponent<Whirlpool>("Whirlpool");
 export const FirePillar = defineComponent<FirePillar>("FirePillar");
 export const Storm = defineComponent<Storm>("Storm");
+export const Infected = defineComponent<Infected>("Infected");
 export const Charmed = defineComponent<Charmed>("Charmed");
 export const HeroCooldown = defineComponent<HeroCooldown>("HeroCooldown");
 export const Drowning = defineComponent<Drowning>("Drowning");

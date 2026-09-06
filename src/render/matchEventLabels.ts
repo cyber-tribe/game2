@@ -14,6 +14,7 @@ const MATCH_EVENT_TEMPLATE: Record<MatchEventType, string> = {
   firePillar: "{subject}が火柱を立てた",
   lightning: "{subject}が雷を落とした",
   storm: "{subject}が嵐を呼んだ",
+  plague: "{subject}が病原菌をばら撒いた",
   hurricane: "{subject}がハリケーンを起こした",
   volcano: "{subject}が火山を起こした",
   perseus: "{subject}のリーダーがペルセウスになった",
