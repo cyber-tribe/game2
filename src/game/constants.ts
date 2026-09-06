@@ -245,6 +245,31 @@ export const SWAMP_RADIUS = 1.2;
 /** How many walkers a swamp swallows before it dries up and disappears. */
 export const SWAMP_CAPACITY = 5;
 
+/** How far from its cast point a 聖水の泉 converts walkers — see holyWater.ts. */
+export const HOLY_WATER_RADIUS = 1.5;
+
+/**
+ * How many walkers one 聖水の泉 takes before it dries up.
+ *
+ * Deliberately small. The spring's value is not volume — it is *which*
+ * walker falls in, and the original says so: 「強い英雄を奪えば形勢逆転
+ * できる」. At 3, one well-placed spring can take a hero and a couple of
+ * its escort, which is a turning point; at 20 it would quietly digest a
+ * whole army and the placement would stop mattering.
+ */
+export const HOLY_WATER_CAPACITY = 3;
+
+/**
+ * Mana cost of a 聖水の泉 — "大" tier, above a swamp.
+ *
+ * A swamp of the same size deletes what walks in; this takes it and hands
+ * it back pointed the other way, which is worth roughly twice as much in a
+ * fight (their strongest unit leaves their side *and* joins yours). Priced
+ * to be a decision rather than a habit: at 45 it is not something to leave
+ * lying around on the off-chance.
+ */
+export const HOLY_WATER_MANA_COST = 45;
+
 /**
  * Mana cost of turning the leader into ペルセウス — "大" tier, on par with
  * a volcano: a single relentless attacker that keeps destroying enemy

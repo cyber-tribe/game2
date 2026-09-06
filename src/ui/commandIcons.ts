@@ -18,6 +18,7 @@ const TOOL_ICON: Record<ToolMode, IconKind> = {
   shrine: "shrine",
   earthquake: "earthquake",
   swamp: "swamp",
+  holyWater: "holyWater",
   perseus: "perseus",
   hercules: "hercules",
   odysseus: "odysseus",

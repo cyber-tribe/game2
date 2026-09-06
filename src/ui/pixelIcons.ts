@@ -14,6 +14,7 @@ export type IconKind =
   | "shrine"
   | "earthquake"
   | "swamp"
+  | "holyWater"
   | "perseus"
   | "hercules"
   | "odysseus"

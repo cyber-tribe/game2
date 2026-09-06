@@ -9,6 +9,7 @@ const MATCH_EVENT_TEMPLATE: Record<MatchEventType, string> = {
   shrineMove: "{subject}が集結地を移動した",
   earthquake: "{subject}が地震を起こした",
   swamp: "{subject}が沼を作った",
+  holyWater: "{subject}が聖水の泉を湧かせた",
   volcano: "{subject}が火山を起こした",
   perseus: "{subject}のリーダーがペルセウスになった",
   hercules: "{subject}のリーダーがヘラクレスになった",

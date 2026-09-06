@@ -8,13 +8,14 @@
  * later — see main.ts's onEnemyAction, which already does this for the
  * screen-shake/toast but had no audio equivalent before this.
  */
-export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "volcano" | "perseus" | "hercules" | "odysseus" | "achilles" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "fungus";
+export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "holyWater" | "volcano" | "perseus" | "hercules" | "odysseus" | "achilles" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "fungus";
 
 /** Every MiracleSoundType, for tests and any future UI that wants to list them. */
 export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
   "shrineMove",
   "earthquake",
   "swamp",
+  "holyWater",
   "volcano",
   "perseus",
   "hercules",
@@ -74,6 +75,16 @@ export const RECIPES: Record<MiracleSoundType, MiracleSoundRecipe> = {
   swamp: {
     tones: [{ waveform: "sine", startFrequency: 220, endFrequency: 90, delay: 0, duration: 0.35, peakGain: 0.2 }],
     noise: { delay: 0.05, duration: 0.2, peakGain: 0.08, filterFrequency: 400 },
+  },
+  // A clear rising chime over a soft wash — the only unambiguously *pretty*
+  // sound in the set, because the spring is the only miracle that takes
+  // something rather than destroying it.
+  holyWater: {
+    tones: [
+      { waveform: "sine", startFrequency: 520, endFrequency: 780, delay: 0, duration: 0.5, peakGain: 0.16 },
+      { waveform: "sine", startFrequency: 780, endFrequency: 1040, delay: 0.14, duration: 0.45, peakGain: 0.1 },
+    ],
+    noise: { delay: 0, duration: 0.5, peakGain: 0.06, filterFrequency: 5200 },
   },
   volcano: {
     tones: [{ waveform: "sine", startFrequency: 80, endFrequency: 35, delay: 0, duration: 0.6, peakGain: 0.3 }],

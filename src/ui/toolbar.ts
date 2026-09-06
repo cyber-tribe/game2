@@ -7,6 +7,7 @@ export type ToolMode =
   | "shrine"
   | "earthquake"
   | "swamp"
+  | "holyWater"
   | "perseus"
   | "hercules"
   | "odysseus"
