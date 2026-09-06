@@ -80,7 +80,7 @@
       },
       "trimmed": false
     },
-    "icon_flood": {
+    "icon_gather": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -100,7 +100,7 @@
       },
       "trimmed": false
     },
-    "icon_gather": {
+    "icon_goToShrine": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -120,7 +120,7 @@
       },
       "trimmed": false
     },
-    "icon_goToShrine": {
+    "icon_guardian": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -140,7 +140,7 @@
       },
       "trimmed": false
     },
-    "icon_guardian": {
+    "icon_inspect": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -160,7 +160,7 @@
       },
       "trimmed": false
     },
-    "icon_inspect": {
+    "icon_knight": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -180,7 +180,7 @@
       },
       "trimmed": false
     },
-    "icon_knight": {
+    "icon_lower": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -200,7 +200,7 @@
       },
       "trimmed": false
     },
-    "icon_lower": {
+    "icon_mana": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -220,7 +220,7 @@
       },
       "trimmed": false
     },
-    "icon_mana": {
+    "icon_population": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -240,7 +240,7 @@
       },
       "trimmed": false
     },
-    "icon_population": {
+    "icon_raise": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -260,7 +260,7 @@
       },
       "trimmed": false
     },
-    "icon_raise": {
+    "icon_reef": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -360,11 +360,31 @@
       },
       "trimmed": false
     },
-    "icon_volcano": {
+    "icon_tsunami": {
       "frame": {
         "h": 16,
         "w": 16,
         "x": 32,
+        "y": 16
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 16,
+        "w": 16
+      },
+      "spriteSourceSize": {
+        "h": 16,
+        "w": 16,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "icon_volcano": {
+      "frame": {
+        "h": 16,
+        "w": 16,
+        "x": 48,
         "y": 16
       },
       "rotated": false,

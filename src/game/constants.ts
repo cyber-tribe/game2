@@ -295,10 +295,20 @@ export const HERO_ACTION_COOLDOWN = 6;
 export const VOLCANO_MANA_COST = 40;
 
 /**
- * Mana cost of a flood — "特大" tier, the priciest miracle short of the
- * final battle, since it endangers the caster's own low-lying land too.
+ * Mana cost of a tsunami — "特大" tier, the priciest miracle short of the
+ * final battle. It no longer endangers the caster's own land automatically
+ * (it is aimed now, see applyTsunami), but it can erase a whole coastal
+ * settlement in one cast, so the price stands.
  */
-export const FLOOD_MANA_COST = 70;
+export const TSUNAMI_MANA_COST = 70;
+
+/**
+ * Mana cost of a reef. Cheap on purpose: the original notes 岩礁 as a
+ * low-cost miracle, and its whole role here is to be worth building
+ * *before* an enemy tsunami rather than a reaction to one — a defence the
+ * player cannot afford to pre-place is not a defence.
+ */
+export const REEF_MANA_COST = 12;
 
 /**
  * Mana cost of triggering the final battle — "最大" tier, the priciest

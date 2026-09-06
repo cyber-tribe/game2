@@ -184,7 +184,28 @@ ICONS: dict[str, list[str]] = {
         "ossssssssdddddo.",
         ".oooooooooooooo.",
     ],
-    "flood": [
+    # 岩礁: stone standing out of the water. Deliberately shares the wave
+    # band at the bottom with the tsunami icon, since the two commands are
+    # played against each other and should read as one pair.
+    "reef": [
+        "................",
+        "................",
+        "......oo........",
+        ".....oSSo..oo...",
+        "....oSSSSooSSo..",
+        "...oSSddSSSSddo.",
+        "..oSSdddSSddddo.",
+        "..oSddddddddddo.",
+        "..oddddddddddo..",
+        "...ooooooooo....",
+        "................",
+        "..oooooooooooo..",
+        ".owwwoowwwoowwo.",
+        "..ooooooooooo...",
+        "..oWWWooWWWooWo.",
+        "...oooooooooo...",
+    ],
+    "tsunami": [
         "................",
         "................",
         "..ooo......ooo..",
@@ -495,7 +516,8 @@ ICON_KINDS = (
     "knight",
     "guardian",
     "volcano",
-    "flood",
+    "reef",
+    "tsunami",
     "armageddon",
     "mana",
     "population",

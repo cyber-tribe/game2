@@ -10,7 +10,8 @@ export type ToolMode =
   | "knight"
   | "guardian"
   | "volcano"
-  | "flood"
+  | "tsunami"
+  | "reef"
   | "armageddon"
   | "inspect";
 

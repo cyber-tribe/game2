@@ -21,7 +21,8 @@ const TOOL_ICON: Record<ToolMode, IconKind> = {
   knight: "knight",
   guardian: "guardian",
   volcano: "volcano",
-  flood: "flood",
+  tsunami: "tsunami",
+  reef: "reef",
   armageddon: "armageddon",
   inspect: "inspect",
 };

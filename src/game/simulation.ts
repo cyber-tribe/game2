@@ -75,7 +75,7 @@ export interface SimulationConfig {
    * WorldDefinition.allowedMiracles) applied to the enemy's own miracle
    * casting (enemyMiracles.ts), not just the player's toolbar — "敵の神は
    * プレイヤーと同じルールで介入する". Only earthquake/volcano/knight/
-   * armageddon are ever cast by the enemy, so restricting swamp/flood/
+   * armageddon are ever cast by the enemy, so restricting swamp/tsunami/
    * shrine here has no effect on it. Defaults to every miracle unlocked
    * when omitted, which is fine for tests that don't care about it.
    */
@@ -158,7 +158,8 @@ export type MatchEventType =
   | "knight"
   | "guardian"
   | "armageddon"
-  | "flood"
+  | "tsunami"
+  | "reef"
   | "houseCaptured"
   | "houseBurned"
   | "houseReachedCastle";

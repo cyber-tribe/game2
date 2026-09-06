@@ -434,40 +434,155 @@ export function applyVolcano(
   }
 }
 
-/** How much a single flood cast raises the sea level. */
-export const DEFAULT_FLOOD_AMOUNT = 1;
 
 /**
- * How much a single flood cast cools every existing volcanic rock vertex
- * on the map, map-wide — see applyFlood's doc comment on why this exists.
- * Matches what one raiseVertex hit chips off a single vertex, so a flood
- * is worth roughly "one terraforming click on every rock tile at once".
- */
-export const FLOOD_ROCK_COOLING = 1;
-
-/**
- * Permanently raises the sea level — docs/game-system.md's 洪水,
- * "海面を1段上昇させる". Cumulative: casting it again raises it further.
- * Clamped to MAX_ELEVATION (an all-water map). Doesn't touch `vertices`
- * or evict anyone standing on newly-submerged ground itself — see
- * game/flood.ts's drownFlood for that.
+ * How far a tsunami reaches from its origin, in vertices.
  *
- * Also a combo with 火山: every existing rockHardness vertex cools by
- * FLOOD_ROCK_COOLING, map-wide. A literal "lava submerged by the rising
- * sea" trigger would almost never fire in practice — volcano vertices sit
- * at MAX_ELEVATION (see applyVolcano) while a single flood only raises
- * water by DEFAULT_FLOOD_AMOUNT, so actually drowning a peak would take
- * dozens of casts — so this instead treats the whole rising water table
- * as giving every raging volcano on the map a meaningful shove toward
- * recovering (see raiseVertex's own rockHardness chipping), rather than
- * being a mechanic nobody can ever actually trigger.
+ * Measured against a real map rather than picked: at radius 8 a cast took
+ * roughly 30 vertices of a 64x64 world — a patch a few tiles across, for
+ * the second-priciest miracle in the game. At 12 it erases a settlement's
+ * worth of low ground, which is the weight the mana cost is asking for.
  */
-export function applyFlood(heightmap: Heightmap, amount: number = DEFAULT_FLOOD_AMOUNT): void {
-  heightmap.waterLevel = Math.min(MAX_ELEVATION, heightmap.waterLevel + amount);
+export const DEFAULT_TSUNAMI_RADIUS = 12;
+/**
+ * How far above sea level the wave stands at its origin. Land higher than
+ * this is never touched, however close it is — the original's "高い土地は
+ * 影響を受けない".
+ *
+ * Calibrated against the terrain createHeightmap actually produces, not
+ * against the 0-20 elevation range in the abstract: a fresh map runs 0-7
+ * with a median of 3, so at height 3 a tsunami reached 16 vertices of a
+ * 64x64 map and was invisible in play. At 5 it takes the ordinary low
+ * ground of its target area and leaves the peaks — which is the shape the
+ * miracle is supposed to have.
+ */
+export const DEFAULT_TSUNAMI_HEIGHT = 5;
 
-  for (const row of heightmap.rockHardness) {
-    for (let x = 0; x < row.length; x++) {
-      if (row[x] > 0) row[x] = Math.max(0, row[x] - FLOOD_ROCK_COOLING);
+/** Height of the reef applyReef leaves above sea level. */
+export const REEF_HEIGHT = 1;
+/**
+ * A reef's rock hardness. Lower than VOLCANO_ROCK_HARDNESS: a reef is a
+ * breakwater the player is expected to build and later clear, not the
+ * long-term land denial a volcano is.
+ */
+export const REEF_HARDNESS = 6;
+
+/**
+ * The wave's height at `distance` from its origin — full height at the
+ * center, tapering to nothing at the rim.
+ */
+function tsunamiHeightAt(distance: number, radius: number, height: number): number {
+  if (distance >= radius) return 0;
+  return height * (1 - distance / radius);
+}
+
+/**
+ * The original's 津波 (docs/original-miracles.md #29): a wave spreading
+ * outward from one point, drowning and eroding low ground while leaving
+ * high ground alone.
+ *
+ * This replaces applyFlood, which raised `waterLevel` for the whole world
+ * by one step. That was the single most un-original miracle game2 had: a
+ * global sea-level change cannot be defended against, cannot be aimed, and
+ * hurts the caster exactly as much as the target, so there was no play in
+ * it at all. A tsunami is a *directed* attack with two defences the player
+ * can actually build — high ground and reefs — which is what makes it a
+ * move rather than a coin flip.
+ *
+ * Land within reach and standing below the wave's crest is eroded to sea
+ * level ("低い土地を水没・侵食します"), which turns it to water. Sea level
+ * itself never moves. Anything left standing on the newly-drowned ground
+ * is swept away by game/flood.ts's drownFlood, exactly as before — it
+ * tests against `waterLevel`, and eroded vertices now sit at it.
+ */
+export function applyTsunami(
+  heightmap: Heightmap,
+  originX: number,
+  originY: number,
+  radius: number = DEFAULT_TSUNAMI_RADIUS,
+  height: number = DEFAULT_TSUNAMI_HEIGHT,
+): void {
+  const ox = Math.round(originX);
+  const oy = Math.round(originY);
+  if (ox < 0 || oy < 0 || ox > heightmap.width || oy > heightmap.height) return;
+
+  // A spreading wavefront, not a stamped circle. The difference is what
+  // makes a barrier mean anything: water flows *around* an obstacle and is
+  // stopped only by one that actually separates it from the ground behind.
+  //
+  // An earlier version tested each vertex independently, with a
+  // line-of-sight check back to the origin. On real terrain (createHeightmap
+  // produces a bumpy 0-7 range) every isolated bump cast a straight shadow,
+  // so the result was a scatter of unconnected puddles rather than an
+  // inundation — and a deliberate ridge, the thing the player is supposed to
+  // build, was worth no more than the noise around it.
+  const flooded = new Set<number>();
+  const key = (x: number, y: number) => y * (heightmap.width + 1) + x;
+  const queue: [number, number][] = [[ox, oy]];
+  const seen = new Set<number>([key(ox, oy)]);
+
+  while (queue.length > 0) {
+    const [x, y] = queue.shift()!;
+
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || ny < 0 || nx > heightmap.width || ny > heightmap.height) continue;
+      if (seen.has(key(nx, ny))) continue;
+
+      const distance = Math.hypot(nx - ox, ny - oy);
+      if (distance > radius) continue;
+
+      // Rock breaks the wave outright, whatever its height. The original
+      // states plainly that a 岩礁 stops a tsunami, and a reef sits at sea
+      // level by construction (see applyReef) — so if height alone decided,
+      // a reef would only ever stop the weakest waves, which are exactly the
+      // ones nobody needs defending against. Volcanic rock blocks too, which
+      // is consistent: rock is rock.
+      if (heightmap.rockHardness[ny][nx] > 0) continue;
+
+      const crest = heightmap.waterLevel + tsunamiHeightAt(distance, radius, height);
+      if (heightmap.vertices[ny][nx] > crest) continue;
+
+      seen.add(key(nx, ny));
+      flooded.add(key(nx, ny));
+      queue.push([nx, ny]);
     }
   }
+
+  if (heightmap.vertices[oy][ox] <= heightmap.waterLevel + height) flooded.add(key(ox, oy));
+
+  for (const k of flooded) {
+    heightmap.vertices[Math.floor(k / (heightmap.width + 1))][k % (heightmap.width + 1)] = heightmap.waterLevel;
+  }
+}
+
+/**
+ * The original's 岩礁 (docs/original-miracles.md #25): rock raised out of
+ * the sea. Not buildable land — isBuildable rejects rock — but it stands
+ * above the water, and so it stops a tsunami (see tsunamiReaches).
+ *
+ * Only meaningful on water: on dry land this would just be a small,
+ * pointless volcano, so it refuses to place there.
+ *
+ * One reef is not a breakwater. applyTsunami spreads as a front and flows
+ * around a partial barrier, so sheltering a coast means building a wall of
+ * these across the wave's approach — which is why they are cheap
+ * (REEF_MANA_COST). A single cast that switched off the enemy's most
+ * expensive miracle would be the more boring mechanic.
+ */
+export function applyReef(heightmap: Heightmap, x: number, y: number, hardness: number = REEF_HARDNESS): boolean {
+  const vx = Math.round(x);
+  const vy = Math.round(y);
+  if (vx < 0 || vy < 0 || vx > heightmap.width || vy > heightmap.height) return false;
+  if (heightmap.vertices[vy][vx] > heightmap.waterLevel) return false;
+
+  heightmap.vertices[vy][vx] = Math.min(MAX_ELEVATION, heightmap.waterLevel + REEF_HEIGHT);
+  heightmap.rockHardness[vy][vx] = hardness;
+  return true;
 }

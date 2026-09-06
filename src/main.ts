@@ -4,7 +4,8 @@ import {
   ARMAGEDDON_MANA_COST,
   EARTHQUAKE_MANA_COST,
   ENEMY_PERSONALITY_LABELS,
-  FLOOD_MANA_COST,
+  REEF_MANA_COST,
+  TSUNAMI_MANA_COST,
   GUARDIAN_MANA_COST,
   KNIGHT_MANA_COST,
   MAX_MANA,
@@ -33,7 +34,7 @@ import { mountCommandIcons } from "./ui/commandIcons";
 import { loadCommandIcons } from "./ui/pixelIcons";
 import { StatusPanel } from "./ui/statusPanel";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
-import { DEFAULT_EARTHQUAKE_RADIUS, DEFAULT_VOLCANO_RADIUS, applyEarthquake, applyFlood, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
+import { DEFAULT_EARTHQUAKE_RADIUS, DEFAULT_VOLCANO_RADIUS, applyEarthquake, applyReef, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
 
 /**
  * The camera's fixed base scale — see layout()'s doc comment for why this
@@ -678,16 +679,35 @@ async function bootstrap(world: WorldDefinition) {
       return;
     }
 
-    if (toolMode === "flood") {
-      // Global effect — the tap only confirms the cast, its position doesn't matter.
-      if (!trySpendPlayerMana(FLOOD_MANA_COST)) return;
-      applyFlood(heightmap);
+    if (toolMode === "reef") {
+      // Checked before spending: a reef only means anything at sea, and
+      // charging for a cast that does nothing is the kind of thing that
+      // reads as the game being broken.
+      if (sampleElevation(heightmap, vertex.x, vertex.y) > heightmap.waterLevel) {
+        showEntityInfo("岩礁は海にしか作れません", "warning");
+        return;
+      }
+      if (!trySpendPlayerMana(REEF_MANA_COST)) return;
+      applyReef(heightmap, vertex.x, vertex.y);
+      renderer.redraw(visibleBounds());
+      simulation.recordEvent("player", "reef");
+      vibrate(30);
+      playMiracleSound("reef");
+      return;
+    }
+
+    if (toolMode === "tsunami") {
+      // Aimed, unlike the global sea-level rise this replaced: the tap is
+      // the wave's origin, and high ground or a reef between it and a
+      // settlement genuinely shelters that settlement (see applyTsunami).
+      if (!trySpendPlayerMana(TSUNAMI_MANA_COST)) return;
+      applyTsunami(heightmap, vertex.x, vertex.y);
       drownFlood(simulation.world, heightmap, (event) => simulation.recordImpactEffect(event));
       renderer.redraw(visibleBounds());
-      simulation.recordEvent("player", "flood");
+      simulation.recordEvent("player", "tsunami");
       triggerShake(5);
       vibrate(50);
-      playMiracleSound("flood");
+      playMiracleSound("tsunami");
       return;
     }
   };
@@ -951,7 +971,8 @@ async function bootstrap(world: WorldDefinition) {
     knight: KNIGHT_MANA_COST,
     guardian: GUARDIAN_MANA_COST,
     volcano: VOLCANO_MANA_COST,
-    flood: FLOOD_MANA_COST,
+    reef: REEF_MANA_COST,
+    tsunami: TSUNAMI_MANA_COST,
     armageddon: ARMAGEDDON_MANA_COST,
   };
   const toolButtonsByCost = Object.entries(MANA_COST_BY_TOOL).map(([tool, cost]) => ({

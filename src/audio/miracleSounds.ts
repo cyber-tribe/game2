@@ -8,7 +8,7 @@
  * later — see main.ts's onEnemyAction, which already does this for the
  * screen-shake/toast but had no audio equivalent before this.
  */
-export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "volcano" | "knight" | "guardian" | "armageddon" | "flood";
+export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "volcano" | "knight" | "guardian" | "armageddon" | "tsunami" | "reef";
 
 /** Every MiracleSoundType, for tests and any future UI that wants to list them. */
 export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
@@ -19,7 +19,8 @@ export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
   "knight",
   "guardian",
   "armageddon",
-  "flood",
+  "tsunami",
+  "reef",
 ];
 
 interface ToneLayer {
@@ -90,9 +91,15 @@ export const RECIPES: Record<MiracleSoundType, MiracleSoundRecipe> = {
     ],
     noise: { delay: 0, duration: 0.9, peakGain: 0.35, filterFrequency: 600 },
   },
-  flood: {
+  tsunami: {
     tones: [{ waveform: "sine", startFrequency: 300, endFrequency: 150, delay: 0, duration: 0.7, peakGain: 0.18 }],
     noise: { delay: 0, duration: 0.8, peakGain: 0.28, filterFrequency: 1200 },
+  },
+  // Short, hard and dry — stone breaking the surface, deliberately nothing
+  // like the tsunami's long wash, since the two are used against each other.
+  reef: {
+    tones: [{ waveform: "square", startFrequency: 160, endFrequency: 90, delay: 0, duration: 0.18, peakGain: 0.14 }],
+    noise: { delay: 0, duration: 0.22, peakGain: 0.2, filterFrequency: 2200 },
   },
 };
 
