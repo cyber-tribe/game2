@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
-import { MoveTarget, Position, Walker } from "../components";
+import { Detour, MoveTarget, Position, Walker } from "../components";
 import { ROAD_SPEED_MULTIPLIER } from "../constants";
-import { applyRoad, createHeightmap, type Heightmap } from "../../world/heightmap";
+import { applyRoad, applyWall, createHeightmap, type Heightmap } from "../../world/heightmap";
 import { createMovementSystem, movementSystem } from "./movement";
 
 function createWalkerAt(world: World, x: number, y: number, speed = 1) {
@@ -102,5 +102,121 @@ describe("createMovementSystem on a road", () => {
     movementSystem(world, 1);
 
     expect(world.get(walker, Position)).toEqual({ x: 2, y: 0 });
+  });
+});
+
+describe("createMovementSystem against a 城壁", () => {
+  function flatHeightmap(size: number, elevation: number): Heightmap {
+    const heightmap = createHeightmap(size, size, "grass");
+    for (const row of heightmap.vertices) row.fill(elevation);
+    return heightmap;
+  }
+
+  /** A north-south wall from (x, yFrom) to (x, yTo), the way a player chains casts. */
+  function wallLine(heightmap: Heightmap, x: number, yFrom: number, yTo: number): void {
+    for (let y = yFrom; y <= yTo; y++) applyWall(heightmap, x, y, 0);
+  }
+
+  function run(world: World, heightmap: Heightmap, ticks: number, step = 0.25): void {
+    const system = createMovementSystem({ heightmap });
+    for (let i = 0; i < ticks; i++) system(world, step);
+  }
+
+  /** The original's 城壁: 「信者の進行を遮る壁」 (docs/original-miracles.md #12). */
+  it("never lets an ordinary walker stand on the wall", () => {
+    const heightmap = flatHeightmap(20, 5);
+    wallLine(heightmap, 10, 8, 12);
+    const world = new World();
+    const walker = createWalkerAt(world, 5, 10, 2);
+    world.add(walker, MoveTarget, { x: 15, y: 10 });
+
+    const system = createMovementSystem({ heightmap });
+    for (let i = 0; i < 200; i++) {
+      system(world, 0.25);
+      const pos = world.get(walker, Position)!;
+      expect(heightmap.wall[Math.round(pos.y)][Math.round(pos.x)]).toBe(false);
+    }
+  });
+
+  it("walks around the end of the wall and reaches the far side", () => {
+    const heightmap = flatHeightmap(20, 5);
+    wallLine(heightmap, 10, 8, 12);
+    const world = new World();
+    const walker = createWalkerAt(world, 5, 10, 2);
+    world.add(walker, MoveTarget, { x: 15, y: 10 });
+
+    run(world, heightmap, 200);
+
+    expect(world.get(walker, Position)!.x).toBeGreaterThan(11);
+  });
+
+  it("stops committing to a side once the straight line is open again", () => {
+    const heightmap = flatHeightmap(20, 5);
+    wallLine(heightmap, 10, 8, 12);
+    const world = new World();
+    const walker = createWalkerAt(world, 5, 10, 2);
+    world.add(walker, MoveTarget, { x: 15, y: 10 });
+
+    // Nine steps of 0.5 puts the walker at the foot of the wall.
+    run(world, heightmap, 10);
+    expect(world.has(walker, Detour)).toBe(true);
+
+    run(world, heightmap, 200);
+    expect(world.has(walker, Detour)).toBe(false);
+  });
+
+  /** 「英雄以外は越えられない」 — the exception is the whole second half of #12. */
+  it("lets a hero walk straight over it", () => {
+    const heightmap = flatHeightmap(20, 5);
+    wallLine(heightmap, 10, 8, 12);
+    const world = new World();
+    const hero = createWalkerAt(world, 5, 10, 2);
+    world.add(hero, Walker, { strength: 20, state: "hercules", speed: 2 });
+    world.add(hero, MoveTarget, { x: 15, y: 10 });
+
+    run(world, heightmap, 12);
+
+    const pos = world.get(hero, Position)!;
+    expect(pos.x).toBeCloseTo(11);
+    expect(pos.y).toBeCloseTo(10);
+  });
+
+  /**
+   * A cast can raise stone around someone standing there. Ignoring walls
+   * for that one step is what keeps that from being a way to entomb a
+   * walker forever in a game where nothing else removes a wall for free.
+   */
+  it("lets a walker caught inside the stone walk out of it", () => {
+    const heightmap = flatHeightmap(20, 5);
+    applyWall(heightmap, 10, 10, 1);
+    const world = new World();
+    const walker = createWalkerAt(world, 10, 10, 2);
+    world.add(walker, MoveTarget, { x: 15, y: 10 });
+
+    run(world, heightmap, 200);
+
+    expect(world.get(walker, Position)!.x).toBeGreaterThan(11);
+  });
+
+  /**
+   * Local steering, not a path search (see stepAroundWalls): a walker
+   * boxed in on every side simply stops, which is a fair thing for a wall
+   * to be able to do.
+   */
+  it("stays put when every direction is walled", () => {
+    const heightmap = flatHeightmap(20, 5);
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        applyWall(heightmap, 10 + dx, 10 + dy, 0);
+      }
+    }
+    const world = new World();
+    const walker = createWalkerAt(world, 10, 10, 1);
+    world.add(walker, MoveTarget, { x: 15, y: 10 });
+
+    run(world, heightmap, 10, 1);
+
+    expect(world.get(walker, Position)).toEqual({ x: 10, y: 10 });
   });
 });

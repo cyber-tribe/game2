@@ -824,6 +824,27 @@ ICONS.update({
         "..osdsssdsssdo..",
         ".ossdsssdsssdso.",
     ],
+    # 城壁: a battlemented stone wall seen face-on. Crenellations are what
+    # say "wall" rather than "floor" or "crate" at 16px — the courses of
+    # block below them only work once the top edge is broken.
+    "wall": [
+        "................",
+        "................",
+        "................",
+        "..ooo.ooo.ooo...",
+        "..oso.oso.oso...",
+        "..oso.oso.oso...",
+        "..oooooooooooo..",
+        "..osssdsssdsso..",
+        "..oddddddddddo..",
+        "..osdsssdsssdo..",
+        "..oddddddddddo..",
+        "..osssdsssdsso..",
+        "..oooooooooooo..",
+        "................",
+        "................",
+        "................",
+    ],
     # 毒カビ: toadstools with spores drifting off them. Purple (the mana
     # tones) rather than the swamp's own murk, and a hard silhouette of caps
     # and stems, so it never reads as "another swamp" in the panel.
@@ -882,6 +903,7 @@ ICON_KINDS = (
     "volcano",
     "reef",
     "road",
+    "wall",
     "fungus",
     "tsunami",
     "armageddon",

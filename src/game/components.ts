@@ -326,6 +326,21 @@ export interface HeroCooldown {
   remaining: number;
 }
 
+/**
+ * Which way around a 城壁 a walker has committed to going.
+ *
+ * Wall-following needs one bit of memory or it is not wall-following: a
+ * walker that re-picks a side every tick oscillates in front of the wall
+ * forever, because the two ways around a barrier look equally good from
+ * directly in front of it. Held until the walker can head straight at its
+ * target again (see systems/movement.ts), which is what makes it let go
+ * the moment it clears the end of the wall.
+ */
+export interface Detour {
+  /** +1 turns one way around the wall, -1 the other. */
+  turn: number;
+}
+
 export const Position = defineComponent<Position>("Position");
 export const Owner = defineComponent<Owner>("Owner");
 export const Walker = defineComponent<Walker>("Walker");
@@ -342,3 +357,4 @@ export const Infected = defineComponent<Infected>("Infected");
 export const Charmed = defineComponent<Charmed>("Charmed");
 export const HeroCooldown = defineComponent<HeroCooldown>("HeroCooldown");
 export const Drowning = defineComponent<Drowning>("Drowning");
+export const Detour = defineComponent<Detour>("Detour");
