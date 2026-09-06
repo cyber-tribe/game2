@@ -17,6 +17,8 @@ export type IconKind =
   | "holyWater"
   | "tornado"
   | "firePillar"
+  | "lightning"
+  | "storm"
   | "hurricane"
   | "perseus"
   | "hercules"

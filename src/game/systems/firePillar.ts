@@ -1,5 +1,5 @@
 import type { System } from "../../ecs";
-import { MIN_ELEVATION, type Heightmap } from "../../world/heightmap";
+import { scorchGround, type Heightmap } from "../../world/heightmap";
 import { FirePillar, House, Position, Walker } from "../components";
 import {
   FIRE_PILLAR_RADIUS,
@@ -72,7 +72,7 @@ export function createFirePillarSystem(config: Partial<FirePillarConfig> = {}): 
       world.add(entity, Position, next);
       world.add(entity, FirePillar, { remaining, headingX: stepX, headingY: stepY });
 
-      if (heightmap && scorchAround(heightmap, next, FIRE_PILLAR_RADIUS) > 0) onScorch();
+      if (heightmap && scorchGround(heightmap, next.x, next.y, FIRE_PILLAR_RADIUS).length > 0) onScorch();
 
       for (const walkerEntity of world.query(Walker, Position)) {
         if (world.get(walkerEntity, Walker)!.state === "achilles") continue;
@@ -90,39 +90,4 @@ export function createFirePillarSystem(config: Partial<FirePillarConfig> = {}): 
       }
     }
   };
-}
-
-/**
- * Burns every land vertex within `radius` of (x, y) barren, returning how
- * many it took. Water is left alone — there is nothing there to burn — and
- * so is ground already dead, so a pillar circling over its own path does
- * not keep reporting damage it already did.
- *
- * Woodland, roads and 毒カビ on the ground it crosses are gone: whatever
- * was growing or laid there burned with it.
- */
-function scorchAround(heightmap: Heightmap, center: { x: number; y: number }, radius: number): number {
-  const cx = Math.round(center.x);
-  const cy = Math.round(center.y);
-  let scorched = 0;
-
-  for (let dy = -Math.ceil(radius); dy <= Math.ceil(radius); dy++) {
-    const vy = cy + dy;
-    if (vy < 0 || vy > heightmap.height) continue;
-    for (let dx = -Math.ceil(radius); dx <= Math.ceil(radius); dx++) {
-      const vx = cx + dx;
-      if (vx < 0 || vx > heightmap.width) continue;
-      if (Math.hypot(dx, dy) > radius) continue;
-      if (heightmap.vertices[vy][vx] <= Math.max(MIN_ELEVATION, heightmap.waterLevel)) continue;
-      if (heightmap.scorched[vy][vx]) continue;
-
-      heightmap.scorched[vy][vx] = true;
-      heightmap.forest[vy][vx] = false;
-      heightmap.road[vy][vx] = false;
-      heightmap.fungus[vy][vx] = false;
-      scorched++;
-    }
-  }
-
-  return scorched;
 }

@@ -24,6 +24,8 @@ import {
   HOLY_WATER_MANA_COST,
   TORNADO_MANA_COST,
   FIRE_PILLAR_MANA_COST,
+  LIGHTNING_MANA_COST,
+  STORM_MANA_COST,
   HURRICANE_MANA_COST,
   TERRAIN_EDIT_MANA_COST,
   TERRAIN_EDIT_RULE_LABELS,
@@ -54,6 +56,8 @@ const HERO_MANA_COST: Record<HeroKind, number> = {
 import { createHolyWater } from "./game/holyWater";
 import { applyHurricane } from "./game/hurricane";
 import { createFirePillar } from "./game/firePillar";
+import { strikeLightning } from "./game/lightning";
+import { createStorm } from "./game/storm";
 import { createTornado } from "./game/tornado";
 import { collapseSwampsNear, createSwamp } from "./game/swamp";
 import { burnFire } from "./game/fire";
@@ -720,6 +724,29 @@ async function bootstrap(world: WorldDefinition) {
       return;
     }
 
+    if (toolMode === "lightning") {
+      if (!trySpendPlayerMana(LIGHTNING_MANA_COST)) return;
+      strikeLightning(simulation.world, heightmap, vertex, Math.random, (event) =>
+        simulation.recordImpactEffect(event),
+      );
+      renderer.redraw(visibleBounds());
+      simulation.recordEvent("player", "lightning");
+      triggerShake(6);
+      vibrate([15, 40, 15]);
+      playMiracleSound("lightning");
+      return;
+    }
+
+    if (toolMode === "storm") {
+      if (!trySpendPlayerMana(STORM_MANA_COST)) return;
+      createStorm(simulation.world, vertex.x, vertex.y);
+      simulation.recordEvent("player", "storm");
+      triggerShake(3);
+      vibrate([20, 30, 20, 30]);
+      playMiracleSound("storm");
+      return;
+    }
+
     if (toolMode === "firePillar") {
       if (!trySpendPlayerMana(FIRE_PILLAR_MANA_COST)) return;
       // Aimed like the earthquake, the tornado and the hurricane: from the
@@ -1167,6 +1194,8 @@ async function bootstrap(world: WorldDefinition) {
     holyWater: HOLY_WATER_MANA_COST,
     tornado: TORNADO_MANA_COST,
     firePillar: FIRE_PILLAR_MANA_COST,
+    lightning: LIGHTNING_MANA_COST,
+    storm: STORM_MANA_COST,
     hurricane: HURRICANE_MANA_COST,
     ...HERO_MANA_COST,
     volcano: VOLCANO_MANA_COST,

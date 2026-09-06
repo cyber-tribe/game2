@@ -41,6 +41,7 @@ import { createHelenSystem } from "./systems/helen";
 import { createHeroLossSystem } from "./systems/heroLoss";
 import { createHolyWaterSystem } from "./systems/holyWater";
 import { createFirePillarSystem } from "./systems/firePillar";
+import { createStormSystem } from "./systems/storm";
 import { createTornadoSystem } from "./systems/tornado";
 import { createWhirlpoolSystem } from "./systems/whirlpool";
 import { createSwampSystem } from "./systems/swamp";
@@ -166,6 +167,8 @@ export type MatchEventType =
   | "holyWater"
   | "tornado"
   | "firePillar"
+  | "lightning"
+  | "storm"
   | "hurricane"
   | "volcano"
   | "forest"
@@ -286,6 +289,15 @@ export class Simulation {
       )
       .add(
         createFirePillarSystem({
+          heightmap: config.heightmap,
+          onImpact: (event) => this.recordImpactEffect(event),
+          onScorch: () => {
+            this.terrainChanged = true;
+          },
+        }),
+      )
+      .add(
+        createStormSystem({
           heightmap: config.heightmap,
           onImpact: (event) => this.recordImpactEffect(event),
           onScorch: () => {

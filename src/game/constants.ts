@@ -795,3 +795,56 @@ export const HURRICANE_PUSH = 4;
  * miracles it is made of.
  */
 export const HURRICANE_MANA_COST = 28;
+
+/**
+ * How many bolts one 雷 throws — the original's 「指定地点周辺へ落雷」
+ * (docs/original-miracles.md #16).
+ *
+ * Plural on purpose. A single bolt exactly on the tapped tile would be a
+ * tiny fire rain; several scattered around it is what makes lightning feel
+ * like lightning, and it is the shape the original's own level rule
+ * describes (see LIGHTNING_SCATTER).
+ */
+export const LIGHTNING_BOLTS = 5;
+
+/**
+ * How far from the aim point a bolt may land, in tiles.
+ *
+ * This is the original's 「レベルが上がると威力ではなく**命中率**が向上
+ * する」 expressed as the one thing game2 can express: the miracle is
+ * *inaccurate*, and that inaccuracy is its character rather than a defect.
+ * game2 has no miracle levels, so nothing shrinks this today — when levels
+ * exist, this is the number they should move, and not the damage.
+ */
+export const LIGHTNING_SCATTER = 3;
+
+/** How far each bolt kills, burns and scorches, in tiles. */
+export const LIGHTNING_BOLT_RADIUS = 1;
+
+/**
+ * Mana cost of a 雷 — below fire rain.
+ *
+ * It covers a comparable area but cannot be aimed within it: half a
+ * scattered strike lands on ground nobody cared about. The discount is for
+ * the uncertainty, not for weakness.
+ */
+export const LIGHTNING_MANA_COST = 20;
+
+/** How long a 嵐's cloud sits over its ground, in seconds. */
+export const STORM_LIFETIME = 12;
+
+/** Seconds between a 嵐's strikes. */
+export const STORM_STRIKE_INTERVAL = 0.8;
+
+/** How far from the cloud's centre its bolts can land, in tiles. */
+export const STORM_RADIUS = 4;
+
+/**
+ * Mana cost of a 嵐 — above 雷 and above fire rain.
+ *
+ * It denies a whole area for twelve seconds and leaves it barren, which is
+ * worth more than any single strike. What it does *not* do is kill anyone
+ * (「この雷は人には直接当たらない」), so it is priced as area denial
+ * rather than as a bigger 雷.
+ */
+export const STORM_MANA_COST = 38;
