@@ -151,6 +151,13 @@ export const TERRAIN_COLOR: Record<Heightmap["terrain"], number> = {
 };
 
 const WATER_COLOR = GAME_PALETTE.waterMid;
+/**
+ * Torn ground (see Heightmap.crevice). Near-black, and deliberately darker
+ * than anything else on the map: a crevice kills whoever walks into it, so
+ * it has to read as a hole at a glance rather than as one more shade of
+ * terrain.
+ */
+const CREVICE_COLOR = 0x120e08;
 
 /**
  * A single flat solid color read as "のっぺり" (flat, lifeless) next to the
@@ -627,7 +634,7 @@ export class IsoRenderer {
    * initial full-map render before any camera/viewport exists yet.
    */
   redraw(bounds?: TileBounds): void {
-    const { width, height, rockHardness, forest, waterLevel, terrain } = this.heightmap;
+    const { width, height, rockHardness, forest, crevice, waterLevel, terrain } = this.heightmap;
     const vertices = this.displayVertices;
     const graphics = this.graphics;
     graphics.clear();
@@ -688,11 +695,26 @@ export class IsoRenderer {
 
         const isWater = avgElevation <= waterLevel;
         const isRock = isRockTile[y - minY][x - minX];
+        const isCreviceTile = crevice[y][x] || crevice[y][x + 1] || crevice[y + 1][x + 1] || crevice[y + 1][x];
+        // Woodland is ordinary ground with a different canopy, so it loses
+        // to every kind of ground that is *not* ordinary — a crevice torn
+        // through a forest is a hole, not trees.
         const isForestTile =
-          !isWater && !isRock && (forest[y][x] || forest[y][x + 1] || forest[y + 1][x + 1] || forest[y + 1][x]);
-        const baseColor = isWater ? WATER_COLOR : isRock ? VOLCANO_ROCK_COLOR : isForestTile ? FOREST_COLOR : TERRAIN_COLOR[terrain];
+          !isCreviceTile &&
+          !isWater &&
+          !isRock &&
+          (forest[y][x] || forest[y][x + 1] || forest[y + 1][x + 1] || forest[y + 1][x]);
+        const baseColor = isCreviceTile
+          ? CREVICE_COLOR
+          : isWater
+            ? WATER_COLOR
+            : isRock
+              ? VOLCANO_ROCK_COLOR
+              : isForestTile
+                ? FOREST_COLOR
+                : TERRAIN_COLOR[terrain];
 
-        if (isWater) {
+        if (isWater && !isCreviceTile) {
           // Water always reads as a single flat, unshaded plane — never a
           // sloped/shaded seabed showing through — at its own tile's
           // average depth, same as before this became a per-vertex mesh.
@@ -717,8 +739,8 @@ export class IsoRenderer {
           // 3 points are always planar, so each triangle (unlike the full
           // 4-corner quad, which can warp into a non-planar "saddle" when
           // all 4 corners differ) has one well-defined normal to shade by.
-          this.fillTerrainTriangle(graphics, a, b, c, baseColor, terrain, isRock, isForestTile);
-          this.fillTerrainTriangle(graphics, a, c, d2, baseColor, terrain, isRock, isForestTile);
+          this.fillTerrainTriangle(graphics, a, b, c, baseColor, terrain, isRock || isCreviceTile, isForestTile);
+          this.fillTerrainTriangle(graphics, a, c, d2, baseColor, terrain, isRock || isCreviceTile, isForestTile);
         }
 
         // The map's own outer edge always gets a genuine vertical wall
@@ -799,7 +821,7 @@ export class IsoRenderer {
     c: Vec3,
     baseColor: number,
     terrain: Heightmap["terrain"],
-    isRock: boolean,
+    hasOwnColor: boolean,
     isForest = false,
   ): void {
     const pa = this.toScreen(a.x, a.y, a.z);
@@ -807,10 +829,23 @@ export class IsoRenderer {
     const pc = this.toScreen(c.x, c.y, c.z);
     const isFlat = Math.abs(a.z - b.z) < FLAT_EPSILON && Math.abs(b.z - c.z) < FLAT_EPSILON;
 
-    // Flat ground takes a dither texture (canopy for woodland, the
-    // terrain's own otherwise); anything sloped or rocky is shaded flat
-    // colour, since a global-space texture cannot follow a slope.
-    const fill = isFlat && !isRock ? (isForest ? FOREST_FILL : TERRAIN_FILL[terrain]) : shadeColor(baseColor, isFlat ? 1 : triangleBrightness(a, b, c));
+    // Two separate questions, and both have to be asked.
+    //
+    // `hasOwnColor` keeps the flat-tile shortcut from swallowing tiles that
+    // are not ordinary ground: a flat triangle normally takes a dither
+    // texture and ignores baseColor entirely, which silently painted
+    // freshly-torn crevices as grass (a crevice is carved dead flat to the
+    // floor, so it hit that path every time).
+    //
+    // `isForest` picks *which* texture ordinary flat ground gets — canopy
+    // or bare terrain. Woodland still wants a texture; it just wants a
+    // different one.
+    const fill =
+      isFlat && !hasOwnColor
+        ? isForest
+          ? FOREST_FILL
+          : TERRAIN_FILL[terrain]
+        : shadeColor(baseColor, isFlat ? 1 : triangleBrightness(a, b, c));
 
     graphics.poly([pa.sx, pa.sy, pb.sx, pb.sy, pc.sx, pc.sy]).fill(fill);
   }

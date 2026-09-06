@@ -20,6 +20,7 @@ import {
   isBuildable,
   isInWaterPool,
   isForest,
+  isCrevice,
   isRock,
   REEF_HEIGHT,
   isTerrainEditAllowed,
@@ -30,6 +31,9 @@ import {
   type Heightmap,
   type TerrainEditRule,
 } from "./heightmap";
+function blankCrevice(width: number, height: number): boolean[][] {
+  return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
+}
 
 function blankLayer(width: number, height: number): boolean[][] {
   return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
@@ -43,7 +47,8 @@ function flatHeightmap(
 ): Heightmap {
   const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
   const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
-  return { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height), waterLevel };
+  return { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
+      crevice: blankCrevice(width, height), waterLevel };
 }
 
 describe("createHeightmap", () => {
@@ -428,41 +433,79 @@ describe("findLeastFlatVertex", () => {
 });
 
 describe("applyEarthquake", () => {
-  it("perturbs every vertex within radius and leaves the rest untouched", () => {
-    const heightmap = flatHeightmap(10, 10, 5);
+  const straight = () => 0.5; // rng=0.5 -> zero wander, a dead-straight crack
 
-    applyEarthquake(heightmap, 5, 5, 2, 3, () => 1); // rng=1 -> delta always +maxDelta
+  it("tears a crevice running from the origin along the given direction", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
 
-    for (let dy = -2; dy <= 2; dy++) {
-      for (let dx = -2; dx <= 2; dx++) {
-        expect(heightmap.vertices[5 + dy][5 + dx]).toBe(8);
-      }
+    applyEarthquake(heightmap, 5, 10, 1, 0, 6, straight);
+
+    for (let x = 6; x <= 11; x++) {
+      expect(isCrevice(heightmap, x, 10)).toBe(true);
     }
-    expect(heightmap.vertices[5][8]).toBe(5); // outside radius
-    expect(heightmap.vertices[8][5]).toBe(5); // outside radius
   });
 
-  it("can lower vertices too, clamped at MIN_ELEVATION", () => {
-    const heightmap = flatHeightmap(6, 6, 2);
+  it("runs the other way when aimed the other way — the direction is the point", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
 
-    applyEarthquake(heightmap, 3, 3, 1, 5, () => 0); // rng=0 -> delta always -maxDelta
+    applyEarthquake(heightmap, 15, 10, -1, 0, 6, straight);
 
-    expect(heightmap.vertices[3][3]).toBe(MIN_ELEVATION);
+    expect(isCrevice(heightmap, 10, 10)).toBe(true);
+    expect(isCrevice(heightmap, 20, 10)).toBe(false);
   });
 
-  it("clamps at MAX_ELEVATION when the swing would push a vertex too high", () => {
-    const heightmap = flatHeightmap(6, 6, MAX_ELEVATION - 1);
+  it("leaves ground off the crack's line untouched — it is a line, not a disc", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
 
-    applyEarthquake(heightmap, 3, 3, 0, 5, () => 1); // rng=1 -> delta always +maxDelta
+    applyEarthquake(heightmap, 5, 10, 1, 0, 6, straight);
 
-    expect(heightmap.vertices[3][3]).toBe(MAX_ELEVATION);
+    expect(isCrevice(heightmap, 8, 16)).toBe(false);
+    expect(heightmap.vertices[16][8]).toBe(5);
   });
 
-  it("does not touch vertices outside the map bounds", () => {
-    const heightmap = flatHeightmap(4, 4, 5);
+  it("carves the torn ground down to the floor", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
 
-    expect(() => applyEarthquake(heightmap, 0, 0, 3, 4, () => 1)).not.toThrow();
-    expect(heightmap.vertices[0][0]).toBe(9);
+    applyEarthquake(heightmap, 5, 10, 1, 0, 6, straight);
+
+    expect(heightmap.vertices[10][8]).toBe(MIN_ELEVATION);
+  });
+
+  it("makes the torn ground unbuildable", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    applyEarthquake(heightmap, 5, 10, 1, 0, 6, straight);
+
+    expect(isBuildable(heightmap, 8, 10)).toBe(false);
+  });
+
+  it("stops at the map edge instead of throwing", () => {
+    const heightmap = flatHeightmap(6, 6, 5);
+
+    expect(() => applyEarthquake(heightmap, 3, 3, 1, 0, 20, straight)).not.toThrow();
+  });
+
+  it("still does something when given no direction at all", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    applyEarthquake(heightmap, 5, 10, 0, 0, 4, straight);
+
+    expect(heightmap.crevice.flat().filter(Boolean).length).toBeGreaterThan(0);
+  });
+
+  /**
+   * The original's "修復されるまで残る": a crevice persists, but is not
+   * permanent. Filling it back in closes it — today that is terraforming;
+   * the original gives the job to 花 (#7), which does not exist yet.
+   */
+  it("closes again once the ground is raised back out of the floor", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyEarthquake(heightmap, 5, 10, 1, 0, 6, straight);
+    expect(isCrevice(heightmap, 8, 10)).toBe(true);
+
+    raiseVertex(heightmap, 8, 10, 1);
+
+    expect(isCrevice(heightmap, 8, 10)).toBe(false);
   });
 });
 
@@ -470,7 +513,10 @@ describe("applyVolcano", () => {
   it("shapes a cone-with-crater within radius, and marks every affected vertex as rock", () => {
     const heightmap = flatHeightmap(10, 10, 3);
 
-    applyVolcano(heightmap, 5, 5, 1, 7);
+    // lavaVolume 0: the cone in isolation. The flow gets its own tests
+    // below, and letting it run here would bury the very vertices this one
+    // checks are untouched.
+    applyVolcano(heightmap, 5, 5, 1, 7, 0);
 
     // Rim (the 4 orthogonal neighbors, exactly `radius` out) is the peak.
     for (const [dy, dx] of [
@@ -504,10 +550,19 @@ describe("applyVolcano", () => {
     expect(heightmap.rockHardness[5][7]).toBe(0);
   });
 
+  it("returns every vertex it covered, so the ECS side can bury what stood there", () => {
+    const heightmap = flatHeightmap(10, 10, 3);
+
+    const covered = applyVolcano(heightmap, 5, 5, 1, 7, 0);
+
+    expect(covered).toHaveLength(9); // the 3x3 cone footprint
+    expect(covered).toContainEqual({ x: 5, y: 5 });
+  });
+
   it("makes the affected area unbuildable", () => {
     const heightmap = flatHeightmap(6, 6, 3);
 
-    applyVolcano(heightmap, 3, 3, 0);
+    applyVolcano(heightmap, 3, 3, 0, VOLCANO_ROCK_HARDNESS, 0);
 
     expect(isBuildable(heightmap, 3, 3)).toBe(false);
   });
@@ -515,14 +570,14 @@ describe("applyVolcano", () => {
   it("uses VOLCANO_ROCK_HARDNESS by default", () => {
     const heightmap = flatHeightmap(6, 6, 3);
 
-    applyVolcano(heightmap, 3, 3, 0);
+    applyVolcano(heightmap, 3, 3, 0, undefined, 0);
 
     expect(heightmap.rockHardness[3][3]).toBe(VOLCANO_ROCK_HARDNESS);
   });
 
   it("eventually clears once enough terrain edits chip the hardness away", () => {
     const heightmap = flatHeightmap(6, 6, 3);
-    applyVolcano(heightmap, 3, 3, 0, 2);
+    applyVolcano(heightmap, 3, 3, 0, 2, 0);
 
     raiseVertex(heightmap, 3, 3, -1);
     expect(isRock(heightmap, 3, 3)).toBe(true);
@@ -531,10 +586,59 @@ describe("applyVolcano", () => {
     expect(isRock(heightmap, 3, 3)).toBe(false);
   });
 
+  it("floods lava beyond the cone, covering far more ground than the cone itself", () => {
+    const heightmap = flatHeightmap(30, 30, 3);
+
+    const covered = applyVolcano(heightmap, 15, 15, 1, 7, 20);
+
+    expect(covered.length).toBe(9 + 20);
+    expect(covered.filter(({ x, y }) => Math.abs(x - 15) > 1 || Math.abs(y - 15) > 1).length).toBe(20);
+  });
+
+  /**
+   * The interaction the miracle is played around
+   * (docs/original-miracles.md #24): "溶岩は……水地形で止まります". A
+   * channel is a firebreak; high ground is not.
+   */
+  it("stops at water instead of crossing it", () => {
+    const heightmap = flatHeightmap(30, 30, 3);
+    // A moat two vertices thick, all the way around the volcano.
+    for (let y = 0; y <= 30; y++) {
+      for (let x = 0; x <= 30; x++) {
+        const ring = Math.max(Math.abs(x - 15), Math.abs(y - 15));
+        if (ring === 4 || ring === 5) heightmap.vertices[y][x] = MIN_ELEVATION;
+      }
+    }
+
+    applyVolcano(heightmap, 15, 15, 1, 7, 200);
+
+    expect(heightmap.rockHardness[15][21]).toBe(0); // beyond the moat
+    expect(heightmap.rockHardness[19][15]).toBe(0);
+  });
+
+  it("runs downhill, taking the low ground before the high", () => {
+    const heightmap = flatHeightmap(30, 30, 8);
+    // A valley running east from the volcano.
+    for (let x = 16; x <= 26; x++) heightmap.vertices[15][x] = 1;
+
+    applyVolcano(heightmap, 15, 15, 1, 7, 8);
+
+    expect(heightmap.rockHardness[15][22]).toBeGreaterThan(0); // down the valley
+    expect(heightmap.rockHardness[22][15]).toBe(0); // across the plateau
+  });
+
+  it("spends exactly its volume, no more", () => {
+    const heightmap = flatHeightmap(30, 30, 3);
+
+    const covered = applyVolcano(heightmap, 15, 15, 0, 7, 5);
+
+    expect(covered.length).toBe(1 + 5);
+  });
+
   it("does not touch vertices outside the map bounds", () => {
     const heightmap = flatHeightmap(4, 4, 3);
 
-    expect(() => applyVolcano(heightmap, 0, 0, 3)).not.toThrow();
+    expect(() => applyVolcano(heightmap, 0, 0, 3, undefined, 0)).not.toThrow();
     // (0, 0) is the volcano's own center, which — with a real rim to sit
     // below (radius >= 1) — is the crater floor, not the rim itself.
     expect(heightmap.vertices[0][0]).toBe(MAX_ELEVATION - VOLCANO_CRATER_DEPTH);

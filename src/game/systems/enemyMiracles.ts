@@ -188,8 +188,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
     if (allowedMiracles.includes("volcano") && populationRatio >= VOLCANO_POPULATION_RATIO * tuning.volcanoRatioMultiplier) {
       const target = densestOpponentCluster(world, opponentId, DEFAULT_VOLCANO_RADIUS, rng);
       if (target && trySpendMana(world, factionId, VOLCANO_MANA_COST)) {
-        applyVolcano(heightmap, target.x, target.y);
-        eruptVolcano(world, target.x, target.y, DEFAULT_VOLCANO_RADIUS);
+        eruptVolcano(world, applyVolcano(heightmap, target.x, target.y));
         onAction({ type: "volcano", position: target });
         return;
       }
@@ -198,7 +197,11 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
     if (!allowedMiracles.includes("earthquake")) return;
     const target = densestOpponentCluster(world, opponentId, DEFAULT_EARTHQUAKE_RADIUS, rng);
     if (target && trySpendMana(world, factionId, EARTHQUAKE_MANA_COST)) {
-      applyEarthquake(heightmap, target.x, target.y, undefined, undefined, rng);
+      // Same aiming rule the player gets (see main.ts): away from its own
+      // shrine, through the target.
+      const shrineEntity = findFactionEntity(world, factionId);
+      const from = shrineEntity === undefined ? target : world.get(shrineEntity, FactionState)!.shrinePosition;
+      applyEarthquake(heightmap, target.x, target.y, target.x - from.x, target.y - from.y, undefined, rng);
       collapseSwampsNear(world, target.x, target.y, DEFAULT_EARTHQUAKE_RADIUS);
       onAction({ type: "earthquake", position: target });
     }

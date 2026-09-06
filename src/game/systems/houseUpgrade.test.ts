@@ -3,6 +3,9 @@ import { World } from "../../ecs";
 import type { Heightmap } from "../../world/heightmap";
 import { House, Owner, Position, type FactionId } from "../components";
 import { createHouseUpgradeSystem } from "./houseUpgrade";
+function blankCrevice(width: number, height: number): boolean[][] {
+  return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
+}
 
 function blankLayer(width: number, height: number): boolean[][] {
   return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
@@ -11,7 +14,8 @@ function blankLayer(width: number, height: number): boolean[][] {
 function flatHeightmap(width: number, height: number, elevation: number): Heightmap {
   const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
   const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
-  return { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height), waterLevel: 0 };
+  return { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
+      crevice: blankCrevice(width, height), waterLevel: 0 };
 }
 
 function createHouse(world: World, x: number, y: number, level: House["level"] = "hut") {

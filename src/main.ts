@@ -37,7 +37,7 @@ import { mountCommandIcons } from "./ui/commandIcons";
 import { loadCommandIcons } from "./ui/pixelIcons";
 import { StatusPanel } from "./ui/statusPanel";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
-import { DEFAULT_EARTHQUAKE_RADIUS, DEFAULT_VOLCANO_RADIUS, applyEarthquake, applyFireRain, applyForest, applyReef, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
+import { DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyForest, applyReef, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
 
 /**
  * The camera's fixed base scale — see layout()'s doc comment for why this
@@ -620,7 +620,13 @@ async function bootstrap(world: WorldDefinition) {
 
     if (toolMode === "earthquake") {
       if (!trySpendPlayerMana(EARTHQUAKE_MANA_COST)) return;
-      applyEarthquake(heightmap, vertex.x, vertex.y);
+      // The fissure runs away from the caster's own shrine, through the
+      // tapped point. The original aims it with a pointer; a tap has no
+      // second axis to carry a heading, and taking it from "where I am to
+      // where I struck" gives one for free — and never cracks the ground
+      // back toward your own settlement.
+      const from = simulation.getShrinePosition("player") ?? vertex;
+      applyEarthquake(heightmap, vertex.x, vertex.y, vertex.x - from.x, vertex.y - from.y);
       collapseSwampsNear(simulation.world, vertex.x, vertex.y, DEFAULT_EARTHQUAKE_RADIUS);
       renderer.redraw(visibleBounds());
       simulation.recordEvent("player", "earthquake");
@@ -670,8 +676,7 @@ async function bootstrap(world: WorldDefinition) {
 
     if (toolMode === "volcano") {
       if (!trySpendPlayerMana(VOLCANO_MANA_COST)) return;
-      applyVolcano(heightmap, vertex.x, vertex.y);
-      eruptVolcano(simulation.world, vertex.x, vertex.y, DEFAULT_VOLCANO_RADIUS);
+      eruptVolcano(simulation.world, applyVolcano(heightmap, vertex.x, vertex.y));
       renderer.redraw(visibleBounds());
       simulation.recordEvent("player", "volcano");
       triggerShake(8);
