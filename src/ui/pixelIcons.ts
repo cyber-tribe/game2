@@ -22,6 +22,8 @@ export type IconKind =
   | "fireRain"
   | "tsunami"
   | "reef"
+  | "road"
+  | "fungus"
   | "armageddon"
   | "inspect"
   | "settle"

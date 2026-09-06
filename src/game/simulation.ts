@@ -32,9 +32,10 @@ import { createHouseUpgradeSystem } from "./systems/houseUpgrade";
 import { guardianTargetingSystem, heroCooldownSystem, knightTargetingSystem } from "./systems/hero";
 import { leaderSystem } from "./systems/leader";
 import { manaSystem } from "./systems/mana";
-import { movementSystem } from "./systems/movement";
+import { createMovementSystem } from "./systems/movement";
 import { createSettleSystem } from "./systems/settle";
 import { createCreviceSystem } from "./systems/crevice";
+import { createFungusSystem } from "./systems/fungus";
 import { createSwampSystem } from "./systems/swamp";
 import { createWanderTargetSystem } from "./systems/wanderTarget";
 import { ALL_MIRACLES, type EnemyPersonality, type MiracleId } from "./worlds";
@@ -164,6 +165,8 @@ export type MatchEventType =
   | "armageddon"
   | "tsunami"
   | "reef"
+  | "road"
+  | "fungus"
   | "houseCaptured"
   | "houseBurned"
   | "houseReachedCastle";
@@ -199,6 +202,13 @@ export class Simulation {
 
   private readonly matchEvents: MatchEvent[] = [];
   private elapsedTime = 0;
+  /**
+   * Set whenever a system changes the terrain on its own — today only
+   * 毒カビ's growth (see systems/fungus.ts). Read and cleared by
+   * consumeTerrainChanged; see its doc comment for why the renderer cannot
+   * simply notice by itself.
+   */
+  private terrainChanged = false;
 
   /**
    * Brief visual bursts for kills/captures/drownings — see
@@ -243,10 +253,19 @@ export class Simulation {
       .add(guardianTargetingSystem)
       .add(heroCooldownSystem)
       .add(createWanderTargetSystem({ heightmap: config.heightmap }))
-      .add(movementSystem)
+      .add(createMovementSystem({ heightmap: config.heightmap }))
       .add(gatherSystem)
       .add(createSwampSystem({ onImpact: (event) => this.recordImpactEffect(event) }))
       .add(createCreviceSystem({ heightmap: config.heightmap, onImpact: (event) => this.recordImpactEffect(event) }))
+      .add(
+        createFungusSystem({
+          heightmap: config.heightmap,
+          onImpact: (event) => this.recordImpactEffect(event),
+          onSpread: () => {
+            this.terrainChanged = true;
+          },
+        }),
+      )
       .add(
         createDrowningSystem({
           heightmap: config.heightmap,
@@ -322,6 +341,23 @@ export class Simulation {
    */
   recordImpactEffect(event: ImpactEffectEvent): void {
     this.impactEffects.push({ ...event, age: 0 });
+  }
+
+  /**
+   * Whether the terrain changed by itself since this was last asked, and
+   * clears the flag.
+   *
+   * main.ts's ticker skips rebuilding the terrain mesh whenever the camera
+   * hasn't moved and nothing is still animating — a real saving, since
+   * that rebuild scales with visible tile count. 毒カビ breaks that
+   * assumption: it grows on its own clock, moving no camera and animating
+   * no elevation, so without this its spread stayed invisible until the
+   * player happened to pan or cast something.
+   */
+  consumeTerrainChanged(): boolean {
+    const changed = this.terrainChanged;
+    this.terrainChanged = false;
+    return changed;
   }
 
   /** Every ImpactEffect still within its visible lifetime — see EntityLayer. */

@@ -8,7 +8,7 @@
  * later — see main.ts's onEnemyAction, which already does this for the
  * screen-shake/toast but had no audio equivalent before this.
  */
-export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "volcano" | "knight" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef";
+export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "volcano" | "knight" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "fungus";
 
 /** Every MiracleSoundType, for tests and any future UI that wants to list them. */
 export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
@@ -24,6 +24,8 @@ export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
   "flower",
   "fireRain",
   "reef",
+  "road",
+  "fungus",
 ];
 
 interface ToneLayer {
@@ -120,6 +122,20 @@ export const RECIPES: Record<MiracleSoundType, MiracleSoundRecipe> = {
   reef: {
     tones: [{ waveform: "square", startFrequency: 160, endFrequency: 90, delay: 0, duration: 0.18, peakGain: 0.14 }],
     noise: { delay: 0, duration: 0.22, peakGain: 0.2, filterFrequency: 2200 },
+  },
+  // Two flat, even taps — stone laid down, nothing rising or falling. The
+  // only deliberately unremarkable sound here: a road is infrastructure.
+  road: {
+    tones: [
+      { waveform: "square", startFrequency: 240, endFrequency: 240, delay: 0, duration: 0.08, peakGain: 0.1 },
+      { waveform: "square", startFrequency: 240, endFrequency: 240, delay: 0.12, duration: 0.08, peakGain: 0.1 },
+    ],
+  },
+  // A wet, sagging note under a dull hiss — something spreading, not
+  // striking. Low-passed hard so it never sounds like the fire's crackle.
+  fungus: {
+    tones: [{ waveform: "sine", startFrequency: 150, endFrequency: 70, delay: 0, duration: 0.7, peakGain: 0.13 }],
+    noise: { delay: 0.05, duration: 0.8, peakGain: 0.14, filterFrequency: 700 },
   },
 };
 

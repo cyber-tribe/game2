@@ -26,6 +26,8 @@ const TOOL_ICON: Record<ToolMode, IconKind> = {
   fireRain: "fireRain",
   tsunami: "tsunami",
   reef: "reef",
+  road: "road",
+  fungus: "fungus",
   armageddon: "armageddon",
   inspect: "inspect",
 };

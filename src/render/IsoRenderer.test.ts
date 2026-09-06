@@ -12,10 +12,6 @@ import {
   waterFrameIndex,
   type TileBounds,
 } from "./IsoRenderer";
-function blankCrevice(width: number, height: number): boolean[][] {
-  return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
-}
-
 function blankLayer(width: number, height: number): boolean[][] {
   return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
 }
@@ -24,7 +20,7 @@ function flatHeightmap(width: number, height: number, elevation: number): Height
   const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
   const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
   return { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
-      crevice: blankCrevice(width, height), waterLevel: 0 };
+      crevice: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), waterLevel: 0 };
 }
 
 /**
@@ -555,5 +551,58 @@ describe("terrain kinds that overlap", () => {
 
     expect(textured(woodedFills)).toBeGreaterThan(0);
     expect(textured(tornFills)).toBe(0);
+  });
+});
+
+describe("road and fungus surfaces", () => {
+  /**
+   * Every ground surface is drawn with its own dither texture (see
+   * SURFACE_FILL), so "does paving look different from grass?" is exactly
+   * "did these two maps use different textures?". Compared as texture
+   * identity rather than by sampling pixels: the textures are generated
+   * once at module load, so identity is the whole distinction the renderer
+   * itself makes.
+   */
+  const texturesUsed = (heightmap: Heightmap) =>
+    new Set(
+      drawInstructions(new IsoRenderer(heightmap))
+        .filter((i) => i.action === "fill" && i.data.style!.texture !== Texture.WHITE)
+        .map((i) => i.data.style!.texture),
+    );
+
+  const covered = (layer: "road" | "fungus" | "forest") => {
+    const heightmap = flatHeightmap(3, 3, 5);
+    for (const row of heightmap[layer]) row.fill(true);
+    return heightmap;
+  };
+
+  it("draws paving, rot, canopy and bare ground as four different surfaces", () => {
+    const surfaces = [texturesUsed(flatHeightmap(3, 3, 5)), texturesUsed(covered("road")), texturesUsed(covered("fungus")), texturesUsed(covered("forest"))];
+
+    for (const surface of surfaces) expect(surface.size).toBe(1);
+    expect(new Set(surfaces.map((surface) => [...surface][0])).size).toBe(4);
+  });
+
+  /**
+   * A vertex is never both paved and rotten (applyRoad refuses fungus), but
+   * a tile has four corners, so a tile on the boundary between a road and
+   * the outbreak it is holding back touches one of each. The rot wins:
+   * standing on it is fatal, and paving drawn over the top would hide the
+   * one thing the player has to see.
+   */
+  it("draws rot rather than paving on the tile where the two meet", () => {
+    const boundary = flatHeightmap(3, 3, 5);
+    for (const row of boundary.road) row.fill(true);
+    boundary.fungus[1][1] = true;
+
+    expect(texturesUsed(boundary)).toEqual(new Set([...texturesUsed(covered("fungus")), ...texturesUsed(covered("road"))]));
+    expect(texturesUsed(boundary).size).toBe(2);
+  });
+
+  it("draws a crevice as a hole even where a road ran", () => {
+    const torn = covered("road");
+    for (const row of torn.crevice) row.fill(true);
+
+    expect(texturesUsed(torn).size).toBe(0);
   });
 });

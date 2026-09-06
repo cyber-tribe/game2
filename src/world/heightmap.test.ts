@@ -13,6 +13,11 @@ import {
   applyFireRain,
   applyFlower,
   applyForest,
+  applyFungus,
+  applyRoad,
+  spreadFungus,
+  FUNGUS_SPREAD_CHANCE,
+  FUNGUS_WITHER_CHANCE,
   applyVolcano,
   countFlatNeighbors,
   createHeightmap,
@@ -21,6 +26,8 @@ import {
   isBuildable,
   isInWaterPool,
   isForest,
+  isFungus,
+  isRoad,
   isCrevice,
   isRock,
   REEF_HEIGHT,
@@ -32,10 +39,6 @@ import {
   type Heightmap,
   type TerrainEditRule,
 } from "./heightmap";
-function blankCrevice(width: number, height: number): boolean[][] {
-  return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
-}
-
 function blankLayer(width: number, height: number): boolean[][] {
   return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
 }
@@ -49,7 +52,7 @@ function flatHeightmap(
   const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
   const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
   return { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
-      crevice: blankCrevice(width, height), waterLevel };
+      crevice: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), waterLevel };
 }
 
 describe("createHeightmap", () => {
@@ -968,5 +971,192 @@ describe("applyFlower", () => {
     applyFlower(heightmap, 15, 15, 2);
 
     expect(isRock(heightmap, 25, 15)).toBe(true);
+  });
+});
+
+describe("applyRoad", () => {
+  it("paves the ground around the cast point", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    applyRoad(heightmap, 10, 10, 2);
+
+    expect(isRoad(heightmap, 10, 10)).toBe(true);
+    expect(isRoad(heightmap, 11, 10)).toBe(true);
+    expect(isRoad(heightmap, 15, 10)).toBe(false);
+  });
+
+  it("does not pave water", () => {
+    const heightmap = flatHeightmap(20, 20, MIN_ELEVATION);
+
+    expect(applyRoad(heightmap, 10, 10, 2)).toEqual([]);
+  });
+
+  it("does not pave ground already lost to 毒カビ — a road is laid ahead of an outbreak, not over it", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    heightmap.fungus[10][10] = true;
+
+    applyRoad(heightmap, 10, 10, 0);
+
+    expect(isRoad(heightmap, 10, 10)).toBe(false);
+  });
+
+  it("reports nothing paved when it paves nothing, so the caller can refuse the cast", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyRoad(heightmap, 10, 10, 1);
+
+    expect(applyRoad(heightmap, 10, 10, 1)).toEqual([]);
+  });
+});
+
+describe("applyFungus", () => {
+  it("seeds rot at the cast point", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    applyFungus(heightmap, 10, 10, 1);
+
+    expect(isFungus(heightmap, 10, 10)).toBe(true);
+  });
+
+  it("does not take root on a road", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyRoad(heightmap, 10, 10, 0);
+
+    expect(applyFungus(heightmap, 10, 10, 0)).toEqual([]);
+  });
+
+  it("does not take root on water", () => {
+    const heightmap = flatHeightmap(20, 20, MIN_ELEVATION);
+
+    expect(applyFungus(heightmap, 10, 10, 1)).toEqual([]);
+  });
+
+  it("makes the ground it covers unbuildable — it swallows buildings, so none can be raised on it", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    applyFungus(heightmap, 10, 10, 0);
+
+    expect(isBuildable(heightmap, 10, 10)).toBe(false);
+  });
+});
+
+describe("spreadFungus", () => {
+  /**
+   * Below every threshold: every reachable vertex is taken, and every
+   * vertex with any exposure at all also withers. Tests that only care
+   * about where the rot can reach seed a solid 3x3 block, so the front
+   * keeps advancing even while the old fringe dies back behind it.
+   */
+  const spreadsEverywhere = () => 0;
+  /** At or above the spread threshold, below the wither one: nothing grows, the fringe dies. */
+  const alwaysWithers = () => FUNGUS_SPREAD_CHANCE;
+
+  const seedBlock = (heightmap: Heightmap, cx: number, cy: number) => {
+    for (let y = cy - 1; y <= cy + 1; y++) for (let x = cx - 1; x <= cx + 1; x++) heightmap.fungus[y][x] = true;
+  };
+
+  it("creeps onto neighbouring ground", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    heightmap.fungus[10][10] = true;
+
+    spreadFungus(heightmap, spreadsEverywhere);
+
+    expect(isFungus(heightmap, 11, 10)).toBe(true);
+    expect(isFungus(heightmap, 10, 11)).toBe(true);
+  });
+
+  /**
+   * The interaction both 道 and 毒カビ exist for
+   * (docs/original-miracles.md #11): "道路を作る……毒カビの進行を止める".
+   * A road that merely made walkers faster would be a convenience; a road
+   * that quarantines is a decision.
+   */
+  it("never crosses a road, however certain the spread", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    for (let y = 0; y <= 20; y++) heightmap.road[y][13] = true;
+    seedBlock(heightmap, 10, 10);
+
+    for (let step = 0; step < 20; step++) spreadFungus(heightmap, spreadsEverywhere);
+
+    expect(isFungus(heightmap, 13, 10)).toBe(false);
+    expect(isFungus(heightmap, 14, 10)).toBe(false);
+    // ...while the same rot runs freely the other way.
+    expect(isFungus(heightmap, 5, 10)).toBe(true);
+  });
+
+  it("does not cross water either", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    for (let y = 0; y <= 20; y++) heightmap.vertices[y][13] = MIN_ELEVATION;
+    seedBlock(heightmap, 10, 10);
+
+    for (let step = 0; step < 20; step++) spreadFungus(heightmap, spreadsEverywhere);
+
+    expect(isFungus(heightmap, 14, 10)).toBe(false);
+  });
+
+  it("lets an unsupported patch die back on its own — the original's 自然消滅", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    heightmap.fungus[10][10] = true;
+
+    const { withered } = spreadFungus(heightmap, alwaysWithers);
+
+    expect(withered).toEqual([{ x: 10, y: 10 }]);
+    expect(isFungus(heightmap, 10, 10)).toBe(false);
+  });
+
+  it("keeps the inside of a solid patch even while its fringe dies back", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    for (let y = 9; y <= 11; y++) for (let x = 9; x <= 11; x++) heightmap.fungus[y][x] = true;
+
+    spreadFungus(heightmap, alwaysWithers);
+
+    expect(isFungus(heightmap, 10, 10)).toBe(true);
+  });
+
+  /**
+   * The die-back is graded by exposure rather than a threshold — a vertex
+   * walled in on all four sides is safe however unlucky the roll, which is
+   * what lets a dense outbreak persist while a thin one frays away.
+   */
+  it("never withers a vertex surrounded on all four sides, however bad the roll", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    for (let y = 9; y <= 11; y++) for (let x = 9; x <= 11; x++) heightmap.fungus[y][x] = true;
+
+    const { withered } = spreadFungus(heightmap, () => 0);
+
+    expect(withered).not.toContainEqual({ x: 10, y: 10 });
+    expect(withered.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * The original's "複数設置すると大繁殖" — spreading per fungus
+   * *neighbour* rather than at a flat rate is what makes two overlapping
+   * casts grow several times faster than one, with no special case for it.
+   */
+  it("grows faster where several patches meet", () => {
+    const lone = flatHeightmap(20, 20, 5);
+    lone.fungus[10][9] = true;
+    const cluster = flatHeightmap(20, 20, 5);
+    for (const [x, y] of [[9, 10], [11, 10], [10, 9]]) cluster.fungus[y][x] = true;
+
+    // A rate this vertex reaches only with 2+ fungus neighbours.
+    const twoNeighborsOnly = () => FUNGUS_SPREAD_CHANCE * 1.5;
+    spreadFungus(lone, twoNeighborsOnly);
+    spreadFungus(cluster, twoNeighborsOnly);
+
+    expect(isFungus(lone, 10, 10)).toBe(false);
+    expect(isFungus(cluster, 10, 10)).toBe(true);
+  });
+
+  it("decides growth and die-back against the same starting state, so nothing grows and dies in one step", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    heightmap.fungus[10][10] = true;
+
+    // Below both thresholds: everything grows, and every under-supported
+    // vertex withers.
+    const { grown, withered } = spreadFungus(heightmap, () => 0);
+
+    expect(withered).toEqual([{ x: 10, y: 10 }]);
+    for (const { x, y } of grown) expect(isFungus(heightmap, x, y)).toBe(true);
+    expect(FUNGUS_WITHER_CHANCE).toBeGreaterThan(0);
   });
 });

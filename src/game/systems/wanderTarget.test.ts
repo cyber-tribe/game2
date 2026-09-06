@@ -3,10 +3,6 @@ import { World } from "../../ecs";
 import type { Heightmap } from "../../world/heightmap";
 import { MoveTarget, Position, Walker } from "../components";
 import { createWanderTargetSystem } from "./wanderTarget";
-function blankCrevice(width: number, height: number): boolean[][] {
-  return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
-}
-
 function blankLayer(width: number, height: number): boolean[][] {
   return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
 }
@@ -17,7 +13,7 @@ function halfWaterHeightmap(width: number, height: number, landFromX: number): H
   );
   const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
   return { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
-      crevice: blankCrevice(width, height), waterLevel: 0 };
+      crevice: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), waterLevel: 0 };
 }
 
 function queueRng(values: number[]): () => number {

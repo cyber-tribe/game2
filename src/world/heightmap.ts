@@ -35,6 +35,28 @@ export interface Heightmap {
    */
   crevice: boolean[][];
   /**
+   * Per-vertex: is this ground paved?
+   *
+   * The original's 道 (docs/original-miracles.md #11) speeds the people who
+   * walk on it — and, far more importantly, **stops 毒カビ from spreading
+   * across it**. That second half is why a road is terrain rather than a
+   * cosmetic overlay: it is the only piece of ground the fungus below
+   * cannot cross, so paving a line ahead of an outbreak is a genuine act of
+   * quarantine ("防疫としての地形制御", docs/original-miracles.md's own
+   * interaction table).
+   */
+  road: boolean[][];
+  /**
+   * Per-vertex: is this ground rotting under 毒カビ?
+   *
+   * The original's 毒カビ (docs/original-miracles.md #9) is "増殖する沼に
+   * 近い。複数設置すると大繁殖し建物や信者を飲み込む。自然消滅すること
+   * もある" — so unlike every other layer here it changes on its own, tick
+   * by tick, in both directions. See spreadFungus for the growth/withering
+   * rule and systems/fungus.ts for what standing in it costs.
+   */
+  fungus: boolean[][];
+  /**
    * Current sea level — starts at MIN_ELEVATION and only ever rises, via
    * applyFlood. Anything at or below it is water, per docs/game-system.md's
    * 洪水, "海面を1段上昇させる".
@@ -95,7 +117,9 @@ export function createHeightmap(
   }
   const forest = Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
   const crevice = Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
-  return { width, height, terrain, vertices, rockHardness, forest, crevice, waterLevel: MIN_ELEVATION };
+  const road = Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
+  const fungus = Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
+  return { width, height, terrain, vertices, rockHardness, forest, crevice, road, fungus, waterLevel: MIN_ELEVATION };
 }
 
 /**
@@ -250,10 +274,17 @@ export function isRock(heightmap: Heightmap, x: number, y: number): boolean {
  * docs/game-system.md, "海には建物を建てられず、通常の民は入ると溺れる".
  * Sea level is `heightmap.waterLevel`, which starts at MIN_ELEVATION but
  * can rise (see applyFlood). Volcano rock can't be built on either, per
- * "岩の上には建築できない".
+ * "岩の上には建築できない". Nor is ground already eaten by 毒カビ, which
+ * "建物や信者を飲み込む" (docs/original-miracles.md #9) — a house cannot be
+ * raised on the rot that would swallow it.
  */
 export function isBuildable(heightmap: Heightmap, x: number, y: number): boolean {
-  return sampleElevation(heightmap, x, y) > heightmap.waterLevel && !isRock(heightmap, x, y) && !isCrevice(heightmap, x, y);
+  return (
+    sampleElevation(heightmap, x, y) > heightmap.waterLevel &&
+    !isRock(heightmap, x, y) &&
+    !isCrevice(heightmap, x, y) &&
+    !isFungus(heightmap, x, y)
+  );
 }
 
 /** Whether the vertex nearest (x, y) is a crevice — see Heightmap.crevice and applyEarthquake. */
@@ -928,4 +959,224 @@ export function applyFlower(
   }
 
   return healed;
+}
+
+/** How far from its cast point a road paves ground, in vertices. */
+export const DEFAULT_ROAD_RADIUS = 2;
+
+/** Whether the vertex nearest (x, y) is paved — see Heightmap.road. */
+export function isRoad(heightmap: Heightmap, x: number, y: number): boolean {
+  const vx = Math.round(x);
+  const vy = Math.round(y);
+  if (vx < 0 || vy < 0 || vx > heightmap.width || vy > heightmap.height) return false;
+  return heightmap.road[vy][vx];
+}
+
+/**
+ * The original's 道 (docs/original-miracles.md #11): "道路を作る。上では
+ * 信者の移動速度が上がる。毒カビの進行を止める".
+ *
+ * Paving is refused on ground already lost to 毒カビ — you lay a road
+ * *ahead* of an outbreak, not over it. That is the whole shape of the
+ * interaction: a road is worth casting before it is obviously needed, and
+ * once the rot has arrived the answer is 花 (applyFlower) instead. It keeps
+ * `road` and `fungus` mutually exclusive too, so neither layer has to
+ * decide which of the two a vertex "really" is.
+ *
+ * Returns the vertices paved, so a cast that would do nothing can be
+ * refused rather than silently charged for.
+ */
+export function applyRoad(
+  heightmap: Heightmap,
+  centerX: number,
+  centerY: number,
+  radius: number = DEFAULT_ROAD_RADIUS,
+): { x: number; y: number }[] {
+  const cx = Math.round(centerX);
+  const cy = Math.round(centerY);
+  const paved: { x: number; y: number }[] = [];
+
+  for (let dy = -radius; dy <= radius; dy++) {
+    const vy = cy + dy;
+    if (vy < 0 || vy > heightmap.height) continue;
+    for (let dx = -radius; dx <= radius; dx++) {
+      const vx = cx + dx;
+      if (vx < 0 || vx > heightmap.width) continue;
+      if (Math.hypot(dx, dy) > radius) continue;
+      if (heightmap.road[vy][vx]) continue;
+      // isBuildable already rejects fungus, water, rock and crevices —
+      // exactly the ground a road cannot be laid on.
+      if (!isBuildable(heightmap, vx, vy)) continue;
+
+      heightmap.road[vy][vx] = true;
+      paved.push({ x: vx, y: vy });
+    }
+  }
+
+  return paved;
+}
+
+/** How far from its cast point a fungus outbreak starts, in vertices. */
+export const DEFAULT_FUNGUS_RADIUS = 1;
+
+/**
+ * Per fungus-covered neighbour, the chance an empty vertex is taken over in
+ * one growth step (see spreadFungus).
+ *
+ * Deliberately scaled by neighbour count rather than flat: it is what makes
+ * the original's "複数設置すると大繁殖" true without special-casing it.
+ * One patch grows only along a thin fringe where most empty vertices touch
+ * a single fungus vertex; two overlapping patches give their shared front
+ * two or three fungus neighbours each, tripling the local growth rate.
+ */
+export const FUNGUS_SPREAD_CHANCE = 0.1;
+
+/**
+ * The chance a *fully exposed* fungus vertex (no fungus neighbours at all)
+ * dies back in one growth step, scaled down by how many neighbours it does
+ * have — see spreadFungus. A vertex with all four dies never.
+ *
+ * The graded form matters more than the number. A flat "wither below N
+ * neighbours" rule turned out to have no middle setting: at N=2 a single
+ * cast grew without bound and swallowed the map on its own; at N=3 even
+ * three overlapping casts went extinct within a minute. Scaling by exposure
+ * gives the behaviour the original describes instead — measured over 40
+ * runs at these values, a lone seed dies out about a quarter of the time
+ * and otherwise creeps ("自然消滅することもある"), while three overlapping
+ * casts reliably reach a few hundred vertices over several minutes
+ * ("複数設置すると大繁殖") — slowly enough that a road laid across its path
+ * is a real answer rather than a formality.
+ */
+export const FUNGUS_WITHER_CHANCE = 0.35;
+
+/** Orthogonal neighbours a vertex has — the divisor of the exposure scaling above. */
+const FUNGUS_MAX_NEIGHBORS = 4;
+
+/** Whether the vertex nearest (x, y) is covered in 毒カビ — see Heightmap.fungus. */
+export function isFungus(heightmap: Heightmap, x: number, y: number): boolean {
+  const vx = Math.round(x);
+  const vy = Math.round(y);
+  if (vx < 0 || vy < 0 || vx > heightmap.width || vy > heightmap.height) return false;
+  return heightmap.fungus[vy][vx];
+}
+
+/**
+ * The original's 毒カビ (docs/original-miracles.md #9): seeds an outbreak
+ * around a point. What makes it dangerous is not this cast but spreadFungus,
+ * which runs every tick afterwards.
+ *
+ * Returns the vertices seeded, so a cast that would do nothing can be
+ * refused rather than silently charged for.
+ */
+export function applyFungus(
+  heightmap: Heightmap,
+  centerX: number,
+  centerY: number,
+  radius: number = DEFAULT_FUNGUS_RADIUS,
+): { x: number; y: number }[] {
+  const cx = Math.round(centerX);
+  const cy = Math.round(centerY);
+  const seeded: { x: number; y: number }[] = [];
+
+  for (let dy = -radius; dy <= radius; dy++) {
+    const vy = cy + dy;
+    if (vy < 0 || vy > heightmap.height) continue;
+    for (let dx = -radius; dx <= radius; dx++) {
+      const vx = cx + dx;
+      if (vx < 0 || vx > heightmap.width) continue;
+      if (Math.hypot(dx, dy) > radius) continue;
+      if (!canFungusTake(heightmap, vx, vy)) continue;
+
+      heightmap.fungus[vy][vx] = true;
+      seeded.push({ x: vx, y: vy });
+    }
+  }
+
+  return seeded;
+}
+
+/**
+ * Ground 毒カビ can take over: land it could otherwise be built on (so not
+ * water, rock or a crevice, and not somewhere it already grows) and, the
+ * point of the whole pair, **not a road**.
+ */
+function canFungusTake(heightmap: Heightmap, x: number, y: number): boolean {
+  if (x < 0 || y < 0 || x > heightmap.width || y > heightmap.height) return false;
+  if (heightmap.road[y][x]) return false;
+  return isBuildable(heightmap, x, y);
+}
+
+const ORTHOGONAL = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+] as const;
+
+/**
+ * One growth step of every 毒カビ patch on the map, applied simultaneously
+ * (a cellular automaton: growth and withering are both decided against the
+ * state at the start of the step, so a vertex taken this step cannot also
+ * wither this step).
+ *
+ * Two opposing rules, straight out of the original's own description, and
+ * both keyed on the same thing — how many fungus neighbours a vertex has.
+ * Empty ground is taken over at FUNGUS_SPREAD_CHANCE *per fungus
+ * neighbour* ("複数設置すると大繁殖"), while a fungus vertex dies back at
+ * FUNGUS_WITHER_CHANCE scaled by how exposed it is
+ * ("自然消滅することもある"). A lone seed is almost all fringe and often
+ * fizzles; two casts laid over each other build an interior that cannot
+ * wither at all and a front that grows several times faster. Nothing
+ * crosses a road (see canFungusTake).
+ *
+ * Returns what changed, so the caller can redraw and clear out whatever the
+ * new growth swallowed (see systems/fungus.ts).
+ */
+export function spreadFungus(
+  heightmap: Heightmap,
+  rng: () => number = Math.random,
+): { grown: { x: number; y: number }[]; withered: { x: number; y: number }[] } {
+  const stride = heightmap.width + 1;
+  const candidates = new Map<number, { x: number; y: number; neighbors: number }>();
+  const occupied: { x: number; y: number; neighbors: number }[] = [];
+
+  for (let y = 0; y <= heightmap.height; y++) {
+    for (let x = 0; x <= heightmap.width; x++) {
+      if (!heightmap.fungus[y][x]) continue;
+
+      let neighbors = 0;
+      for (const [dx, dy] of ORTHOGONAL) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx > heightmap.width || ny > heightmap.height) continue;
+        if (heightmap.fungus[ny][nx]) {
+          neighbors++;
+          continue;
+        }
+        const key = ny * stride + nx;
+        const candidate = candidates.get(key);
+        if (candidate) candidate.neighbors++;
+        else candidates.set(key, { x: nx, y: ny, neighbors: 1 });
+      }
+      occupied.push({ x, y, neighbors });
+    }
+  }
+
+  const grown: { x: number; y: number }[] = [];
+  for (const { x, y, neighbors } of candidates.values()) {
+    if (!canFungusTake(heightmap, x, y)) continue;
+    if (rng() >= FUNGUS_SPREAD_CHANCE * neighbors) continue;
+    heightmap.fungus[y][x] = true;
+    grown.push({ x, y });
+  }
+
+  const withered: { x: number; y: number }[] = [];
+  for (const { x, y, neighbors } of occupied) {
+    const exposure = (FUNGUS_MAX_NEIGHBORS - neighbors) / FUNGUS_MAX_NEIGHBORS;
+    if (rng() >= FUNGUS_WITHER_CHANCE * exposure) continue;
+    heightmap.fungus[y][x] = false;
+    withered.push({ x, y });
+  }
+
+  return { grown, withered };
 }
