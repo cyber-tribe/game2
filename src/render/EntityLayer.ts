@@ -1,5 +1,5 @@
 import { Container, Graphics, Sprite } from "pixi.js";
-import { Drowning, FirePillar, FactionState, HolyWater, House, MoveTarget, Owner, Position, Swamp, Tornado, Walker, Whirlpool, isHeroState, type FactionId, type HeroKind } from "../game/components";
+import { Drowning, FirePillar, Storm, FactionState, HolyWater, House, MoveTarget, Owner, Position, Swamp, Tornado, Walker, Whirlpool, isHeroState, type FactionId, type HeroKind } from "../game/components";
 import type { Entity, World } from "../ecs";
 import { FARMLAND_RADIUS, IMPACT_EFFECT_DURATION } from "../game/constants";
 import { distance, type Point } from "../game/systems/geometry";
@@ -137,6 +137,21 @@ const FIRE_PILLAR_EMBER_COLOR = 0x8c2a12;
 const FIRE_PILLAR_HEIGHT = 40;
 const FIRE_PILLAR_BANDS = 7;
 const FIRE_PILLAR_FLICKER = 3.1;
+/**
+ * 嵐 — a flat dark cloud over the ground it is denying, with a bolt
+ * flickering under it. Drawn low and wide rather than as a column: the
+ * other two lasting hazards (竜巻, 火柱) stand up off the ground and move,
+ * and a player has to be able to tell at a glance which of the three is
+ * over their settlement.
+ */
+const STORM_CLOUD_COLOR = 0x2a2f3a;
+const STORM_EDGE_COLOR = 0x4a5266;
+const STORM_BOLT_COLOR = 0xf2f0c8;
+/** Screen px the cloud floats above the ground it covers. */
+const STORM_CLOUD_HEIGHT = 26;
+const STORM_PUFFS = 5;
+/** Flashes per second — irregular enough to read as lightning rather than a blinking light. */
+const STORM_FLASH_RATE = 2.7;
 const WHIRLPOOL_COLOR = 0x0b4f66;
 const WHIRLPOOL_FOAM_COLOR = 0xa8d8e8;
 const WHIRLPOOL_RINGS = 3;
@@ -427,6 +442,31 @@ export class EntityLayer {
         g.ellipse(sx + wobble, sy, 22 * scale, 11 * scale)
           .fill({ color: WHIRLPOOL_COLOR, alpha: 0.35 + 0.2 * (1 - scale) })
           .stroke({ width: 1, color: WHIRLPOOL_FOAM_COLOR, alpha: 0.5 * scale });
+      }
+    }
+
+    for (const entity of world.query(Position, Storm)) {
+      const pos = world.get(entity, Position)!;
+      const { sx, sy } = this.iso.project(pos.x, pos.y);
+      const top = sy - STORM_CLOUD_HEIGHT;
+
+      for (let puff = 0; puff < STORM_PUFFS; puff++) {
+        const spread = (puff / (STORM_PUFFS - 1)) * 2 - 1;
+        const drift = Math.sin(this.elapsedTime * 0.6 + puff) * 2;
+        g.ellipse(sx + spread * 26 + drift, top + Math.abs(spread) * 4, 16 - Math.abs(spread) * 4, 8)
+          .fill({ color: STORM_CLOUD_COLOR, alpha: 0.85 })
+          .stroke({ width: 1, color: STORM_EDGE_COLOR, alpha: 0.6 });
+      }
+
+      // A bolt on roughly every other flash, hanging from a different part
+      // of the cloud each time, so the strike reads as coming *from* the
+      // weather rather than as a fixed decoration.
+      const flash = this.elapsedTime * STORM_FLASH_RATE;
+      if (flash % 1 < 0.22) {
+        const offset = (Math.sin(Math.floor(flash) * 12.9898) * 43758.5453) % 1;
+        const boltX = sx + (offset * 2 - 1) * 22;
+        g.poly([boltX, top + 6, boltX + 4, top + 14, boltX + 1, top + 14, boltX + 5, top + 24])
+          .stroke({ width: 2, color: STORM_BOLT_COLOR, alpha: 0.9 });
       }
     }
 

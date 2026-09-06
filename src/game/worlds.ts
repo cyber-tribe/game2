@@ -16,6 +16,8 @@ export type MiracleId =
   | "holyWater"
   | "tornado"
   | "firePillar"
+  | "lightning"
+  | "storm"
   | "hurricane"
   | "reef"
   | "road"
@@ -42,6 +44,8 @@ export const ALL_MIRACLES: readonly MiracleId[] = [
   "holyWater",
   "tornado",
   "firePillar",
+  "lightning",
+  "storm",
   "hurricane",
   "reef",
   "road",

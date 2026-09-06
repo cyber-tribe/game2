@@ -21,6 +21,8 @@ const TOOL_ICON: Record<ToolMode, IconKind> = {
   holyWater: "holyWater",
   tornado: "tornado",
   firePillar: "firePillar",
+  lightning: "lightning",
+  storm: "storm",
   hurricane: "hurricane",
   perseus: "perseus",
   hercules: "hercules",

@@ -301,6 +301,46 @@ export function isBuildable(heightmap: Heightmap, x: number, y: number): boolean
   );
 }
 
+/**
+ * Burns every land vertex within `radius` of (x, y) barren, returning the
+ * ones it took — the 「地面を荒地化」 that 火柱 (#21), 雷 (#16) and 嵐
+ * (#18) all leave behind.
+ *
+ * Water is left alone (nothing there to burn) and so is ground already
+ * dead, so a second strike on the same spot reports no new damage and the
+ * caller can tell a redraw is unnecessary.
+ */
+export function scorchGround(
+  heightmap: Heightmap,
+  centerX: number,
+  centerY: number,
+  radius: number,
+): { x: number; y: number }[] {
+  const cx = Math.round(centerX);
+  const cy = Math.round(centerY);
+  const burned: { x: number; y: number }[] = [];
+
+  for (let dy = -Math.ceil(radius); dy <= Math.ceil(radius); dy++) {
+    const vy = cy + dy;
+    if (vy < 0 || vy > heightmap.height) continue;
+    for (let dx = -Math.ceil(radius); dx <= Math.ceil(radius); dx++) {
+      const vx = cx + dx;
+      if (vx < 0 || vx > heightmap.width) continue;
+      if (Math.hypot(dx, dy) > radius) continue;
+      if (heightmap.vertices[vy][vx] <= Math.max(MIN_ELEVATION, heightmap.waterLevel)) continue;
+      if (heightmap.scorched[vy][vx]) continue;
+
+      heightmap.scorched[vy][vx] = true;
+      heightmap.forest[vy][vx] = false;
+      heightmap.road[vy][vx] = false;
+      heightmap.fungus[vy][vx] = false;
+      burned.push({ x: vx, y: vy });
+    }
+  }
+
+  return burned;
+}
+
 /** Whether the vertex nearest (x, y) has been burned barren — see Heightmap.scorched. */
 export function isScorched(heightmap: Heightmap, x: number, y: number): boolean {
   const vx = Math.round(x);

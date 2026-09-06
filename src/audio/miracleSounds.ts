@@ -8,7 +8,7 @@
  * later — see main.ts's onEnemyAction, which already does this for the
  * screen-shake/toast but had no audio equivalent before this.
  */
-export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "holyWater" | "tornado" | "firePillar" | "hurricane" | "volcano" | "perseus" | "hercules" | "odysseus" | "achilles" | "adonis" | "helen" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "fungus";
+export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "holyWater" | "tornado" | "firePillar" | "lightning" | "storm" | "hurricane" | "volcano" | "perseus" | "hercules" | "odysseus" | "achilles" | "adonis" | "helen" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "fungus";
 
 /** Every MiracleSoundType, for tests and any future UI that wants to list them. */
 export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
@@ -18,6 +18,8 @@ export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
   "holyWater",
   "tornado",
   "firePillar",
+  "lightning",
+  "storm",
   "hurricane",
   "volcano",
   "perseus",
@@ -104,6 +106,17 @@ export const RECIPES: Record<MiracleSoundType, MiracleSoundRecipe> = {
   firePillar: {
     tones: [{ waveform: "sawtooth", startFrequency: 150, endFrequency: 110, delay: 0, duration: 1, peakGain: 0.12 }],
     noise: { delay: 0, duration: 1.2, peakGain: 0.3, filterFrequency: 2400 },
+  },
+  // A crack, then the rumble after it — the only sound here that is two
+  // separate events rather than one shape.
+  lightning: {
+    tones: [{ waveform: "square", startFrequency: 1800, endFrequency: 200, delay: 0, duration: 0.06, peakGain: 0.24 }],
+    noise: { delay: 0.05, duration: 0.7, peakGain: 0.22, filterFrequency: 900 },
+  },
+  // The same rumble without the crack, long and low: weather, not a strike.
+  storm: {
+    tones: [{ waveform: "sine", startFrequency: 90, endFrequency: 60, delay: 0, duration: 1.2, peakGain: 0.14 }],
+    noise: { delay: 0, duration: 1.4, peakGain: 0.2, filterFrequency: 600 },
   },
   // One hard gust: bright noise that arrives at full strength and falls
   // away. Where the tornado's wind keeps climbing, this one is over by the

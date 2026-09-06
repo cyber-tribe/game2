@@ -10,6 +10,8 @@ export type ToolMode =
   | "holyWater"
   | "tornado"
   | "firePillar"
+  | "lightning"
+  | "storm"
   | "hurricane"
   | "perseus"
   | "hercules"

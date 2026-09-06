@@ -216,6 +216,24 @@ export interface Tornado {
 }
 
 /**
+ * The original's 嵐 (docs/original-miracles.md #18): 「雷雲を発生させ周辺へ
+ * 継続的に落雷。単発の雷と違い**範囲持続型**。この雷は**人には直接
+ * 当たらない**」.
+ *
+ * The one lasting hazard that does not move. 竜巻 and 火柱 wander and are
+ * dangerous wherever they end up; a storm sits over the ground it was cast
+ * on and makes *that* ground unusable — which is the only way an area-denial
+ * miracle can exist in a game where everything else either lands once or
+ * walks away.
+ */
+export interface Storm {
+  /** Seconds of life left; the cloud is removed at zero. */
+  remaining: number;
+  /** Seconds until the next bolt falls. */
+  untilStrike: number;
+}
+
+/**
  * The original's 火柱 (docs/original-miracles.md #21): 「移動する火柱。
  * ランダムに動き、地面を荒地化し人を焼死させ建物を崩壊させる。固定AoEでは
  * なく**移動する危険地帯**」.
@@ -297,6 +315,7 @@ export const HolyWater = defineComponent<HolyWater>("HolyWater");
 export const Tornado = defineComponent<Tornado>("Tornado");
 export const Whirlpool = defineComponent<Whirlpool>("Whirlpool");
 export const FirePillar = defineComponent<FirePillar>("FirePillar");
+export const Storm = defineComponent<Storm>("Storm");
 export const Charmed = defineComponent<Charmed>("Charmed");
 export const HeroCooldown = defineComponent<HeroCooldown>("HeroCooldown");
 export const Drowning = defineComponent<Drowning>("Drowning");
