@@ -35,6 +35,17 @@ export interface Heightmap {
    */
   crevice: boolean[][];
   /**
+   * Per-vertex: has fire burned this ground barren?
+   *
+   * The original's 火柱 (docs/original-miracles.md #21) 「地面を荒地化し」 —
+   * a moving pillar of flame that leaves dead ground behind it. Kept as its
+   * own layer rather than reusing rockHardness (a volcano's rock) because
+   * the two are healed the same way but are not the same thing: rock is
+   * chipped down by repeated terraforming, ash simply *is* barren until
+   * something makes it live again (applyFlower).
+   */
+  scorched: boolean[][];
+  /**
    * Per-vertex: is this ground paved?
    *
    * The original's 道 (docs/original-miracles.md #11) speeds the people who
@@ -117,9 +128,10 @@ export function createHeightmap(
   }
   const forest = Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
   const crevice = Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
+  const scorched = Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
   const road = Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
   const fungus = Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
-  return { width, height, terrain, vertices, rockHardness, forest, crevice, road, fungus, waterLevel: MIN_ELEVATION };
+  return { width, height, terrain, vertices, rockHardness, forest, crevice, scorched, road, fungus, waterLevel: MIN_ELEVATION };
 }
 
 /**
@@ -276,15 +288,25 @@ export function isRock(heightmap: Heightmap, x: number, y: number): boolean {
  * can rise (see applyFlood). Volcano rock can't be built on either, per
  * "岩の上には建築できない". Nor is ground already eaten by 毒カビ, which
  * "建物や信者を飲み込む" (docs/original-miracles.md #9) — a house cannot be
- * raised on the rot that would swallow it.
+ * raised on the rot that would swallow it — nor ground a 火柱 has burned
+ * barren (#21's 「地面を荒地化し」).
  */
 export function isBuildable(heightmap: Heightmap, x: number, y: number): boolean {
   return (
     sampleElevation(heightmap, x, y) > heightmap.waterLevel &&
     !isRock(heightmap, x, y) &&
     !isCrevice(heightmap, x, y) &&
-    !isFungus(heightmap, x, y)
+    !isFungus(heightmap, x, y) &&
+    !isScorched(heightmap, x, y)
   );
+}
+
+/** Whether the vertex nearest (x, y) has been burned barren — see Heightmap.scorched. */
+export function isScorched(heightmap: Heightmap, x: number, y: number): boolean {
+  const vx = Math.round(x);
+  const vy = Math.round(y);
+  if (vx < 0 || vy < 0 || vx > heightmap.width || vy > heightmap.height) return false;
+  return heightmap.scorched[vy][vx];
 }
 
 /** Whether the vertex nearest (x, y) is a crevice — see Heightmap.crevice and applyEarthquake. */
@@ -912,10 +934,11 @@ export const DEFAULT_FLOWER_RADIUS = 3;
  * なった土地を通常の平地へ戻します。沼、地震による亀裂、火山で荒れた
  * 土地などを修復でき……溶岩にも有効".
  *
- * The counter to three separate miracles at once, which is why it is worth
+ * The counter to four separate miracles at once, which is why it is worth
  * more than its own small effect suggests: an earthquake's crevice
  * (plan/archived/0095), a volcano's rock and the lava that ran from it
- * (plan/archived/0096) all become ordinary ground again. Swamps are ECS
+ * (plan/archived/0096), and the ash a 火柱 leaves behind (#21) all become
+ * ordinary ground again. Swamps are ECS
  * entities rather than terrain, so the caller clears those separately with
  * collapseSwampsNear — the same call an earthquake already makes.
  *
@@ -947,13 +970,15 @@ export function applyFlower(
 
       const wasTorn = heightmap.crevice[vy][vx];
       const wasRock = heightmap.rockHardness[vy][vx] > 0;
-      if (!wasTorn && !wasRock) continue;
+      const wasBurned = heightmap.scorched[vy][vx];
+      if (!wasTorn && !wasRock && !wasBurned) continue;
 
       if (wasTorn) {
         heightmap.crevice[vy][vx] = false;
         heightmap.vertices[vy][vx] = Math.min(MAX_ELEVATION, heightmap.waterLevel + 1);
       }
       heightmap.rockHardness[vy][vx] = 0;
+      heightmap.scorched[vy][vx] = false;
       healed.push({ x: vx, y: vy });
     }
   }

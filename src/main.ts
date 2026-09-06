@@ -23,6 +23,7 @@ import {
   SWAMP_MANA_COST,
   HOLY_WATER_MANA_COST,
   TORNADO_MANA_COST,
+  FIRE_PILLAR_MANA_COST,
   HURRICANE_MANA_COST,
   TERRAIN_EDIT_MANA_COST,
   TERRAIN_EDIT_RULE_LABELS,
@@ -52,6 +53,7 @@ const HERO_MANA_COST: Record<HeroKind, number> = {
 };
 import { createHolyWater } from "./game/holyWater";
 import { applyHurricane } from "./game/hurricane";
+import { createFirePillar } from "./game/firePillar";
 import { createTornado } from "./game/tornado";
 import { collapseSwampsNear, createSwamp } from "./game/swamp";
 import { burnFire } from "./game/fire";
@@ -718,6 +720,20 @@ async function bootstrap(world: WorldDefinition) {
       return;
     }
 
+    if (toolMode === "firePillar") {
+      if (!trySpendPlayerMana(FIRE_PILLAR_MANA_COST)) return;
+      // Aimed like the earthquake, the tornado and the hurricane: from the
+      // caster's own shrine, through the tapped point. It wanders from
+      // there, so this is a push rather than a path.
+      const from = simulation.getShrinePosition("player") ?? vertex;
+      createFirePillar(simulation.world, vertex.x, vertex.y, vertex.x - from.x, vertex.y - from.y);
+      simulation.recordEvent("player", "firePillar");
+      triggerShake(4);
+      vibrate([30, 15, 30]);
+      playMiracleSound("firePillar");
+      return;
+    }
+
     if (toolMode === "hurricane") {
       if (!trySpendPlayerMana(HURRICANE_MANA_COST)) return;
       // Aimed like the earthquake and the tornado: from the caster's own
@@ -1150,6 +1166,7 @@ async function bootstrap(world: WorldDefinition) {
     swamp: SWAMP_MANA_COST,
     holyWater: HOLY_WATER_MANA_COST,
     tornado: TORNADO_MANA_COST,
+    firePillar: FIRE_PILLAR_MANA_COST,
     hurricane: HURRICANE_MANA_COST,
     ...HERO_MANA_COST,
     volcano: VOLCANO_MANA_COST,

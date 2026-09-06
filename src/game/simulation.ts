@@ -40,6 +40,7 @@ import { createFungusSystem } from "./systems/fungus";
 import { createHelenSystem } from "./systems/helen";
 import { createHeroLossSystem } from "./systems/heroLoss";
 import { createHolyWaterSystem } from "./systems/holyWater";
+import { createFirePillarSystem } from "./systems/firePillar";
 import { createTornadoSystem } from "./systems/tornado";
 import { createWhirlpoolSystem } from "./systems/whirlpool";
 import { createSwampSystem } from "./systems/swamp";
@@ -164,6 +165,7 @@ export type MatchEventType =
   | "swamp"
   | "holyWater"
   | "tornado"
+  | "firePillar"
   | "hurricane"
   | "volcano"
   | "forest"
@@ -219,8 +221,9 @@ export class Simulation {
   private elapsedTime = 0;
   /**
    * Set whenever a system changes the terrain on its own — 毒カビ's
-   * growth (see systems/fungus.ts) and a 渦巻き eating the coast (see
-   * systems/whirlpool.ts). Read and cleared by
+   * growth (see systems/fungus.ts), a 渦巻き eating the coast (see
+   * systems/whirlpool.ts) and a 火柱 burning it barren (see
+   * systems/firePillar.ts). Read and cleared by
    * consumeTerrainChanged; see its doc comment for why the renderer cannot
    * simply notice by itself.
    */
@@ -279,6 +282,15 @@ export class Simulation {
         createTornadoSystem({
           heightmap: config.heightmap,
           onImpact: (event) => this.recordImpactEffect(event),
+        }),
+      )
+      .add(
+        createFirePillarSystem({
+          heightmap: config.heightmap,
+          onImpact: (event) => this.recordImpactEffect(event),
+          onScorch: () => {
+            this.terrainChanged = true;
+          },
         }),
       )
       .add(

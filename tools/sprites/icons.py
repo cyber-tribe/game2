@@ -253,6 +253,27 @@ ICONS: dict[str, list[str]] = {
     # ハリケーン: three swept gusts blowing right, each curling at its end.
     # Horizontal where the tornado's icon is vertical, because the one thing
     # a player has to read off this miracle is that it has a direction.
+    # 火柱: a standing column of flame over the dead ground it leaves. The
+    # tornado's icon is the same silhouette in stone tones; this one is the
+    # one that burns, and the scorched strip under it is the difference.
+    "firePillar": [
+        "......oooo......",
+        ".....oorroo.....",
+        ".....orrrro.....",
+        "....oorrrroo....",
+        "....orrbbrro....",
+        "...oorrbbrroo...",
+        "...orrbSSbrro...",
+        "...orrbSSbrro...",
+        "...orrrbbrrro...",
+        "...oorrrrrroo...",
+        "....orrrrrro....",
+        "..oooooooooooo..",
+        ".oddddddddddddo.",
+        "...oddddddddo...",
+        "..oooooooooooo..",
+        "................",
+    ],
     "hurricane": [
         "................",
         "................",
@@ -791,6 +812,7 @@ ICON_KINDS = (
     "forest",
     "flower",
     "tornado",
+    "firePillar",
     "hurricane",
     "fireRain",
     "volcano",

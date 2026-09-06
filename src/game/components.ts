@@ -216,6 +216,24 @@ export interface Tornado {
 }
 
 /**
+ * The original's 火柱 (docs/original-miracles.md #21): 「移動する火柱。
+ * ランダムに動き、地面を荒地化し人を焼死させ建物を崩壊させる。固定AoEでは
+ * なく**移動する危険地帯**」.
+ *
+ * Shaped like a Tornado — a lifetime and a heading — because they are the
+ * same kind of thing, a hazard that walks. What separates them is what
+ * they do to what they walk over: a tornado carries people off and leaves
+ * the ground alone, a fire pillar burns everything and leaves the ground
+ * dead.
+ */
+export interface FirePillar {
+  /** Seconds of life left; the pillar is removed at zero. */
+  remaining: number;
+  headingX: number;
+  headingY: number;
+}
+
+/**
  * The original's 渦巻き (docs/original-miracles.md #26): 「海上を移動しながら
  * 陸地を削って水へ戻す。一定時間で分裂して被害範囲が広がる」.
  *
@@ -278,6 +296,7 @@ export const Swamp = defineComponent<Swamp>("Swamp");
 export const HolyWater = defineComponent<HolyWater>("HolyWater");
 export const Tornado = defineComponent<Tornado>("Tornado");
 export const Whirlpool = defineComponent<Whirlpool>("Whirlpool");
+export const FirePillar = defineComponent<FirePillar>("FirePillar");
 export const Charmed = defineComponent<Charmed>("Charmed");
 export const HeroCooldown = defineComponent<HeroCooldown>("HeroCooldown");
 export const Drowning = defineComponent<Drowning>("Drowning");
