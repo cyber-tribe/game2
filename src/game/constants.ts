@@ -2,6 +2,29 @@ import type { TerrainEditRule, TerrainType } from "../world/heightmap";
 import type { HeroKind, HouseLevel } from "./components";
 import type { EnemyPersonality } from "./worlds";
 
+/**
+ * How far from its shrine each of a faction's starting walkers is placed,
+ * in tiles — see Simulation's spawnWalkers.
+ *
+ * Small: they are meant to read as a group gathered at the shrine, not as
+ * a scattered patrol. It only has to be big enough that they are not
+ * standing *inside each other*, which is what they used to do.
+ */
+export const INITIAL_WALKER_SPREAD = 1.5;
+
+/**
+ * How close to an existing house a walker may settle, in tiles — see
+ * systems/settle.ts.
+ *
+ * There was no such rule, so walkers standing on the same spot founded
+ * houses on the same spot: measured on the final world, one faction held
+ * three houses at *identical* coordinates at 40 seconds. Stacked houses
+ * are invisible (they draw on top of each other), pay full mana each, and
+ * — the reason this is a fix rather than tidying — die together to
+ * anything with a radius.
+ */
+export const HOUSE_SPACING = 1;
+
 /** Tiles per second for a freshly spawned walker. */
 export const DEFAULT_WALKER_SPEED = 1.5;
 

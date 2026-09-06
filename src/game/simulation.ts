@@ -13,7 +13,7 @@ import {
   type HouseLevel,
   type WalkerState,
 } from "./components";
-import { DEFAULT_WALKER_SPEED, FARMLAND_RADIUS, HOUSE_LEVELS, IMPACT_EFFECT_DURATION, TILES_PER_HOUSE_CAP } from "./constants";
+import { DEFAULT_WALKER_SPEED, FARMLAND_RADIUS, HOUSE_LEVELS, IMPACT_EFFECT_DURATION, INITIAL_WALKER_SPREAD, TILES_PER_HOUSE_CAP } from "./constants";
 import { createFaction, findFactionEntity, moveShrine } from "./faction";
 import { promoteHero } from "./hero";
 import { totalPopulation } from "./population";
@@ -567,10 +567,31 @@ export class Simulation {
     return entities;
   }
 
+  /**
+   * Places a faction's starting walkers in a ring around its shrine rather
+   * than all on the exact same point.
+   *
+   * They used to share one position exactly, and on slow terrain they can
+   * stay there for a minute — nothing makes an idle walker move, and
+   * settling happens wherever one stands. Measured on the final world's
+   * rock terrain, a faction still occupied a single point at 40 seconds:
+   * three walkers, then three houses, all at identical coordinates. A
+   * single area miracle of any size therefore erased an entire faction,
+   * which is what made an opening cast able to end a match outright (see
+   * plan/0107).
+   *
+   * Deterministic, not random: a match's opening should not vary in a way
+   * nobody can see, and the ring is the shape "everyone gathered at the
+   * shrine" ought to have had in the first place.
+   */
   private spawnWalkers(faction: FactionId, origin: { x: number; y: number }, count: number): void {
     for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
       const walker = this.world.createEntity();
-      this.world.add(walker, Position, { x: origin.x, y: origin.y });
+      this.world.add(walker, Position, {
+        x: origin.x + Math.cos(angle) * INITIAL_WALKER_SPREAD,
+        y: origin.y + Math.sin(angle) * INITIAL_WALKER_SPREAD,
+      });
       this.world.add(walker, Owner, { faction });
       this.world.add(walker, Walker, { strength: 1, state: "seeking", speed: DEFAULT_WALKER_SPEED });
     }

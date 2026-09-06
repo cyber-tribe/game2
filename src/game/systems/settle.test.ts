@@ -192,3 +192,52 @@ describe("createSettleSystem", () => {
     expect(world.query(House)).toHaveLength(1);
   });
 });
+
+function createWalker(world: World, faction: "player" | "enemy", x: number, y: number) {
+  const walker = world.createEntity();
+  world.add(walker, Position, { x, y });
+  world.add(walker, Owner, { faction });
+  world.add(walker, Walker, { strength: 1, state: "seeking", speed: 1 });
+  return walker;
+}
+
+describe("createSettleSystem — spacing", () => {
+  /**
+   * There was no spacing rule at all, so walkers standing on the same spot
+   * founded houses on the same spot: measured on the final world, one
+   * faction held three houses at *identical* coordinates at 40 seconds.
+   * Stacked houses are invisible, pay full mana each, and die together to
+   * anything with a radius (plan/0107).
+   */
+  it("does not stack a house on top of one that is already there", () => {
+    const world = new World();
+    createWalker(world, "player", 5, 5);
+    createWalker(world, "player", 5, 5);
+    createWalker(world, "player", 5, 5);
+
+    createSettleSystem()(world, 1);
+
+    expect(world.query(House)).toHaveLength(1);
+  });
+
+  it("leaves the refused walkers seeking, so they settle elsewhere later", () => {
+    const world = new World();
+    createWalker(world, "player", 5, 5);
+    const second = createWalker(world, "player", 5, 5);
+
+    createSettleSystem()(world, 1);
+
+    expect(world.isAlive(second)).toBe(true);
+    expect(world.get(second, Walker)!.state).toBe("seeking");
+  });
+
+  it("still settles a walker standing clear of every house", () => {
+    const world = new World();
+    createWalker(world, "player", 5, 5);
+    createWalker(world, "player", 12, 12);
+
+    createSettleSystem()(world, 1);
+
+    expect(world.query(House)).toHaveLength(2);
+  });
+});

@@ -1,7 +1,9 @@
 import type { Entity, System, World } from "../../ecs";
 import { isBuildable, type Heightmap } from "../../world/heightmap";
 import { Charmed, FactionState, House, MoveTarget, Owner, Position, Walker, type FactionId } from "../components";
+import { HOUSE_SPACING } from "../constants";
 import { hasOtherSeekingWalkers } from "./gatherTargeting";
+import { distance } from "./geometry";
 
 export interface SettleConfig {
   /** When given, a walker only settles on buildable (above sea level) land. */
@@ -59,6 +61,9 @@ export function createSettleSystem(config: Partial<SettleConfig> = {}): System {
     const warringFactions = factionsInFinalBattle(world);
     const gatheringLeaders = currentGatheringLeaders(world);
     const houseCountByFaction = countHousesByFaction(world);
+    // Rebuilt per tick and appended to as houses go up, so two walkers
+    // standing together cannot both settle on the same spot in one pass.
+    const occupied = world.query(Position, House).map((entity) => world.get(entity, Position)!);
 
     for (const entity of world.query(Position, Walker, Owner)) {
       // 「建物から引き離し」 — someone Helen is dragging around does not
@@ -75,6 +80,10 @@ export function createSettleSystem(config: Partial<SettleConfig> = {}): System {
 
       const pos = world.get(entity, Position)!;
       if (heightmap && !isBuildable(heightmap, pos.x, pos.y)) continue;
+      // Not on top of a house that is already there — see HOUSE_SPACING.
+      // A walker refused here simply stays "seeking" and is given somewhere
+      // else to be on a later tick (wanderTarget.ts), so nothing stalls.
+      if (occupied.some((house) => distance(house, pos) < HOUSE_SPACING)) continue;
 
       const house = world.createEntity();
       world.add(house, Position, { x: pos.x, y: pos.y });
@@ -82,6 +91,7 @@ export function createSettleSystem(config: Partial<SettleConfig> = {}): System {
       world.add(house, House, { level: "hut", population: 0 });
 
       world.destroyEntity(entity);
+      occupied.push({ x: pos.x, y: pos.y });
       houseCountByFaction.set(owner.faction, (houseCountByFaction.get(owner.faction) ?? 0) + 1);
     }
   };
