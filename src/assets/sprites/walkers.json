@@ -1,1920 +1,3840 @@
 {
   "frames": {
-    "walker_enemy_guardian_NE_stand": {
+    "walker_enemy_guardian_NE_0": {
       "frame": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_guardian_NE_step": {
+    "walker_enemy_guardian_NE_1": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 5,
+        "h": 18,
+        "w": 11,
+        "x": 11,
         "y": 0
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_guardian_NW_stand": {
+    "walker_enemy_guardian_NE_2": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 10,
+        "h": 18,
+        "w": 11,
+        "x": 22,
         "y": 0
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_guardian_NW_step": {
+    "walker_enemy_guardian_NE_3": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 15,
+        "h": 18,
+        "w": 11,
+        "x": 33,
         "y": 0
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_guardian_SE_stand": {
+    "walker_enemy_guardian_NW_0": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 20,
+        "h": 18,
+        "w": 11,
+        "x": 44,
         "y": 0
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_guardian_SE_step": {
+    "walker_enemy_guardian_NW_1": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 25,
-        "y": 0
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_guardian_SW_stand": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 30,
-        "y": 0
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_guardian_SW_step": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 35,
-        "y": 0
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_knight_NE_stand": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 40,
-        "y": 0
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_knight_NE_step": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 45,
-        "y": 0
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_knight_NW_stand": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 50,
-        "y": 0
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_knight_NW_step": {
-      "frame": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 55,
         "y": 0
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_knight_SE_stand": {
+    "walker_enemy_guardian_NW_2": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 60,
+        "h": 18,
+        "w": 11,
+        "x": 66,
         "y": 0
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_knight_SE_step": {
+    "walker_enemy_guardian_NW_3": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 65,
+        "h": 18,
+        "w": 11,
+        "x": 77,
         "y": 0
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_knight_SW_stand": {
+    "walker_enemy_guardian_SE_0": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 70,
+        "h": 18,
+        "w": 11,
+        "x": 88,
         "y": 0
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_knight_SW_step": {
+    "walker_enemy_guardian_SE_1": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 75,
+        "h": 18,
+        "w": 11,
+        "x": 99,
         "y": 0
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_leaderGuardian_NE_stand": {
+    "walker_enemy_guardian_SE_2": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 9
+        "h": 18,
+        "w": 11,
+        "x": 110,
+        "y": 0
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_leaderGuardian_NE_step": {
+    "walker_enemy_guardian_SE_3": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 5,
-        "y": 9
+        "h": 18,
+        "w": 11,
+        "x": 121,
+        "y": 0
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_leaderGuardian_NW_stand": {
+    "walker_enemy_guardian_SW_0": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 10,
-        "y": 9
+        "h": 18,
+        "w": 11,
+        "x": 132,
+        "y": 0
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_leaderGuardian_NW_step": {
+    "walker_enemy_guardian_SW_1": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 15,
-        "y": 9
+        "h": 18,
+        "w": 11,
+        "x": 143,
+        "y": 0
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_leaderGuardian_SE_stand": {
+    "walker_enemy_guardian_SW_2": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 20,
-        "y": 9
+        "h": 18,
+        "w": 11,
+        "x": 154,
+        "y": 0
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_leaderGuardian_SE_step": {
+    "walker_enemy_guardian_SW_3": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 25,
-        "y": 9
+        "h": 18,
+        "w": 11,
+        "x": 165,
+        "y": 0
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_leaderGuardian_SW_stand": {
+    "walker_enemy_knight_NE_0": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 30,
-        "y": 9
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_leaderGuardian_SW_step": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 35,
-        "y": 9
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_leaderKnight_NE_stand": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 40,
-        "y": 9
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_leaderKnight_NE_step": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 45,
-        "y": 9
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_leaderKnight_NW_stand": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 50,
-        "y": 9
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_leaderKnight_NW_step": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 55,
-        "y": 9
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_leaderKnight_SE_stand": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 60,
-        "y": 9
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_leaderKnight_SE_step": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 65,
-        "y": 9
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_leaderKnight_SW_stand": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 70,
-        "y": 9
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_leaderKnight_SW_step": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 75,
-        "y": 9
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_leader_NE_stand": {
-      "frame": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 18
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_leader_NE_step": {
+    "walker_enemy_knight_NE_1": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 5,
+        "h": 18,
+        "w": 11,
+        "x": 11,
         "y": 18
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_leader_NW_stand": {
+    "walker_enemy_knight_NE_2": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 10,
+        "h": 18,
+        "w": 11,
+        "x": 22,
         "y": 18
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_leader_NW_step": {
+    "walker_enemy_knight_NE_3": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 15,
+        "h": 18,
+        "w": 11,
+        "x": 33,
         "y": 18
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_leader_SE_stand": {
+    "walker_enemy_knight_NW_0": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 20,
+        "h": 18,
+        "w": 11,
+        "x": 44,
         "y": 18
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_leader_SE_step": {
+    "walker_enemy_knight_NW_1": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 25,
-        "y": 18
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_leader_SW_stand": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 30,
-        "y": 18
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_leader_SW_step": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 35,
-        "y": 18
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_plain_NE_stand": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 40,
-        "y": 18
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_plain_NE_step": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 45,
-        "y": 18
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_plain_NW_stand": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 50,
-        "y": 18
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_enemy_plain_NW_step": {
-      "frame": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 55,
         "y": 18
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_plain_SE_stand": {
+    "walker_enemy_knight_NW_2": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 60,
+        "h": 18,
+        "w": 11,
+        "x": 66,
         "y": 18
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_plain_SE_step": {
+    "walker_enemy_knight_NW_3": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 65,
+        "h": 18,
+        "w": 11,
+        "x": 77,
         "y": 18
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_plain_SW_stand": {
+    "walker_enemy_knight_SE_0": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 70,
+        "h": 18,
+        "w": 11,
+        "x": 88,
         "y": 18
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_enemy_plain_SW_step": {
+    "walker_enemy_knight_SE_1": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 75,
+        "h": 18,
+        "w": 11,
+        "x": 99,
         "y": 18
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_guardian_NE_stand": {
+    "walker_enemy_knight_SE_2": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 27
+        "h": 18,
+        "w": 11,
+        "x": 110,
+        "y": 18
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_guardian_NE_step": {
+    "walker_enemy_knight_SE_3": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 5,
-        "y": 27
+        "h": 18,
+        "w": 11,
+        "x": 121,
+        "y": 18
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_guardian_NW_stand": {
+    "walker_enemy_knight_SW_0": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 10,
-        "y": 27
+        "h": 18,
+        "w": 11,
+        "x": 132,
+        "y": 18
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_guardian_NW_step": {
+    "walker_enemy_knight_SW_1": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 15,
-        "y": 27
+        "h": 18,
+        "w": 11,
+        "x": 143,
+        "y": 18
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_guardian_SE_stand": {
+    "walker_enemy_knight_SW_2": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 20,
-        "y": 27
+        "h": 18,
+        "w": 11,
+        "x": 154,
+        "y": 18
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_guardian_SE_step": {
+    "walker_enemy_knight_SW_3": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 25,
-        "y": 27
+        "h": 18,
+        "w": 11,
+        "x": 165,
+        "y": 18
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_guardian_SW_stand": {
+    "walker_enemy_leaderGuardian_NE_0": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 30,
-        "y": 27
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_player_guardian_SW_step": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 35,
-        "y": 27
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_player_knight_NE_stand": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 40,
-        "y": 27
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_player_knight_NE_step": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 45,
-        "y": 27
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_player_knight_NW_stand": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 50,
-        "y": 27
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_player_knight_NW_step": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 55,
-        "y": 27
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_player_knight_SE_stand": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 60,
-        "y": 27
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_player_knight_SE_step": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 65,
-        "y": 27
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_player_knight_SW_stand": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 70,
-        "y": 27
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_player_knight_SW_step": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 75,
-        "y": 27
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_player_leaderGuardian_NE_stand": {
-      "frame": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 36
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_leaderGuardian_NE_step": {
+    "walker_enemy_leaderGuardian_NE_1": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 5,
+        "h": 18,
+        "w": 11,
+        "x": 11,
         "y": 36
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_leaderGuardian_NW_stand": {
+    "walker_enemy_leaderGuardian_NE_2": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 10,
+        "h": 18,
+        "w": 11,
+        "x": 22,
         "y": 36
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_leaderGuardian_NW_step": {
+    "walker_enemy_leaderGuardian_NE_3": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 15,
+        "h": 18,
+        "w": 11,
+        "x": 33,
         "y": 36
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_leaderGuardian_SE_stand": {
+    "walker_enemy_leaderGuardian_NW_0": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 20,
+        "h": 18,
+        "w": 11,
+        "x": 44,
         "y": 36
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_leaderGuardian_SE_step": {
+    "walker_enemy_leaderGuardian_NW_1": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 25,
-        "y": 36
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_player_leaderGuardian_SW_stand": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 30,
-        "y": 36
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_player_leaderGuardian_SW_step": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 35,
-        "y": 36
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_player_leaderKnight_NE_stand": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 40,
-        "y": 36
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_player_leaderKnight_NE_step": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 45,
-        "y": 36
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_player_leaderKnight_NW_stand": {
-      "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 50,
-        "y": 36
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 9,
-        "w": 5
-      },
-      "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "walker_player_leaderKnight_NW_step": {
-      "frame": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 55,
         "y": 36
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_leaderKnight_SE_stand": {
+    "walker_enemy_leaderGuardian_NW_2": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 60,
+        "h": 18,
+        "w": 11,
+        "x": 66,
         "y": 36
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_leaderKnight_SE_step": {
+    "walker_enemy_leaderGuardian_NW_3": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 65,
+        "h": 18,
+        "w": 11,
+        "x": 77,
         "y": 36
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_leaderKnight_SW_stand": {
+    "walker_enemy_leaderGuardian_SE_0": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 70,
+        "h": 18,
+        "w": 11,
+        "x": 88,
         "y": 36
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_leaderKnight_SW_step": {
+    "walker_enemy_leaderGuardian_SE_1": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 75,
+        "h": 18,
+        "w": 11,
+        "x": 99,
         "y": 36
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_leader_NE_stand": {
+    "walker_enemy_leaderGuardian_SE_2": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 45
+        "h": 18,
+        "w": 11,
+        "x": 110,
+        "y": 36
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_leader_NE_step": {
+    "walker_enemy_leaderGuardian_SE_3": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 5,
-        "y": 45
+        "h": 18,
+        "w": 11,
+        "x": 121,
+        "y": 36
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_leader_NW_stand": {
+    "walker_enemy_leaderGuardian_SW_0": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 10,
-        "y": 45
+        "h": 18,
+        "w": 11,
+        "x": 132,
+        "y": 36
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_leader_NW_step": {
+    "walker_enemy_leaderGuardian_SW_1": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 15,
-        "y": 45
+        "h": 18,
+        "w": 11,
+        "x": 143,
+        "y": 36
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_leader_SE_stand": {
+    "walker_enemy_leaderGuardian_SW_2": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 20,
-        "y": 45
+        "h": 18,
+        "w": 11,
+        "x": 154,
+        "y": 36
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_leader_SE_step": {
+    "walker_enemy_leaderGuardian_SW_3": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 25,
-        "y": 45
+        "h": 18,
+        "w": 11,
+        "x": 165,
+        "y": 36
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_leader_SW_stand": {
+    "walker_enemy_leaderKnight_NE_0": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 30,
-        "y": 45
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 54
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_leader_SW_step": {
+    "walker_enemy_leaderKnight_NE_1": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 35,
-        "y": 45
+        "h": 18,
+        "w": 11,
+        "x": 11,
+        "y": 54
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_plain_NE_stand": {
+    "walker_enemy_leaderKnight_NE_2": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 40,
-        "y": 45
+        "h": 18,
+        "w": 11,
+        "x": 22,
+        "y": 54
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_plain_NE_step": {
+    "walker_enemy_leaderKnight_NE_3": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 45,
-        "y": 45
+        "h": 18,
+        "w": 11,
+        "x": 33,
+        "y": 54
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_plain_NW_stand": {
+    "walker_enemy_leaderKnight_NW_0": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 50,
-        "y": 45
+        "h": 18,
+        "w": 11,
+        "x": 44,
+        "y": 54
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_plain_NW_step": {
+    "walker_enemy_leaderKnight_NW_1": {
       "frame": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 55,
-        "y": 45
+        "y": 54
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_plain_SE_stand": {
+    "walker_enemy_leaderKnight_NW_2": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 60,
-        "y": 45
+        "h": 18,
+        "w": 11,
+        "x": 66,
+        "y": 54
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_plain_SE_step": {
+    "walker_enemy_leaderKnight_NW_3": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 65,
-        "y": 45
+        "h": 18,
+        "w": 11,
+        "x": 77,
+        "y": 54
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_plain_SW_stand": {
+    "walker_enemy_leaderKnight_SE_0": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 70,
-        "y": 45
+        "h": 18,
+        "w": 11,
+        "x": 88,
+        "y": 54
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
       "trimmed": false
     },
-    "walker_player_plain_SW_step": {
+    "walker_enemy_leaderKnight_SE_1": {
       "frame": {
-        "h": 9,
-        "w": 5,
-        "x": 75,
-        "y": 45
+        "h": 18,
+        "w": 11,
+        "x": 99,
+        "y": 54
       },
       "rotated": false,
       "sourceSize": {
-        "h": 9,
-        "w": 5
+        "h": 18,
+        "w": 11
       },
       "spriteSourceSize": {
-        "h": 9,
-        "w": 5,
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leaderKnight_SE_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 110,
+        "y": 54
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leaderKnight_SE_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 121,
+        "y": 54
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leaderKnight_SW_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 132,
+        "y": 54
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leaderKnight_SW_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 143,
+        "y": 54
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leaderKnight_SW_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 154,
+        "y": 54
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leaderKnight_SW_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 165,
+        "y": 54
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leader_NE_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 72
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leader_NE_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 11,
+        "y": 72
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leader_NE_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 22,
+        "y": 72
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leader_NE_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 33,
+        "y": 72
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leader_NW_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 44,
+        "y": 72
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leader_NW_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 55,
+        "y": 72
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leader_NW_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 66,
+        "y": 72
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leader_NW_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 77,
+        "y": 72
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leader_SE_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 88,
+        "y": 72
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leader_SE_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 99,
+        "y": 72
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leader_SE_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 110,
+        "y": 72
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leader_SE_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 121,
+        "y": 72
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leader_SW_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 132,
+        "y": 72
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leader_SW_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 143,
+        "y": 72
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leader_SW_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 154,
+        "y": 72
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_leader_SW_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 165,
+        "y": 72
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_plain_NE_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 90
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_plain_NE_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 11,
+        "y": 90
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_plain_NE_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 22,
+        "y": 90
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_plain_NE_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 33,
+        "y": 90
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_plain_NW_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 44,
+        "y": 90
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_plain_NW_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 55,
+        "y": 90
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_plain_NW_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 66,
+        "y": 90
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_plain_NW_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 77,
+        "y": 90
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_plain_SE_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 88,
+        "y": 90
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_plain_SE_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 99,
+        "y": 90
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_plain_SE_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 110,
+        "y": 90
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_plain_SE_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 121,
+        "y": 90
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_plain_SW_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 132,
+        "y": 90
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_plain_SW_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 143,
+        "y": 90
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_plain_SW_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 154,
+        "y": 90
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_enemy_plain_SW_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 165,
+        "y": 90
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_guardian_NE_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 108
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_guardian_NE_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 11,
+        "y": 108
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_guardian_NE_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 22,
+        "y": 108
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_guardian_NE_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 33,
+        "y": 108
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_guardian_NW_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 44,
+        "y": 108
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_guardian_NW_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 55,
+        "y": 108
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_guardian_NW_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 66,
+        "y": 108
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_guardian_NW_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 77,
+        "y": 108
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_guardian_SE_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 88,
+        "y": 108
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_guardian_SE_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 99,
+        "y": 108
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_guardian_SE_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 110,
+        "y": 108
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_guardian_SE_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 121,
+        "y": 108
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_guardian_SW_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 132,
+        "y": 108
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_guardian_SW_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 143,
+        "y": 108
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_guardian_SW_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 154,
+        "y": 108
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_guardian_SW_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 165,
+        "y": 108
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_knight_NE_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 126
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_knight_NE_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 11,
+        "y": 126
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_knight_NE_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 22,
+        "y": 126
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_knight_NE_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 33,
+        "y": 126
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_knight_NW_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 44,
+        "y": 126
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_knight_NW_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 55,
+        "y": 126
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_knight_NW_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 66,
+        "y": 126
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_knight_NW_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 77,
+        "y": 126
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_knight_SE_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 88,
+        "y": 126
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_knight_SE_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 99,
+        "y": 126
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_knight_SE_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 110,
+        "y": 126
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_knight_SE_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 121,
+        "y": 126
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_knight_SW_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 132,
+        "y": 126
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_knight_SW_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 143,
+        "y": 126
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_knight_SW_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 154,
+        "y": 126
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_knight_SW_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 165,
+        "y": 126
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderGuardian_NE_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 144
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderGuardian_NE_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 11,
+        "y": 144
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderGuardian_NE_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 22,
+        "y": 144
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderGuardian_NE_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 33,
+        "y": 144
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderGuardian_NW_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 44,
+        "y": 144
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderGuardian_NW_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 55,
+        "y": 144
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderGuardian_NW_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 66,
+        "y": 144
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderGuardian_NW_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 77,
+        "y": 144
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderGuardian_SE_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 88,
+        "y": 144
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderGuardian_SE_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 99,
+        "y": 144
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderGuardian_SE_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 110,
+        "y": 144
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderGuardian_SE_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 121,
+        "y": 144
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderGuardian_SW_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 132,
+        "y": 144
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderGuardian_SW_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 143,
+        "y": 144
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderGuardian_SW_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 154,
+        "y": 144
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderGuardian_SW_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 165,
+        "y": 144
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderKnight_NE_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 162
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderKnight_NE_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 11,
+        "y": 162
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderKnight_NE_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 22,
+        "y": 162
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderKnight_NE_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 33,
+        "y": 162
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderKnight_NW_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 44,
+        "y": 162
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderKnight_NW_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 55,
+        "y": 162
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderKnight_NW_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 66,
+        "y": 162
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderKnight_NW_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 77,
+        "y": 162
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderKnight_SE_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 88,
+        "y": 162
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderKnight_SE_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 99,
+        "y": 162
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderKnight_SE_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 110,
+        "y": 162
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderKnight_SE_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 121,
+        "y": 162
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderKnight_SW_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 132,
+        "y": 162
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderKnight_SW_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 143,
+        "y": 162
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderKnight_SW_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 154,
+        "y": 162
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leaderKnight_SW_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 165,
+        "y": 162
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leader_NE_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 180
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leader_NE_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 11,
+        "y": 180
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leader_NE_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 22,
+        "y": 180
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leader_NE_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 33,
+        "y": 180
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leader_NW_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 44,
+        "y": 180
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leader_NW_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 55,
+        "y": 180
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leader_NW_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 66,
+        "y": 180
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leader_NW_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 77,
+        "y": 180
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leader_SE_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 88,
+        "y": 180
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leader_SE_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 99,
+        "y": 180
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leader_SE_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 110,
+        "y": 180
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leader_SE_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 121,
+        "y": 180
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leader_SW_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 132,
+        "y": 180
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leader_SW_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 143,
+        "y": 180
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leader_SW_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 154,
+        "y": 180
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_leader_SW_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 165,
+        "y": 180
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_plain_NE_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 198
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_plain_NE_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 11,
+        "y": 198
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_plain_NE_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 22,
+        "y": 198
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_plain_NE_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 33,
+        "y": 198
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_plain_NW_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 44,
+        "y": 198
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_plain_NW_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 55,
+        "y": 198
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_plain_NW_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 66,
+        "y": 198
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_plain_NW_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 77,
+        "y": 198
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_plain_SE_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 88,
+        "y": 198
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_plain_SE_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 99,
+        "y": 198
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_plain_SE_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 110,
+        "y": 198
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_plain_SE_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 121,
+        "y": 198
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_plain_SW_0": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 132,
+        "y": 198
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_plain_SW_1": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 143,
+        "y": 198
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_plain_SW_2": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 154,
+        "y": 198
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "walker_player_plain_SW_3": {
+      "frame": {
+        "h": 18,
+        "w": 11,
+        "x": 165,
+        "y": 198
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 18,
+        "w": 11
+      },
+      "spriteSourceSize": {
+        "h": 18,
+        "w": 11,
         "x": 0,
         "y": 0
       },
@@ -1927,8 +3847,8 @@
     "image": "walkers.png",
     "scale": "1",
     "size": {
-      "h": 54,
-      "w": 80
+      "h": 216,
+      "w": 176
     }
   }
 }

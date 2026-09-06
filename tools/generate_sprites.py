@@ -22,7 +22,7 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from palette import load  # noqa: E402
-from sprites import atlas, walkers  # noqa: E402
+from sprites import atlas, houses, walkers  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 # Under src/, not public/: Vite then owns the URL, so the atlas picks up the
@@ -30,15 +30,23 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # cache-busting automatically. A file in public/ would be copied verbatim and
 # would need both handled by hand.
 OUT_DIR = REPO_ROOT / "src" / "assets" / "sprites"
-PNG_NAME = "walkers.png"
-PNG_PATH = OUT_DIR / PNG_NAME
-JSON_PATH = OUT_DIR / "walkers.json"
+
+# Walkers and buildings are packed separately rather than into one sheet:
+# their frame sizes differ by a factor of five, and a single uniform grid
+# would pad every 11x18 walker out to 56x56.
+SHEETS = {"walkers": walkers.render_all, "houses": houses.render_all}
 
 
-def build() -> tuple[Image.Image, str]:
+def build() -> dict[str, tuple[Image.Image, str]]:
+    """Every sheet, as (image, serialized descriptor) keyed by sheet name."""
     palette = load()
-    sheet, meta = atlas.pack(walkers.render_all(palette), PNG_NAME)
-    return sheet, json.dumps(meta, indent=2, sort_keys=True) + "\n"
+    output: dict[str, tuple[Image.Image, str]] = {}
+
+    for name, render_all in SHEETS.items():
+        sheet, meta = atlas.pack(render_all(palette), f"{name}.png")
+        output[name] = (sheet, json.dumps(meta, indent=2, sort_keys=True) + "\n")
+
+    return output
 
 
 def _png_matches(path: Path, sheet: Image.Image) -> bool:
@@ -57,28 +65,34 @@ def _png_matches(path: Path, sheet: Image.Image) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true", help="exit non-zero if the committed atlas is stale")
+    parser.add_argument("--check", action="store_true", help="exit non-zero if a committed atlas is stale")
     args = parser.parse_args()
 
-    sheet, json_text = build()
-    stale: list[Path] = []
-    if not _png_matches(PNG_PATH, sheet):
-        stale.append(PNG_PATH)
-    if not JSON_PATH.exists() or JSON_PATH.read_text(encoding="utf-8") != json_text:
-        stale.append(JSON_PATH)
+    sheets = build()
+    stale = [
+        name
+        for name, (sheet, json_text) in sheets.items()
+        if not _png_matches(OUT_DIR / f"{name}.png", sheet)
+        or not (OUT_DIR / f"{name}.json").exists()
+        or (OUT_DIR / f"{name}.json").read_text(encoding="utf-8") != json_text
+    ]
 
     if args.check:
         if stale:
-            for path in stale:
-                print(f"out of date: {path.relative_to(REPO_ROOT)}", file=sys.stderr)
+            for name in stale:
+                print(f"out of date: {(OUT_DIR / name).relative_to(REPO_ROOT)}.png / .json", file=sys.stderr)
             print("\nRun `npm run sprites` and commit the result.", file=sys.stderr)
             return 1
-        print("sprite atlas is up to date")
+        print("sprite atlases are up to date")
         return 0
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    atlas.write(sheet, json_text, PNG_PATH, JSON_PATH)
-    print(f"wrote {PNG_PATH.relative_to(REPO_ROOT)} and {JSON_PATH.relative_to(REPO_ROOT)}")
+    for name in stale:
+        sheet, json_text = sheets[name]
+        atlas.write(sheet, json_text, OUT_DIR / f"{name}.png", OUT_DIR / f"{name}.json")
+        print(f"wrote {name}.png and {name}.json")
+    if not stale:
+        print("sprite atlases already up to date")
     return 0
 
 

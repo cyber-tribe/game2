@@ -7,8 +7,8 @@ import type { ImpactEffectSnapshot, ImpactEffectType } from "../game/systems/eff
 import { GAME_PALETTE } from "./palette";
 import { type IsoRenderer } from "./IsoRenderer";
 import { createDitherTexture } from "./patternTexture";
-import { drawHouseSprite, type Facing } from "./pixelArt";
-import { loadWalkerSprites, walkerFrameKey, walkerPose, walkerTexture } from "./walkerSprites";
+import { houseFrameKey, houseTexture, loadHouseSprites } from "./houseSprites";
+import { WALK_FRAMES, loadWalkerSprites, walkerFrameKey, walkerPose, walkerTexture, type Facing } from "./walkerSprites";
 
 /**
  * Deterministic pseudo-random value in [0, 1) for a tile's (x, y) — fixes
@@ -26,7 +26,7 @@ function swampTileHash(x: number, y: number, salt: number): number {
 /**
  * Quantizes a tile-space heading (dx, dy) to one of the 4 iso screen
  * diagonals a 2:1 projection produces from the 4 tile-axis directions —
- * see pixelArt.ts's Facing doc comment. Ties (e.g. dx === dy) favor the
+ * see walkerSprites.ts's Facing doc comment. Ties (e.g. dx === dy) favor the
  * x-axis reading, which only matters for a walker heading exactly
  * diagonally in tile-space, an edge case with no single "more correct"
  * answer. (0, 0) — no real heading — also falls through to "SE", the
@@ -51,10 +51,20 @@ const FACTION_COLOR: Record<FactionId, number> = {
   enemy: GAME_PALETTE.enemyAccent,
 };
 
-/** On-screen size of one art pixel of a walker's sprite (the atlas is authored 5x9 — see tools/sprites/walkers.py). */
-const WALKER_PIXEL_SIZE = 1.3;
-/** A leader's own sprite renders bigger, plus a small plume baked into its frames — replaces the old halo circle. */
-const LEADER_PIXEL_SIZE = WALKER_PIXEL_SIZE * 1.8;
+/**
+ * On-screen size of one art pixel of a walker's sprite. The atlas is
+ * authored at 11x18 (tools/sprites/walkers.py) and drawn 1:1, so a walker
+ * is 11x18 screen pixels — about a sixth of a 64px tile.
+ *
+ * The previous art was 5x9 drawn at 1.3, i.e. 6.5x11.7 on screen. Holding
+ * that on-screen size while quadrupling the art's resolution would have
+ * meant drawing every sprite at 0.6 scale, and a nearest-filtered sprite at
+ * a fractional scale drops whole rows of pixels — the detail would have
+ * cost legibility rather than adding any.
+ */
+const WALKER_PIXEL_SIZE = 1;
+/** A leader renders larger, on top of the plume baked into its own frames. */
+const LEADER_PIXEL_SIZE = 1.4;
 /**
  * Swamp used to be a translucent purple overlay (a hazard-radius marker,
  * not real ground) — per plan/0087, it's now drawn as an actual dark
@@ -81,24 +91,37 @@ const FARMLAND_FURROW_ROWS = 3;
 const FARMLAND_FURROW_ALPHA = 0.45;
 const SHRINE_POLE_HEIGHT = 18;
 const SHRINE_FLAG_WIDTH = 10;
-/** Radians/second the walk-cycle phase advances — see the per-walker animation in update(). */
-const WALK_CYCLE_SPEED = 6;
-/** How far (screen px) a walker bobs at the peak of its step. */
-const WALK_BOB_AMPLITUDE = 1;
+/** Walk-cycle frames per second — see the per-walker animation in update(). */
+const WALK_CYCLE_SPEED = 7;
+/**
+ * Scales the per-walker phase offset off its position. Deliberately not a
+ * whole number: the offset itself is `x * 3 + y * 5`, which for a walker
+ * standing on integer tile coordinates is an integer — and an integer
+ * offset into a 4-frame cycle only matters modulo 4, so whole groups of
+ * walkers came out in lockstep. (Before the cycle became discrete, the
+ * offset fed a sine and any value spread it fine.)
+ */
+const WALK_PHASE_SPREAD = 0.37;
 
 /**
- * The walk-cycle state for a walker at a given moment — a per-walker phase
- * offset (from its own position, so it's stable frame to frame without
- * tracking anything extra) keeps the whole army from stepping in unison.
+ * Which of the WALK_FRAMES walk-cycle frames a walker is on right now — a
+ * per-walker phase offset (from its own position, so it's stable frame to
+ * frame without tracking anything extra) keeps the whole army from stepping
+ * in unison.
+ *
+ * This used to also return a screen-space `bob`, applied by shifting the
+ * sprite up a fraction of a pixel. The bounce is baked into the art now
+ * (the passing frames sit a pixel higher than the contact frames — see
+ * BOB_BY_FRAME in tools/sprites/walkers.py), so applying it here as well
+ * would double it, and a sub-pixel shift on a nearest-filtered sprite only
+ * made the figure shimmer anyway.
+ *
  * Pulled out as a pure function so the animation math is unit-testable
  * without needing a Graphics/canvas context.
  */
-export function walkCycle(
-  elapsedTime: number,
-  pos: { x: number; y: number },
-): { stepping: boolean; bob: number } {
-  const phase = elapsedTime * WALK_CYCLE_SPEED + (pos.x * 3 + pos.y * 5);
-  return { stepping: Math.sin(phase) > 0, bob: Math.abs(Math.sin(phase)) * WALK_BOB_AMPLITUDE };
+export function walkCycle(elapsedTime: number, pos: { x: number; y: number }): number {
+  const phase = elapsedTime * WALK_CYCLE_SPEED + (pos.x * 3 + pos.y * 5) * WALK_PHASE_SPREAD;
+  return ((Math.floor(phase) % WALK_FRAMES) + WALK_FRAMES) % WALK_FRAMES;
 }
 
 /**
@@ -182,6 +205,9 @@ export class EntityLayer {
    * need its own eviction pass to avoid leaking a Sprite per dead walker.
    */
   private readonly walkerPool: Sprite[] = [];
+  /** Buildings, likewise pooled — see pooled(). */
+  private readonly houseLayer = new Container();
+  private readonly housePool: Sprite[] = [];
   private elapsedTime = 0;
   /**
    * Each walker's last-known facing, kept across frames — a walker with no
@@ -192,7 +218,7 @@ export class EntityLayer {
   private readonly lastFacing = new Map<Entity, Facing>();
 
   constructor(private readonly iso: IsoRenderer) {
-    this.view.addChild(this.graphics, this.walkerLayer, this.effects);
+    this.view.addChild(this.graphics, this.houseLayer, this.walkerLayer, this.effects);
   }
 
   /**
@@ -200,8 +226,8 @@ export class EntityLayer {
    * the first frame already has textures; update() renders walkers as soon
    * as it resolves and simply skips them before that.
    */
-  static loadAssets(): Promise<void> {
-    return loadWalkerSprites();
+  static async loadAssets(): Promise<void> {
+    await Promise.all([loadWalkerSprites(), loadHouseSprites()]);
   }
 
   update(world: World, deltaSeconds = 0, impactEffects: readonly ImpactEffectSnapshot[] = []): void {
@@ -216,8 +242,9 @@ export class EntityLayer {
     // on top of it. Reuses swampAffectedTiles' generic "tiles within radius
     // of a point" selection. Per plan/archived/0085-isometric-house-sprites.md, this
     // is a real soil/furrow texture now, not a faction-colored overlay —
-    // ownership reads from the house's own flag (see pixelArt.ts's
-    // drawFlag), not from tinting the ground a whole faction's color.
+    // ownership reads from the house's own flag (drawn into its
+    // sprite by tools/sprites/houses.py), not from tinting the ground a
+    // whole faction's color.
     const { width: mapWidth, height: mapHeight } = this.iso.heightmap;
     for (const entity of world.query(Position, House)) {
       const pos = world.get(entity, Position)!;
@@ -301,14 +328,21 @@ export class EntityLayer {
       }
     }
 
+    let drawnHouses = 0;
     for (const entity of world.query(Position, House, Owner)) {
       const pos = world.get(entity, Position)!;
       const owner = world.get(entity, Owner)!;
       const house = world.get(entity, House)!;
       const { sx, sy } = this.iso.project(pos.x, pos.y);
 
-      drawHouseSprite(g, sx, sy, house.level, FACTION_COLOR[owner.faction]);
+      const texture = houseTexture(houseFrameKey(owner.faction, house.level));
+      if (!texture) continue;
+
+      const sprite = this.pooled(this.housePool, this.houseLayer, drawnHouses++);
+      sprite.texture = texture;
+      sprite.position.set(sx, sy);
     }
+    for (let i = drawnHouses; i < this.housePool.length; i++) this.housePool[i].visible = false;
 
     let drawnWalkers = 0;
     for (const entity of world.query(Position, Walker, Owner)) {
@@ -320,21 +354,21 @@ export class EntityLayer {
       const heroKind = walker.state === "knight" || walker.state === "guardian" ? walker.state : undefined;
       const pixelSize = isLeader ? LEADER_PIXEL_SIZE : WALKER_PIXEL_SIZE;
 
-      const { stepping, bob } = walkCycle(this.elapsedTime, pos);
+      const frame = walkCycle(this.elapsedTime, pos);
 
       const target = world.get(entity, MoveTarget);
       const facing = target ? facingFor(target.x - pos.x, target.y - pos.y) : (this.lastFacing.get(entity) ?? "SE");
       this.lastFacing.set(entity, facing);
 
-      const texture = walkerTexture(walkerFrameKey(owner.faction, walkerPose(isLeader, heroKind), facing, stepping));
+      const texture = walkerTexture(walkerFrameKey(owner.faction, walkerPose(isLeader, heroKind), facing, frame));
       if (!texture) continue;
 
-      const sprite = this.walkerSprite(drawnWalkers++);
+      const sprite = this.pooled(this.walkerPool, this.walkerLayer, drawnWalkers++);
       sprite.texture = texture;
-      // Anchored bottom-center: (sx, sy) is the walker's ground point, the
-      // same anchor drawWalkerSprite used before, and every atlas frame puts
-      // the feet on its bottom row (see tools/sprites/walkers.py).
-      sprite.position.set(sx, sy - bob);
+      // Anchored bottom-center: (sx, sy) is the walker's ground point, and
+      // every atlas frame puts the feet on its bottom row (see
+      // tools/sprites/walkers.py).
+      sprite.position.set(sx, sy);
       sprite.scale.set(pixelSize);
     }
 
@@ -354,17 +388,22 @@ export class EntityLayer {
   }
 
   /**
-   * The pooled Sprite for the nth walker drawn this frame, created on first
-   * use. Anchor and parent are set once here rather than per frame, since a
-   * pooled sprite keeps them for its whole life.
+   * The pooled Sprite at `index` in `pool`, created on first use. Anchor
+   * and parent are set once here rather than per frame, since a pooled
+   * sprite keeps both for its whole life.
+   *
+   * Pooled by index rather than keyed by entity: walkers are created and
+   * destroyed constantly (settling, drowning, combat) and houses are
+   * captured and burned, so an entity-keyed map would need its own eviction
+   * pass to avoid leaking a Sprite per dead entity.
    */
-  private walkerSprite(index: number): Sprite {
-    let sprite = this.walkerPool[index];
+  private pooled(pool: Sprite[], layer: Container, index: number): Sprite {
+    let sprite = pool[index];
     if (!sprite) {
       sprite = new Sprite();
       sprite.anchor.set(0.5, 1);
-      this.walkerPool[index] = sprite;
-      this.walkerLayer.addChild(sprite);
+      pool[index] = sprite;
+      layer.addChild(sprite);
     }
     sprite.visible = true;
     return sprite;

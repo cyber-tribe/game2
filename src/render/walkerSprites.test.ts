@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
 import type { FactionId } from "../game/components";
-import type { Facing } from "./pixelArt";
-import { ATLAS_FRAME_KEYS, walkerFrameKey, walkerPose, type HeroKind, type WalkerPose } from "./walkerSprites";
+import {
+  ATLAS_FRAME_KEYS,
+  WALK_FRAMES,
+  walkerFrameKey,
+  walkerPose,
+  type Facing,
+  type HeroKind,
+  type WalkerPose,
+} from "./walkerSprites";
 
 const FACTIONS: FactionId[] = ["player", "enemy"];
 const FACINGS: Facing[] = ["NE", "NW", "SE", "SW"];
 const POSES: WalkerPose[] = ["plain", "leader", "knight", "guardian", "leaderKnight", "leaderGuardian"];
+const FRAMES = Array.from({ length: WALK_FRAMES }, (_, i) => i);
 
 describe("walkerPose", () => {
   it("maps a plain walker and a plain leader", () => {
@@ -50,8 +58,8 @@ describe("walkerFrameKey", () => {
     for (const faction of FACTIONS) {
       for (const pose of POSES) {
         for (const facing of FACINGS) {
-          for (const stepping of [false, true]) {
-            asked.push(walkerFrameKey(faction, pose, facing, stepping));
+          for (const frame of FRAMES) {
+            asked.push(walkerFrameKey(faction, pose, facing, frame));
           }
         }
       }
@@ -64,7 +72,7 @@ describe("walkerFrameKey", () => {
     const asked = new Set(
       FACTIONS.flatMap((faction) =>
         POSES.flatMap((pose) =>
-          FACINGS.flatMap((facing) => [false, true].map((stepping) => walkerFrameKey(faction, pose, facing, stepping))),
+          FACINGS.flatMap((facing) => FRAMES.map((frame) => walkerFrameKey(faction, pose, facing, frame))),
         ),
       ),
     );
@@ -72,7 +80,8 @@ describe("walkerFrameKey", () => {
     expect(ATLAS_FRAME_KEYS.filter((key) => !asked.has(key))).toEqual([]);
   });
 
-  it("distinguishes the walk-cycle frames", () => {
-    expect(walkerFrameKey("player", "plain", "SE", true)).not.toBe(walkerFrameKey("player", "plain", "SE", false));
+  it("gives every walk-cycle frame its own key", () => {
+    const keys = new Set(FRAMES.map((frame) => walkerFrameKey("player", "plain", "SE", frame)));
+    expect(keys.size).toBe(WALK_FRAMES);
   });
 });
