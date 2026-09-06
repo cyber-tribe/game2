@@ -1,7 +1,7 @@
 import type { System } from "../../ecs";
 import { isBuildable, type Heightmap } from "../../world/heightmap";
 import { DEFAULT_WANDER_RADIUS } from "../constants";
-import { MoveTarget, Position, Walker } from "../components";
+import { Charmed, MoveTarget, Position, Walker } from "../components";
 
 export interface WanderTargetConfig {
   /** Max distance (in tiles) a new wander target can be from the walker. */
@@ -32,6 +32,7 @@ export function createWanderTargetSystem(config: Partial<WanderTargetConfig> = {
 
   return (world) => {
     for (const entity of world.query(Position, Walker)) {
+      if (world.has(entity, Charmed)) continue;
       const walker = world.get(entity, Walker)!;
       if (walker.state !== "seeking") continue;
       if (world.has(entity, MoveTarget)) continue;

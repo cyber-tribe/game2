@@ -1,5 +1,5 @@
 import type { Entity, System, World } from "../../ecs";
-import { FactionState, House, MoveTarget, Owner, Position, Walker, type FactionId } from "../components";
+import { Charmed, FactionState, House, MoveTarget, Owner, Position, Walker, type FactionId } from "../components";
 import { distance, type Point } from "./geometry";
 
 /**
@@ -16,6 +16,9 @@ export const fightTargetingSystem: System = (world) => {
   if (fightingFactions.size === 0) return;
 
   for (const entity of world.query(Position, Walker, Owner)) {
+    // Under トロイのヘレン's hold: its own side does not command it.
+    if (world.has(entity, Charmed)) continue;
+
     const owner = world.get(entity, Owner)!;
     if (!fightingFactions.has(owner.faction)) continue;
 

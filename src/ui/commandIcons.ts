@@ -26,6 +26,7 @@ const TOOL_ICON: Record<ToolMode, IconKind> = {
   odysseus: "odysseus",
   achilles: "achilles",
   adonis: "adonis",
+  helen: "helen",
   guardian: "guardian",
   volcano: "volcano",
   forest: "forest",

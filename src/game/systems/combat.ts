@@ -1,6 +1,6 @@
 import type { Entity, System, World } from "../../ecs";
 import { ADONIS_MIN_SPLIT_STRENGTH, ADONIS_SPLIT_GAP, COMBAT_RANGE, HERO_ACTION_COOLDOWN, HOUSE_LEVELS } from "../constants";
-import { HeroCooldown, House, Owner, Position, Walker, isAdvancingHeroState, type FactionId } from "../components";
+import { Charmed, HeroCooldown, House, Owner, Position, Walker, isAdvancingHeroState, type FactionId } from "../components";
 import type { OnImpactEffect } from "./effects";
 import { distance, type Point } from "./geometry";
 
@@ -38,6 +38,10 @@ export function createWalkerCombatSystem(config: Partial<WalkerCombatConfig> = {
         if (!world.isAlive(b)) continue;
         if (world.get(a, Owner)!.faction === world.get(b, Owner)!.faction) continue;
         if (!withinRange(world.get(a, Position)!, world.get(b, Position)!)) continue;
+        // Someone トロイのヘレン is holding is 拘束 — bound, walked away,
+        // and out of the fight entirely. They are still the enemy's people
+        // (they are not converted), they are simply not fighting for them.
+        if (world.has(a, Charmed) || world.has(b, Charmed)) continue;
 
         resolveWalkerFight(world, a, b, onImpact);
         if (!world.isAlive(a)) break;
@@ -51,6 +55,27 @@ function resolveWalkerFight(world: World, a: Entity, b: Entity, onImpact: OnImpa
   const walkerB = world.get(b, Walker)!;
   const posA = world.get(a, Position)!;
   const posB = world.get(b, Position)!;
+
+  // トロイのヘレン 「敵と戦わない」 (docs/original-miracles.md #28). Not
+  // "wins without fighting" and not "cannot be touched": she deals no
+  // damage at all and dies to anyone who reaches her, whatever their
+  // strength. That is the risk her charm is meant to keep her out of —
+  // HELEN_CHARM_RADIUS is six times COMBAT_RANGE, so an approaching walker
+  // is normally taken long before it arrives, and only the one she has no
+  // room left for gets through.
+  const helenA = walkerA.state === "helen";
+  const helenB = walkerB.state === "helen";
+  if (helenA || helenB) {
+    if (helenA) {
+      world.destroyEntity(a);
+      onImpact({ position: posA, type: "combatDeath" });
+    }
+    if (helenB) {
+      world.destroyEntity(b);
+      onImpact({ position: posB, type: "combatDeath" });
+    }
+    return;
+  }
 
   if (walkerA.strength > walkerB.strength) {
     world.add(a, Walker, { ...walkerA, strength: walkerA.strength - walkerB.strength });
@@ -111,6 +136,10 @@ export function createHouseCaptureSystem(config: Partial<HouseCaptureConfig> = {
       const walkerPos = world.get(walkerEntity, Position)!;
       const walkerOwner = world.get(walkerEntity, Owner)!;
       const walker = world.get(walkerEntity, Walker)!;
+      // トロイのヘレン 「敵と戦わない」 — she has no way to hurt a house
+      // and must not be consumed capturing one; and anyone she is holding
+      // is 拘束, not free to storm a building on the way past.
+      if (walker.state === "helen" || world.has(walkerEntity, Charmed)) continue;
 
       for (const houseEntity of world.query(Position, House, Owner)) {
         const houseOwner = world.get(houseEntity, Owner)!;

@@ -37,6 +37,7 @@ import { createMovementSystem } from "./systems/movement";
 import { createSettleSystem } from "./systems/settle";
 import { createCreviceSystem } from "./systems/crevice";
 import { createFungusSystem } from "./systems/fungus";
+import { createHelenSystem } from "./systems/helen";
 import { createHeroLossSystem } from "./systems/heroLoss";
 import { createHolyWaterSystem } from "./systems/holyWater";
 import { createTornadoSystem } from "./systems/tornado";
@@ -173,6 +174,7 @@ export type MatchEventType =
   | "odysseus"
   | "achilles"
   | "adonis"
+  | "helen"
   | "guardian"
   | "heroLost"
   | "armageddon"
@@ -265,6 +267,7 @@ export class Simulation {
       .add(gatherTargetingSystem)
       .add(heroAdvanceTargetingSystem)
       .add(guardianTargetingSystem)
+      .add(createHelenSystem())
       .add(heroCooldownSystem)
       .add(createHeroLossSystem({ onHeroLost: (faction) => this.recordEvent(faction, "heroLost") }))
       .add(createWanderTargetSystem({ heightmap: config.heightmap }))

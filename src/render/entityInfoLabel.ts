@@ -12,6 +12,7 @@ const WALKER_STATE_LABELS: Record<WalkerState, string> = {
   odysseus: "オディッセウス",
   achilles: "アキレス",
   adonis: "アドニス",
+  helen: "トロイのヘレン",
   guardian: "守護者化済み",
 };
 

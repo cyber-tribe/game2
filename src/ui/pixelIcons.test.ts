@@ -16,6 +16,7 @@ const ALL_KINDS: IconKind[] = [
   "odysseus",
   "achilles",
   "adonis",
+  "helen",
   "guardian",
   "forest",
   "flower",

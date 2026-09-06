@@ -151,7 +151,7 @@ class Pose:
     hero: str | None
 
 
-HEROES = ("perseus", "hercules", "odysseus", "achilles", "adonis", "guardian")
+HEROES = ("perseus", "hercules", "odysseus", "achilles", "adonis", "helen", "guardian")
 """The hero kinds, matching HeroKind in src/game/components.ts. Each carries
 its own prop (see _PROPS) — at this size the weapon *is* the identity, since
 there is no room for a face or a costume, and a player who cannot tell which
@@ -369,6 +369,25 @@ def _twin_blades(canvas: Canvas, tones: dict[str, RGB], palette: Palette, top: i
     canvas.px(out, top + 2, guard)
 
 
+def _mirror(canvas: Canvas, tones: dict[str, RGB], palette: Palette, top: int, mirror: bool) -> None:
+    """トロイのヘレン's hand mirror. Every other hero here carries a weapon
+    that is tall and thin; hers is small and round, so the one thing her
+    silhouette has to say — that she is not armed — reads at a glance."""
+    x, _, out = _prop_columns(mirror)
+    frame = palette.rgb("bronzeLight")
+    face = palette.rgb("stoneHighlight")
+    handle = palette.rgb("bronzeDark")
+    for row in range(2):
+        canvas.px(x, top - 2 + row, face)
+        canvas.px(out, top - 2 + row, face)
+    canvas.px(x, top - 3, frame)
+    canvas.px(out, top - 3, frame)
+    canvas.px(x, top, frame)
+    canvas.px(out, top, frame)
+    canvas.px(x, top + 1, handle)
+    canvas.px(x, top + 2, handle)
+
+
 _PROPS = {
     # ペルセウス keeps the blade the nameless 騎士 already carried: it is
     # the original's "基準の英雄", and the baseline should look like the
@@ -378,6 +397,7 @@ _PROPS = {
     "odysseus": _bow,
     "achilles": _spear,
     "adonis": _twin_blades,
+    "helen": _mirror,
     "guardian": _shield,
 }
 

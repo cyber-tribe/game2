@@ -1,6 +1,6 @@
 import type { Entity, System, World } from "../../ecs";
 import { isBuildable, type Heightmap } from "../../world/heightmap";
-import { FactionState, House, MoveTarget, Owner, Position, Walker, type FactionId } from "../components";
+import { Charmed, FactionState, House, MoveTarget, Owner, Position, Walker, type FactionId } from "../components";
 import { hasOtherSeekingWalkers } from "./gatherTargeting";
 
 export interface SettleConfig {
@@ -61,6 +61,9 @@ export function createSettleSystem(config: Partial<SettleConfig> = {}): System {
     const houseCountByFaction = countHousesByFaction(world);
 
     for (const entity of world.query(Position, Walker, Owner)) {
+      // 「建物から引き離し」 — someone Helen is dragging around does not
+      // stop and found a house wherever she happens to lead them.
+      if (world.has(entity, Charmed)) continue;
       const walker = world.get(entity, Walker)!;
       if (walker.state !== "seeking") continue;
       if (world.has(entity, MoveTarget)) continue;

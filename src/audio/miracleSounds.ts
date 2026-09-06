@@ -8,7 +8,7 @@
  * later — see main.ts's onEnemyAction, which already does this for the
  * screen-shake/toast but had no audio equivalent before this.
  */
-export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "holyWater" | "tornado" | "hurricane" | "volcano" | "perseus" | "hercules" | "odysseus" | "achilles" | "adonis" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "fungus";
+export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "holyWater" | "tornado" | "hurricane" | "volcano" | "perseus" | "hercules" | "odysseus" | "achilles" | "adonis" | "helen" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "fungus";
 
 /** Every MiracleSoundType, for tests and any future UI that wants to list them. */
 export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
@@ -24,6 +24,7 @@ export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
   "odysseus",
   "achilles",
   "adonis",
+  "helen",
   "guardian",
   "armageddon",
   "tsunami",
@@ -140,6 +141,15 @@ export const RECIPES: Record<MiracleSoundType, MiracleSoundRecipe> = {
       { waveform: "square", startFrequency: 660, endFrequency: 500, delay: 0, duration: 0.1, peakGain: 0.2 },
       { waveform: "square", startFrequency: 660, endFrequency: 500, delay: 0.14, duration: 0.1, peakGain: 0.16 },
       { waveform: "square", startFrequency: 880, endFrequency: 660, delay: 0.28, duration: 0.12, peakGain: 0.14 },
+    ],
+  },
+  // Soft and rising, with no strike in it at all — the only hero who
+  // arrives without a blade. Closest in shape to the spring's chime, since
+  // both take people rather than killing them.
+  helen: {
+    tones: [
+      { waveform: "sine", startFrequency: 440, endFrequency: 660, delay: 0, duration: 0.4, peakGain: 0.13 },
+      { waveform: "sine", startFrequency: 660, endFrequency: 880, delay: 0.18, duration: 0.4, peakGain: 0.09 },
     ],
   },
   // The same two notes with a breath of fire under them.
