@@ -17,6 +17,7 @@ import {
   flattenTile,
   isBuildable,
   isInWaterPool,
+  isCrevice,
   isRock,
   REEF_HEIGHT,
   isTerrainEditAllowed,
@@ -27,6 +28,9 @@ import {
   type Heightmap,
   type TerrainEditRule,
 } from "./heightmap";
+function blankCrevice(width: number, height: number): boolean[][] {
+  return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
+}
 
 function flatHeightmap(
   width: number,
@@ -36,7 +40,7 @@ function flatHeightmap(
 ): Heightmap {
   const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
   const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
-  return { width, height, terrain: "grass", vertices, rockHardness, waterLevel };
+  return { width, height, terrain: "grass", vertices, rockHardness, crevice: blankCrevice(width, height), waterLevel };
 }
 
 describe("createHeightmap", () => {
@@ -421,41 +425,79 @@ describe("findLeastFlatVertex", () => {
 });
 
 describe("applyEarthquake", () => {
-  it("perturbs every vertex within radius and leaves the rest untouched", () => {
-    const heightmap = flatHeightmap(10, 10, 5);
+  const straight = () => 0.5; // rng=0.5 -> zero wander, a dead-straight crack
 
-    applyEarthquake(heightmap, 5, 5, 2, 3, () => 1); // rng=1 -> delta always +maxDelta
+  it("tears a crevice running from the origin along the given direction", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
 
-    for (let dy = -2; dy <= 2; dy++) {
-      for (let dx = -2; dx <= 2; dx++) {
-        expect(heightmap.vertices[5 + dy][5 + dx]).toBe(8);
-      }
+    applyEarthquake(heightmap, 5, 10, 1, 0, 6, straight);
+
+    for (let x = 6; x <= 11; x++) {
+      expect(isCrevice(heightmap, x, 10)).toBe(true);
     }
-    expect(heightmap.vertices[5][8]).toBe(5); // outside radius
-    expect(heightmap.vertices[8][5]).toBe(5); // outside radius
   });
 
-  it("can lower vertices too, clamped at MIN_ELEVATION", () => {
-    const heightmap = flatHeightmap(6, 6, 2);
+  it("runs the other way when aimed the other way — the direction is the point", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
 
-    applyEarthquake(heightmap, 3, 3, 1, 5, () => 0); // rng=0 -> delta always -maxDelta
+    applyEarthquake(heightmap, 15, 10, -1, 0, 6, straight);
 
-    expect(heightmap.vertices[3][3]).toBe(MIN_ELEVATION);
+    expect(isCrevice(heightmap, 10, 10)).toBe(true);
+    expect(isCrevice(heightmap, 20, 10)).toBe(false);
   });
 
-  it("clamps at MAX_ELEVATION when the swing would push a vertex too high", () => {
-    const heightmap = flatHeightmap(6, 6, MAX_ELEVATION - 1);
+  it("leaves ground off the crack's line untouched — it is a line, not a disc", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
 
-    applyEarthquake(heightmap, 3, 3, 0, 5, () => 1); // rng=1 -> delta always +maxDelta
+    applyEarthquake(heightmap, 5, 10, 1, 0, 6, straight);
 
-    expect(heightmap.vertices[3][3]).toBe(MAX_ELEVATION);
+    expect(isCrevice(heightmap, 8, 16)).toBe(false);
+    expect(heightmap.vertices[16][8]).toBe(5);
   });
 
-  it("does not touch vertices outside the map bounds", () => {
-    const heightmap = flatHeightmap(4, 4, 5);
+  it("carves the torn ground down to the floor", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
 
-    expect(() => applyEarthquake(heightmap, 0, 0, 3, 4, () => 1)).not.toThrow();
-    expect(heightmap.vertices[0][0]).toBe(9);
+    applyEarthquake(heightmap, 5, 10, 1, 0, 6, straight);
+
+    expect(heightmap.vertices[10][8]).toBe(MIN_ELEVATION);
+  });
+
+  it("makes the torn ground unbuildable", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    applyEarthquake(heightmap, 5, 10, 1, 0, 6, straight);
+
+    expect(isBuildable(heightmap, 8, 10)).toBe(false);
+  });
+
+  it("stops at the map edge instead of throwing", () => {
+    const heightmap = flatHeightmap(6, 6, 5);
+
+    expect(() => applyEarthquake(heightmap, 3, 3, 1, 0, 20, straight)).not.toThrow();
+  });
+
+  it("still does something when given no direction at all", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    applyEarthquake(heightmap, 5, 10, 0, 0, 4, straight);
+
+    expect(heightmap.crevice.flat().filter(Boolean).length).toBeGreaterThan(0);
+  });
+
+  /**
+   * The original's "修復されるまで残る": a crevice persists, but is not
+   * permanent. Filling it back in closes it — today that is terraforming;
+   * the original gives the job to 花 (#7), which does not exist yet.
+   */
+  it("closes again once the ground is raised back out of the floor", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyEarthquake(heightmap, 5, 10, 1, 0, 6, straight);
+    expect(isCrevice(heightmap, 8, 10)).toBe(true);
+
+    raiseVertex(heightmap, 8, 10, 1);
+
+    expect(isCrevice(heightmap, 8, 10)).toBe(false);
   });
 });
 

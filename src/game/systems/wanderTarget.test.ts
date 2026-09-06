@@ -3,13 +3,16 @@ import { World } from "../../ecs";
 import type { Heightmap } from "../../world/heightmap";
 import { MoveTarget, Position, Walker } from "../components";
 import { createWanderTargetSystem } from "./wanderTarget";
+function blankCrevice(width: number, height: number): boolean[][] {
+  return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
+}
 
 function halfWaterHeightmap(width: number, height: number, landFromX: number): Heightmap {
   const vertices = Array.from({ length: height + 1 }, () =>
     Array.from({ length: width + 1 }, (_, x) => (x >= landFromX ? 5 : 0)),
   );
   const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
-  return { width, height, terrain: "grass", vertices, rockHardness, waterLevel: 0 };
+  return { width, height, terrain: "grass", vertices, rockHardness, crevice: blankCrevice(width, height), waterLevel: 0 };
 }
 
 function queueRng(values: number[]): () => number {
