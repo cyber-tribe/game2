@@ -1,4 +1,4 @@
-import type { FactionId } from "../game/components";
+import type { FactionId, WalkerState } from "../game/components";
 import atlasData from "../assets/sprites/walkers.json";
 import atlasUrl from "../assets/sprites/walkers.png";
 import { SpriteAtlas } from "./spriteSheet";
@@ -37,6 +37,17 @@ export type WalkerPose = "plain" | "leader" | "knight" | "guardian" | "leaderKni
 export type HeroKind = "knight" | "guardian";
 
 /**
+ * What the walker is doing, on top of which way it faces — see ACTIONS in
+ * tools/sprites/walkers.py.
+ *
+ * "seeking" and "traveling" deliberately share the walking art: both are a
+ * person going somewhere, and inventing a visible difference the player
+ * cannot act on would be noise. Fighting and drowning are the two states
+ * that change what the player should do.
+ */
+export type WalkerAction = "walk" | "fight" | "drown";
+
+/**
  * Frames in one walk cycle: contact, passing, contact, passing. Two frames
  * (what this started with) read as a twitch at this size; four read as
  * walking, because the passing poses lift the figure a pixel while the
@@ -56,8 +67,24 @@ export function walkerPose(isLeader: boolean, heroKind?: HeroKind): WalkerPose {
  * only as an invisible walker at runtime. walkerSprites.test.ts checks
  * every key this can produce against the committed atlas.
  */
-export function walkerFrameKey(faction: FactionId, pose: WalkerPose, facing: Facing, frame: number): string {
-  return `walker_${faction}_${pose}_${facing}_${frame}`;
+export function walkerFrameKey(
+  faction: FactionId,
+  pose: WalkerPose,
+  action: WalkerAction,
+  facing: Facing,
+  frame: number,
+): string {
+  return `walker_${faction}_${pose}_${action}_${facing}_${frame}`;
+}
+
+/**
+ * The action a walker is currently in, from the state EntityLayer already
+ * has. Drowning wins over fighting: a walker going under has stopped being
+ * a combatant, and that is the more urgent thing for the player to see.
+ */
+export function walkerAction(state: WalkerState, isDrowning: boolean): WalkerAction {
+  if (isDrowning) return "drown";
+  return state === "fighting" ? "fight" : "walk";
 }
 
 /** Every frame key present in the committed atlas. Exported for the test. */

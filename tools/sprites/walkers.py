@@ -91,6 +91,17 @@ LEGS_PASSING = [
     "...BB.BB...",
     "..BBB.BBB..",
 ]
+# Braced, weight low and feet planted wide — a stance, not a step. Reused
+# for both frames of the fight cycle: what moves in a fight at this size is
+# the arms, and shuffling the feet as well just makes the figure look like
+# it is walking on the spot.
+LEGS_BRACED = [
+    "..LL...LL..",
+    "..LL...LL..",
+    ".LL.....LL.",
+    ".BB.....BB.",
+    "BBB.....BBB",
+]
 LEGS_BY_FRAME = [LEGS_CONTACT, LEGS_PASSING, LEGS_CONTACT, LEGS_PASSING]
 
 # Arms, indexed by walk frame: which of the two swings forward (drawn a row
@@ -102,6 +113,29 @@ ARMS_BY_FRAME = [(1, 0), (0, 0), (0, 1), (0, 0)]
 
 BOB_BY_FRAME = [0, -1, 0, -1]
 """Passing poses lift the figure a pixel — a walk's own vertical bounce."""
+
+ACTIONS = ("walk", "fight", "drown")
+"""What the walker is doing, on top of which way it faces.
+
+Mapped from the ECS in EntityLayer: a walker with a Drowning component is
+"drown", one whose WalkerState is "fighting" is "fight", everything else
+walks. "seeking" and "traveling" deliberately share the walking art — both
+are a person going somewhere, and inventing a difference the player cannot
+act on would be noise."""
+
+FIGHT_ARMS_BY_FRAME = [True, False, True, False]
+"""Guard (both arms up) alternating with strike (lead arm thrust out). Two
+poses over four frames, so a fight reads at the same cadence as a walk."""
+
+DROWN_BOB_BY_FRAME = [0, 1, 2, 1]
+"""How far the figure sinks, in pixels, over the drowning cycle — it bobs
+rather than holding still, which is what makes it read as struggling in
+water rather than standing in it."""
+
+DROWN_VISIBLE_ROWS = 7
+"""Rows of the figure kept above the waterline: head, shoulders and the
+raised arms. Everything below is cut off rather than drawn, so the walker
+reads as *in* the water instead of standing on top of it."""
 
 FACINGS = ("NE", "NW", "SE", "SW")
 """The 4 isometric movement directions — see Facing in src/render/pixelArt.ts.
@@ -139,11 +173,11 @@ SKIN = (0xE0, 0xB8, 0x8A)
 for the UI that also reads from it."""
 
 
-def frame_key(faction: str, pose: str, facing: str, frame: int) -> str:
+def frame_key(faction: str, pose: str, action: str, facing: str, frame: int) -> str:
     """The atlas key. Mirrored by walkerFrameKey() in
     src/render/walkerSprites.ts — the two must agree exactly, which the
     round-trip test there checks."""
-    return f"walker_{faction}_{pose}_{facing}_{frame}"
+    return f"walker_{faction}_{pose}_{action}_{facing}_{frame}"
 
 
 def _tones(palette: Palette, clothing: RGB) -> dict[str, RGB]:
@@ -187,15 +221,16 @@ def _arms(canvas: Canvas, tones: dict[str, RGB], top: int, frame: int, mirror: b
         canvas.px(x, top + ARM_ROWS - 1 + offset, tones["s"])
 
 
-def _plume(canvas: Canvas, tones: dict[str, RGB], color: RGB) -> None:
+def _plume(canvas: Canvas, tones: dict[str, RGB], color: RGB, offset: int = 0) -> None:
     """A leader's crest: a tuft rising from the crown, on the centerline so
-    it stays put under mirroring."""
+    it stays put under mirroring. `offset` follows the head when the pose
+    moves the whole figure (a drowning leader sinks, crest and all)."""
     center = FRAME_WIDTH // 2
-    canvas.px(center, 1, shade(color, 0.35))
-    canvas.px(center, 2, color)
-    canvas.px(center - 1, 2, color)
-    canvas.px(center + 1, 2, color)
-    canvas.px(center, 3, color)
+    canvas.px(center, 1 + offset, shade(color, 0.35))
+    canvas.px(center, 2 + offset, color)
+    canvas.px(center - 1, 2 + offset, color)
+    canvas.px(center + 1, 2 + offset, color)
+    canvas.px(center, 3 + offset, color)
 
 
 def _sword(canvas: Canvas, tones: dict[str, RGB], palette: Palette, top: int, mirror: bool) -> None:
@@ -241,27 +276,117 @@ def _shield(canvas: Canvas, tones: dict[str, RGB], palette: Palette, top: int, m
             canvas.px(x, top + row_index, colors[key])
 
 
-def render_frame(palette: Palette, faction: str, pose: Pose, facing: str, frame: int) -> Image.Image:
-    toward_camera = facing[0] == "S"
-    mirror = facing[1] == "W"
-    tones = _tones(palette, palette.rgb(FACTIONS[faction]))
+def _fight_arms(canvas: Canvas, tones: dict[str, RGB], shoulder: int, guard: bool, mirror: bool) -> None:
+    """Guard: both arms drawn up beside the head. Strike: the lead arm
+    thrown straight out sideways, clear of the body.
 
-    canvas = Canvas(FRAME_WIDTH, FRAME_HEIGHT)
+    The two poses have to differ in *silhouette*, not just in which pixel
+    is which color. A first attempt moved each arm a row or two inside the
+    figure's existing outline and the fight read as a stand — at 11px wide
+    nothing inside the silhouette registers."""
+
+    def column_x(column: int) -> int:
+        return FRAME_WIDTH - 1 - column if mirror else column
+
+    back, lead = 2, 8
+
+    # The back arm is up in both poses — a fighter does not drop its guard.
+    x = column_x(back)
+    for row in range(3):
+        canvas.px(x, shoulder - 2 + row, tones["A"])
+    canvas.px(x, shoulder - 3, tones["s"])
+
+    x = column_x(lead)
+    if guard:
+        for row in range(3):
+            canvas.px(x, shoulder - 2 + row, tones["A"])
+        canvas.px(x, shoulder - 3, tones["s"])
+    else:
+        # Thrown out level with the shoulder, two columns past the body.
+        canvas.px(x, shoulder, tones["A"])
+        canvas.px(column_x(lead + 1), shoulder, tones["A"])
+        canvas.px(column_x(lead + 2), shoulder, tones["s"])
+
+
+def _drown_arms(canvas: Canvas, tones: dict[str, RGB], head_top: int, mirror: bool) -> None:
+    """Both arms straight up, rising *above* the head.
+
+    Above, not beside: arms level with the head sit inside the figure's own
+    outline and read as shoulders. The whole point of this pose is a
+    silhouette nobody mistakes for standing."""
+    for column in (2, 8):
+        x = FRAME_WIDTH - 1 - column if mirror else column
+        canvas.px(x, head_top - 3, tones["s"])
+        for row in range(3):
+            canvas.px(x, head_top - 2 + row, tones["A"])
+
+
+def _render_walk(canvas: Canvas, palette: Palette, tones: dict[str, RGB], pose: Pose, toward_camera: bool, mirror: bool, frame: int) -> int:
     top = BODY_TOP + BOB_BY_FRAME[frame]
-
     _blit(canvas, HEAD_FRONT if toward_camera else HEAD_BACK, top, tones, mirror)
     _blit(canvas, TORSO, top + 5, tones, mirror)
     _blit(canvas, LEGS_BY_FRAME[frame], top + 9, tones, mirror)
     # Arms last: the forward-swinging one reaches a row into the hips, and
     # drawing the legs over it erased the hand that gives the arm its end.
     _arms(canvas, tones, top + 6, frame, mirror)
+    return top
+
+
+def _render_fight(canvas: Canvas, palette: Palette, tones: dict[str, RGB], pose: Pose, toward_camera: bool, mirror: bool, frame: int) -> int:
+    # No bob: a braced fighter is planted. The movement is all in the arms.
+    top = BODY_TOP
+    _blit(canvas, HEAD_FRONT if toward_camera else HEAD_BACK, top, tones, mirror)
+    _blit(canvas, TORSO, top + 5, tones, mirror)
+    _blit(canvas, LEGS_BRACED, top + 9, tones, mirror)
+    _fight_arms(canvas, tones, top + 7, FIGHT_ARMS_BY_FRAME[frame], mirror)
+    return top
+
+
+def _render_drown(canvas: Canvas, palette: Palette, tones: dict[str, RGB], pose: Pose, toward_camera: bool, mirror: bool, frame: int) -> int:
+    """Head and raised arms only, sunk further down the frame as it bobs.
+
+    Drawn into a scratch canvas and then copied back with everything below
+    the waterline dropped — cutting the figure off is what says "in the
+    water", and it also means the drowning pose needs no separate art for
+    the parts that are simply not visible."""
+    sink = DROWN_BOB_BY_FRAME[frame]
+    scratch = Canvas(FRAME_WIDTH, FRAME_HEIGHT)
+    top = BODY_TOP
+    _blit(scratch, HEAD_FRONT if toward_camera else HEAD_BACK, top, tones, mirror)
+    _blit(scratch, TORSO, top + 5, tones, mirror)
+    _drown_arms(scratch, tones, top, mirror)
+
+    for y in range(top - 3, top + DROWN_VISIBLE_ROWS):
+        for x in range(FRAME_WIDTH):
+            pixel = scratch.get(x, y)
+            if pixel[3]:
+                canvas.px(x, y + sink, pixel[:3])
+    return top + sink
+
+
+RENDERERS = {"walk": _render_walk, "fight": _render_fight, "drown": _render_drown}
+
+
+def render_frame(palette: Palette, faction: str, pose: Pose, action: str, facing: str, frame: int) -> Image.Image:
+    toward_camera = facing[0] == "S"
+    mirror = facing[1] == "W"
+    tones = _tones(palette, palette.rgb(FACTIONS[faction]))
+
+    canvas = Canvas(FRAME_WIDTH, FRAME_HEIGHT)
+    top = RENDERERS[action](canvas, palette, tones, pose, toward_camera, mirror, frame)
 
     if pose.leader:
-        _plume(canvas, tones, palette.rgb(FACTIONS[faction]))
-    if pose.hero == "knight":
-        _sword(canvas, tones, palette, top + 6, mirror)
-    elif pose.hero == "guardian":
-        _shield(canvas, tones, palette, top + 6, mirror)
+        _plume(canvas, tones, palette.rgb(FACTIONS[faction]), top - BODY_TOP)
+    # A drowning walker has dropped its gear — drawing a raised sword on
+    # someone going under would read as an attack, which is the opposite of
+    # what is happening.
+    if action != "drown":
+        # Raised into the fight's own guard, so the weapon moves with the arms.
+        raised = -2 if action == "fight" else 0
+        if pose.hero == "knight":
+            _sword(canvas, tones, palette, top + 6 + raised, mirror)
+        elif pose.hero == "guardian":
+            _shield(canvas, tones, palette, top + 6 + raised, mirror)
 
     canvas.outline(palette.rgb("ink"))
     return canvas.to_image()
@@ -271,9 +396,10 @@ def render_all(palette: Palette) -> dict[str, Image.Image]:
     frames: dict[str, Image.Image] = {}
     for faction in FACTIONS:
         for pose in POSES:
-            for facing in FACINGS:
-                for frame in range(WALK_FRAMES):
-                    frames[frame_key(faction, pose.name, facing, frame)] = render_frame(
-                        palette, faction, pose, facing, frame
-                    )
+            for action in ACTIONS:
+                for facing in FACINGS:
+                    for frame in range(WALK_FRAMES):
+                        frames[frame_key(faction, pose.name, action, facing, frame)] = render_frame(
+                            palette, faction, pose, action, facing, frame
+                        )
     return frames
