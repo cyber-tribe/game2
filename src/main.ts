@@ -21,6 +21,7 @@ import {
   SWAMP_MANA_COST,
   HOLY_WATER_MANA_COST,
   TORNADO_MANA_COST,
+  HURRICANE_MANA_COST,
   TERRAIN_EDIT_MANA_COST,
   TERRAIN_EDIT_RULE_LABELS,
   TERRAIN_LABELS,
@@ -46,6 +47,7 @@ const HERO_MANA_COST: Record<HeroKind, number> = {
   guardian: GUARDIAN_MANA_COST,
 };
 import { createHolyWater } from "./game/holyWater";
+import { applyHurricane } from "./game/hurricane";
 import { createTornado } from "./game/tornado";
 import { collapseSwampsNear, createSwamp } from "./game/swamp";
 import { burnFire } from "./game/fire";
@@ -712,6 +714,22 @@ async function bootstrap(world: WorldDefinition) {
       return;
     }
 
+    if (toolMode === "hurricane") {
+      if (!trySpendPlayerMana(HURRICANE_MANA_COST)) return;
+      // Aimed like the earthquake and the tornado: from the caster's own
+      // shrine, through the tapped point. Here the direction is the whole
+      // miracle — it decides what the gust throws people *into*.
+      const from = simulation.getShrinePosition("player") ?? vertex;
+      applyHurricane(simulation.world, vertex, vertex.x - from.x, vertex.y - from.y, (event) =>
+        simulation.recordImpactEffect(event),
+      );
+      simulation.recordEvent("player", "hurricane");
+      triggerShake(5);
+      vibrate([40, 20, 40]);
+      playMiracleSound("hurricane");
+      return;
+    }
+
     if (toolMode === "forest") {
       // Affordability first, then whether it would do anything: a forest
       // only takes on buildable land, and charging for a cast that plants
@@ -1128,6 +1146,7 @@ async function bootstrap(world: WorldDefinition) {
     swamp: SWAMP_MANA_COST,
     holyWater: HOLY_WATER_MANA_COST,
     tornado: TORNADO_MANA_COST,
+    hurricane: HURRICANE_MANA_COST,
     ...HERO_MANA_COST,
     volcano: VOLCANO_MANA_COST,
     forest: FOREST_MANA_COST,

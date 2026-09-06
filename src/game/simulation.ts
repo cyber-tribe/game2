@@ -162,6 +162,7 @@ export type MatchEventType =
   | "swamp"
   | "holyWater"
   | "tornado"
+  | "hurricane"
   | "volcano"
   | "forest"
   | "flower"

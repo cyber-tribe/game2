@@ -210,6 +210,10 @@ const IMPACT_EFFECT_COLOR: Record<ImpactEffectType, number> = {
   // 聖水の泉 — the pale gold of the spring itself, so a conversion reads
   // as "something was taken", not as another death.
   converted: 0xf2e6a8,
+  // ハリケーン — pale, almost white: wind, and the only impact that is not
+  // by itself a death. What it leaves behind depends on where it threw
+  // them, so the mark says "something moved", not "something died".
+  blown: 0xe8f0f2,
 };
 
 /** Screen-px radius an ImpactEffect's ring has expanded to by the time it fully fades out. */

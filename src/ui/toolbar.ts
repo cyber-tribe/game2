@@ -9,6 +9,7 @@ export type ToolMode =
   | "swamp"
   | "holyWater"
   | "tornado"
+  | "hurricane"
   | "perseus"
   | "hercules"
   | "odysseus"

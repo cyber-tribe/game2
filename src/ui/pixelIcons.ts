@@ -16,6 +16,7 @@ export type IconKind =
   | "swamp"
   | "holyWater"
   | "tornado"
+  | "hurricane"
   | "perseus"
   | "hercules"
   | "odysseus"
