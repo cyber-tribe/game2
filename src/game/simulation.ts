@@ -158,6 +158,7 @@ export type MatchEventType =
   | "swamp"
   | "volcano"
   | "forest"
+  | "flower"
   | "fireRain"
   | "knight"
   | "guardian"

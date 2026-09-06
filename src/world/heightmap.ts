@@ -904,6 +904,63 @@ export function applyFireRain(
   return [...burned.values()];
 }
 
+/** How far from its cast point a flower heals torn ground, in vertices. */
+export const DEFAULT_FLOWER_RADIUS = 3;
+
+/**
+ * The original's 花 (docs/original-miracles.md #7): "荒れて建築不能に
+ * なった土地を通常の平地へ戻します。沼、地震による亀裂、火山で荒れた
+ * 土地などを修復でき……溶岩にも有効".
+ *
+ * The counter to three separate miracles at once, which is why it is worth
+ * more than its own small effect suggests: an earthquake's crevice
+ * (plan/archived/0095), a volcano's rock and the lava that ran from it
+ * (plan/archived/0096) all become ordinary ground again. Swamps are ECS
+ * entities rather than terrain, so the caller clears those separately with
+ * collapseSwampsNear — the same call an earthquake already makes.
+ *
+ * A crevice is not merely un-flagged: it was carved to the floor, so
+ * leaving it there would hand back a lake instead of a field. It comes
+ * back just clear of the water, which restores buildable land without
+ * doubling as a free terraforming tool.
+ *
+ * Returns the vertices it healed, so a cast that would do nothing can be
+ * refused rather than silently charged for.
+ */
+export function applyFlower(
+  heightmap: Heightmap,
+  centerX: number,
+  centerY: number,
+  radius: number = DEFAULT_FLOWER_RADIUS,
+): { x: number; y: number }[] {
+  const cx = Math.round(centerX);
+  const cy = Math.round(centerY);
+  const healed: { x: number; y: number }[] = [];
+
+  for (let dy = -radius; dy <= radius; dy++) {
+    const vy = cy + dy;
+    if (vy < 0 || vy > heightmap.height) continue;
+    for (let dx = -radius; dx <= radius; dx++) {
+      const vx = cx + dx;
+      if (vx < 0 || vx > heightmap.width) continue;
+      if (Math.hypot(dx, dy) > radius) continue;
+
+      const wasTorn = heightmap.crevice[vy][vx];
+      const wasRock = heightmap.rockHardness[vy][vx] > 0;
+      if (!wasTorn && !wasRock) continue;
+
+      if (wasTorn) {
+        heightmap.crevice[vy][vx] = false;
+        heightmap.vertices[vy][vx] = Math.min(MAX_ELEVATION, heightmap.waterLevel + 1);
+      }
+      heightmap.rockHardness[vy][vx] = 0;
+      healed.push({ x: vx, y: vy });
+    }
+  }
+
+  return healed;
+}
+
 /** How far from its cast point a road paves ground, in vertices. */
 export const DEFAULT_ROAD_RADIUS = 2;
 

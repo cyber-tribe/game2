@@ -11,6 +11,7 @@ import {
   applyReef,
   applyTsunami,
   applyFireRain,
+  applyFlower,
   applyForest,
   applyFungus,
   applyRoad,
@@ -907,6 +908,69 @@ describe("applyFireRain", () => {
     applyFireRain(heightmap, 16, 20, 1);
 
     expect(heightmap.forest[20][30]).toBe(true);
+  });
+});
+
+describe("applyFlower", () => {
+  /**
+   * The point of this miracle: it is the counter to three others at once
+   * (docs/original-miracles.md #7). These first two tests are the loops
+   * that plan/archived/0095 and plan/archived/0096 deliberately left open.
+   */
+  it("closes an earthquake's crevice and gives back buildable land", () => {
+    const heightmap = flatHeightmap(30, 30, 5);
+    applyEarthquake(heightmap, 10, 15, 1, 0, 6, () => 0.5);
+    expect(isBuildable(heightmap, 13, 15)).toBe(false);
+
+    applyFlower(heightmap, 13, 15, 2);
+
+    expect(isCrevice(heightmap, 13, 15)).toBe(false);
+    expect(isBuildable(heightmap, 13, 15)).toBe(true);
+  });
+
+  it("clears a volcano's rock and the lava that ran from it", () => {
+    const heightmap = flatHeightmap(30, 30, 5);
+    applyVolcano(heightmap, 15, 15, 1, 7, 0);
+    expect(isRock(heightmap, 15, 15)).toBe(true);
+
+    applyFlower(heightmap, 15, 15, 2);
+
+    expect(isRock(heightmap, 15, 15)).toBe(false);
+    expect(isBuildable(heightmap, 15, 15)).toBe(true);
+  });
+
+  it("lifts a crevice clear of the water rather than leaving a lake behind", () => {
+    // A crevice is carved to the floor, which at the default sea level is
+    // underwater — un-flagging it alone would hand back a pond.
+    const heightmap = flatHeightmap(30, 30, 5);
+    applyEarthquake(heightmap, 10, 15, 1, 0, 6, () => 0.5);
+
+    applyFlower(heightmap, 13, 15, 2);
+
+    expect(heightmap.vertices[15][13]).toBeGreaterThan(heightmap.waterLevel);
+  });
+
+  it("leaves healthy ground exactly as it was", () => {
+    const heightmap = flatHeightmap(30, 30, 5);
+
+    applyFlower(heightmap, 15, 15, 2);
+
+    expect(heightmap.vertices[15][15]).toBe(5);
+  });
+
+  it("reports nothing healed when there is nothing to heal, so the caller can refuse the cast", () => {
+    const heightmap = flatHeightmap(30, 30, 5);
+
+    expect(applyFlower(heightmap, 15, 15, 2)).toEqual([]);
+  });
+
+  it("does not reach past its radius", () => {
+    const heightmap = flatHeightmap(30, 30, 5);
+    applyVolcano(heightmap, 25, 15, 0, 7, 0);
+
+    applyFlower(heightmap, 15, 15, 2);
+
+    expect(isRock(heightmap, 25, 15)).toBe(true);
   });
 });
 

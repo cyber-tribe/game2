@@ -186,6 +186,26 @@ ICONS: dict[str, list[str]] = {
         "....ooooo.......",
         "................",
     ],
+    # 花: a bloom opening. The only miracle that repairs, so it is the only
+    # icon built from a soft rounded shape rather than an edge or a blade.
+    "flower": [
+        "................",
+        "......oo........",
+        ".....obbo.......",
+        "..oo.obbo.oo....",
+        ".obbooBBoobbo...",
+        ".obbbBbbBbbbo...",
+        "..obBbbbbBbo....",
+        "...obbbbbbo.....",
+        "..obbbBBbbbo....",
+        ".obbboBBobbbo...",
+        ".obbo.oo.obbo...",
+        "..oo..gg..oo....",
+        "......ogo.......",
+        ".....gogog......",
+        "....ogo.ogo.....",
+        ".....o...o......",
+    ],
     # 火の雨: flame falling, over ground that is already alight.
     "fireRain": [
         "................",
@@ -538,7 +558,7 @@ ICONS.update({
     # 道: a paved way running toward the horizon. Perspective rather than a
     # flat strip — at 16px a plain rectangle of stone reads as a wall, and
     # the courses of laid stone are what say "road" rather than "floor".
-"road": [
+    "road": [
         "................",
         "......oooo......",
         "......osdo......",
@@ -597,6 +617,7 @@ ICON_KINDS = (
     "knight",
     "guardian",
     "forest",
+    "flower",
     "fireRain",
     "volcano",
     "reef",

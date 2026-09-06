@@ -8,7 +8,7 @@
  * later — see main.ts's onEnemyAction, which already does this for the
  * screen-shake/toast but had no audio equivalent before this.
  */
-export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "volcano" | "knight" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "reef" | "road" | "fungus";
+export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "volcano" | "knight" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "fungus";
 
 /** Every MiracleSoundType, for tests and any future UI that wants to list them. */
 export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
@@ -21,6 +21,7 @@ export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
   "armageddon",
   "tsunami",
   "forest",
+  "flower",
   "fireRain",
   "reef",
   "road",
@@ -104,6 +105,14 @@ export const RECIPES: Record<MiracleSoundType, MiracleSoundRecipe> = {
   // Soft and rising — growth, the only constructive miracle in the set.
   forest: {
     tones: [{ waveform: "sine", startFrequency: 180, endFrequency: 420, delay: 0, duration: 0.5, peakGain: 0.14 }],
+  },
+  // A clean rising chime — the only miracle that repairs, and the only one
+  // with no noise layer at all.
+  flower: {
+    tones: [
+      { waveform: "sine", startFrequency: 520, endFrequency: 780, delay: 0, duration: 0.35, peakGain: 0.12 },
+      { waveform: "sine", startFrequency: 780, endFrequency: 1040, delay: 0.12, duration: 0.35, peakGain: 0.09 },
+    ],
   },
   // Crackle: broadband noise with no tone under it at all.
   fireRain: {

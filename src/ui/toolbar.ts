@@ -11,6 +11,7 @@ export type ToolMode =
   | "guardian"
   | "volcano"
   | "forest"
+  | "flower"
   | "fireRain"
   | "tsunami"
   | "reef"

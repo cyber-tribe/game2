@@ -18,6 +18,7 @@ export type IconKind =
   | "guardian"
   | "volcano"
   | "forest"
+  | "flower"
   | "fireRain"
   | "tsunami"
   | "reef"

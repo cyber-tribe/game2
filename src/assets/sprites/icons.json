@@ -100,11 +100,31 @@
       },
       "trimmed": false
     },
-    "icon_forest": {
+    "icon_flower": {
       "frame": {
         "h": 16,
         "w": 16,
         "x": 80,
+        "y": 0
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 16,
+        "w": 16
+      },
+      "spriteSourceSize": {
+        "h": 16,
+        "w": 16,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "icon_forest": {
+      "frame": {
+        "h": 16,
+        "w": 16,
+        "x": 96,
         "y": 0
       },
       "rotated": false,
@@ -124,7 +144,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 96,
+        "x": 112,
         "y": 0
       },
       "rotated": false,
@@ -144,7 +164,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 112,
+        "x": 128,
         "y": 0
       },
       "rotated": false,
@@ -164,7 +184,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 128,
+        "x": 144,
         "y": 0
       },
       "rotated": false,
@@ -184,7 +204,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 144,
+        "x": 160,
         "y": 0
       },
       "rotated": false,
@@ -204,7 +224,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 160,
+        "x": 176,
         "y": 0
       },
       "rotated": false,
@@ -224,7 +244,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 176,
+        "x": 192,
         "y": 0
       },
       "rotated": false,
@@ -244,7 +264,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 192,
+        "x": 208,
         "y": 0
       },
       "rotated": false,
@@ -264,7 +284,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 208,
+        "x": 224,
         "y": 0
       },
       "rotated": false,
@@ -284,7 +304,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 224,
+        "x": 240,
         "y": 0
       },
       "rotated": false,
@@ -304,26 +324,6 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 240,
-        "y": 0
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 16,
-        "w": 16
-      },
-      "spriteSourceSize": {
-        "h": 16,
-        "w": 16,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "icon_reef": {
-      "frame": {
-        "h": 16,
-        "w": 16,
         "x": 0,
         "y": 16
       },
@@ -340,7 +340,7 @@
       },
       "trimmed": false
     },
-    "icon_releasePopulation": {
+    "icon_reef": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -360,7 +360,7 @@
       },
       "trimmed": false
     },
-    "icon_road": {
+    "icon_releasePopulation": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -380,7 +380,7 @@
       },
       "trimmed": false
     },
-    "icon_settle": {
+    "icon_road": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -400,7 +400,7 @@
       },
       "trimmed": false
     },
-    "icon_shrine": {
+    "icon_settle": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -420,7 +420,7 @@
       },
       "trimmed": false
     },
-    "icon_swamp": {
+    "icon_shrine": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -440,7 +440,7 @@
       },
       "trimmed": false
     },
-    "icon_tsunami": {
+    "icon_swamp": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -460,11 +460,31 @@
       },
       "trimmed": false
     },
-    "icon_volcano": {
+    "icon_tsunami": {
       "frame": {
         "h": 16,
         "w": 16,
         "x": 112,
+        "y": 16
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 16,
+        "w": 16
+      },
+      "spriteSourceSize": {
+        "h": 16,
+        "w": 16,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "icon_volcano": {
+      "frame": {
+        "h": 16,
+        "w": 16,
+        "x": 128,
         "y": 16
       },
       "rotated": false,
