@@ -5,6 +5,8 @@ import {
   EARTHQUAKE_MANA_COST,
   ENEMY_PERSONALITY_LABELS,
   REEF_MANA_COST,
+  FIRE_RAIN_MANA_COST,
+  FOREST_MANA_COST,
   TSUNAMI_MANA_COST,
   GUARDIAN_MANA_COST,
   KNIGHT_MANA_COST,
@@ -21,6 +23,7 @@ import { trySpendMana } from "./game/faction";
 import { drownFlood } from "./game/flood";
 import { Simulation, type GameOutcome, type InspectableEntity, type MatchEvent } from "./game/simulation";
 import { collapseSwampsNear, createSwamp } from "./game/swamp";
+import { burnFire } from "./game/fire";
 import { eruptVolcano } from "./game/volcano";
 import { ALL_MIRACLES, WORLDS, nextWorldId, unlockedCountForPassword, type MiracleId, type WorldDefinition } from "./game/worlds";
 import { EntityLayer } from "./render/EntityLayer";
@@ -34,7 +37,7 @@ import { mountCommandIcons } from "./ui/commandIcons";
 import { loadCommandIcons } from "./ui/pixelIcons";
 import { StatusPanel } from "./ui/statusPanel";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
-import { DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyReef, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
+import { DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyForest, applyReef, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
 
 /**
  * The camera's fixed base scale — see layout()'s doc comment for why this
@@ -642,6 +645,35 @@ async function bootstrap(world: WorldDefinition) {
       return;
     }
 
+    if (toolMode === "forest") {
+      // Checked before spending: a forest only takes on buildable land, and
+      // charging for a cast that plants nothing reads as the game being
+      // broken.
+      if (applyForest(heightmap, vertex.x, vertex.y).length === 0) {
+        showEntityInfo("ここには森が育ちません", "warning");
+        return;
+      }
+      if (!trySpendPlayerMana(FOREST_MANA_COST)) return;
+      renderer.redraw(visibleBounds());
+      simulation.recordEvent("player", "forest");
+      vibrate(20);
+      playMiracleSound("forest");
+      return;
+    }
+
+    if (toolMode === "fireRain") {
+      if (!trySpendPlayerMana(FIRE_RAIN_MANA_COST)) return;
+      burnFire(simulation.world, applyFireRain(heightmap, vertex.x, vertex.y), (event) =>
+        simulation.recordImpactEffect(event),
+      );
+      renderer.redraw(visibleBounds());
+      simulation.recordEvent("player", "fireRain");
+      triggerShake(4);
+      vibrate([30, 20, 30]);
+      playMiracleSound("fireRain");
+      return;
+    }
+
     if (toolMode === "volcano") {
       if (!trySpendPlayerMana(VOLCANO_MANA_COST)) return;
       eruptVolcano(simulation.world, applyVolcano(heightmap, vertex.x, vertex.y));
@@ -976,6 +1008,8 @@ async function bootstrap(world: WorldDefinition) {
     knight: KNIGHT_MANA_COST,
     guardian: GUARDIAN_MANA_COST,
     volcano: VOLCANO_MANA_COST,
+    forest: FOREST_MANA_COST,
+    fireRain: FIRE_RAIN_MANA_COST,
     reef: REEF_MANA_COST,
     tsunami: TSUNAMI_MANA_COST,
     armageddon: ARMAGEDDON_MANA_COST,

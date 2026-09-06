@@ -166,6 +166,45 @@ ICONS: dict[str, list[str]] = {
     # A dark rock cone with a bright plume over it. The first version made
     # the cone almost white and the plume two stray pixels, so it read as a
     # tent — the lava has to be the loudest thing in the tile.
+    # 森: a stand of trees, not one tree — the miracle plants an area, and
+    # the pair with 火の雨 is about how far the fire runs through it.
+    "forest": [
+        "................",
+        ".....o....o.....",
+        "....ogo..ogo....",
+        "...oggo..oggo...",
+        "..oggggooggggo..",
+        "..oggggggggggo..",
+        "...oggoggoggo...",
+        "....ooBoogoo....",
+        "...ogggoBoggo...",
+        "..oggggogoggo...",
+        "..oggggggggo....",
+        "...oggogggo.....",
+        "....oBoBoo......",
+        "....oBoBo.......",
+        "....ooooo.......",
+        "................",
+    ],
+    # 火の雨: flame falling, over ground that is already alight.
+    "fireRain": [
+        "................",
+        "..o....o....o...",
+        ".obo..obo..obo..",
+        ".obo..obo..obo..",
+        "..o....o....o...",
+        "................",
+        "...o...o...o....",
+        "..obo.obo.obo...",
+        "..obo.obo.obo...",
+        "...o...o...o....",
+        "................",
+        "...oo..oo..oo...",
+        "..obbooobboobo..",
+        ".obrbobbrbobrbo.",
+        "obrrbobrrbobrrbo",
+        ".oooooooooooooo.",
+    ],
     "volcano": [
         "................",
         "....o.....o.....",
@@ -515,6 +554,8 @@ ICON_KINDS = (
     "swamp",
     "knight",
     "guardian",
+    "forest",
+    "fireRain",
     "volcano",
     "reef",
     "tsunami",

@@ -16,10 +16,15 @@ function blankCrevice(width: number, height: number): boolean[][] {
   return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
 }
 
+function blankLayer(width: number, height: number): boolean[][] {
+  return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
+}
+
 function flatHeightmap(width: number, height: number, elevation: number): Heightmap {
   const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
   const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
-  return { width, height, terrain: "grass", vertices, rockHardness, crevice: blankCrevice(width, height), waterLevel: 0 };
+  return { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
+      crevice: blankCrevice(width, height), waterLevel: 0 };
 }
 
 /**
@@ -519,5 +524,36 @@ describe("waterFrameIndex", () => {
 
   it("gives the same elapsed time the same frame (deterministic)", () => {
     expect(waterFrameIndex(1.23)).toBe(waterFrameIndex(1.23));
+  });
+});
+
+describe("terrain kinds that overlap", () => {
+  /**
+   * Woodland and a crevice can sit on the same vertex — an earthquake tears
+   * straight through a forest — and the two want opposite fills: a canopy
+   * texture, or the flat near-black of a hole. This is the precedence the
+   * merge of those two features had to settle, so it is pinned here rather
+   * than left to whichever ternary happened to come first.
+   *
+   * A crevice wins. It kills whoever walks in; trees over the top of it
+   * would hide the one thing the player has to see.
+   */
+  it("draws a crevice as a hole even where a forest stood", () => {
+    const wooded = flatHeightmap(3, 3, 5);
+    for (const row of wooded.forest) row.fill(true);
+    const woodedFills = drawInstructions(new IsoRenderer(wooded)).filter((i) => i.action === "fill");
+
+    const torn = flatHeightmap(3, 3, 5);
+    for (const row of torn.forest) row.fill(true);
+    for (const row of torn.crevice) row.fill(true);
+    const tornFills = drawInstructions(new IsoRenderer(torn)).filter((i) => i.action === "fill");
+
+    // Counted rather than asserted over every fill: the map's own outer
+    // edge is drawn as solid-colour walls (see drawEdgeWall), and on a 3x3
+    // map every tile touches it.
+    const textured = (fills: typeof woodedFills) => fills.filter((f) => f.data.style!.texture !== Texture.WHITE).length;
+
+    expect(textured(woodedFills)).toBeGreaterThan(0);
+    expect(textured(tornFills)).toBe(0);
   });
 });

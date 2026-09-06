@@ -10,10 +10,15 @@ function blankCrevice(width: number, height: number): boolean[][] {
   return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
 }
 
+function blankLayer(width: number, height: number): boolean[][] {
+  return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
+}
+
 function flatHeightmap(width: number, height: number, elevation: number): Heightmap {
   const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
   const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
-  return { width, height, terrain: "grass", vertices, rockHardness, crevice: blankCrevice(width, height), waterLevel: 0 };
+  return { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
+      crevice: blankCrevice(width, height), waterLevel: 0 };
 }
 
 describe("Simulation", () => {
@@ -483,7 +488,8 @@ describe("Simulation", () => {
       Array.from({ length: width + 1 }, (_, x) => (x >= waterFrom && x < waterTo ? 0 : 5)),
     );
     const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
-    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness, crevice: blankCrevice(width, height), waterLevel: 0 };
+    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
+      crevice: blankCrevice(width, height), waterLevel: 0 };
 
     const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
 
@@ -551,7 +557,8 @@ describe("Simulation", () => {
     const height = 20;
     const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(5));
     const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
-    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness, crevice: blankCrevice(width, height), waterLevel: 0 };
+    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
+      crevice: blankCrevice(width, height), waterLevel: 0 };
 
     const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
 
@@ -573,6 +580,7 @@ describe("Simulation", () => {
       terrain,
       vertices: Array.from({ length: height + 1 }, () => Array(width + 1).fill(5)),
       rockHardness: Array.from({ length: height + 1 }, () => Array(width + 1).fill(0)),
+      forest: blankLayer(width, height),
       crevice: blankCrevice(width, height),
       waterLevel: 0,
     });
@@ -624,7 +632,8 @@ describe("Simulation", () => {
     const height = 20;
     const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(5));
     const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
-    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness, crevice: blankCrevice(width, height), waterLevel: 0 };
+    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
+      crevice: blankCrevice(width, height), waterLevel: 0 };
 
     const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
 
@@ -760,7 +769,8 @@ describe("Simulation", () => {
     const height = 20;
     const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(1)); // uniformly low land
     const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
-    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness, crevice: blankCrevice(width, height), waterLevel: 0 };
+    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
+      crevice: blankCrevice(width, height), waterLevel: 0 };
 
     const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
 
@@ -785,7 +795,8 @@ describe("Simulation", () => {
     const height = 20;
     const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(1));
     const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
-    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness, crevice: blankCrevice(width, height), waterLevel: 0 };
+    const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
+      crevice: blankCrevice(width, height), waterLevel: 0 };
 
     const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
     for (let i = 0; i < 200; i++) sim.update(0.1);

@@ -17,6 +17,8 @@ export type IconKind =
   | "knight"
   | "guardian"
   | "volcano"
+  | "forest"
+  | "fireRain"
   | "tsunami"
   | "reef"
   | "armageddon"
