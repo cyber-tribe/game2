@@ -95,3 +95,36 @@ describe("createCreviceSystem", () => {
     expect(world.query(Walker)).toHaveLength(1);
   });
 });
+
+describe("createCreviceSystem — ヘラクレス", () => {
+  /**
+   * 「地割れに落ちない」 (docs/original-miracles.md #15) — the other half of
+   * the earthquake, and the reason the priciest hero is worth its price on
+   * a map somebody has already torn open.
+   */
+  it("walks a ヘラクレス over torn ground unharmed", () => {
+    const heightmap = flatHeightmap(20, 5);
+    applyEarthquake(heightmap, 5, 10, 1, 0, 6, () => 0.5);
+    const world = new World();
+    const hero = spawnWalker(world, 8, 10);
+    world.add(hero, Walker, { ...world.get(hero, Walker)!, state: "hercules" });
+
+    createCreviceSystem({ heightmap })(world, 0.1);
+
+    expect(world.isAlive(hero)).toBe(true);
+  });
+
+  it("still swallows every other hero", () => {
+    const heightmap = flatHeightmap(20, 5);
+    applyEarthquake(heightmap, 5, 10, 1, 0, 6, () => 0.5);
+    const world = new World();
+    for (const state of ["perseus", "odysseus", "achilles", "guardian"] as const) {
+      const hero = spawnWalker(world, 8, 10);
+      world.add(hero, Walker, { ...world.get(hero, Walker)!, state });
+    }
+
+    createCreviceSystem({ heightmap })(world, 0.1);
+
+    expect(world.query(Walker)).toHaveLength(0);
+  });
+});

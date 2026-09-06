@@ -9,12 +9,13 @@ import {
   Walker,
   type BehaviorMode,
   type FactionId,
+  type HeroKind,
   type HouseLevel,
   type WalkerState,
 } from "./components";
 import { DEFAULT_WALKER_SPEED, FARMLAND_RADIUS, HOUSE_LEVELS, IMPACT_EFFECT_DURATION, TILES_PER_HOUSE_CAP } from "./constants";
 import { createFaction, findFactionEntity, moveShrine } from "./faction";
-import { guardianify, knightify } from "./hero";
+import { promoteHero } from "./hero";
 import { totalPopulation } from "./population";
 import { releasePopulation } from "./populationRelease";
 import { createHouseCaptureSystem, createWalkerCombatSystem } from "./systems/combat";
@@ -29,7 +30,7 @@ import { gatherTargetingSystem } from "./systems/gatherTargeting";
 import { goToShrineSystem } from "./systems/goToShrine";
 import { createHouseGrowthSystem } from "./systems/houseGrowth";
 import { createHouseUpgradeSystem } from "./systems/houseUpgrade";
-import { guardianTargetingSystem, heroCooldownSystem, knightTargetingSystem } from "./systems/hero";
+import { guardianTargetingSystem, heroAdvanceTargetingSystem, heroCooldownSystem } from "./systems/hero";
 import { leaderSystem } from "./systems/leader";
 import { manaSystem } from "./systems/mana";
 import { createMovementSystem } from "./systems/movement";
@@ -76,7 +77,7 @@ export interface SimulationConfig {
    * Same per-world "使用可能な奇跡の制限" (see game/worlds.ts's
    * WorldDefinition.allowedMiracles) applied to the enemy's own miracle
    * casting (enemyMiracles.ts), not just the player's toolbar — "敵の神は
-   * プレイヤーと同じルールで介入する". Only earthquake/volcano/knight/
+   * プレイヤーと同じルールで介入する". Only earthquake/volcano/ペルセウス/
    * armageddon are ever cast by the enemy, so restricting swamp/tsunami/
    * shrine here has no effect on it. Defaults to every miracle unlocked
    * when omitted, which is fine for tests that don't care about it.
@@ -148,7 +149,7 @@ export interface GameOutcome {
  * reasoning as main.ts's vibrate() — it's the core, extremely frequent
  * action, so logging every tap would bury the events actually worth
  * telling a story about) plus a few house milestones dramatic enough to
- * be worth their own line (captured, burned by a knight, or reaching the
+ * be worth their own line (captured, burned by a hero, or reaching the
  * top "castle" tier — but not every intermediate upgrade/downgrade, which
  * is far too routine).
  */
@@ -160,7 +161,10 @@ export type MatchEventType =
   | "forest"
   | "flower"
   | "fireRain"
-  | "knight"
+  | "perseus"
+  | "hercules"
+  | "odysseus"
+  | "achilles"
   | "guardian"
   | "armageddon"
   | "tsunami"
@@ -249,7 +253,7 @@ export class Simulation {
       .add(fightTargetingSystem)
       .add(goToShrineSystem)
       .add(gatherTargetingSystem)
-      .add(knightTargetingSystem)
+      .add(heroAdvanceTargetingSystem)
       .add(guardianTargetingSystem)
       .add(heroCooldownSystem)
       .add(createWanderTargetSystem({ heightmap: config.heightmap }))
@@ -427,14 +431,9 @@ export class Simulation {
     return entity === undefined ? undefined : this.world.get(entity, FactionState)!.shrinePosition;
   }
 
-  /** The "騎士化" miracle — turns a faction's current leader into a knight. */
-  knightify(faction: FactionId): void {
-    knightify(this.world, faction);
-  }
-
-  /** The "守護者化" miracle — turns a faction's current leader into a guardian. */
-  guardianify(faction: FactionId): void {
-    guardianify(this.world, faction);
+  /** The hero miracles — turns a faction's current leader into `kind`. See hero.ts. */
+  promoteHero(faction: FactionId, kind: HeroKind): void {
+    promoteHero(this.world, faction, kind);
   }
 
   /**

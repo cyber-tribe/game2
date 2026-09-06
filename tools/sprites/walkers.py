@@ -151,16 +151,23 @@ class Pose:
     hero: str | None
 
 
+HEROES = ("perseus", "hercules", "odysseus", "achilles", "guardian")
+"""The hero kinds, matching HeroKind in src/game/components.ts. Each carries
+its own prop (see _PROPS) — at this size the weapon *is* the identity, since
+there is no room for a face or a costume, and a player who cannot tell which
+hero is on the field cannot use the difference between them."""
+
 POSES = [
     Pose("plain", leader=False, hero=None),
     Pose("leader", leader=True, hero=None),
-    Pose("knight", leader=False, hero="knight"),
-    Pose("guardian", leader=False, hero="guardian"),
-    Pose("leaderKnight", leader=True, hero="knight"),
-    Pose("leaderGuardian", leader=True, hero="guardian"),
+    *[Pose(hero, leader=False, hero=hero) for hero in HEROES],
+    *[Pose(f"leader{hero[0].upper()}{hero[1:]}", leader=True, hero=hero) for hero in HEROES],
 ]
 """A leader can also be promoted to a hero, and both marks are drawn in that
-case, so the pairs are enumerated rather than treated as exclusive."""
+case, so the pairs are enumerated rather than treated as exclusive. The
+paired name is "leader" + the hero's own name capitalized — the same rule
+walkerPose() uses in src/render/walkerSprites.ts, so neither side needs a
+lookup table."""
 
 FACTIONS = {"player": "playerAccent", "enemy": "enemyAccent"}
 """Walker clothing takes the calibrated faction accents from the palette.
@@ -276,6 +283,88 @@ def _shield(canvas: Canvas, tones: dict[str, RGB], palette: Palette, top: int, m
             canvas.px(x, top + row_index, colors[key])
 
 
+def _prop_columns(mirror: bool) -> tuple[int, int, int]:
+    """The columns a hand-held prop is drawn in: the hand's own column, the
+    one just inboard of it (toward the body), and the one just outboard (the
+    frame's own edge). The frame is 11px wide and the body owns the middle,
+    so the difference between one hero and the next has to come out of these
+    columns and a handful of rows. Props that need real width take the
+    outboard column rather than the inboard one — anything drawn against the
+    body merges into its outline and stops reading as a separate object."""
+    column = 9
+    x = FRAME_WIDTH - 1 - column if mirror else column
+    step = -1 if mirror else 1
+    return x, x - step, x + step
+
+
+def _club(canvas: Canvas, tones: dict[str, RGB], palette: Palette, top: int, mirror: bool) -> None:
+    """ヘラクレス's club: top-heavy, the opposite silhouette to the sword's
+    taper. Weight reads as strength at a glance, which is the one thing
+    this hero's identity has to communicate."""
+    x, _, out = _prop_columns(mirror)
+    head = palette.rgb("bronzeMid")
+    highlight = palette.rgb("bronzeLight")
+    shaft = palette.rgb("bronzeDark")
+    # A 2x4 head over a 1px shaft: the mass is all at the top, where the
+    # sword's is in the middle and the spear's is a single bright pixel.
+    for row in range(4):
+        canvas.px(x, top - 5 + row, highlight if row == 0 else head)
+        canvas.px(out, top - 5 + row, head if row else highlight)
+    for row in range(-1, 5):
+        canvas.px(x, top + row, shaft)
+
+
+def _bow(canvas: Canvas, tones: dict[str, RGB], palette: Palette, top: int, mirror: bool) -> None:
+    """オディッセウス's bow — his own weapon in the story, and the only
+    curved prop here, so it separates from the three straight ones by shape
+    before colour."""
+    x, _, out = _prop_columns(mirror)
+    limb = palette.rgb("bronzeMid")
+    string = palette.rgb("stoneHighlight")
+    # Tips on the hand's own column, belly bowing outward over the frame's
+    # edge, string drawn straight between the tips. Two columns is exactly
+    # enough for a curve, as long as one of them is the straight line the
+    # other bows away from — and the bulge has to go outward, away from the
+    # body, or the whole prop reads as one thick slab.
+    for row in range(-4, 4):
+        canvas.px(x, top + row, string)
+    # The limb only where it curves — filling the outboard column for the
+    # whole length just gives a second straight line, and two straight
+    # lines side by side read as a plank, not a bow. Left hollow in the
+    # middle, the same two columns read as a drawn string with the wood
+    # bending away from it at both ends.
+    for row in (-4, -3, 2, 3):
+        canvas.px(out, top + row, limb)
+
+
+def _spear(canvas: Canvas, tones: dict[str, RGB], palette: Palette, top: int, mirror: bool) -> None:
+    """アキレス's spear: the tallest, thinnest prop, reaching a row higher
+    than the sword so the two do not read as the same blade. The head takes
+    the lava tones rather than steel — the hero fire cannot kill, carrying
+    the one colour on the map that means fire."""
+    x, _, out = _prop_columns(mirror)
+    shaft = palette.rgb("bronzeDark")
+    head = palette.rgb("lavaBright")
+    ember = palette.rgb("lavaMid")
+    canvas.px(x, top - 6, head)
+    canvas.px(x, top - 5, ember)
+    canvas.px(out, top - 5, ember)
+    for row in range(-4, 5):
+        canvas.px(x, top + row, shaft)
+
+
+_PROPS = {
+    # ペルセウス keeps the blade the nameless 騎士 already carried: it is
+    # the original's "基準の英雄", and the baseline should look like the
+    # thing everything else is measured against.
+    "perseus": _sword,
+    "hercules": _club,
+    "odysseus": _bow,
+    "achilles": _spear,
+    "guardian": _shield,
+}
+
+
 def _fight_arms(canvas: Canvas, tones: dict[str, RGB], shoulder: int, guard: bool, mirror: bool) -> None:
     """Guard: both arms drawn up beside the head. Strike: the lead arm
     thrown straight out sideways, clear of the body.
@@ -383,10 +472,8 @@ def render_frame(palette: Palette, faction: str, pose: Pose, action: str, facing
     if action != "drown":
         # Raised into the fight's own guard, so the weapon moves with the arms.
         raised = -2 if action == "fight" else 0
-        if pose.hero == "knight":
-            _sword(canvas, tones, palette, top + 6 + raised, mirror)
-        elif pose.hero == "guardian":
-            _shield(canvas, tones, palette, top + 6 + raised, mirror)
+        if pose.hero is not None:
+            _PROPS[pose.hero](canvas, tones, palette, top + 6 + raised, mirror)
 
     canvas.outline(palette.rgb("ink"))
     return canvas.to_image()

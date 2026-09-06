@@ -1,4 +1,4 @@
-import type { FactionId, WalkerState } from "../game/components";
+import type { FactionId, HeroKind, WalkerState } from "../game/components";
 import atlasData from "../assets/sprites/walkers.json";
 import atlasUrl from "../assets/sprites/walkers.png";
 import { SpriteAtlas } from "./spriteSheet";
@@ -32,9 +32,21 @@ export type Facing = "NE" | "NW" | "SE" | "SW";
  * can be promoted, and both marks are drawn in that case — so the pairs are
  * enumerated rather than treated as mutually exclusive.
  */
-export type WalkerPose = "plain" | "leader" | "knight" | "guardian" | "leaderKnight" | "leaderGuardian";
+export type WalkerPose =
+  | "plain"
+  | "leader"
+  | "perseus"
+  | "hercules"
+  | "odysseus"
+  | "achilles"
+  | "guardian"
+  | "leaderPerseus"
+  | "leaderHercules"
+  | "leaderOdysseus"
+  | "leaderAchilles"
+  | "leaderGuardian";
 
-export type HeroKind = "knight" | "guardian";
+export type { HeroKind };
 
 /**
  * What the walker is doing, on top of which way it faces — see ACTIONS in
@@ -58,7 +70,10 @@ export const WALK_FRAMES = 4;
 export function walkerPose(isLeader: boolean, heroKind?: HeroKind): WalkerPose {
   if (!heroKind) return isLeader ? "leader" : "plain";
   if (!isLeader) return heroKind;
-  return heroKind === "knight" ? "leaderKnight" : "leaderGuardian";
+  // "leader" + the hero's own name, capitalized — the same rule
+  // tools/sprites/walkers.py's POSES uses to name the paired frames, so
+  // adding a hero never means editing a lookup table on either side.
+  return `leader${heroKind[0].toUpperCase()}${heroKind.slice(1)}` as WalkerPose;
 }
 
 /**

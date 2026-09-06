@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { World } from "../ecs";
 import { FactionState, Owner, Position, Walker } from "./components";
 import { createFaction } from "./faction";
-import { guardianify, knightify } from "./hero";
+import { promoteHero } from "./hero";
 
 function spawnWalker(world: World, faction: "player" | "enemy") {
   const entity = world.createEntity();
@@ -12,28 +12,66 @@ function spawnWalker(world: World, faction: "player" | "enemy") {
   return entity;
 }
 
-describe("knightify", () => {
-  it("turns the faction's current leader into a knight", () => {
+describe("promoteHero", () => {
+  it("turns the faction's current leader into ペルセウス", () => {
     const world = new World();
     const faction = createFaction(world, "player", { x: 0, y: 0 });
     const leader = spawnWalker(world, "player");
     world.add(faction, FactionState, { ...world.get(faction, FactionState)!, leaderId: leader });
 
-    knightify(world, "player");
+    promoteHero(world, "player", "perseus");
 
-    expect(world.get(leader, Walker)!.state).toBe("knight");
+    expect(world.get(leader, Walker)!.state).toBe("perseus");
   });
 
-  it("leaves the leader's strength/speed untouched", () => {
+  /**
+   * ペルセウス is the original's "基準の英雄" and was game2's 騎士 before
+   * the heroes had names, so it must still move no number at all — the
+   * other three are priced and balanced against exactly this.
+   */
+  it("leaves the leader's strength/speed untouched for ペルセウス", () => {
     const world = new World();
     const faction = createFaction(world, "player", { x: 0, y: 0 });
     const leader = spawnWalker(world, "player");
     world.add(leader, Walker, { strength: 7, state: "seeking", speed: 2.5 });
     world.add(faction, FactionState, { ...world.get(faction, FactionState)!, leaderId: leader });
 
-    knightify(world, "player");
+    promoteHero(world, "player", "perseus");
 
-    expect(world.get(leader, Walker)).toEqual({ strength: 7, state: "knight", speed: 2.5 });
+    expect(world.get(leader, Walker)).toMatchObject({ strength: 7, state: "perseus", speed: 2.5 });
+  });
+
+  it("doubles ヘラクレス's strength and speeds オディッセウス up", () => {
+    const world = new World();
+    const faction = createFaction(world, "player", { x: 0, y: 0 });
+    const leader = spawnWalker(world, "player");
+    world.add(leader, Walker, { strength: 4, state: "seeking", speed: 1.5 });
+    world.add(faction, FactionState, { ...world.get(faction, FactionState)!, leaderId: leader });
+
+    promoteHero(world, "player", "hercules");
+    expect(world.get(leader, Walker)).toMatchObject({ strength: 8, speed: 1.5 });
+
+    promoteHero(world, "player", "odysseus");
+    expect(world.get(leader, Walker)).toMatchObject({ strength: 4, speed: 2.7 });
+  });
+
+  /**
+   * Without a remembered base, cycling through the hero miracles would
+   * compound their multipliers — and the cheapest route to the strongest
+   * ヘラクレス would be to buy every other hero first.
+   */
+  it("re-derives the traits from the base rather than compounding them", () => {
+    const world = new World();
+    const faction = createFaction(world, "player", { x: 0, y: 0 });
+    const leader = spawnWalker(world, "player");
+    world.add(leader, Walker, { strength: 4, state: "seeking", speed: 1.5 });
+    world.add(faction, FactionState, { ...world.get(faction, FactionState)!, leaderId: leader });
+
+    promoteHero(world, "player", "hercules");
+    promoteHero(world, "player", "odysseus");
+    promoteHero(world, "player", "hercules");
+
+    expect(world.get(leader, Walker)).toMatchObject({ strength: 8, speed: 1.5 });
   });
 
   it("does nothing when the faction has no leader assigned", () => {
@@ -41,25 +79,25 @@ describe("knightify", () => {
     createFaction(world, "player", { x: 0, y: 0 });
     spawnWalker(world, "player");
 
-    expect(() => knightify(world, "player")).not.toThrow();
+    expect(() => promoteHero(world, "player", "perseus")).not.toThrow();
   });
 
-  it("does nothing when the leader is already a knight", () => {
+  it("does nothing when the leader is already that hero", () => {
     const world = new World();
     const faction = createFaction(world, "player", { x: 0, y: 0 });
     const leader = spawnWalker(world, "player");
-    world.add(leader, Walker, { strength: 3, state: "knight", speed: 1 });
+    world.add(leader, Walker, { strength: 3, state: "perseus", speed: 1 });
     world.add(faction, FactionState, { ...world.get(faction, FactionState)!, leaderId: leader });
 
-    knightify(world, "player");
+    promoteHero(world, "player", "perseus");
 
-    expect(world.get(leader, Walker)).toEqual({ strength: 3, state: "knight", speed: 1 });
+    expect(world.get(leader, Walker)).toEqual({ strength: 3, state: "perseus", speed: 1 });
   });
 
   it("does nothing when the faction doesn't exist", () => {
     const world = new World();
 
-    expect(() => knightify(world, "player")).not.toThrow();
+    expect(() => promoteHero(world, "player", "perseus")).not.toThrow();
   });
 
   it("does nothing when the leader entity is no longer alive", () => {
@@ -69,30 +107,30 @@ describe("knightify", () => {
     world.add(faction, FactionState, { ...world.get(faction, FactionState)!, leaderId: leader });
     world.destroyEntity(leader);
 
-    expect(() => knightify(world, "player")).not.toThrow();
+    expect(() => promoteHero(world, "player", "perseus")).not.toThrow();
   });
 
-  it("re-specializes an existing guardian leader into a knight", () => {
+  it("re-specializes an existing 守護者 leader into ペルセウス", () => {
     const world = new World();
     const faction = createFaction(world, "player", { x: 0, y: 0 });
     const leader = spawnWalker(world, "player");
     world.add(leader, Walker, { strength: 3, state: "guardian", speed: 1 });
     world.add(faction, FactionState, { ...world.get(faction, FactionState)!, leaderId: leader });
 
-    knightify(world, "player");
+    promoteHero(world, "player", "perseus");
 
-    expect(world.get(leader, Walker)!.state).toBe("knight");
+    expect(world.get(leader, Walker)!.state).toBe("perseus");
   });
 });
 
-describe("guardianify", () => {
+describe("promoteHero — 守護者", () => {
   it("turns the faction's current leader into a guardian", () => {
     const world = new World();
     const faction = createFaction(world, "player", { x: 0, y: 0 });
     const leader = spawnWalker(world, "player");
     world.add(faction, FactionState, { ...world.get(faction, FactionState)!, leaderId: leader });
 
-    guardianify(world, "player");
+    promoteHero(world, "player", "guardian");
 
     expect(world.get(leader, Walker)!.state).toBe("guardian");
   });
@@ -104,19 +142,19 @@ describe("guardianify", () => {
     world.add(leader, Walker, { strength: 3, state: "guardian", speed: 1 });
     world.add(faction, FactionState, { ...world.get(faction, FactionState)!, leaderId: leader });
 
-    guardianify(world, "player");
+    promoteHero(world, "player", "guardian");
 
     expect(world.get(leader, Walker)).toEqual({ strength: 3, state: "guardian", speed: 1 });
   });
 
-  it("re-specializes an existing knight leader into a guardian", () => {
+  it("re-specializes an existing ペルセウス leader into 守護者", () => {
     const world = new World();
     const faction = createFaction(world, "player", { x: 0, y: 0 });
     const leader = spawnWalker(world, "player");
-    world.add(leader, Walker, { strength: 3, state: "knight", speed: 1 });
+    world.add(leader, Walker, { strength: 3, state: "perseus", speed: 1 });
     world.add(faction, FactionState, { ...world.get(faction, FactionState)!, leaderId: leader });
 
-    guardianify(world, "player");
+    promoteHero(world, "player", "guardian");
 
     expect(world.get(leader, Walker)!.state).toBe("guardian");
   });
@@ -126,12 +164,12 @@ describe("guardianify", () => {
     createFaction(world, "player", { x: 0, y: 0 });
     spawnWalker(world, "player");
 
-    expect(() => guardianify(world, "player")).not.toThrow();
+    expect(() => promoteHero(world, "player", "guardian")).not.toThrow();
   });
 
   it("does nothing when the faction doesn't exist", () => {
     const world = new World();
 
-    expect(() => guardianify(world, "player")).not.toThrow();
+    expect(() => promoteHero(world, "player", "guardian")).not.toThrow();
   });
 });

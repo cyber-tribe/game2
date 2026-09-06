@@ -12,28 +12,71 @@ export interface Owner {
 }
 
 /**
- * "seeking", "knight", and "guardian" are driven by systems in this slice:
- * "knight" via knightTargetingSystem (hunts anywhere, burns houses),
- * "guardian" via guardianTargetingSystem (only engages threats near its own
- * faction's houses, captures normally) — both also get special-cased
+ * Which hero a promoted leader has become — see hero.ts's promoteHero and
+ * HERO_TRAITS in constants.ts.
+ *
+ * The four named ones are the original's own heroes
+ * (docs/original-miracles.md #3/#15/#19/#23), one per element, and they
+ * exist as separate kinds because each carries a *different* rule rather
+ * than a different number:
+ *
+ * - "perseus" — 「標準的な戦闘型で、敵地へ進んで攻撃する基準の英雄」.
+ *   This is exactly what game2 called 騎士 before they had names, kept
+ *   unchanged so the baseline it is the baseline *of* stays put.
+ * - "hercules" — 「戦闘力が最も高い。地割れに落ちない」. The counter to
+ *   an earthquake's crevice (systems/crevice.ts).
+ * - "odysseus" — 「移動速度が速い」. Compounds with a road
+ *   (systems/movement.ts), which is the only other thing that moves a
+ *   walker faster.
+ * - "achilles" — 「火が効かず焼死しない」. The counter to fire rain, and
+ *   so to a forest turned against its owner (game/fire.ts).
+ *
+ * "guardian" is game2's own, not the original's — a defensive hero that
+ * only engages threats near its own houses (see guardianTargetingSystem).
+ * The original has no such hero, but removing a working miracle to match a
+ * roster would be a loss, so it stays alongside them, like 平坦化 does
+ * among the terrain tools.
+ */
+export type HeroKind = "perseus" | "hercules" | "odysseus" | "achilles" | "guardian";
+
+/**
+ * "seeking" and the hero kinds are driven by systems in this slice: the
+ * four attacking heroes via heroAdvanceTargetingSystem (hunt anywhere, burn
+ * houses), "guardian" via guardianTargetingSystem (only engages threats near
+ * its own faction's houses, captures normally) — both also get special-cased
  * handling in houseCaptureSystem and drowning.ts's open-water immunity,
  * see isHeroState below. "traveling" and "fighting" remain placeholders.
  */
-export type WalkerState = "seeking" | "traveling" | "fighting" | "knight" | "guardian";
+export type WalkerState = "seeking" | "traveling" | "fighting" | HeroKind;
 
-/** Every WalkerState that promoteHero (hero.ts) can produce — see isHeroState. */
-const HERO_WALKER_STATES: readonly WalkerState[] = ["knight", "guardian"];
+/** Every HeroKind, in the order the toolbar lists them. */
+export const HERO_KINDS: readonly HeroKind[] = ["perseus", "hercules", "odysseus", "achilles", "guardian"];
 
 /**
- * Whether `state` is one of the hero states (see HERO_WALKER_STATES) —
+ * The attacking heroes: every kind that marches on the enemy and burns
+ * what it reaches, i.e. all of the original's own four. Kept as its own
+ * list rather than "everything except guardian" so that adding アドニス
+ * (#10) or トロイのヘレン (#28) — neither of which behaves like either —
+ * is a matter of deciding which list they join, not of discovering that
+ * the negation quietly swept them up.
+ */
+export const ADVANCING_HERO_KINDS: readonly HeroKind[] = ["perseus", "hercules", "odysseus", "achilles"];
+
+/** Whether `state` is an attacking hero — see ADVANCING_HERO_KINDS. */
+export function isAdvancingHeroState(state: WalkerState): boolean {
+  return (ADVANCING_HERO_KINDS as readonly string[]).includes(state);
+}
+
+/**
+ * Whether `state` is one of the hero states (see HERO_KINDS) —
  * shared by houseCaptureSystem (hero-specific capture/burn rules) and
  * drowning.ts (open-water immunity) so both stay in sync with whatever
  * hero kinds promoteHero actually produces, rather than each hardcoding
- * its own "knight" check. Notably NOT used by swampSystem: heroes drown
+ * its own per-kind check. Notably NOT used by swampSystem: heroes drown
  * in swamps just like anyone else.
  */
 export function isHeroState(state: WalkerState): boolean {
-  return HERO_WALKER_STATES.includes(state);
+  return (HERO_KINDS as readonly string[]).includes(state);
 }
 
 export interface Walker {
@@ -42,6 +85,19 @@ export interface Walker {
   state: WalkerState;
   /** Tiles per second. */
   speed: number;
+  /**
+   * What this walker's strength and speed were before any hero miracle
+   * multiplied them (see hero.ts's promoteHero and HERO_TRAITS). Absent on
+   * a walker that has never been promoted.
+   *
+   * Kept so re-specializing from one hero to another re-derives both
+   * numbers from the same base instead of compounding: without it, a
+   * leader cycled ヘラクレス → オディッセウス → ヘラクレス would come out
+   * four times as strong as one that was simply cast ヘラクレス once, and
+   * the cheapest path to the strongest hero would be to buy every other
+   * hero first.
+   */
+  heroBase?: { strength: number; speed: number };
 }
 
 /** Where a Position-having entity is currently walking to. Removed on arrival. */

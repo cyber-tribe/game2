@@ -65,7 +65,7 @@ describe("gatherTargetingSystem", () => {
     const world = new World();
     const leader = spawnWalker(world, "player", 9, 9);
     const knight = spawnWalker(world, "player", 2, 2);
-    world.add(knight, Walker, { strength: 1, state: "knight", speed: 1 });
+    world.add(knight, Walker, { strength: 1, state: "perseus", speed: 1 });
     createFactionState(world, "player", leader);
 
     gatherTargetingSystem(world, 1);
@@ -168,7 +168,7 @@ describe("hasOtherSeekingWalkers", () => {
     const world = new World();
     const leader = spawnWalker(world, "player", 0, 0);
     const knight = spawnWalker(world, "player", 5, 5);
-    world.add(knight, Walker, { strength: 1, state: "knight", speed: 1 });
+    world.add(knight, Walker, { strength: 1, state: "perseus", speed: 1 });
 
     expect(hasOtherSeekingWalkers(world, "player", leader)).toBe(false);
   });

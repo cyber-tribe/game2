@@ -1,6 +1,6 @@
 import type { Entity, System, World } from "../../ecs";
 import { COMBAT_RANGE, HERO_ACTION_COOLDOWN, HOUSE_LEVELS } from "../constants";
-import { HeroCooldown, House, Owner, Position, Walker, type FactionId } from "../components";
+import { HeroCooldown, House, Owner, Position, Walker, isAdvancingHeroState, type FactionId } from "../components";
 import type { OnImpactEffect } from "./effects";
 import { distance, type Point } from "./geometry";
 
@@ -71,7 +71,7 @@ function resolveWalkerFight(world: World, a: Entity, b: Entity, onImpact: OnImpa
 export interface HouseCaptureConfig {
   /** Called when an attacker's strength beats a house's defense and takes it over. */
   onCapture: (attackerFaction: FactionId) => void;
-  /** Called when a knight burns a house down instead of capturing it. */
+  /** Called when an attacking hero burns a house down instead of capturing it. */
   onBurn: (attackerFaction: FactionId) => void;
   /** Called once per capture/burn/repel — see systems/effects.ts. */
   onImpact: OnImpactEffect;
@@ -85,8 +85,9 @@ export interface HouseCaptureConfig {
  * per docs/game-system.md a house fight always ends with capture or the
  * attacker's defeat, never a draw that leaves both sides as they were.
  *
- * The two hero kinds (see isHeroState) are the exceptions:
- * - A knight, per docs/game-system.md "敵の...家を（奪わず）焼き払う",
+ * Heroes (see isHeroState) are the exceptions:
+ * - An attacking hero (see ADVANCING_HERO_KINDS), per docs/game-system.md
+ *   "敵の...家を（奪わず）焼き払う",
  *   burns the house down (destroys it outright, regardless of defense)
  *   rather than capturing it, and survives to keep marching
  *   ("指示に依存せず戦い続ける").
@@ -95,7 +96,7 @@ export interface HouseCaptureConfig {
  *   walker) but survives a successful capture instead of being consumed by
  *   it — a defender that holds what it takes rather than a raider that
  *   burns and moves on.
- * Both hero kinds get a HeroCooldown after resolving a house — see that
+ * Every hero gets a HeroCooldown after resolving a house — see that
  * component's doc comment.
  */
 export function createHouseCaptureSystem(config: Partial<HouseCaptureConfig> = {}): System {
@@ -115,12 +116,12 @@ export function createHouseCaptureSystem(config: Partial<HouseCaptureConfig> = {
         const housePos = world.get(houseEntity, Position)!;
         if (!withinRange(walkerPos, housePos)) continue;
 
-        if (walker.state === "knight") {
+        if (isAdvancingHeroState(walker.state)) {
           world.destroyEntity(houseEntity);
           onImpact({ position: housePos, type: "houseBurned" });
           onBurn(walkerOwner.faction);
-          // See HeroCooldown's doc comment / knightTargetingSystem — without
-          // this a knight instantly marches on to its next-nearest target.
+          // See HeroCooldown's doc comment / heroAdvanceTargetingSystem —
+          // without this a hero instantly marches on to its next target.
           world.add(walkerEntity, HeroCooldown, { remaining: HERO_ACTION_COOLDOWN });
           break;
         }

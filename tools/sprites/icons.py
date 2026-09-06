@@ -309,7 +309,10 @@ ICONS.update({
     # it produces are recognizably the same thing.
     # Upright, thick, and the same blade the promoted walker carries. The
     # old icon ran a 1px diagonal across the tile and read as a scratch.
-    "knight": [
+    # ペルセウス: the blade the nameless 騎士 carried before the heroes had
+    # names. Unchanged on purpose — the original's "基準の英雄" should look
+    # like the thing the other three are measured against.
+    "perseus": [
         "................",
         ".......oo.......",
         "......oSSo......",
@@ -326,6 +329,63 @@ ICONS.update({
         ".....obbbbo.....",
         ".....oBBBBo.....",
         "......oooo......",
+    ],
+    # ヘラクレス: a studded mace. Mass at the top, like the walker's own club.
+    "hercules": [
+        "................",
+        "....oooooooo....",
+        "...oBBBBBBBBo...",
+        "...oBbbSbbbBo...",
+        "...oBbSbbSbBo...",
+        "...oBbbbbbbBo...",
+        "...oBbbbSbbBo...",
+        "...oBBBBBBBBo...",
+        "....oooooooo....",
+        "......oddo......",
+        "......oddo......",
+        "......oddo......",
+        "......oddo......",
+        "......oddo......",
+        "......oddo......",
+        "......oooo......",
+    ],
+    # オディッセウス: a strung bow — the only curve in the panel.
+    "odysseus": [
+        "......o.........",
+        ".....oBo........",
+        "...oBo.S........",
+        "..oBo..S........",
+        ".oBo...S........",
+        ".oBo...S........",
+        ".oBo...Sooooooo.",
+        ".oBo...Sssssssso",
+        ".oBo...Sooooooo.",
+        ".oBo...S........",
+        ".oBo...S........",
+        "..oBo..S........",
+        "...oBo.S........",
+        ".....oBo........",
+        "......o.........",
+        "................",
+    ],
+    # アキレス: a spear whose head burns. Fire cannot kill him; he carries it.
+    "achilles": [
+        "........o.......",
+        ".......oro......",
+        "......orbro.....",
+        "......orbro.....",
+        "......orrro.....",
+        ".......oro......",
+        ".......oBo......",
+        ".......odo......",
+        ".......odo......",
+        ".......odo......",
+        ".......odo......",
+        ".......odo......",
+        ".......odo......",
+        ".......odo......",
+        ".......odo......",
+        ".......ooo......",
     ],
     "guardian": [
         "................",
@@ -614,7 +674,10 @@ ICON_KINDS = (
     "shrine",
     "earthquake",
     "swamp",
-    "knight",
+    "perseus",
+    "hercules",
+    "odysseus",
+    "achilles",
     "guardian",
     "forest",
     "flower",

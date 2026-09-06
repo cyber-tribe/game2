@@ -12,7 +12,10 @@ import {
   FUNGUS_MANA_COST,
   TSUNAMI_MANA_COST,
   GUARDIAN_MANA_COST,
-  KNIGHT_MANA_COST,
+  PERSEUS_MANA_COST,
+  HERCULES_MANA_COST,
+  ODYSSEUS_MANA_COST,
+  ACHILLES_MANA_COST,
   MAX_MANA,
   SHRINE_MOVE_MANA_COST,
   SWAMP_MANA_COST,
@@ -25,6 +28,21 @@ import type { EnemyMiracleEvent } from "./game/systems/enemyMiracles";
 import { trySpendMana } from "./game/faction";
 import { drownFlood } from "./game/flood";
 import { Simulation, type GameOutcome, type InspectableEntity, type MatchEvent } from "./game/simulation";
+import type { HeroKind } from "./game/components";
+
+/**
+ * What each hero miracle costs. One table rather than five branches: the
+ * heroes are the same action ("promote the leader") at five prices, and
+ * both the toolbar's affordability dimming and applyTool's own dispatch
+ * read it, so a new hero cannot be added to one and forgotten in the other.
+ */
+const HERO_MANA_COST: Record<HeroKind, number> = {
+  perseus: PERSEUS_MANA_COST,
+  hercules: HERCULES_MANA_COST,
+  odysseus: ODYSSEUS_MANA_COST,
+  achilles: ACHILLES_MANA_COST,
+  guardian: GUARDIAN_MANA_COST,
+};
 import { collapseSwampsNear, createSwamp } from "./game/swamp";
 import { burnFire } from "./game/fire";
 import { eruptVolcano } from "./game/volcano";
@@ -217,13 +235,13 @@ async function bootstrap(world: WorldDefinition) {
   const showEntityInfo = (text: string, tone: "neutral" | "warning" = "neutral") => showPanelMessage(text, 4000, tone);
 
   // Mirrors the shake magnitudes applyTool uses for the player's own casts
-  // of the same miracles (knight/guardian have no player-side shake to
+  // of the same miracles (the hero miracles have no player-side shake to
   // match, so keep their own small, hero-scale values).
   const ENEMY_SHAKE_MAGNITUDE: Record<EnemyMiracleEvent["type"], number> = {
     armageddon: 10,
     volcano: 8,
     earthquake: 6,
-    knight: 3,
+    perseus: 3,
     guardian: 3,
   };
 
@@ -761,23 +779,19 @@ async function bootstrap(world: WorldDefinition) {
       return;
     }
 
-    if (toolMode === "knight") {
-      // Also a global effect (it acts on the leader, not the tapped spot).
-      if (!trySpendPlayerMana(KNIGHT_MANA_COST)) return;
-      simulation.knightify("player");
-      simulation.recordEvent("player", "knight");
-      vibrate(30);
-      playMiracleSound("knight");
-      return;
-    }
-
-    if (toolMode === "guardian") {
-      // Also a global effect (it acts on the leader, not the tapped spot).
-      if (!trySpendPlayerMana(GUARDIAN_MANA_COST)) return;
-      simulation.guardianify("player");
-      simulation.recordEvent("player", "guardian");
-      vibrate(25);
-      playMiracleSound("guardian");
+    // Every hero miracle is the same action with a different name — a
+    // global effect on the leader, not on the tapped spot — so they share
+    // one branch rather than five copies. Which hero the player actually
+    // gets is entirely HERO_TRAITS plus the systems that own each rule
+    // (see game/hero.ts).
+    const heroCost = HERO_MANA_COST[toolMode as HeroKind];
+    if (heroCost !== undefined) {
+      const kind = toolMode as HeroKind;
+      if (!trySpendPlayerMana(heroCost)) return;
+      simulation.promoteHero("player", kind);
+      simulation.recordEvent("player", kind);
+      vibrate(kind === "guardian" ? 25 : 30);
+      playMiracleSound(kind);
       return;
     }
 
@@ -1081,8 +1095,7 @@ async function bootstrap(world: WorldDefinition) {
     shrine: SHRINE_MOVE_MANA_COST,
     earthquake: EARTHQUAKE_MANA_COST,
     swamp: SWAMP_MANA_COST,
-    knight: KNIGHT_MANA_COST,
-    guardian: GUARDIAN_MANA_COST,
+    ...HERO_MANA_COST,
     volcano: VOLCANO_MANA_COST,
     forest: FOREST_MANA_COST,
     flower: FLOWER_MANA_COST,

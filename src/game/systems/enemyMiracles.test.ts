@@ -7,7 +7,7 @@ import {
   ARMAGEDDON_POPULATION_RATIO,
   EARTHQUAKE_MANA_COST,
   GUARDIAN_MANA_COST,
-  KNIGHT_MANA_COST,
+  PERSEUS_MANA_COST,
   VOLCANO_MANA_COST,
   VOLCANO_POPULATION_RATIO,
 } from "../constants";
@@ -141,7 +141,7 @@ describe("createEnemyMiracleSystem", () => {
     const leader = createWalker(world, "enemy");
     world.add(enemy, FactionState, {
       ...world.get(enemy, FactionState)!,
-      mana: KNIGHT_MANA_COST,
+      mana: PERSEUS_MANA_COST,
       leaderId: leader,
     });
     createFaction(world, "player", { x: 9, y: 9 });
@@ -154,9 +154,9 @@ describe("createEnemyMiracleSystem", () => {
       onAction: (event) => events.push(event),
     })(world, 8);
 
-    expect(world.get(leader, Walker)!.state).toBe("knight");
+    expect(world.get(leader, Walker)!.state).toBe("perseus");
     expect(world.get(enemy, FactionState)!.mana).toBe(0);
-    expect(events).toEqual([{ type: "knight" }]);
+    expect(events).toEqual([{ type: "perseus" }]);
   });
 
   it("guardians instead of knighting its leader when meaningfully behind on population", () => {
@@ -185,7 +185,7 @@ describe("createEnemyMiracleSystem", () => {
     const world = new World();
     const enemy = createFaction(world, "enemy", { x: 0, y: 0 }, "fight");
     const leader = createWalker(world, "enemy");
-    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: KNIGHT_MANA_COST, leaderId: leader });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: PERSEUS_MANA_COST, leaderId: leader });
     createHouse(world, "enemy", 0, 0, 5);
     createFaction(world, "player", { x: 9, y: 9 });
     createHouse(world, "player", 9, 9, 20);
@@ -194,7 +194,7 @@ describe("createEnemyMiracleSystem", () => {
       decisionInterval: 8,
       heightmap: flatHeightmap(10, 10, 5),
       worldCenter: WORLD_CENTER,
-      allowedMiracles: ["earthquake", "knight"], // guardian deliberately absent
+      allowedMiracles: ["earthquake", "perseus"], // guardian deliberately absent
     })(world, 8);
 
     // The AI's read of the fight ("we're behind, defend") isn't unlocked as
@@ -223,17 +223,17 @@ describe("createEnemyMiracleSystem", () => {
   it("does not knight an already-knighted leader", () => {
     const world = new World();
     const enemy = createFaction(world, "enemy", { x: 0, y: 0 }, "fight");
-    const leader = createWalker(world, "enemy", "knight");
+    const leader = createWalker(world, "enemy", "perseus");
     world.add(enemy, FactionState, {
       ...world.get(enemy, FactionState)!,
-      mana: KNIGHT_MANA_COST,
+      mana: PERSEUS_MANA_COST,
       leaderId: leader,
     });
     createFaction(world, "player", { x: 9, y: 9 });
 
     createEnemyMiracleSystem({ decisionInterval: 8, heightmap: flatHeightmap(10, 10, 5), worldCenter: WORLD_CENTER })(world, 8);
 
-    expect(world.get(enemy, FactionState)!.mana).toBe(KNIGHT_MANA_COST); // untouched — nothing to knight
+    expect(world.get(enemy, FactionState)!.mana).toBe(PERSEUS_MANA_COST); // untouched — nothing to knight
   });
 
   it("casts an earthquake on a random opponent house when nothing higher-priority applies", () => {
@@ -367,7 +367,7 @@ describe("createEnemyMiracleSystem", () => {
     const world = new World();
     const enemy = createFaction(world, "enemy", { x: 0, y: 0 }, "fight");
     const leader = createWalker(world, "enemy");
-    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: KNIGHT_MANA_COST, leaderId: leader });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: PERSEUS_MANA_COST, leaderId: leader });
     createFaction(world, "player", { x: 9, y: 9 });
     createHouse(world, "player", 5, 5);
 
@@ -499,7 +499,7 @@ describe("createEnemyMiracleSystem personality tuning", () => {
     const world = new World();
     const enemy = createFaction(world, "enemy", { x: 0, y: 0 }, "fight");
     const leader = createWalker(world, "enemy");
-    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: KNIGHT_MANA_COST, leaderId: leader });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: PERSEUS_MANA_COST, leaderId: leader });
     createHouse(world, "enemy", 0, 0, 8);
     createFaction(world, "player", { x: 9, y: 9 });
     createHouse(world, "player", 9, 9, 10); // ratio (8+1 leader)/10 = 0.9 -> "behind" under balanced (<1), but not under aggressive's <0.7
@@ -513,8 +513,8 @@ describe("createEnemyMiracleSystem personality tuning", () => {
       onAction: (event) => events.push(event),
     })(world, 8);
 
-    expect(world.get(leader, Walker)!.state).toBe("knight");
-    expect(events).toEqual([{ type: "knight" }]);
+    expect(world.get(leader, Walker)!.state).toBe("perseus");
+    expect(events).toEqual([{ type: "perseus" }]);
   });
 
   it("a defensive personality guardians its leader where balanced would prefer knight", () => {

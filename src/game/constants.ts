@@ -1,5 +1,5 @@
 import type { TerrainEditRule, TerrainType } from "../world/heightmap";
-import type { HouseLevel } from "./components";
+import type { HeroKind, HouseLevel } from "./components";
 import type { EnemyPersonality } from "./worlds";
 
 /** Tiles per second for a freshly spawned walker. */
@@ -246,12 +246,44 @@ export const SWAMP_RADIUS = 1.2;
 export const SWAMP_CAPACITY = 5;
 
 /**
- * Mana cost of knighting the leader — "大" tier, on par with a volcano:
- * a single relentless attacker that keeps destroying enemy walkers and
- * houses without further mana until it's killed (though, like anyone
- * else, it can still drown in a swamp — see systems/swamp.ts).
+ * Mana cost of turning the leader into ペルセウス — "大" tier, on par with
+ * a volcano: a single relentless attacker that keeps destroying enemy
+ * walkers and houses without further mana until it's killed (though, like
+ * anyone else, it can still drown in a swamp — see systems/swamp.ts).
+ *
+ * Unchanged from what 騎士化 cost before the heroes had names. ペルセウス
+ * is the original's own "基準の英雄" (docs/original-miracles.md #3), and a
+ * baseline that moved when it was renamed would be no baseline at all: the
+ * other three are priced against this one.
  */
-export const KNIGHT_MANA_COST = 35;
+export const PERSEUS_MANA_COST = 35;
+
+/**
+ * Mana cost of ヘラクレス — the priciest hero, and the only one that is
+ * simply *better* in a fight (HERO_TRAITS gives it double strength) rather
+ * than better at one specific thing. It also walks over an earthquake's
+ * crevices unharmed (systems/crevice.ts), which is what makes it worth
+ * more than the strength alone: it is the answer to a map the enemy has
+ * already torn open, where every other hero has to walk around.
+ */
+export const HERCULES_MANA_COST = 50;
+
+/**
+ * Mana cost of オディッセウス — the cheapest hero. Speed alone wins no
+ * fight it would otherwise lose, and priced any higher nobody would take
+ * mobility over ペルセウス's plain reliability. Cheap enough to be the
+ * hero you cast when the enemy is far away and the map is wide.
+ */
+export const ODYSSEUS_MANA_COST = 30;
+
+/**
+ * Mana cost of アキレス — above ペルセウス, below ヘラクレス. Fire
+ * immunity is worth nothing at all against an enemy who never casts fire,
+ * and decisive against one who does: an アキレス walks through their own
+ * forest as it burns (game/fire.ts). Situational power is priced between
+ * "reliable" and "simply stronger".
+ */
+export const ACHILLES_MANA_COST = 40;
 
 /**
  * Mana cost of turning the leader into a guardian — "中〜大" tier, cheaper
@@ -261,6 +293,34 @@ export const KNIGHT_MANA_COST = 35;
  * guardianify/systems/hero.ts's guardianTargetingSystem.
  */
 export const GUARDIAN_MANA_COST = 25;
+
+/**
+ * What each hero kind multiplies its leader's strength and speed by when
+ * the miracle lands — see hero.ts's promoteHero.
+ *
+ * Only ヘラクレス and オディッセウス move a number at all; every other
+ * hero's identity is a *rule* somewhere else (アキレス does not burn,
+ * ペルセウス and 守護者 differ in where they will go), which is the whole
+ * reason the original's heroes read as different characters rather than as
+ * one hero at four price points. A stat table is the wrong shape for most
+ * of what makes them different, so it deliberately holds only the two
+ * traits that genuinely are numbers.
+ *
+ * ペルセウス and 守護者 sit at 1x on purpose: they are exactly the 騎士 and
+ * 守護者 that already existed, so no existing match plays differently for
+ * having renamed them.
+ */
+export const HERO_TRAITS: Record<HeroKind, { strength: number; speed: number }> = {
+  // 「戦闘力が最も高い」 — the one hero that simply out-fights the others.
+  hercules: { strength: 2, speed: 1 },
+  // 「移動速度が速い」. Compounds with ROAD_SPEED_MULTIPLIER rather than
+  // replacing it: an オディッセウス on a road is the fastest thing on the
+  // map, which is exactly the reading of two mobility effects meeting.
+  odysseus: { strength: 1, speed: 1.8 },
+  perseus: { strength: 1, speed: 1 },
+  achilles: { strength: 1, speed: 1 },
+  guardian: { strength: 1, speed: 1 },
+};
 
 /**
  * Distance (in tiles) from any of a faction's own houses within which a

@@ -1,5 +1,5 @@
 import { Container, Graphics, Sprite } from "pixi.js";
-import { Drowning, FactionState, House, MoveTarget, Owner, Position, Swamp, Walker, type FactionId } from "../game/components";
+import { Drowning, FactionState, House, MoveTarget, Owner, Position, Swamp, Walker, isHeroState, type FactionId, type HeroKind } from "../game/components";
 import type { Entity, World } from "../ecs";
 import { FARMLAND_RADIUS, IMPACT_EFFECT_DURATION } from "../game/constants";
 import { distance, type Point } from "../game/systems/geometry";
@@ -359,7 +359,7 @@ export class EntityLayer {
       const walker = world.get(entity, Walker)!;
       const { sx, sy } = this.iso.project(pos.x, pos.y);
       const isLeader = leaderIds.has(entity);
-      const heroKind = walker.state === "knight" || walker.state === "guardian" ? walker.state : undefined;
+      const heroKind = isHeroState(walker.state) ? (walker.state as HeroKind) : undefined;
       const pixelSize = isLeader ? LEADER_PIXEL_SIZE : WALKER_PIXEL_SIZE;
 
       const frame = walkCycle(this.elapsedTime, pos);

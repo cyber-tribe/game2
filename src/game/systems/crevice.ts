@@ -25,11 +25,11 @@ export interface CreviceConfig {
  * whole difference between this and the old earthquake, which churned the
  * ground and then stopped mattering.
  *
- * Heroes die here like anyone else for now. The original gives ヘラクレス
- * (#15) immunity to exactly this, which is a reason to check hero kind
- * here once the six named heroes exist — deliberately not anticipated,
- * since guessing at it now would mean writing a rule for a hero that
- * doesn't exist yet.
+ * ヘラクレス is the one exception, per the original's own 「地割れに
+ * 落ちない」 (docs/original-miracles.md #15) — this is the other half of
+ * the earthquake, and the reason the priciest hero is worth its price on a
+ * map somebody has already torn open. Every other hero dies here like
+ * anyone else; nothing else checks isHeroState.
  */
 export function createCreviceSystem(config: Partial<CreviceConfig> = {}): System {
   const onImpact = config.onImpact ?? (() => {});
@@ -39,6 +39,8 @@ export function createCreviceSystem(config: Partial<CreviceConfig> = {}): System
     if (!heightmap) return;
 
     for (const entity of world.query(Walker, Position)) {
+      if (world.get(entity, Walker)!.state === "hercules") continue;
+
       const pos = world.get(entity, Position)!;
       if (!isCrevice(heightmap, pos.x, pos.y)) continue;
 

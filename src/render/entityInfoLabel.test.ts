@@ -21,10 +21,10 @@ describe("describeInspectableEntity", () => {
       faction: "enemy",
       position: { x: 1, y: 1 },
       strength: 1,
-      state: "knight",
+      state: "perseus",
     });
 
-    expect(text).toBe("敵のウォーカー 強さ1.0（騎士化済み）");
+    expect(text).toBe("敵のウォーカー 強さ1.0（ペルセウス）");
   });
 
   it("describes a house with its level, population, and capacity", () => {

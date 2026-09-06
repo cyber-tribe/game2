@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../ecs";
-import { House, Owner, Position, Walker } from "./components";
+import { House, Owner, Position, Walker, type WalkerState } from "./components";
 import { burnFire } from "./fire";
 
 function createHouse(world: World, x: number, y: number) {
@@ -11,11 +11,11 @@ function createHouse(world: World, x: number, y: number) {
   return entity;
 }
 
-function createWalker(world: World, x: number, y: number) {
+function createWalker(world: World, x: number, y: number, state: WalkerState = "seeking") {
   const entity = world.createEntity();
   world.add(entity, Position, { x, y });
   world.add(entity, Owner, { faction: "player" });
-  world.add(entity, Walker, { strength: 1, state: "seeking", speed: 1 });
+  world.add(entity, Walker, { strength: 1, state, speed: 1 });
   return entity;
 }
 
@@ -73,5 +73,43 @@ describe("burnFire", () => {
     burnFire(world, [{ x: 5, y: 5 }], (event) => types.push(event.type));
 
     expect(new Set(types)).toEqual(new Set(["houseBurned", "combatDeath"]));
+  });
+});
+
+describe("burnFire — アキレス", () => {
+  /**
+   * 「火が効かず焼死しない」 (docs/original-miracles.md #23) — the other
+   * half of fire rain, and so the answer to a forest turned against its
+   * owner (docs/original-miracles.md's 森 → 火の雨).
+   */
+  it("leaves an アキレス standing in the fire", () => {
+    const world = new World();
+    const hero = createWalker(world, 5, 5, "achilles");
+
+    burnFire(world, [{ x: 5, y: 5 }]);
+
+    expect(world.isAlive(hero)).toBe(true);
+  });
+
+  it("still burns every other hero", () => {
+    const world = new World();
+    for (const state of ["perseus", "hercules", "odysseus", "guardian"] as const) {
+      createWalker(world, 5, 5, state);
+    }
+
+    burnFire(world, [{ x: 5, y: 5 }]);
+
+    expect(world.query(Walker)).toHaveLength(0);
+  });
+
+  /** The hero survives; what they were defending does not. */
+  it("burns the house an アキレス is standing on all the same", () => {
+    const world = new World();
+    createWalker(world, 5, 5, "achilles");
+    createHouse(world, 5, 5);
+
+    burnFire(world, [{ x: 5, y: 5 }]);
+
+    expect(world.query(House)).toHaveLength(0);
   });
 });

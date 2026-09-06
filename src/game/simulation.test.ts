@@ -145,7 +145,7 @@ describe("Simulation", () => {
     });
     const aggressiveLeader = setUpBehindEnemy(aggressive);
     aggressive.update(1);
-    expect(aggressive.world.get(aggressiveLeader, Walker)!.state).toBe("knight"); // aggressive only turtles below ratio 0.7
+    expect(aggressive.world.get(aggressiveLeader, Walker)!.state).toBe("perseus"); // aggressive only turtles below ratio 0.7
   });
 
   it("lists every walker as an InspectableEntity with its faction/strength/state", () => {
@@ -422,7 +422,7 @@ describe("Simulation", () => {
     const knight = sim.world.createEntity();
     sim.world.add(knight, Position, { x: 5, y: 5 });
     sim.world.add(knight, Owner, { faction: "player" });
-    sim.world.add(knight, Walker, { strength: 1, state: "knight", speed: 1 });
+    sim.world.add(knight, Walker, { strength: 1, state: "perseus", speed: 1 });
 
     sim.update(0.1);
 
@@ -453,7 +453,7 @@ describe("Simulation", () => {
     const [playerWalker] = sim.world.query(Walker, Owner).filter((e) => sim.world.get(e, Owner)!.faction === "player");
     sim.world.add(playerState, FactionState, { ...sim.world.get(playerState, FactionState)!, leaderId: playerWalker });
 
-    sim.guardianify("player");
+    sim.promoteHero("player", "guardian");
 
     expect(sim.world.get(playerWalker, Walker)!.state).toBe("guardian");
   });
@@ -697,20 +697,20 @@ describe("Simulation", () => {
   it("a knighted leader hunts down the enemy regardless of behaviorMode, and survives the kill", () => {
     const sim = new Simulation({ worldWidth: 4, worldHeight: 4, initialWalkersPerFaction: 1 });
     // The lone walker starts right at its own faction's shrine, so a brief
-    // gather pass promotes it to leader before knightify needs one.
+    // gather pass promotes it to leader before promoteHero needs one.
     sim.setBehaviorMode("player", "gather");
     sim.update(0.001);
-    sim.knightify("player");
+    sim.promoteHero("player", "perseus");
 
     const [playerWalker] = sim.world.query(Walker, Owner).filter((e) => sim.world.get(e, Owner)!.faction === "player");
-    expect(sim.world.get(playerWalker, Walker)!.state).toBe("knight");
+    expect(sim.world.get(playerWalker, Walker)!.state).toBe("perseus");
     // Overwhelming strength removes any doubt about walker-vs-walker combat
     // (an exact tie would destroy both sides) — this test is about the
     // knight's unconditional targeting/burning wiring, not combat math,
     // which walkerCombatSystem/houseCaptureSystem already cover on their own.
     sim.world.add(playerWalker, Walker, { ...sim.world.get(playerWalker, Walker)!, strength: 999 });
 
-    // Generous budget: knightTargetingSystem/fightTargetingSystem lock onto
+    // Generous budget: heroAdvanceTargetingSystem/fightTargetingSystem lock onto
     // a snapshot of the enemy's position rather than tracking it live, so if
     // the enemy walker is still wandering when the knight locks on, the
     // knight can arrive at an already-stale, empty spot and only then
@@ -727,7 +727,7 @@ describe("Simulation", () => {
 
     const playerWalkers = sim.world.query(Walker, Owner).filter((e) => sim.world.get(e, Owner)!.faction === "player");
     expect(playerWalkers).toHaveLength(1);
-    expect(sim.world.get(playerWalkers[0], Walker)!.state).toBe("knight");
+    expect(sim.world.get(playerWalkers[0], Walker)!.state).toBe("perseus");
   });
 
   it("armageddon abandons every house, sends both factions to the center, and forces the game to a conclusion", () => {

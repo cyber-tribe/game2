@@ -163,7 +163,7 @@ describe("houseCaptureSystem", () => {
   it("a knight burns an enemy house down instead of capturing it, even a strong one", () => {
     const world = new World();
     const house = createHouse(world, "enemy", 0, 0, "castle");
-    const knight = createWalker(world, "player", 0, 0, 1, "knight"); // far below castle's defense
+    const knight = createWalker(world, "player", 0, 0, 1, "perseus"); // far below castle's defense
 
     const burned: FactionId[] = [];
     const captured: FactionId[] = [];
@@ -181,7 +181,7 @@ describe("houseCaptureSystem", () => {
   it("a knight survives after burning a house and can keep marching", () => {
     const world = new World();
     createHouse(world, "enemy", 0, 0);
-    const knight = createWalker(world, "player", 0, 0, 1, "knight");
+    const knight = createWalker(world, "player", 0, 0, 1, "perseus");
 
     createHouseCaptureSystem()(world, 0);
 
@@ -191,7 +191,7 @@ describe("houseCaptureSystem", () => {
   it("puts a knight on HeroCooldown after it burns a house, so it can't instantly march on", () => {
     const world = new World();
     createHouse(world, "enemy", 0, 0);
-    const knight = createWalker(world, "player", 0, 0, 1, "knight");
+    const knight = createWalker(world, "player", 0, 0, 1, "perseus");
 
     createHouseCaptureSystem()(world, 0);
 
@@ -272,7 +272,7 @@ describe("houseCaptureSystem", () => {
   it("reports a houseBurned impact at the house's position when a knight burns it", () => {
     const world = new World();
     createHouse(world, "enemy", 1, 2, "castle");
-    createWalker(world, "player", 1, 2, 1, "knight");
+    createWalker(world, "player", 1, 2, 1, "perseus");
 
     const impacts: ImpactEffectEvent[] = [];
     createHouseCaptureSystem({ onImpact: (event) => impacts.push(event) })(world, 0);
