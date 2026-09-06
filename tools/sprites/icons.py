@@ -1,0 +1,556 @@
+"""Draws the command-panel icons.
+
+Replaces the procedural drawing in src/ui/pixelIcons.ts (fillCircle,
+drawLine, fillMountain and friends). Held up against the panel at actual
+size, roughly half of those icons did not read: 集結, 戦闘, 地震, 最終決戦
+and 騎士化 were sparse scatterings of pixels with no recognizable
+silhouette, and nearly all of them used tones close enough to the stone
+button field that they washed out.
+
+Written as explicit 16x16 patterns rather than as drawing calls. At this
+size an icon *is* its pixels — there is no shape to compute — so the
+pattern is both the source and the review artifact. Two rules run through
+all of them:
+
+1. **Every icon has an ink outline.** The button field is mid-tone stone
+   (#7f6f4d); anything without a dark edge sinks into it.
+2. **The silhouette carries the meaning.** Color is a second channel
+   (lava orange, water teal, faction blue), never the only one — the panel
+   dims disabled buttons, and an icon that relied on hue would stop
+   reading exactly when the player most needs to know what it is.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+from PIL import Image
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from palette import Palette  # noqa: E402
+
+from .canvas import RGB, Canvas  # noqa: E402
+
+ICON_SIZE = 16
+"""Unchanged from the old pixelIcons.ts: the panel's buttons are already
+sized around a 16px icon, and this pass is about legibility, not scale."""
+
+# Character legend, resolved against the shared palette in _tones().
+#
+#   o ink outline    S stone highlight   s stone light    d stone dark
+#   b bronze light   B bronze mid        w water light    W water mid
+#   g grass          r warning red       m mana           M mana highlight
+#   k skin           f faction blue
+LEGEND = {
+    "o": "ink",
+    "S": "stoneHighlight",
+    "s": "stoneLight",
+    "d": "stoneDark",
+    "b": "bronzeLight",
+    "B": "bronzeMid",
+    "w": "waterLight",
+    "W": "waterMid",
+    "g": "grassMid",
+    "r": "warning",
+    "m": "manaAccent",
+    "M": "manaHighlight",
+    "f": "playerAccent",
+}
+
+SKIN: RGB = (0xE0, 0xB8, 0x8A)
+
+
+def _tones(palette: Palette) -> dict[str, RGB]:
+    tones = {key: palette.rgb(name) for key, name in LEGEND.items()}
+    tones["k"] = SKIN
+    return tones
+
+
+# Terrain tools. raise/lower/flatten share one mountain so the three read as
+# a set acting on the same thing, differing only in the arrow.
+ICONS: dict[str, list[str]] = {
+    "raise": [
+        "................",
+        ".......oo.......",
+        "......oSSo......",
+        ".....oSSSSo.....",
+        "....oSSSSSSo....",
+        "...ooooSSoooo...",
+        "......oSSo......",
+        "......oSSo......",
+        "......oooo......",
+        "................",
+        "......oooo......",
+        ".....oSSddo.....",
+        "...ooSSSdddoo...",
+        "..oSSSSSddddo...",
+        ".oSSSSSSdddddo..",
+        ".oooooooooooooo.",
+    ],
+    "lower": [
+        "................",
+        "......oooo......",
+        "......oSSo......",
+        "......oSSo......",
+        "...ooooSSoooo...",
+        "....oSSSSSSo....",
+        ".....oSSSSo.....",
+        "......oSSo......",
+        ".......oo.......",
+        "................",
+        "......oooo......",
+        ".....oSSddo.....",
+        "...ooSSSdddoo...",
+        "..oSSSSSddddo...",
+        ".oSSSSSSdddddo..",
+        ".oooooooooooooo.",
+    ],
+    "flatten": [
+        "................",
+        "..oooo....oooo..",
+        "..obbo....obbo..",
+        "..obbo....obbo..",
+        ".oobbboo.oobbboo",
+        ".obbbbbo.obbbbbo",
+        "..obbbo...obbbo.",
+        "...obo.....obo..",
+        "....o.......o...",
+        "................",
+        "..oooooooooooo..",
+        ".oSSSSSSSSSSSSo.",
+        ".oSSSSSSSSSSSSo.",
+        ".oddddddddddddo.",
+        "..oooooooooooo..",
+        "................",
+    ],
+    # A slab split by a crack that actually runs through it. The old icon
+    # scattered short strokes across the tile with no ground under them, so
+    # there was nothing for the crack to be a crack *in*.
+    "earthquake": [
+        "................",
+        "................",
+        ".........oo.....",
+        "........oo......",
+        "..oooooooooooo..",
+        ".oSSSSSSoSSSSSo.",
+        ".oSSSSSoSSSSSSo.",
+        ".oSSSSSSoSSSSSo.",
+        ".oSSSSSSSoSSSSo.",
+        ".oddddddoddddddo",
+        ".odddddoddddddo.",
+        ".oddddddoddddddo",
+        "..ooooooooooooo.",
+        "......oo........",
+        ".......oo.......",
+        "................",
+    ],
+    "swamp": [
+        "................",
+        "................",
+        "....oo....oo....",
+        "...oMo...oMo....",
+        "....o.....o.....",
+        "..oooooooooooo..",
+        ".odddmdddmdddo..",
+        "odmdddmdddddmdo.",
+        "odddoddddoddddo.",
+        "odmdddddmddddo..",
+        ".oddmdddddmddo..",
+        "..odddmdddddo...",
+        "...ooddddddo....",
+        ".....oooooo.....",
+        "................",
+        "................",
+    ],
+    # A dark rock cone with a bright plume over it. The first version made
+    # the cone almost white and the plume two stray pixels, so it read as a
+    # tent — the lava has to be the loudest thing in the tile.
+    "volcano": [
+        "................",
+        "....o.....o.....",
+        "...obo...obo....",
+        "....o.obo.o.....",
+        "......obo.......",
+        "....oobbboo.....",
+        "....obbbbbo.....",
+        "...oobbbbboo....",
+        "...osobbbosdo...",
+        "..ossobbbosddo..",
+        "..osssobosdddo..",
+        ".ossssoboddddo..",
+        ".ossssssdddddo..",
+        "osssssssddddddo.",
+        "ossssssssdddddo.",
+        ".oooooooooooooo.",
+    ],
+    "flood": [
+        "................",
+        "................",
+        "..ooo......ooo..",
+        ".owwwo....owwwo.",
+        "owwwwwo..owwwwwo",
+        ".oWWWWWooWWWWWo.",
+        "..oWWWWWWWWWWo..",
+        "...oooooooooo...",
+        "................",
+        "..oooooooooooo..",
+        ".owwwoowwwoowwo.",
+        "..ooooooooooo...",
+        "..oWWWooWWWooWo.",
+        "...oooooooooo...",
+        "................",
+        "................",
+    ],
+    "armageddon": [
+        "................",
+        "....oooooo......",
+        "...oSSSSSSo.....",
+        "..oSSSSSSSSo....",
+        "..oSooSSooSo....",
+        "..oSooSSooSo....",
+        "..oSSSSSSSSo....",
+        "..oSSoSSoSSo....",
+        "...oSSSSSSo.....",
+        "....oSoSoSo.....",
+        "....oooooooo....",
+        "...orooooooro...",
+        "..oro......oro..",
+        "..oo........oo..",
+        "................",
+        "................",
+    ],
+}
+
+
+ICONS.update({
+    # Hero promotions: a sword and a shield, the same two marks the walker
+    # sprites carry (tools/sprites/walkers.py), so the button and the unit
+    # it produces are recognizably the same thing.
+    # Upright, thick, and the same blade the promoted walker carries. The
+    # old icon ran a 1px diagonal across the tile and read as a scratch.
+    "knight": [
+        "................",
+        ".......oo.......",
+        "......oSSo......",
+        "......oSSo......",
+        "......oSSo......",
+        "......oSSo......",
+        "......oSSo......",
+        "......oSSo......",
+        "...ooooSSoooo...",
+        "..obbbbbbbbbo...",
+        "...ooooBBoooo...",
+        "......oBBo......",
+        "......oBBo......",
+        ".....obbbbo.....",
+        ".....oBBBBo.....",
+        "......oooo......",
+    ],
+    "guardian": [
+        "................",
+        "...oooooooo.....",
+        "..oBBBBBBBBo....",
+        "..oBbbbbbbBo....",
+        "..oBbBBBBbBo....",
+        "..oBbBbbBbBo....",
+        "..oBbBbbBbBo....",
+        "..oBbBBBBbBo....",
+        "..oBbbbbbbBo....",
+        "..oBBBBBBBBo....",
+        "...oBBBBBBo.....",
+        "....oBBBBo......",
+        ".....oBBo.......",
+        "......oo........",
+        "................",
+        "................",
+    ],
+    # Rally point. The same pennant-on-a-pole a building flies, so "where my
+    # people gather" reads as the same visual language as "whose house".
+    "shrine": [
+        "................",
+        "...oo...........",
+        "...ofoooooo.....",
+        "...offffffo.....",
+        "...offffffo.....",
+        "...offffo.......",
+        "...offo.........",
+        "...oo...........",
+        "...oo...........",
+        "...oo...........",
+        "...oo...........",
+        "...oo...........",
+        "..oooo..........",
+        ".odddddo........",
+        ".oooooooo.......",
+        "................",
+    ],
+    "settle": [
+        "................",
+        "................",
+        ".......oo.......",
+        "......oSSo......",
+        ".....oSSSSo.....",
+        "....oSSSSSSo....",
+        "...oSSSSSSSSo...",
+        "..oSSSSSSSSSSo..",
+        ".oooooooooooooo.",
+        "..ossssssssso...",
+        "..ossooooosso...",
+        "..ossoddosso....",
+        "..ossoddosso....",
+        "..ossoddosso....",
+        "..oooooooooo....",
+        "................",
+    ],
+    # A ring, not a filled disc: a lens you can see through is what makes a
+    # magnifier read as one.
+    "inspect": [
+        "................",
+        "....oooooo......",
+        "...oSSSSSSo.....",
+        "..oSSoooSSo.....",
+        "..oSo.w.oSo.....",
+        "..oSo...oSo.....",
+        "..oSo...oSo.....",
+        "..oSSoooSSo.....",
+        "...oSSSSSSo.....",
+        "....oooSSSo.....",
+        "......oSSSSo....",
+        ".......oSSSSo...",
+        "........oSSSSo..",
+        ".........oSSSo..",
+        "..........ooo...",
+        "................",
+    ],
+})
+
+
+# Behaviour-mode icons. All four are about *people*, so all four are built
+# from the same little figure — what changes is what it is doing, which is
+# the distinction the buttons actually express.
+FIGURE = [
+    "..ooo..",
+    ".okkko.",
+    ".okkko.",
+    "..ooo..",
+    ".offfo.",
+    "offfffo",
+    "offfffo",
+    ".offfo.",
+    ".oo.oo.",
+    ".od.do.",
+    ".oo.oo.",
+]
+
+
+def _figure(canvas: Canvas, tones: dict[str, RGB], left: int, top: int, rows: list[str] | None = None) -> None:
+    for y, row in enumerate(rows or FIGURE):
+        for x, key in enumerate(row):
+            if key != ".":
+                canvas.px(left + x, top + y, tones[key])
+
+
+ICONS.update({
+    # Gather: two figures converging on a point, drawn as arrows rather than
+    # as more figures — the old icon was a scatter of dots with no direction
+    # in it at all, which is the one thing "gather" has to convey.
+    # Two arrows closing on a post. The first attempt used four diagonals,
+    # which at 16px met in the middle and read as a plain X — no inward
+    # direction, which is the whole meaning of the command.
+    "gather": [
+        "................",
+        "................",
+        ".......oo.......",
+        ".......oo.......",
+        "....o..oo..o....",
+        "...oo..oo..oo...",
+        "..obo..oo..obo..",
+        ".obbooooooooobo.",
+        ".obbooooooooobo.",
+        "..obo..oo..obo..",
+        "...oo..oo..oo...",
+        "....o..oo..o....",
+        ".......oo.......",
+        ".......oo.......",
+        "................",
+        "................",
+    ],
+    # Fight: crossed blades. The old icon was a thin bent line that read as
+    # nothing; two crossed swords are unmistakable even at 16px.
+    "fight": [
+        "................",
+        ".oo..........oo.",
+        "oSSo........oSSo",
+        ".oSSo......oSSo.",
+        "..oSSo....oSSo..",
+        "...oSSo..oSSo...",
+        "....oSSooSSo....",
+        ".....oSSSSo.....",
+        ".....oSSSSo.....",
+        "....oSSooSSo....",
+        "...oBSo..oSBo...",
+        "..obBo....oBbo..",
+        "..oBo......oBo..",
+        "..obo......obo..",
+        "..ooo......ooo..",
+        "................",
+    ],
+})
+
+
+ICONS.update({
+    # Go to rally point: the figure plus the pennant it is heading for.
+    "goToShrine": [
+        "................",
+        "..........oo....",
+        "..........ofooo.",
+        "..ooo.....offfo.",
+        ".okkko....offo..",
+        ".okkko....oo....",
+        "..ooo.....oo....",
+        ".offfo....oo....",
+        "offfffobbooo....",
+        "offfffo...oo....",
+        ".offfo....oo....",
+        ".oo.oo....oo....",
+        ".od.do...oooo...",
+        ".oo.oo..odddo...",
+        "........oooooo..",
+        "................",
+    ],
+    # Release population: a figure stepping out through a doorway.
+    "releasePopulation": [
+        "................",
+        "..oooooo........",
+        "..oSSSSo........",
+        "..oSooSo..ooo...",
+        "..oSooSo.okkko..",
+        "..oSooSo.okkko..",
+        "..oSooSo..ooo...",
+        "..oSooSo.offfo..",
+        "..oSooSooffffo..",
+        "..oSooSooffffo..",
+        "..oSooSo.offfo..",
+        "..oSooSo.oo.oo..",
+        "..oSooSo.od.do..",
+        "..oSooSo.oo.oo..",
+        "..oooooo........",
+        "................",
+    ],
+    # Status-row icons: mana as a charged orb, population as a pair.
+    "mana": [
+        "................",
+        "......oo........",
+        ".....oMMo.......",
+        "....oMMMMo......",
+        "...oMMmmMMo.....",
+        "..oMmmmmmmMo....",
+        "..oMmmmmmmmo....",
+        ".oMmmmmmmmmmo...",
+        ".oMmmmmmmmmmo...",
+        ".ommmmmmmmmmo...",
+        "..ommmmmmmmo....",
+        "..ommmmmmmmo....",
+        "...ommmmmmo.....",
+        "....oooooo......",
+        "................",
+        "................",
+    ],
+    "population": [
+        "................",
+        "..ooo.....ooo...",
+        ".okkko...okkko..",
+        ".okkko...okkko..",
+        "..ooo.....ooo...",
+        ".offfo...offfo..",
+        "offfffo.offfffo.",
+        "offfffo.offfffo.",
+        ".offfo...offfo..",
+        ".oo.oo...oo.oo..",
+        ".od.do...od.do..",
+        ".oo.oo...oo.oo..",
+        "................",
+        "................",
+        "................",
+        "................",
+    ],
+})
+
+# Ordered so the atlas and the contact sheet both follow the panel's own
+# left-to-right order rather than dictionary insertion order.
+ICON_KINDS = (
+    "settle",
+    "gather",
+    "goToShrine",
+    "fight",
+    "releasePopulation",
+    "inspect",
+    "raise",
+    "lower",
+    "flatten",
+    "shrine",
+    "earthquake",
+    "swamp",
+    "knight",
+    "guardian",
+    "volcano",
+    "flood",
+    "armageddon",
+    "mana",
+    "population",
+)
+
+
+def frame_key(kind: str) -> str:
+    """The atlas key. Mirrored by iconFrameKey() in src/ui/pixelIcons.ts."""
+    return f"icon_{kind}"
+
+
+def render(palette: Palette, kind: str) -> Image.Image:
+    tones = _tones(palette)
+    canvas = Canvas(ICON_SIZE, ICON_SIZE)
+    for y, row in enumerate(ICONS[kind]):
+        for x, key in enumerate(row):
+            if key != ".":
+                canvas.px(x, y, tones[key])
+    return canvas.to_image()
+
+
+def _validate() -> None:
+    """Fails generation on the mistakes a 16x16 pattern table invites.
+
+    These checks used to live in src/ui/pixelIcons.test.ts, against the
+    procedural builders. They belong here now: the patterns are the art, so
+    a blank or duplicated icon is a defect in *this* file, and CI runs
+    `npm run sprites:check`, which builds every sheet and so runs this.
+    """
+    missing = set(ICON_KINDS) - set(ICONS)
+    extra = set(ICONS) - set(ICON_KINDS)
+    if missing or extra:
+        raise ValueError(f"ICON_KINDS and ICONS disagree: missing={sorted(missing)} extra={sorted(extra)}")
+
+    silhouettes: dict[str, str] = {}
+    for kind in ICON_KINDS:
+        rows = ICONS[kind]
+        if len(rows) != ICON_SIZE or any(len(row) != ICON_SIZE for row in rows):
+            raise ValueError(f"{kind}: every icon must be {ICON_SIZE}x{ICON_SIZE}")
+
+        unknown = {c for row in rows for c in row} - set(LEGEND) - {".", "k"}
+        if unknown:
+            raise ValueError(f"{kind}: characters not in LEGEND: {sorted(unknown)}")
+
+        if all(c == "." for row in rows for c in row):
+            raise ValueError(f"{kind}: renders as a blank square")
+
+        silhouette = "|".join(row.replace(".", " ") for row in rows)
+        # Two commands that look identical are worse than an ugly icon: the
+        # player cannot tell the buttons apart at all.
+        if silhouette in silhouettes:
+            raise ValueError(f"{kind}: same silhouette as {silhouettes[silhouette]}")
+        silhouettes[silhouette] = kind
+
+
+def render_all(palette: Palette) -> dict[str, Image.Image]:
+    _validate()
+    return {frame_key(kind): render(palette, kind) for kind in ICON_KINDS}
