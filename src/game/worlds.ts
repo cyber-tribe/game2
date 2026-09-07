@@ -1,4 +1,5 @@
 import type { TerrainEditRule, TerrainType } from "../world/heightmap";
+import type { MiracleSchool } from "./miracleSchools";
 
 /**
  * The discretionary miracles a world can lock/unlock — everything a player
@@ -153,6 +154,23 @@ export interface WorldDefinition {
    */
   enemyPersonality: EnemyPersonality;
   /**
+   * Which of the original's six schools this world's enemy god draws its
+   * miracles from — see miracleSchools.ts's ENEMY_SIGNATURE_MIRACLE.
+   *
+   * The axis that makes one god feel unlike another across a whole match:
+   * a 火 god rains fire on your settlements, a 水 god takes your people
+   * with a spring instead of killing them. Like enemyPersonality (and
+   * unlike terrain or AI speed) it is deliberately not part of the
+   * monotonic "never relaxing" curve — a later world's god isn't a
+   * *harder* school, it is a different one.
+   *
+   * A god can only cast what its world unlocks (allowedMiracles gates it
+   * exactly as it gates the player), so each world's own school is one
+   * whose signature is unlocked there. A god whose signature is out of
+   * reach falls back on 地震 like any other.
+   */
+  enemySchool: MiracleSchool;
+  /**
    * Whether the player's raise/lower/flatten taps may directly reshape land
    * within the enemy's own territory — per docs/game-system.md 10節's
    * "各ワールドは...使用可能な奇跡の制限などが異なり", another stage-shaped
@@ -196,15 +214,15 @@ export interface WorldDefinition {
 const WORLD_SIZE = 64;
 
 export const WORLDS: WorldDefinition[] = [
-  { id: "quiet-plain", name: "静かな草原", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "grass", terrainEditRule: "both", enemyDecisionInterval: 6, enemyAggressionThreshold: 6, allowedMiracles: ["earthquake"], enemyPersonality: "balanced", enemyTerritoryEditable: true, instantDrowning: false },
-  { id: "dry-highland", name: "乾いた高地", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "desert", terrainEditRule: "both", enemyDecisionInterval: 5, enemyAggressionThreshold: 5, allowedMiracles: ["earthquake", "swamp"], enemyPersonality: "balanced", enemyTerritoryEditable: true, instantDrowning: false },
-  { id: "frozen-border", name: "凍てつく国境", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "snow", terrainEditRule: "raiseOnly", enemyDecisionInterval: 5, enemyAggressionThreshold: 4, allowedMiracles: ["earthquake", "swamp", "shrine"], enemyPersonality: "balanced", enemyTerritoryEditable: true, instantDrowning: false },
+  { id: "quiet-plain", name: "静かな草原", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "grass", terrainEditRule: "both", enemyDecisionInterval: 6, enemyAggressionThreshold: 6, allowedMiracles: ["earthquake"], enemyPersonality: "balanced", enemySchool: "earth", enemyTerritoryEditable: true, instantDrowning: false },
+  { id: "dry-highland", name: "乾いた高地", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "desert", terrainEditRule: "both", enemyDecisionInterval: 5, enemyAggressionThreshold: 5, allowedMiracles: ["earthquake", "swamp"], enemyPersonality: "balanced", enemySchool: "plant", enemyTerritoryEditable: true, instantDrowning: false },
+  { id: "frozen-border", name: "凍てつく国境", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "snow", terrainEditRule: "raiseOnly", enemyDecisionInterval: 5, enemyAggressionThreshold: 4, allowedMiracles: ["earthquake", "swamp", "shrine", "lightning"], enemyPersonality: "balanced", enemySchool: "air", enemyTerritoryEditable: true, instantDrowning: false },
   // First world with hero miracles — an aggressive god shows off knight rushing. Rock/溶岩地帯 terrain: its own water is "海がマグマ" themed — instant drowning.
-  { id: "ashen-waste", name: "灰の荒野", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 4, enemyAggressionThreshold: 3, allowedMiracles: ["earthquake", "swamp", "shrine", "perseus", "guardian"], enemyPersonality: "aggressive", enemyTerritoryEditable: true, instantDrowning: true },
+  { id: "ashen-waste", name: "灰の荒野", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 4, enemyAggressionThreshold: 3, allowedMiracles: ["earthquake", "swamp", "shrine", "lightning", "perseus", "guardian", "fireRain"], enemyPersonality: "aggressive", enemySchool: "fire", enemyTerritoryEditable: true, instantDrowning: true },
   // A turtling god that leans on guardian/volcano and needs a much bigger lead to commit — teaches the player to break a defense, not just outrace one.
-  { id: "rising-frontier", name: "隆起する辺境", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "desert", terrainEditRule: "raiseOnly", enemyDecisionInterval: 3, enemyAggressionThreshold: 3, allowedMiracles: ["earthquake", "swamp", "shrine", "perseus", "hercules", "guardian", "volcano"], enemyPersonality: "defensive", enemyTerritoryEditable: true, instantDrowning: false },
+  { id: "rising-frontier", name: "隆起する辺境", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "desert", terrainEditRule: "raiseOnly", enemyDecisionInterval: 3, enemyAggressionThreshold: 3, allowedMiracles: ["earthquake", "swamp", "shrine", "lightning", "perseus", "hercules", "guardian", "fireRain", "volcano", "plague"], enemyPersonality: "defensive", enemySchool: "human", enemyTerritoryEditable: true, instantDrowning: false },
   // The final boss goes back to all-in aggression, decisively finishing the match the moment it's ahead — and, for the first time, its own territory is off-limits to direct terraforming: cornering it takes combat/miracles, not just digging its houses into the sea by hand. Rock terrain again — same lava-sea theming as ashen-waste.
-  { id: "final-frontline", name: "最終戦線", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 2, enemyAggressionThreshold: 2, allowedMiracles: ALL_MIRACLES, enemyPersonality: "aggressive", enemyTerritoryEditable: false, instantDrowning: true },
+  { id: "final-frontline", name: "最終戦線", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 2, enemyAggressionThreshold: 2, allowedMiracles: ALL_MIRACLES, enemyPersonality: "aggressive", enemySchool: "water", enemyTerritoryEditable: false, instantDrowning: true },
 ];
 
 /**
