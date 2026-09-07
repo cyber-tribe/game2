@@ -199,11 +199,57 @@
         gap: 4px;
       }
 
+      /*
+       * `display: grid` above outranks the browser's own [hidden] rule
+       * (same specificity, ours comes later), so without this the five
+       * schools that are meant to be put away render anyway — the whole
+       * panel, exactly what these categories exist to avoid.
+       */
+      .command-row[hidden] {
+        display: none;
+      }
+
       /* A thin bronze rule separates "常時発動できる方針" from "奇跡" without needing a labeled section header. */
       .command-row.tool-group {
         margin-top: 4px;
         padding-top: 5px;
         border-top: 2px solid var(--bronze-dark);
+      }
+
+      /*
+       * The six schools (see src/ui/miracleCategories.ts). Narrower than a
+       * command button because each holds one or two characters, and it
+       * lets all six sit on one line at any phone width; the school's own
+       * miracles then get the full-width row below it.
+       */
+      .command-row.category-row {
+        grid-template-columns: repeat(6, 1fr);
+        margin-top: 4px;
+        padding-top: 5px;
+        border-top: 2px solid var(--bronze-dark);
+      }
+
+      .category-button {
+        min-height: 30px;
+        font-size: 12px;
+      }
+
+      /* The selected school reads as the row's own tab, not as a pressed tool. */
+      .category-button[aria-pressed="true"] {
+        background: var(--bronze-mid);
+      }
+
+      /*
+       * auto-*fit*, unlike the auto-fill the other rows use: a school has
+       * four or five miracles, so auto-fill would lay out nine 46px
+       * columns and leave half the row empty with 「集結地移動」 wrapped
+       * onto three lines in a narrow button. Collapsing the empty tracks
+       * lets the four or five buttons that exist share the row's whole
+       * width instead, which is also what keeps a school to one line.
+       */
+      .command-row.miracle-group {
+        grid-template-columns: repeat(auto-fit, minmax(46px, 1fr));
+        margin-top: 4px;
       }
 
       .command-button {
@@ -593,38 +639,60 @@
           <button type="button" class="command-button" data-tool="inspect">照会</button>
         </div>
         <div class="command-row tool-group">
-          <button type="button" class="command-button" data-tool="raise" aria-pressed="true">隆起</button>
+          <button type="button" class="command-button" aria-pressed="true" data-tool="raise">隆起</button>
           <button type="button" class="command-button" data-tool="lower">沈降</button>
           <button type="button" class="command-button" data-tool="flatten">平坦化</button>
+        </div>
+        <!-- The original's own six schools of miracle — see src/ui/miracleCategories.ts. -->
+        <div class="command-row category-row" id="miracle-categories">
+          <button type="button" class="command-button category-button" aria-pressed="true" data-category="human">人</button>
+          <button type="button" class="command-button category-button" data-category="plant">植物</button>
+          <button type="button" class="command-button category-button" data-category="earth">地</button>
+          <button type="button" class="command-button category-button" data-category="air">気</button>
+          <button type="button" class="command-button category-button" data-category="fire">火</button>
+          <button type="button" class="command-button category-button" data-category="water">水</button>
+        </div>
+        <div class="command-row miracle-group" data-category="human">
           <button type="button" class="command-button" data-tool="shrine">集結地移動</button>
-          <button type="button" class="command-button" data-tool="earthquake">地震</button>
-          <button type="button" class="command-button" data-tool="swamp">沼</button>
-          <button type="button" class="command-button" data-tool="holyWater">聖水の泉</button>
           <button type="button" class="command-button" data-tool="perseus">ペルセウス</button>
-          <button type="button" class="command-button" data-tool="hercules">ヘラクレス</button>
-          <button type="button" class="command-button" data-tool="odysseus">オディッセウス</button>
-          <button type="button" class="command-button" data-tool="achilles">アキレス</button>
-          <button type="button" class="command-button" data-tool="adonis">アドニス</button>
-          <button type="button" class="command-button" data-tool="helen">トロイのヘレン</button>
+          <button type="button" class="command-button" data-tool="plague">病原菌</button>
+          <button type="button" class="command-button" data-tool="armageddon">最終決戦</button>
           <button type="button" class="command-button" data-tool="guardian">守護者化</button>
+        </div>
+        <div class="command-row miracle-group" data-category="plant" hidden>
           <button type="button" class="command-button" data-tool="forest">森</button>
           <button type="button" class="command-button" data-tool="flower">花</button>
+          <button type="button" class="command-button" data-tool="swamp">沼</button>
+          <button type="button" class="command-button" data-tool="fungus">毒カビ</button>
+          <button type="button" class="command-button" data-tool="adonis">アドニス</button>
+        </div>
+        <div class="command-row miracle-group" data-category="earth" hidden>
           <button type="button" class="command-button" data-tool="road">道</button>
           <button type="button" class="command-button" data-tool="wall">城壁</button>
+          <button type="button" class="command-button" data-tool="earthquake">地震</button>
           <button type="button" class="command-button" data-tool="megalith">地下巨石</button>
-          <button type="button" class="command-button" data-tool="fungus">毒カビ</button>
-          <button type="button" class="command-button" data-tool="tornado">竜巻</button>
-          <button type="button" class="command-button" data-tool="firePillar">火柱</button>
-          <button type="button" class="command-button" data-tool="lightning">雷</button>
-          <button type="button" class="command-button" data-tool="storm">嵐</button>
-          <button type="button" class="command-button" data-tool="plague">病原菌</button>
-          <button type="button" class="command-button" data-tool="hurricane">ハリケーン</button>
-          <button type="button" class="command-button" data-tool="fireRain">火の雨</button>
-          <button type="button" class="command-button" data-tool="volcano">火山</button>
-          <button type="button" class="command-button" data-tool="reef">岩礁</button>
-          <button type="button" class="command-button" data-tool="tsunami">津波</button>
-          <button type="button" class="command-button" data-tool="armageddon">最終決戦</button>
+          <button type="button" class="command-button" data-tool="hercules">ヘラクレス</button>
         </div>
+        <div class="command-row miracle-group" data-category="air" hidden>
+          <button type="button" class="command-button" data-tool="lightning">雷</button>
+          <button type="button" class="command-button" data-tool="tornado">竜巻</button>
+          <button type="button" class="command-button" data-tool="storm">嵐</button>
+          <button type="button" class="command-button" data-tool="odysseus">オディッセウス</button>
+          <button type="button" class="command-button" data-tool="hurricane">ハリケーン</button>
+        </div>
+        <div class="command-row miracle-group" data-category="fire" hidden>
+          <button type="button" class="command-button" data-tool="firePillar">火柱</button>
+          <button type="button" class="command-button" data-tool="fireRain">火の雨</button>
+          <button type="button" class="command-button" data-tool="achilles">アキレス</button>
+          <button type="button" class="command-button" data-tool="volcano">火山</button>
+        </div>
+        <div class="command-row miracle-group" data-category="water" hidden>
+          <button type="button" class="command-button" data-tool="reef">岩礁</button>
+          <button type="button" class="command-button" data-tool="holyWater">聖水の泉</button>
+          <button type="button" class="command-button" data-tool="helen">トロイのヘレン</button>
+          <button type="button" class="command-button" data-tool="tsunami">津波</button>
+        </div>
+      </div>
       </div>
     </div>
 
