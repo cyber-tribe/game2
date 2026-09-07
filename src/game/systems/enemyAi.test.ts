@@ -186,6 +186,66 @@ describe("createEnemyAiSystem", () => {
     expect(world.get(enemy, FactionState)!.behaviorMode).toBe("fight");
   });
 
+  /**
+   * A walker takes a house only when its strength beats that house's
+   * defense (systems/combat.ts), and every walker is born at strength 1
+   * against a hut's 3 — so an army that marches as it is born can only
+   * feed itself to the buildings. Gathering is the one thing that adds
+   * strength together, so the faction musters first.
+   */
+  it("musters instead of marching while nothing it has could take a house", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    addWalkers(world, 10); // strength 1 each, past the aggression threshold
+    addHouse(world, "enemy", 1, 1);
+    addHouse(world, "player", 10, 10); // a hut: defense 3
+    const [leader] = world.query(Walker, Owner);
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, leaderId: leader });
+
+    createEnemyAiSystem({ decisionInterval: 5, aggressionThreshold: 4, economyFloor: 1 })(world, 5);
+
+    expect(world.get(enemy, FactionState)!.behaviorMode).toBe("gather");
+  });
+
+  it("marches once it has someone who can take one", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    addWalkers(world, 10);
+    addHouse(world, "enemy", 1, 1);
+    addHouse(world, "player", 10, 10); // defense 3
+    const [champion] = world.query(Walker, Owner);
+    world.add(champion, Walker, { ...world.get(champion, Walker)!, strength: 4 });
+
+    createEnemyAiSystem({ decisionInterval: 5, aggressionThreshold: 4, economyFloor: 1 })(world, 5);
+
+    expect(world.get(enemy, FactionState)!.behaviorMode).toBe("fight");
+  });
+
+  it("does not muster when the opponent has no houses left to take", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    addWalkers(world, 10);
+    addHouse(world, "enemy", 1, 1);
+    addWalkerAt(world, "player", 40, 40); // walkers only — any walker can fight a walker
+
+    createEnemyAiSystem({ decisionInterval: 5, aggressionThreshold: 4, economyFloor: 1 })(world, 5);
+
+    expect(world.get(enemy, FactionState)!.behaviorMode).toBe("fight");
+  });
+
+  it("still drops everything to defend, however weak its army is", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    addWalkers(world, 10); // all strength 1
+    addHouse(world, "enemy", 10, 10);
+    addHouse(world, "player", 30, 30);
+    addWalkerAt(world, "player", 12, 10); // at the enemy's door
+
+    createEnemyAiSystem({ decisionInterval: 5, aggressionThreshold: 4, threatRadius: 4, economyFloor: 1 })(world, 5);
+
+    expect(world.get(enemy, FactionState)!.behaviorMode).toBe("fight");
+  });
+
   it("never overrides behaviorMode once finalBattle is set, even past the aggression threshold", () => {
     const world = new World();
     const enemy = createFaction(world, "enemy", { x: 0, y: 0 }, "goToShrine");
