@@ -107,7 +107,12 @@ describe("Simulation", () => {
       const leader = sim.world.createEntity();
       sim.world.add(leader, Position, { x: 5, y: 5 });
       sim.world.add(leader, Owner, { faction: "enemy" });
-      sim.world.add(leader, Walker, { strength: 1, state: "seeking", speed: 1 });
+      // Strong enough to take the player's hut below (defense 3), so the
+      // enemy AI leaves the "fight" mode this test sets rather than
+      // sending the faction off to muster — see ENEMY_AI's own muster
+      // rule. totalPopulation counts a walker as 1 whatever its strength,
+      // so this doesn't move the population ratio the test is about.
+      sim.world.add(leader, Walker, { strength: 4, state: "seeking", speed: 1 });
       const enemyHouse = sim.world.createEntity();
       sim.world.add(enemyHouse, Position, { x: 4, y: 4 });
       sim.world.add(enemyHouse, Owner, { faction: "enemy" });
