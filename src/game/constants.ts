@@ -257,6 +257,40 @@ export const ENEMY_AI_AGGRESSION_THRESHOLD = 4;
  * doesn't sit in "settle" while a house is under siege just because its
  * total walker count hasn't reached the usual aggression bar.
  */
+/**
+ * Houses the enemy wants before it will leave home to attack — see
+ * systems/enemyAi.ts. Being attacked overrides it.
+ *
+ * Fixes an inversion in the difficulty curve. "fight" is a faction-wide
+ * instruction: while it is set, nobody settles. The enemy went aggressive
+ * purely on walker count, and the harder worlds set that threshold
+ * *lower* (6 on the first world, 2 on the last), so the hardest world's
+ * enemy abandoned building at two walkers and never came back — it spent
+ * the match raiding with whatever it had while its economy stayed at
+ * nothing. The "harder" setting made the enemy poorer, not stronger.
+ *
+ * Measured with neither side played, on the hardest enemy settings
+ * (decisionInterval 2, aggressionThreshold 2), houses after 7 minutes:
+ *
+ * | floor | grass: enemy / player | rock: enemy / player |
+ * |-------|-----------------------|----------------------|
+ * | 0 (before) | 32.4 / 85        | 24.2 / 37.8          |
+ * | 8     | 75.2 / 69.4           | 42.4 / 85            |
+ * | **16**| **83.8 / 63.6**       | **61.0 / 82.9**      |
+ *
+ * Sixteen rather than eight because rock — the terrain the last two
+ * worlds use — is where the collapse was worst, and eight only half
+ * fixes it there (42 houses against 85). Values between 8 and 20 sit
+ * inside the run-to-run spread on grass, so this is picked on the rock
+ * measurement, at 12 runs.
+ *
+ * The player's own count falling (85 to 63.6 on grass) is the point
+ * rather than a side effect: an enemy that built first now has something
+ * to attack with, and a player who does nothing for seven minutes should
+ * be losing houses.
+ */
+export const ENEMY_AI_ECONOMY_FLOOR = 16;
+
 export const ENEMY_AI_THREAT_RADIUS = 4;
 
 /** Mana cost of conjuring a swamp — a "中" tier miracle, similar to an earthquake. */
