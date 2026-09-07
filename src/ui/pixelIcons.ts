@@ -45,7 +45,7 @@ export type IconKind =
   | "gather"
   | "goToShrine"
   | "fight"
-  | "releasePopulation"
+  | "sprog"
   | "mana"
   | "population";
 

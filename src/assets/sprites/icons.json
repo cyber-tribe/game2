@@ -600,7 +600,7 @@
       },
       "trimmed": false
     },
-    "icon_releasePopulation": {
+    "icon_road": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -620,7 +620,7 @@
       },
       "trimmed": false
     },
-    "icon_road": {
+    "icon_settle": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -640,7 +640,7 @@
       },
       "trimmed": false
     },
-    "icon_settle": {
+    "icon_shrine": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -660,7 +660,7 @@
       },
       "trimmed": false
     },
-    "icon_shrine": {
+    "icon_sprog": {
       "frame": {
         "h": 16,
         "w": 16,

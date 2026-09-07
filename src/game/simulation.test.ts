@@ -180,7 +180,9 @@ describe("Simulation", () => {
 
     const entities = sim.listInspectableEntities();
     expect(entities).toEqual([
-      { kind: "house", faction: "enemy", position: { x: 3, y: 4 }, level: "manor", population: 12, capacity: HOUSE_LEVELS.manor.capacity },
+      // `entity` is the ECS id, carried so a tap that picked something can
+      // then act on it — see スプログ in main.ts.
+      { entity: house, kind: "house", faction: "enemy", position: { x: 3, y: 4 }, level: "manor", population: 12, capacity: HOUSE_LEVELS.manor.capacity },
     ]);
   });
 

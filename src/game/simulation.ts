@@ -1,4 +1,4 @@
-import { Scheduler, World } from "../ecs";
+import { Scheduler, World, type Entity } from "../ecs";
 import type { Heightmap, TerrainEditRule } from "../world/heightmap";
 import { triggerArmageddon } from "./armageddon";
 import {
@@ -17,7 +17,7 @@ import { DEFAULT_WALKER_SPEED, FARMLAND_RADIUS, HOUSE_LEVELS, IMPACT_EFFECT_DURA
 import { createFaction, findFactionEntity, moveShrine } from "./faction";
 import { promoteHero } from "./hero";
 import { totalPopulation } from "./population";
-import { releasePopulation } from "./populationRelease";
+import { sprogHouse } from "./populationRelease";
 import { createHouseCaptureSystem, createWalkerCombatSystem } from "./systems/combat";
 import type { ImpactEffectEvent, ImpactEffectSnapshot } from "./systems/effects";
 import { createDrowningSystem } from "./systems/drowning";
@@ -152,9 +152,23 @@ export interface FactionSummary {
  * IsoRenderer.project, and render/entityInfoLabel.ts turns the result
  * into the Japanese text actually shown.
  */
+/**
+ * `entity` is the ECS id the row was built from, so a tap that picked
+ * something on screen can then *act* on it — スプログ aims at one house
+ * (see sprogHouse), and picking it is the same screen-space nearest-thing
+ * search the 照会 panel already does.
+ */
 export type InspectableEntity =
-  | { kind: "walker"; faction: FactionId; position: Position; strength: number; state: WalkerState }
-  | { kind: "house"; faction: FactionId; position: Position; level: HouseLevel; population: number; capacity: number };
+  | { entity: Entity; kind: "walker"; faction: FactionId; position: Position; strength: number; state: WalkerState }
+  | {
+      entity: Entity;
+      kind: "house";
+      faction: FactionId;
+      position: Position;
+      level: HouseLevel;
+      population: number;
+      capacity: number;
+    };
 
 export interface GameOutcome {
   over: boolean;
@@ -519,12 +533,12 @@ export class Simulation {
   }
 
   /**
-   * The "人口放出" action — see populationRelease.ts. Free, like
-   * setBehaviorMode; returns how many walkers were actually released so
-   * callers can skip feedback (haptics, etc.) on a no-op tap.
+   * The original's スプログ — see populationRelease.ts. Free, like
+   * setBehaviorMode; returns whether anyone actually walked out so callers
+   * can skip feedback (haptics, etc.) on a no-op tap.
    */
-  releasePopulation(faction: FactionId): number {
-    return releasePopulation(this.world, faction, this.maxHousesPerFaction);
+  sprogHouse(house: Entity): boolean {
+    return sprogHouse(this.world, house, this.maxHousesPerFaction);
   }
 
   /**
@@ -584,6 +598,7 @@ export class Simulation {
     for (const entity of this.world.query(Walker, Position, Owner)) {
       const walker = this.world.get(entity, Walker)!;
       entities.push({
+        entity,
         kind: "walker",
         faction: this.world.get(entity, Owner)!.faction,
         position: this.world.get(entity, Position)!,
@@ -595,6 +610,7 @@ export class Simulation {
     for (const entity of this.world.query(House, Position, Owner)) {
       const house = this.world.get(entity, House)!;
       entities.push({
+        entity,
         kind: "house",
         faction: this.world.get(entity, Owner)!.faction,
         position: this.world.get(entity, Position)!,

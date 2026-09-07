@@ -1,70 +1,72 @@
-import type { World } from "../ecs";
-import { House, Owner, Position, Walker, type FactionId } from "./components";
+import type { Entity, World } from "../ecs";
+import { House, Owner, Position, Walker } from "./components";
 import {
   DEFAULT_WALKER_SPEED,
   HOUSE_LEVELS,
   POPULATION_RELEASE_EFFICIENCY,
   POPULATION_RELEASE_MIN_FRACTION,
+  SPROG_FRACTION,
 } from "./constants";
 
 /**
- * The "人口放出" action: immediately empties every one of a faction's
- * houses that has grown enough to be worth it into a fresh walker, rather
- * than waiting for createHouseGrowthSystem to fill it to capacity on its
- * own. Free, like Simulation.setBehaviorMode — this is a standing power,
- * not a mana-gated miracle — but not a pure win either: a released
- * walker's strength is only POPULATION_RELEASE_EFFICIENCY of the
- * population it was built from (see that constant), permanently weaker
- * than the strength-1 walker the same house would eventually produce on
- * its own. That's the trade this exists for — a faction can bleed
- * population out early for more, sooner, weaker walkers (faster
- * settling/expansion, since settle.ts's createSettleSystem doesn't care
- * about a walker's strength) instead of letting it accumulate into fewer,
- * stronger ones.
+ * The original's スプログ — 「建物の中心にカーソルを合わせてBボタンを押すと、
+ * 信者の一部が追い出される」 — one of the two conveniences the original is
+ * praised for by name, and the one it singles out as new to this instalment:
+ * 「特にスプログは前作に無かった仕様で、ゲームの進行が早くなったと好評。
+ * 前作では建物の収容可能人数を超えるまで待たなければならなかった」.
  *
- * A house only releases once its population/capacity ratio has reached
- * POPULATION_RELEASE_MIN_FRACTION — otherwise this would let a faction
- * shred a house's progress into an unbounded stream of near-worthless
- * walkers, each still capable of founding a whole new house per
+ * Two things in that sentence are load-bearing, and game2's previous
+ * faction-wide 送出 had neither:
+ *
+ * - **One building.** The cursor is on a house; that house is what empties.
+ *   Emptying every house a faction owns at once is a different move, and a
+ *   strictly blunter one — with it on the panel, nobody would ever aim.
+ * - **A part of them** (「一部が追い出される」). SPROG_FRACTION of the
+ *   population walks out and the rest stays, so the house keeps growing
+ *   from where it is rather than restarting from zero. That is what makes
+ *   this "don't wait for capacity" rather than "cash the house in".
+ *
+ * Not a miracle: free, like Simulation.setBehaviorMode and moveShrine. The
+ * cost is paid in the walker itself, which is weaker than the strength-1
+ * one the same house would eventually produce on its own — see
+ * POPULATION_RELEASE_EFFICIENCY.
+ *
+ * Refused below POPULATION_RELEASE_MIN_FRACTION of capacity: without a
+ * floor this would shred a house's progress into an unbounded stream of
+ * near-worthless walkers, each still able to found a whole new house per
  * settle.ts, far faster than createHouseGrowthSystem's capacity-gated
- * pacing ever allows. Skipped entirely once the faction is already at
- * maxHousesPerFaction, for the same reason createHouseGrowthSystem stops
- * spawning walkers there — see its doc comment: those new walkers would
- * otherwise settle into houses beyond the cap that stands in for land
- * scarcity.
+ * pacing allows. Refused too once the faction is at maxHousesPerFaction,
+ * for the same reason createHouseGrowthSystem stops spawning there.
  *
- * Returns how many walkers were actually released, so callers can skip
- * feedback (haptics, etc.) when nothing happened.
+ * Returns whether anyone actually walked out, so callers can skip feedback
+ * (haptics, etc.) when nothing happened.
  */
-export function releasePopulation(world: World, faction: FactionId, maxHousesPerFaction: number): number {
+export function sprogHouse(world: World, house: Entity, maxHousesPerFaction: number): boolean {
+  const owner = world.get(house, Owner);
+  const state = world.get(house, House);
+  const pos = world.get(house, Position);
+  if (!owner || !state || !pos) return false;
+
   let houseCount = 0;
   for (const entity of world.query(House, Owner)) {
-    if (world.get(entity, Owner)!.faction === faction) houseCount++;
+    if (world.get(entity, Owner)!.faction === owner.faction) houseCount++;
   }
-  if (houseCount >= maxHousesPerFaction) return 0;
+  if (houseCount >= maxHousesPerFaction) return false;
 
-  let released = 0;
-  for (const entity of world.query(House, Position, Owner)) {
-    if (world.get(entity, Owner)!.faction !== faction) continue;
+  const capacity = HOUSE_LEVELS[state.level].capacity;
+  if (state.population / capacity < POPULATION_RELEASE_MIN_FRACTION) return false;
 
-    const house = world.get(entity, House)!;
-    const pos = world.get(entity, Position)!;
-    const capacity = HOUSE_LEVELS[house.level].capacity;
-    const fraction = house.population / capacity;
-    if (fraction < POPULATION_RELEASE_MIN_FRACTION) continue;
+  const leaving = state.population * SPROG_FRACTION;
 
-    const walker = world.createEntity();
-    world.add(walker, Position, { x: pos.x, y: pos.y });
-    world.add(walker, Owner, { faction });
-    world.add(walker, Walker, {
-      strength: fraction * POPULATION_RELEASE_EFFICIENCY,
-      state: "seeking",
-      speed: DEFAULT_WALKER_SPEED,
-    });
+  const walker = world.createEntity();
+  world.add(walker, Position, { x: pos.x, y: pos.y });
+  world.add(walker, Owner, { faction: owner.faction });
+  world.add(walker, Walker, {
+    strength: (leaving / capacity) * POPULATION_RELEASE_EFFICIENCY,
+    state: "seeking",
+    speed: DEFAULT_WALKER_SPEED,
+  });
 
-    world.add(entity, House, { level: house.level, population: 0 });
-    released++;
-  }
-
-  return released;
+  world.add(house, House, { level: state.level, population: state.population - leaving });
+  return true;
 }

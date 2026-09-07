@@ -16,6 +16,7 @@ const TOOL_ICON: Record<ToolMode, IconKind> = {
   lower: "lower",
   flatten: "flatten",
   autoFlatten: "autoFlatten",
+  sprog: "sprog",
   shrine: "shrine",
   earthquake: "earthquake",
   swamp: "swamp",
@@ -63,6 +64,4 @@ export function mountCommandIcons(): void {
     const tool = button.dataset.tool as ToolMode;
     button.prepend(createIconCanvas(TOOL_ICON[tool]));
   }
-  const releaseButton = document.getElementById("release-population");
-  releaseButton?.prepend(createIconCanvas("releasePopulation"));
 }

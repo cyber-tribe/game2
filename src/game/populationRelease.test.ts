@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../ecs";
 import { House, Owner, Position, Walker } from "./components";
-import { HOUSE_LEVELS, POPULATION_RELEASE_EFFICIENCY, POPULATION_RELEASE_MIN_FRACTION } from "./constants";
-import { releasePopulation } from "./populationRelease";
+import {
+  HOUSE_LEVELS,
+  POPULATION_RELEASE_EFFICIENCY,
+  POPULATION_RELEASE_MIN_FRACTION,
+  SPROG_FRACTION,
+} from "./constants";
+import { sprogHouse } from "./populationRelease";
 
 function createHouse(world: World, x: number, y: number, population: number, faction: "player" | "enemy" = "player") {
   const entity = world.createEntity();
@@ -12,29 +17,31 @@ function createHouse(world: World, x: number, y: number, population: number, fac
   return entity;
 }
 
-describe("releasePopulation", () => {
-  it("does nothing when no house has reached the minimum fraction", () => {
+describe("sprogHouse", () => {
+  it("does nothing when the house has not reached the minimum fraction", () => {
     const world = new World();
     const capacity = HOUSE_LEVELS.hut.capacity;
-    const house = createHouse(world, 0, 0, capacity * POPULATION_RELEASE_MIN_FRACTION - 0.01);
+    const population = capacity * POPULATION_RELEASE_MIN_FRACTION - 0.01;
+    const house = createHouse(world, 0, 0, population);
 
-    const released = releasePopulation(world, "player", Infinity);
-
-    expect(released).toBe(0);
+    expect(sprogHouse(world, house, Infinity)).toBe(false);
     expect(world.query(Walker)).toHaveLength(0);
-    expect(world.get(house, House)!.population).toBeCloseTo(capacity * POPULATION_RELEASE_MIN_FRACTION - 0.01);
+    expect(world.get(house, House)!.population).toBeCloseTo(population);
   });
 
-  it("empties a house at/above the minimum fraction into a weaker walker", () => {
+  /**
+   * 「信者の**一部**が追い出される」 — a part, not all of them. The house is
+   * left standing on real progress rather than back at zero, which is what
+   * makes this "don't wait for capacity" instead of "cash the house in".
+   */
+  it("pushes out only part of the population, leaving the rest in the house", () => {
     const world = new World();
     const capacity = HOUSE_LEVELS.hut.capacity;
-    const population = capacity * 0.7;
+    const population = capacity * 0.8;
     const house = createHouse(world, 3, 4, population);
 
-    const released = releasePopulation(world, "player", Infinity);
-
-    expect(released).toBe(1);
-    expect(world.get(house, House)!.population).toBe(0);
+    expect(sprogHouse(world, house, Infinity)).toBe(true);
+    expect(world.get(house, House)!.population).toBeCloseTo(population * (1 - SPROG_FRACTION));
 
     const walkers = world.query(Walker, Position, Owner);
     expect(walkers).toHaveLength(1);
@@ -43,43 +50,79 @@ describe("releasePopulation", () => {
     expect(world.get(walker, Owner)).toEqual({ faction: "player" });
     const walkerComponent = world.get(walker, Walker)!;
     expect(walkerComponent.state).toBe("seeking");
-    expect(walkerComponent.strength).toBeCloseTo(0.7 * POPULATION_RELEASE_EFFICIENCY);
+    expect(walkerComponent.strength).toBeCloseTo(0.8 * SPROG_FRACTION * POPULATION_RELEASE_EFFICIENCY);
     expect(walkerComponent.strength).toBeLessThan(1);
   });
 
-  it("releases from every qualifying house of the faction in one call", () => {
+  /**
+   * The whole point of aiming: only the tapped house empties. game2's
+   * previous 送出 emptied every house the faction owned in one press, which
+   * left no reason ever to aim at one.
+   */
+  it("touches only the house it was given", () => {
     const world = new World();
     const capacity = HOUSE_LEVELS.hut.capacity;
-    createHouse(world, 0, 0, capacity);
-    createHouse(world, 1, 1, capacity * 0.9);
-    createHouse(world, 2, 2, capacity * 0.1); // below the threshold
+    const target = createHouse(world, 0, 0, capacity);
+    const other = createHouse(world, 5, 5, capacity);
 
-    const released = releasePopulation(world, "player", Infinity);
+    expect(sprogHouse(world, target, Infinity)).toBe(true);
 
-    expect(released).toBe(2);
-    expect(world.query(Walker)).toHaveLength(2);
+    expect(world.query(Walker)).toHaveLength(1);
+    expect(world.get(other, House)!.population).toBe(capacity);
   });
 
-  it("ignores houses belonging to another faction", () => {
+  it("keeps the walker on the same side as the house it left", () => {
     const world = new World();
-    const capacity = HOUSE_LEVELS.hut.capacity;
-    createHouse(world, 0, 0, capacity, "enemy");
+    const house = createHouse(world, 0, 0, HOUSE_LEVELS.hut.capacity, "enemy");
 
-    const released = releasePopulation(world, "player", Infinity);
+    expect(sprogHouse(world, house, Infinity)).toBe(true);
 
-    expect(released).toBe(0);
-    expect(world.query(Walker)).toHaveLength(0);
+    const [walker] = world.query(Walker, Owner);
+    expect(world.get(walker, Owner)).toEqual({ faction: "enemy" });
   });
 
   it("does nothing once the faction is already at its house cap", () => {
     const world = new World();
     const capacity = HOUSE_LEVELS.hut.capacity;
-    createHouse(world, 0, 0, capacity);
+    const house = createHouse(world, 0, 0, capacity);
     createHouse(world, 1, 1, capacity);
 
-    const released = releasePopulation(world, "player", 2);
-
-    expect(released).toBe(0);
+    expect(sprogHouse(world, house, 2)).toBe(false);
     expect(world.query(Walker)).toHaveLength(0);
+    expect(world.get(house, House)!.population).toBe(capacity);
+  });
+
+  it("counts only the owner's own houses against that cap", () => {
+    const world = new World();
+    const capacity = HOUSE_LEVELS.hut.capacity;
+    const house = createHouse(world, 0, 0, capacity);
+    createHouse(world, 1, 1, capacity, "enemy");
+
+    expect(sprogHouse(world, house, 2)).toBe(true);
+  });
+
+  it("does nothing for an entity that is not a house", () => {
+    const world = new World();
+    const entity = world.createEntity();
+
+    expect(sprogHouse(world, entity, Infinity)).toBe(false);
+    expect(world.query(Walker)).toHaveLength(0);
+  });
+
+  /**
+   * Repeated presses run out of steam on their own: each takes only
+   * SPROG_FRACTION of what is left, so the house soon sits under
+   * POPULATION_RELEASE_MIN_FRACTION and refuses rather than shredding its
+   * progress into an unbounded stream of near-worthless walkers. From full,
+   * that is two presses (1 → 0.5, still exactly at the floor → 0.25).
+   */
+  it("runs itself dry after a couple of presses rather than shredding the house", () => {
+    const world = new World();
+    const house = createHouse(world, 0, 0, HOUSE_LEVELS.hut.capacity);
+
+    expect(sprogHouse(world, house, Infinity)).toBe(true);
+    expect(sprogHouse(world, house, Infinity)).toBe(true);
+    expect(sprogHouse(world, house, Infinity)).toBe(false);
+    expect(world.query(Walker)).toHaveLength(2);
   });
 });
