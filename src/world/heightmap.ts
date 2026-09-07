@@ -802,6 +802,71 @@ export const REEF_HEIGHT = 1;
 export const REEF_HARDNESS = 6;
 
 /**
+ * How many vertices long one 岩礁 cast is. The original is specific about
+ * the shape — 「海面上に建物が建てられない土地を**線分状に**発生させる」 —
+ * and the shape is the whole miracle: a breakwater is a line or it is
+ * nothing. See applyReef.
+ */
+export const REEF_LENGTH = 5;
+
+/**
+ * The headings a reef segment can lie along. Only half the compass: a
+ * segment and its reverse are the same line. Listed in the order ties are
+ * resolved, so a cast in open water — where every heading is as good as
+ * every other — always lays the same predictable east–west bar.
+ */
+const REEF_HEADINGS = [
+  { x: 1, y: 0 },
+  { x: 1, y: 1 },
+  { x: 0, y: 1 },
+  { x: -1, y: 1 },
+] as const;
+
+/** How many vertices of a length-`length` segment from (cx, cy) are open water. */
+function reefWaterSpan(
+  heightmap: Heightmap,
+  cx: number,
+  cy: number,
+  heading: { x: number; y: number },
+  length: number,
+): number {
+  const back = Math.floor((length - 1) / 2);
+  let span = 0;
+  for (let step = 0; step < length; step++) {
+    const vx = cx + heading.x * (step - back);
+    const vy = cy + heading.y * (step - back);
+    if (vx < 0 || vy < 0 || vx > heightmap.width || vy > heightmap.height) continue;
+    if (heightmap.vertices[vy][vx] > heightmap.waterLevel) continue;
+    span++;
+  }
+  return span;
+}
+
+/**
+ * The heading a reef cast at (cx, cy) lies along: whichever one keeps the
+ * most of the segment on open water.
+ *
+ * That single rule gives the behaviour a breakwater needs without needing
+ * to reason about coastlines explicitly. Hugging a shore, the heading
+ * running *along* the water is the one parallel to the coast, so the reef
+ * shelters the beach behind it instead of jutting out to sea; inside a
+ * channel it follows the channel; in open water every heading ties and the
+ * first listed wins.
+ */
+function reefHeading(heightmap: Heightmap, cx: number, cy: number, length: number): { x: number; y: number } {
+  let best: { x: number; y: number } = REEF_HEADINGS[0];
+  let bestSpan = -1;
+  for (const heading of REEF_HEADINGS) {
+    const span = reefWaterSpan(heightmap, cx, cy, heading, length);
+    if (span > bestSpan) {
+      bestSpan = span;
+      best = heading;
+    }
+  }
+  return best;
+}
+
+/**
  * The wave's height at `distance` from its origin — full height at the
  * center, tapering to nothing at the rim.
  */
@@ -904,21 +969,54 @@ export function applyTsunami(
  * Only meaningful on water: on dry land this would just be a small,
  * pointless volcano, so it refuses to place there.
  *
- * One reef is not a breakwater. applyTsunami spreads as a front and flows
- * around a partial barrier, so sheltering a coast means building a wall of
- * these across the wave's approach — which is why they are cheap
- * (REEF_MANA_COST). A single cast that switched off the enemy's most
- * expensive miracle would be the more boring mechanic.
+ * One cast lays a *line* of reef — REEF_LENGTH vertices centred on the tap
+ * — not a single stone. The original says so outright
+ * (「**線分状に**発生させる」), and the shape is the entire point: applyTsunami
+ * spreads as a front and flows around a partial barrier, so a lone vertex
+ * shelters nothing at all. game2 used to place exactly one, which left the
+ * player tapping the same coast five or six times to build what the
+ * original hands them in a single cast — the miracle's own defensive role
+ * ("津波の侵食を防ぐ効果も") delegated to the player's patience.
+ *
+ * The segment lies along whichever heading keeps it on open water (see
+ * reefHeading), which against a shore is the one parallel to it — so the
+ * reef shelters the beach behind it rather than jutting out to sea. Land is
+ * never overwritten: vertices of the segment that are already above water
+ * are skipped, so a reef laid against a headland wraps up to it and stops.
+ *
+ * Returns the vertices actually raised, so a cast that would do nothing can
+ * be refused rather than silently charged for.
  */
-export function applyReef(heightmap: Heightmap, x: number, y: number, hardness: number = REEF_HARDNESS): boolean {
-  const vx = Math.round(x);
-  const vy = Math.round(y);
-  if (vx < 0 || vy < 0 || vx > heightmap.width || vy > heightmap.height) return false;
-  if (heightmap.vertices[vy][vx] > heightmap.waterLevel) return false;
+export function applyReef(
+  heightmap: Heightmap,
+  x: number,
+  y: number,
+  hardness: number = REEF_HARDNESS,
+  length: number = REEF_LENGTH,
+): { x: number; y: number }[] {
+  const cx = Math.round(x);
+  const cy = Math.round(y);
+  const raised: { x: number; y: number }[] = [];
+  if (cx < 0 || cy < 0 || cx > heightmap.width || cy > heightmap.height) return raised;
+  if (heightmap.vertices[cy][cx] > heightmap.waterLevel) return raised;
 
-  heightmap.vertices[vy][vx] = Math.min(MAX_ELEVATION, heightmap.waterLevel + REEF_HEIGHT);
-  heightmap.rockHardness[vy][vx] = hardness;
-  return true;
+  const heading = reefHeading(heightmap, cx, cy, length);
+  // Centred on the tap: an odd length puts the tapped vertex in the middle,
+  // an even one leans the extra vertex forward along the heading.
+  const back = Math.floor((length - 1) / 2);
+
+  for (let step = 0; step < length; step++) {
+    const vx = cx + heading.x * (step - back);
+    const vy = cy + heading.y * (step - back);
+    if (vx < 0 || vy < 0 || vx > heightmap.width || vy > heightmap.height) continue;
+    if (heightmap.vertices[vy][vx] > heightmap.waterLevel) continue;
+
+    heightmap.vertices[vy][vx] = Math.min(MAX_ELEVATION, heightmap.waterLevel + REEF_HEIGHT);
+    heightmap.rockHardness[vy][vx] = hardness;
+    raised.push({ x: vx, y: vy });
+  }
+
+  return raised;
 }
 
 /** How far from its cast point a forest plants trees, in vertices. */

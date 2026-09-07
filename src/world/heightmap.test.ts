@@ -37,6 +37,7 @@ import {
   isCrevice,
   isRock,
   REEF_HEIGHT,
+  REEF_LENGTH,
   isTerrainEditAllowed,
   pickTerrainEditRule,
   raiseTile,
@@ -766,10 +767,13 @@ describe("applyTsunami", () => {
    */
   it("is stopped by a reef wall even though the reef is far shorter than the wave", () => {
     const heightmap = flatHeightmap(40, 40, 1);
+    // A north-south channel for the wall to stand in, carved before any
+    // reef is laid so each cast can see the open water it runs along.
+    for (let y = 8; y <= 32; y++) heightmap.vertices[y][24] = MIN_ELEVATION;
     // Spanning the wave's whole reach: anything shorter is flowed around
     // (see the next test), and beyond this span the radius stops it anyway.
-    for (let y = 8; y <= 32; y++) {
-      heightmap.vertices[y][24] = MIN_ELEVATION;
+    // REEF_LENGTH vertices per cast, so a handful of taps closes it.
+    for (let y = 8 + Math.floor(REEF_LENGTH / 2); y <= 32; y += REEF_LENGTH) {
       applyReef(heightmap, 24, y);
     }
 
@@ -786,12 +790,15 @@ describe("applyTsunami", () => {
    * "build a seawall" a real decision instead of a single cheap cast that
    * switches the enemy's most expensive miracle off.
    */
-  it("flows around a reef too short to span the wave, sheltering nothing", () => {
+  it("flows around a single reef cast, too short to span the wave", () => {
     const heightmap = flatHeightmap(40, 40, 1);
-    for (let y = 19; y <= 21; y++) {
-      heightmap.vertices[y][24] = MIN_ELEVATION;
-      applyReef(heightmap, 24, y);
-    }
+    for (let y = 8; y <= 32; y++) heightmap.vertices[y][24] = MIN_ELEVATION;
+    // One cast — REEF_LENGTH vertices of breakwater, against a wave whose
+    // front is 24 vertices across. A line is necessary but not sufficient:
+    // "build a seawall" stays a decision about how much of the coast to
+    // close, rather than one cheap cast that switches the enemy's most
+    // expensive miracle off.
+    applyReef(heightmap, 24, 20);
 
     applyTsunami(heightmap, 20, 20, 12, 6);
 
@@ -801,33 +808,96 @@ describe("applyTsunami", () => {
 
 describe("applyReef", () => {
   it("raises rock just above sea level on a water vertex", () => {
-    const heightmap = flatHeightmap(10, 10, MIN_ELEVATION);
+    const heightmap = flatHeightmap(20, 20, MIN_ELEVATION);
 
-    expect(applyReef(heightmap, 5, 5)).toBe(true);
-    expect(heightmap.vertices[5][5]).toBe(heightmap.waterLevel + REEF_HEIGHT);
-    expect(isRock(heightmap, 5, 5)).toBe(true);
+    expect(applyReef(heightmap, 10, 10)).toContainEqual({ x: 10, y: 10 });
+    expect(heightmap.vertices[10][10]).toBe(heightmap.waterLevel + REEF_HEIGHT);
+    expect(isRock(heightmap, 10, 10)).toBe(true);
+  });
+
+  /**
+   * 「海面上に建物が建てられない土地を**線分状に**発生させる」. The shape is the
+   * miracle: applyTsunami spreads as a front and flows around a partial
+   * barrier, so a single stone shelters nothing. One cast has to produce a
+   * length of breakwater or the miracle's stated defensive role is really
+   * just an instruction to tap the same coast six times.
+   */
+  it("lays a line of reef, not a single stone", () => {
+    const heightmap = flatHeightmap(20, 20, MIN_ELEVATION);
+
+    const raised = applyReef(heightmap, 10, 10);
+
+    expect(raised).toHaveLength(REEF_LENGTH);
+    // A straight line: every vertex on one row or one column, evenly spaced.
+    const sameRow = raised.every((v) => v.y === raised[0].y);
+    const sameColumn = raised.every((v) => v.x === raised[0].x);
+    expect(sameRow || sameColumn).toBe(true);
+  });
+
+  it("centres the line on the cast point", () => {
+    const heightmap = flatHeightmap(20, 20, MIN_ELEVATION);
+
+    const raised = applyReef(heightmap, 10, 10);
+
+    expect(raised).toContainEqual({ x: 10, y: 10 });
+  });
+
+  /**
+   * A breakwater lies along the shore it shelters. Cast against a coast
+   * running north-south, the segment runs north-south too — the heading
+   * that keeps it on water — rather than jutting out into the sea or
+   * running aground.
+   */
+  it("lies along the coast rather than into it", () => {
+    const heightmap = flatHeightmap(20, 20, MIN_ELEVATION);
+    for (let y = 0; y <= 20; y++) {
+      for (let x = 11; x <= 20; x++) heightmap.vertices[y][x] = 3;
+    }
+
+    const raised = applyReef(heightmap, 10, 10);
+
+    expect(raised).toHaveLength(REEF_LENGTH);
+    expect(raised.every((v) => v.x === 10)).toBe(true);
+  });
+
+  it("never overwrites land — the line stops where the shore begins", () => {
+    const heightmap = flatHeightmap(20, 20, MIN_ELEVATION);
+    // A headland cutting the east-west line short on one side. Land to the
+    // north and south as well, so running along the coast is not an option
+    // and the segment has to run into the headland to be truncated by it.
+    for (let x = 0; x <= 20; x++) {
+      heightmap.vertices[9][x] = 3;
+      heightmap.vertices[11][x] = 3;
+    }
+    heightmap.vertices[10][12] = 3;
+
+    const raised = applyReef(heightmap, 10, 10);
+
+    expect(heightmap.vertices[10][12]).toBe(3);
+    expect(raised).not.toContainEqual({ x: 12, y: 10 });
+    expect(raised).toContainEqual({ x: 10, y: 10 });
   });
 
   it("is not buildable land — that is the point of a reef", () => {
-    const heightmap = flatHeightmap(10, 10, MIN_ELEVATION);
+    const heightmap = flatHeightmap(20, 20, MIN_ELEVATION);
 
-    applyReef(heightmap, 5, 5);
+    applyReef(heightmap, 10, 10);
 
-    expect(isBuildable(heightmap, 5, 5)).toBe(false);
+    expect(isBuildable(heightmap, 10, 10)).toBe(false);
   });
 
   it("refuses dry land, where it would just be a pointless volcano", () => {
     const heightmap = flatHeightmap(10, 10, 5);
 
-    expect(applyReef(heightmap, 5, 5)).toBe(false);
+    expect(applyReef(heightmap, 5, 5)).toEqual([]);
     expect(heightmap.vertices[5][5]).toBe(5);
   });
 
   it("refuses vertices outside the map", () => {
     const heightmap = flatHeightmap(10, 10, MIN_ELEVATION);
 
-    expect(applyReef(heightmap, -1, 5)).toBe(false);
-    expect(applyReef(heightmap, 5, 99)).toBe(false);
+    expect(applyReef(heightmap, -1, 5)).toEqual([]);
+    expect(applyReef(heightmap, 5, 99)).toEqual([]);
   });
 });
 
