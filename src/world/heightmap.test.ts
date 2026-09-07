@@ -1164,6 +1164,15 @@ describe("applyMegalith", () => {
     expect(isBoulder(heightmap, 10, 10)).toBe(true);
   });
 
+  it("goes the same way when a plot is levelled into the water rather than dug", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyMegalith(heightmap, 10, 10, 0);
+
+    flattenTile(heightmap, 10, 10, MIN_ELEVATION, "both");
+
+    expect(isBoulder(heightmap, 10, 10)).toBe(false);
+  });
+
   it("is buried by a volcano, which turns it into lava rock instead", () => {
     const heightmap = flatHeightmap(20, 20, 5);
     applyMegalith(heightmap, 10, 10, 1);

@@ -285,7 +285,13 @@ export function flattenTile(heightmap: Heightmap, tileX: number, tileY: number, 
     const row = heightmap.vertices[y];
     if (!row || row[x] === undefined) continue;
     const delta = clamped - row[x];
-    if (delta !== 0 && isTerrainEditAllowed(rule, delta)) row[x] = clamped;
+    if (delta === 0 || !isTerrainEditAllowed(rule, delta)) continue;
+    row[x] = clamped;
+    // Same rule as raiseVertex: a 地下巨石 whose ground ends up under the
+    // sea is gone. Levelling a plot down into the water has to remove it
+    // for the same reason digging does, or which tool the player reached
+    // for would decide whether the stone was destructible.
+    if (heightmap.boulder[y][x] && row[x] <= heightmap.waterLevel) heightmap.boulder[y][x] = false;
   }
 }
 
