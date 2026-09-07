@@ -13,6 +13,8 @@ import {
   ARMAGEDDON_POPULATION_RATIO,
   EARTHQUAKE_MANA_COST,
   ENEMY_PERSONALITY_TUNING,
+  ENEMY_VIEWPORT_ACROSS_TILES,
+  ENEMY_VIEWPORT_ALONG_TILES,
   GUARDIAN_MANA_COST,
   PERSEUS_MANA_COST,
   MIN_ARMAGEDDON_TIME,
@@ -26,6 +28,7 @@ import { collapseSwampsNear } from "../swamp";
 import { eruptVolcano } from "../volcano";
 import { ALL_MIRACLES, type EnemyPersonality, type MiracleId } from "../worlds";
 import { distance, type Point } from "./geometry";
+import { chooseAiViewport } from "./aiViewport";
 
 /**
  * Reported through EnemyMiracleConfig.onAction whenever the enemy
@@ -71,6 +74,12 @@ export interface EnemyMiracleConfig {
    * thresholds, unchanged.
    */
   personality: EnemyPersonality;
+  /**
+   * The enemy god's own view, in tiles across (x - y) and along (x + y) —
+   * see aiViewport.ts and ENEMY_VIEWPORT_ACROSS_TILES. Injectable so a
+   * test can shrink it instead of building a 60-tile map.
+   */
+  viewport: { across: number; along: number };
   /** Called once per miracle actually cast — see EnemyMiracleEvent. */
   onAction: (event: EnemyMiracleEvent) => void;
 }
@@ -107,9 +116,14 @@ export interface EnemyMiracleConfig {
  * thresholds exactly.
  *
  * Both the earthquake and volcano targets are picked by
- * densestOpponentCluster rather than uniformly at random: a real
+ * densestReachableCluster rather than uniformly at random: a real
  * opponent would aim for wherever hits the most houses, not a
- * coin-flip. Each branch spends mana through trySpendMana exactly like
+ * coin-flip — and only at somewhere it can actually reach. Reach is the
+ * same rule the player plays by, ported to a god with no screen: a
+ * target counts only if a view the size and shape of the player's own —
+ * the long thin diamond an isometric screen is in tile space — can hold
+ * both it and one of this faction's own walkers, houses or its shrine
+ * (see aiViewport.ts). Each branch spends mana through trySpendMana exactly like
  * a player's tap, so an enemy that can't afford a step simply falls
  * through to a cheaper one (or does nothing) rather than acting for
  * free — and a branch this world's allowedMiracles hasn't unlocked
@@ -137,6 +151,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
   const rng = config.rng ?? Math.random;
   const allowedMiracles = config.allowedMiracles ?? ALL_MIRACLES;
   const tuning = ENEMY_PERSONALITY_TUNING[config.personality ?? "balanced"];
+  const viewport = config.viewport ?? { across: ENEMY_VIEWPORT_ACROSS_TILES, along: ENEMY_VIEWPORT_ALONG_TILES };
   const onAction = config.onAction ?? (() => {});
   let timeSincePass = decisionInterval;
   let elapsed = 0;
@@ -191,7 +206,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
     }
 
     if (allowedMiracles.includes("volcano") && populationRatio >= VOLCANO_POPULATION_RATIO * tuning.volcanoRatioMultiplier) {
-      const target = densestOpponentCluster(world, opponentId, DEFAULT_VOLCANO_RADIUS, rng);
+      const target = densestReachableCluster(world, factionId, opponentId, DEFAULT_VOLCANO_RADIUS, viewport, rng);
       if (target && trySpendMana(world, factionId, VOLCANO_MANA_COST)) {
         eruptVolcano(world, applyVolcano(heightmap, target.x, target.y));
         onAction({ type: "volcano", position: target });
@@ -200,7 +215,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
     }
 
     if (!allowedMiracles.includes("earthquake")) return;
-    const target = densestOpponentCluster(world, opponentId, DEFAULT_EARTHQUAKE_RADIUS, rng);
+    const target = densestReachableCluster(world, factionId, opponentId, DEFAULT_EARTHQUAKE_RADIUS, viewport, rng);
     if (target && trySpendMana(world, factionId, EARTHQUAKE_MANA_COST)) {
       // Same aiming rule the player gets (see main.ts): away from its own
       // shrine, through the target.
@@ -214,22 +229,61 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
 }
 
 /**
+ * Every position the casting faction can claim to be present at — its
+ * walkers, its houses and its shrine, exactly the three things main.ts
+ * looks for when deciding whether the *player* may cast (see
+ * isOwnFactionVisible).
+ */
+function ownPresence(world: World, factionId: FactionId): Point[] {
+  const positions: Point[] = [];
+  for (const entity of world.query(Position, Owner)) {
+    if (world.get(entity, Owner)!.faction !== factionId) continue;
+    if (!world.has(entity, Walker) && !world.has(entity, House)) continue;
+    positions.push(world.get(entity, Position)!);
+  }
+  const factionEntity = findFactionEntity(world, factionId);
+  if (factionEntity !== undefined) positions.push(world.get(factionEntity, FactionState)!.shrinePosition);
+  return positions;
+}
+
+/**
  * Picks the opponent house surrounded by the most other opponent houses
  * within `radius` — the settlement an earthquake/volcano would actually
- * hit hardest — instead of a uniformly random one. Ties (including the
- * common case of every house being equally isolated) are broken by rng
- * so a single house still gets picked deterministically under a fixed
- * rng in tests.
+ * hit hardest — **out of those the casting god can reach at all**: a
+ * target counts only if one view can hold both it and one of the god's
+ * own (see aiViewport.ts). A denser settlement on
+ * the far side of the map is not a target, it is somewhere to march to
+ * first.
+ *
+ * Ties (including the common case of every house being equally isolated)
+ * are broken by rng so a single house still gets picked deterministically
+ * under a fixed rng in tests.
  */
-function densestOpponentCluster(world: World, opponentId: FactionId, radius: number, rng: () => number): Point | null {
+function densestReachableCluster(
+  world: World,
+  factionId: FactionId,
+  opponentId: FactionId,
+  radius: number,
+  viewport: { across: number; along: number },
+  rng: () => number,
+): Point | null {
   const positions: Point[] = [];
   for (const entity of world.query(House, Position, Owner)) {
     if (world.get(entity, Owner)!.faction === opponentId) positions.push(world.get(entity, Position)!);
   }
   if (positions.length === 0) return null;
 
+  const own = ownPresence(world, factionId);
+  // Scored against every opponent house, reachable or not: how valuable a
+  // settlement is doesn't depend on where the attacker happens to stand.
+  // Only the choice of where to actually strike is limited.
   const scores = positions.map((position) => positions.filter((other) => distance(position, other) <= radius).length);
-  const bestScore = Math.max(...scores);
-  const contenders = positions.filter((_, index) => scores[index] === bestScore);
-  return contenders[Math.floor(rng() * contenders.length)];
+  const reachable = positions
+    .map((position, index) => ({ position, score: scores[index] }))
+    .filter(({ position }) => chooseAiViewport(own, position, viewport.across, viewport.along) !== null);
+  if (reachable.length === 0) return null;
+
+  const bestScore = Math.max(...reachable.map(({ score }) => score));
+  const contenders = reachable.filter(({ score }) => score === bestScore);
+  return contenders[Math.floor(rng() * contenders.length)].position;
 }

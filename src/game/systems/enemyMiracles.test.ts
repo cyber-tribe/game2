@@ -341,6 +341,93 @@ describe("createEnemyMiracleSystem", () => {
     expect(events).toEqual([]);
   });
 
+  /**
+   * The player may only cast where their own people are on screen (see
+   * main.ts's isOwnFactionVisible). These four are the enemy god playing
+   * by the same rule through its own view — see systems/aiViewport.ts.
+   */
+  it("will not strike a settlement it has nobody near", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: EARTHQUAKE_MANA_COST });
+    createFaction(world, "player", { x: 19, y: 19 });
+    createHouse(world, "player", 18, 18);
+
+    const heightmap = flatHeightmap(20, 20, 5);
+    const events: unknown[] = [];
+    // A view 4 tiles each way: the enemy's shrine at (0,0) is nowhere near
+    // the player's house, so no placement of it holds both.
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap,
+      worldCenter: WORLD_CENTER,
+      viewport: { across: 4, along: 4 },
+      onAction: (event) => events.push(event),
+    })(world, 8);
+
+    expect(events).toEqual([]);
+    expect(heightmap.vertices.every((row) => row.every((h) => h === 5))).toBe(true);
+  });
+
+  it("keeps its mana when there is nothing it can reach", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: EARTHQUAKE_MANA_COST });
+    createFaction(world, "player", { x: 19, y: 19 });
+    createHouse(world, "player", 18, 18);
+
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap: flatHeightmap(20, 20, 5),
+      worldCenter: WORLD_CENTER,
+      viewport: { across: 4, along: 4 },
+    })(world, 8);
+
+    expect(world.get(enemy, FactionState)!.mana).toBe(EARTHQUAKE_MANA_COST);
+  });
+
+  it("strikes the same settlement once one of its own walkers has marched up to it", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: EARTHQUAKE_MANA_COST });
+    createFaction(world, "player", { x: 19, y: 19 });
+    createHouse(world, "player", 18, 18);
+    const scout = createWalker(world, "enemy");
+    world.add(scout, Position, { x: 17, y: 18 });
+
+    const events: unknown[] = [];
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap: flatHeightmap(20, 20, 5),
+      worldCenter: WORLD_CENTER,
+      viewport: { across: 4, along: 4 },
+      onAction: (event) => events.push(event),
+    })(world, 8);
+
+    expect(events).toEqual([{ type: "earthquake", position: { x: 18, y: 18 } }]);
+  });
+
+  it("takes the settlement it can reach over a denser one it cannot", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: EARTHQUAKE_MANA_COST });
+    createFaction(world, "player", { x: 19, y: 19 });
+    createHouse(world, "player", 18, 18); // the denser pair, far away
+    createHouse(world, "player", 18, 17);
+    createHouse(world, "player", 1, 1); // lone house, right next to the enemy shrine
+
+    const events: unknown[] = [];
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap: flatHeightmap(20, 20, 5),
+      worldCenter: WORLD_CENTER,
+      viewport: { across: 4, along: 4 },
+      onAction: (event) => events.push(event),
+    })(world, 8);
+
+    expect(events).toEqual([{ type: "earthquake", position: { x: 1, y: 1 } }]);
+  });
+
   it("falls through to earthquake when a decisive population lead exists but armageddon isn't unlocked yet", () => {
     const world = new World();
     const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
