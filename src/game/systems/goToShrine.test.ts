@@ -98,12 +98,44 @@ describe("goToShrineSystem", () => {
     expect(world.has(leader, MoveTarget)).toBe(false);
   });
 
-  it("does nothing when the faction has no leader assigned yet", () => {
+  /**
+   * 「フィールド上の信者達を、シンボルへ集める。…最初に辿り着いた信者は
+   * 「リーダー」となり」 — the order has to be able to start itself. This
+   * used to do nothing at all without a leader, and since nothing else
+   * sent anyone to the shrine to become one, picking 集結シンボルへ before
+   * ever gathering left the walkers wandering off instead.
+   */
+  it("sends everyone to the symbol itself when the faction has no leader yet", () => {
     const world = new World();
-    spawnWalker(world, "player", 0, 0);
+    const walker = spawnWalker(world, "player", 0, 0);
+    const other = spawnWalker(world, "player", 2, 2);
     createFactionState(world, "player", undefined);
 
-    expect(() => goToShrineSystem(world, 1)).not.toThrow();
+    goToShrineSystem(world, 1);
+
+    expect(world.get(walker, MoveTarget)).toEqual({ x: 9, y: 9 });
+    expect(world.get(other, MoveTarget)).toEqual({ x: 9, y: 9 });
+  });
+
+  it("leaves another faction's walkers alone while bootstrapping a leader", () => {
+    const world = new World();
+    const enemy = spawnWalker(world, "enemy", 0, 0);
+    createFactionState(world, "player", undefined);
+
+    goToShrineSystem(world, 1);
+
+    expect(world.has(enemy, MoveTarget)).toBe(false);
+  });
+
+  it("does not drag along someone Helen is holding while bootstrapping", () => {
+    const world = new World();
+    const held = spawnWalker(world, "player", 0, 0);
+    world.add(held, Charmed, { by: spawnWalker(world, "enemy", 1, 1) });
+    createFactionState(world, "player", undefined);
+
+    goToShrineSystem(world, 1);
+
+    expect(world.has(held, MoveTarget)).toBe(false);
   });
 
   /**

@@ -681,7 +681,12 @@ describe("Simulation", () => {
     expect(leaderIds.every((id) => id !== undefined)).toBe(true);
   });
 
-  it("under goToShrine mode, walks a lone leader to a relocated shrine and settles it there", () => {
+  /**
+   * 「集合：…その間、平地があっても新たな建物は一切建てない」. The walker
+   * marches to the symbol and *stands there*. It used to found a hut on
+   * arrival, which turned the order to muster into 定住 with extra steps.
+   */
+  it("under goToShrine mode, walks a lone leader to a relocated shrine and builds nothing there", () => {
     const sim = new Simulation({ worldWidth: 20, worldHeight: 20, initialWalkersPerFaction: 1 });
     // Assigning leaderId directly (rather than via a "gather" pass) sidesteps
     // gatherTargetingSystem's own "nobody else left to gather" fallback (see
@@ -696,14 +701,14 @@ describe("Simulation", () => {
     sim.moveShrine("player", shrine);
 
     // Starting distance is 10 tiles at DEFAULT_WALKER_SPEED=1.5 tiles/s: ~6.7s to arrive.
-    // Stay well under the ~5s-after-arrival mark where the settled hut would
-    // finish accumulating enough population to spawn (and instantly settle)
-    // a second walker at the same spot.
     for (let i = 0; i < 100; i++) sim.update(0.1);
 
+    const playerWalkers = sim.world.query(Walker, Owner, Position).filter((entity) => sim.world.get(entity, Owner)!.faction === "player");
+    expect(playerWalkers).toHaveLength(1);
+    expect(sim.world.get(playerWalkers[0], Position)).toEqual(shrine);
+
     const playerHouses = sim.world.query(House, Owner, Position).filter((entity) => sim.world.get(entity, Owner)!.faction === "player");
-    expect(playerHouses).toHaveLength(1);
-    expect(sim.world.get(playerHouses[0], Position)).toEqual(shrine);
+    expect(playerHouses).toHaveLength(0);
   });
 
   it("a knighted leader hunts down the enemy regardless of behaviorMode, and survives the kill", () => {
