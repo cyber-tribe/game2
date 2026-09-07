@@ -4,6 +4,7 @@ export type ToolMode =
   | "raise"
   | "lower"
   | "flatten"
+  | "autoFlatten"
   | "shrine"
   | "earthquake"
   | "swamp"

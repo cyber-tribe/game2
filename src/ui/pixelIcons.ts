@@ -11,6 +11,7 @@ export type IconKind =
   | "raise"
   | "lower"
   | "flatten"
+  | "autoFlatten"
   | "shrine"
   | "earthquake"
   | "swamp"

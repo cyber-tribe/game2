@@ -296,6 +296,114 @@ export function flattenTile(heightmap: Heightmap, tileX: number, tileY: number, 
 }
 
 /**
+ * How many tiles across one 自動整地 levels — 「Xボタンで建物を中心に
+ * 7x7マスの平地を確保」. See planAutoFlatten.
+ *
+ * Deliberately the original's number rather than one derived from
+ * HOUSE_UPGRADE_FLATNESS_RADIUS: 7x7 tiles is 8x8 vertices, comfortably
+ * more than the 5x5 vertex window countFlatNeighbors checks at radius 2,
+ * so a plot secured this way actually carries the house all the way to
+ * 城砦 instead of landing exactly on the threshold.
+ */
+export const AUTO_FLATTEN_SIZE = 7;
+
+/** Whether flattenTile would move any of this tile's corners. */
+function tileNeedsFlattening(
+  heightmap: Heightmap,
+  tileX: number,
+  tileY: number,
+  elevation: number,
+  rule: TerrainEditRule,
+): boolean {
+  const clamped = Math.min(MAX_ELEVATION, Math.max(MIN_ELEVATION, elevation));
+  for (const [x, y] of [
+    [tileX, tileY],
+    [tileX + 1, tileY],
+    [tileX + 1, tileY + 1],
+    [tileX, tileY + 1],
+  ] as const) {
+    const row = heightmap.vertices[y];
+    if (!row || row[x] === undefined) continue;
+    const delta = clamped - row[x];
+    if (delta !== 0 && isTerrainEditAllowed(rule, delta)) return true;
+  }
+  return false;
+}
+
+/**
+ * The original's 自動整地 (「Xボタンで建物を中心に7x7マスの平地を確保」),
+ * one of the two conveniences the original is praised for by name —
+ * 「操作性も練られている」.
+ *
+ * game2's own 平坦化 is a brush: the player drags it over a plot and every
+ * tile the gesture touches is levelled to the elevation the first tile
+ * seeded. That works, but securing the plot a house needs to reach 城砦
+ * means dragging accurately over 49 tiles, and the original hands the same
+ * result to one button press aimed at the building itself.
+ *
+ * This plans the edit rather than performing it, so the caller can price it
+ * (one TERRAIN_EDIT_MANA_COST per tile, exactly what doing it by hand
+ * costs — this is an ergonomic convenience, not a discount) and refuse the
+ * whole thing before spending anything.
+ *
+ * The target elevation comes from the *centre* tile only, under the same
+ * rule the brush uses for the tile that seeds a stroke. Averaging the whole
+ * 7x7 would shift the ground under the building the plot is being levelled
+ * for; taking the centre keeps the house exactly where it stands and moves
+ * the surroundings to meet it.
+ *
+ * `isEditable` filters out tiles the caller isn't allowed to reshape (the
+ * enemy-territory restriction some worlds impose). Those are skipped rather
+ * than failing the cast, and — since they're absent from the returned list
+ * — never charged for.
+ */
+export function planAutoFlatten(
+  heightmap: Heightmap,
+  centerTileX: number,
+  centerTileY: number,
+  rule: TerrainEditRule,
+  size: number = AUTO_FLATTEN_SIZE,
+  isEditable: (tile: { x: number; y: number }) => boolean = () => true,
+): { elevation: number; tiles: { x: number; y: number }[] } {
+  const cx = Math.min(Math.max(Math.round(centerTileX), 0), heightmap.width - 1);
+  const cy = Math.min(Math.max(Math.round(centerTileY), 0), heightmap.height - 1);
+
+  const corners = [
+    heightmap.vertices[cy][cx],
+    heightmap.vertices[cy][cx + 1],
+    heightmap.vertices[cy + 1][cx + 1],
+    heightmap.vertices[cy + 1][cx],
+  ];
+  // Rounded, unlike the brush's fractional average: the brush's target is
+  // whatever the first tile of a stroke happened to average to, but a plot
+  // this tool "secures" should land on a whole terrace, so a second press
+  // on the same house is a no-op (and free) rather than forever chasing a
+  // fractional height no neighbouring tile shares.
+  const elevation =
+    rule === "raiseOnly"
+      ? Math.max(...corners)
+      : rule === "lowerOnly"
+        ? Math.min(...corners)
+        : Math.round(corners.reduce((sum, h) => sum + h, 0) / corners.length);
+
+  const back = Math.floor((size - 1) / 2);
+  const tiles: { x: number; y: number }[] = [];
+  for (let dy = 0; dy < size; dy++) {
+    const y = cy + dy - back;
+    if (y < 0 || y >= heightmap.height) continue;
+    for (let dx = 0; dx < size; dx++) {
+      const x = cx + dx - back;
+      if (x < 0 || x >= heightmap.width) continue;
+      if (!isEditable({ x, y })) continue;
+      if (!tileNeedsFlattening(heightmap, x, y, elevation, rule)) continue;
+      tiles.push({ x, y });
+    }
+  }
+
+  return { elevation, tiles };
+}
+
+/**
  * Bilinearly interpolated elevation at a fractional tile-space point,
  * clamped to the grid. Shared by the renderer (to place things on the
  * surface) and by game logic (to decide what's dry land).

@@ -60,11 +60,31 @@
       },
       "trimmed": false
     },
-    "icon_earthquake": {
+    "icon_autoFlatten": {
       "frame": {
         "h": 16,
         "w": 16,
         "x": 48,
+        "y": 0
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 16,
+        "w": 16
+      },
+      "spriteSourceSize": {
+        "h": 16,
+        "w": 16,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "icon_earthquake": {
+      "frame": {
+        "h": 16,
+        "w": 16,
+        "x": 64,
         "y": 0
       },
       "rotated": false,
@@ -84,7 +104,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 64,
+        "x": 80,
         "y": 0
       },
       "rotated": false,
@@ -104,7 +124,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 80,
+        "x": 96,
         "y": 0
       },
       "rotated": false,
@@ -124,7 +144,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 96,
+        "x": 112,
         "y": 0
       },
       "rotated": false,
@@ -144,7 +164,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 112,
+        "x": 128,
         "y": 0
       },
       "rotated": false,
@@ -164,7 +184,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 128,
+        "x": 144,
         "y": 0
       },
       "rotated": false,
@@ -184,7 +204,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 144,
+        "x": 160,
         "y": 0
       },
       "rotated": false,
@@ -204,7 +224,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 160,
+        "x": 176,
         "y": 0
       },
       "rotated": false,
@@ -224,7 +244,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 176,
+        "x": 192,
         "y": 0
       },
       "rotated": false,
@@ -244,7 +264,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 192,
+        "x": 208,
         "y": 0
       },
       "rotated": false,
@@ -264,7 +284,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 208,
+        "x": 224,
         "y": 0
       },
       "rotated": false,
@@ -284,7 +304,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 224,
+        "x": 240,
         "y": 0
       },
       "rotated": false,
@@ -304,8 +324,8 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 240,
-        "y": 0
+        "x": 0,
+        "y": 16
       },
       "rotated": false,
       "sourceSize": {
@@ -324,7 +344,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 0,
+        "x": 16,
         "y": 16
       },
       "rotated": false,
@@ -344,7 +364,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 16,
+        "x": 32,
         "y": 16
       },
       "rotated": false,
@@ -364,7 +384,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 32,
+        "x": 48,
         "y": 16
       },
       "rotated": false,
@@ -384,7 +404,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 48,
+        "x": 64,
         "y": 16
       },
       "rotated": false,
@@ -404,7 +424,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 64,
+        "x": 80,
         "y": 16
       },
       "rotated": false,
@@ -424,7 +444,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 80,
+        "x": 96,
         "y": 16
       },
       "rotated": false,
@@ -444,7 +464,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 96,
+        "x": 112,
         "y": 16
       },
       "rotated": false,
@@ -464,7 +484,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 112,
+        "x": 128,
         "y": 16
       },
       "rotated": false,
@@ -484,7 +504,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 128,
+        "x": 144,
         "y": 16
       },
       "rotated": false,
@@ -504,7 +524,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 144,
+        "x": 160,
         "y": 16
       },
       "rotated": false,
@@ -524,7 +544,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 160,
+        "x": 176,
         "y": 16
       },
       "rotated": false,
@@ -544,7 +564,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 176,
+        "x": 192,
         "y": 16
       },
       "rotated": false,
@@ -564,7 +584,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 192,
+        "x": 208,
         "y": 16
       },
       "rotated": false,
@@ -584,7 +604,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 208,
+        "x": 224,
         "y": 16
       },
       "rotated": false,
@@ -604,7 +624,7 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 224,
+        "x": 240,
         "y": 16
       },
       "rotated": false,
@@ -624,26 +644,6 @@
       "frame": {
         "h": 16,
         "w": 16,
-        "x": 240,
-        "y": 16
-      },
-      "rotated": false,
-      "sourceSize": {
-        "h": 16,
-        "w": 16
-      },
-      "spriteSourceSize": {
-        "h": 16,
-        "w": 16,
-        "x": 0,
-        "y": 0
-      },
-      "trimmed": false
-    },
-    "icon_shrine": {
-      "frame": {
-        "h": 16,
-        "w": 16,
         "x": 0,
         "y": 32
       },
@@ -660,7 +660,7 @@
       },
       "trimmed": false
     },
-    "icon_storm": {
+    "icon_shrine": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -680,7 +680,7 @@
       },
       "trimmed": false
     },
-    "icon_swamp": {
+    "icon_storm": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -700,7 +700,7 @@
       },
       "trimmed": false
     },
-    "icon_tornado": {
+    "icon_swamp": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -720,7 +720,7 @@
       },
       "trimmed": false
     },
-    "icon_tsunami": {
+    "icon_tornado": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -740,7 +740,7 @@
       },
       "trimmed": false
     },
-    "icon_volcano": {
+    "icon_tsunami": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -760,11 +760,31 @@
       },
       "trimmed": false
     },
-    "icon_wall": {
+    "icon_volcano": {
       "frame": {
         "h": 16,
         "w": 16,
         "x": 96,
+        "y": 32
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 16,
+        "w": 16
+      },
+      "spriteSourceSize": {
+        "h": 16,
+        "w": 16,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "icon_wall": {
+      "frame": {
+        "h": 16,
+        "w": 16,
+        "x": 112,
         "y": 32
       },
       "rotated": false,

@@ -125,6 +125,28 @@ ICONS: dict[str, list[str]] = {
         "..oooooooooooo..",
         "................",
     ],
+    # 自動整地 — the plot, not the act. Four corner posts staking out the
+    # ground around a house is what this command actually does; reusing the
+    # flatten icon's arrows would have said "level land" without saying
+    # *where*, which is the only thing separating the two buttons.
+    "autoFlatten": [
+        "ooo..........ooo",
+        "oSo..........oSo",
+        "ooo..........ooo",
+        "................",
+        ".......oo.......",
+        "......obbo......",
+        ".....obbbbo.....",
+        "....obbbbbbo....",
+        "...oooooooooo...",
+        ".....oddddo.....",
+        ".....oddddo.....",
+        ".....oooooo.....",
+        "................",
+        "ooo..........ooo",
+        "oSo..........oSo",
+        "ooo..........ooo",
+    ],
     # A slab split by a crack that actually runs through it. The old icon
     # scattered short strokes across the tile with no ground under them, so
     # there was nothing for the crack to be a crack *in*.
@@ -901,6 +923,7 @@ ICON_KINDS = (
     "raise",
     "lower",
     "flatten",
+    "autoFlatten",
     "shrine",
     "earthquake",
     "swamp",

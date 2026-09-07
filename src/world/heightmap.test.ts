@@ -9,6 +9,8 @@ import {
   VOLCANO_ROCK_HARDNESS,
   applyEarthquake,
   applyReef,
+  AUTO_FLATTEN_SIZE,
+  planAutoFlatten,
   applyTsunami,
   applyFireRain,
   applyFlower,
@@ -203,6 +205,133 @@ describe("raiseTile", () => {
 
     expect(heightmap.rockHardness[0][0]).toBe(2);
     expect(heightmap.rockHardness[1][1]).toBe(1);
+  });
+});
+
+describe("planAutoFlatten", () => {
+  /**
+   * 「Xボタンで建物を中心に7x7マスの平地を確保」. The size is the promise: a
+   * plot this wide is 8x8 vertices, comfortably more than the 5x5 window
+   * countFlatNeighbors checks at HOUSE_UPGRADE_FLATNESS_RADIUS, so the
+   * house it is aimed at can actually reach 城砦 on it.
+   */
+  it("plans the full AUTO_FLATTEN_SIZE square around the centre", () => {
+    const heightmap = flatHeightmap(30, 30, 3);
+    // Every tile bumpy, so none is filtered out for already being level.
+    for (let y = 0; y <= 30; y++) {
+      for (let x = 0; x <= 30; x++) heightmap.vertices[y][x] = (x + y) % 2 === 0 ? 3 : 5;
+    }
+
+    const { tiles } = planAutoFlatten(heightmap, 15, 15, "both");
+
+    expect(tiles).toHaveLength(AUTO_FLATTEN_SIZE * AUTO_FLATTEN_SIZE);
+    const half = Math.floor(AUTO_FLATTEN_SIZE / 2);
+    expect(tiles.every((t) => Math.abs(t.x - 15) <= half && Math.abs(t.y - 15) <= half)).toBe(true);
+  });
+
+  /**
+   * The point of aiming at a building: the ground it stands on must not
+   * move out from under it. Averaging the whole 7x7 would drag the house's
+   * own tile toward whatever the surrounding hills happen to average to.
+   */
+  it("takes its target elevation from the centre tile, not the whole plot", () => {
+    const heightmap = flatHeightmap(30, 30, 2);
+    for (let y = 0; y <= 30; y++) {
+      for (let x = 0; x <= 30; x++) heightmap.vertices[y][x] = 9;
+    }
+    for (const [x, y] of [
+      [15, 15],
+      [16, 15],
+      [16, 16],
+      [15, 16],
+    ]) {
+      heightmap.vertices[y][x] = 2;
+    }
+
+    const { elevation } = planAutoFlatten(heightmap, 15, 15, "both");
+
+    expect(elevation).toBe(2);
+  });
+
+  it("levels the whole plot to that elevation once applied", () => {
+    const heightmap = flatHeightmap(30, 30, 9);
+    for (const [x, y] of [
+      [15, 15],
+      [16, 15],
+      [16, 16],
+      [15, 16],
+    ]) {
+      heightmap.vertices[y][x] = 2;
+    }
+
+    const { elevation, tiles } = planAutoFlatten(heightmap, 15, 15, "both");
+    for (const tile of tiles) flattenTile(heightmap, tile.x, tile.y, elevation, "both");
+
+    // The interior of the plot — every vertex whose 4 surrounding tiles are
+    // all inside it — is now one flat terrace.
+    for (let y = 13; y <= 18; y++) {
+      for (let x = 13; x <= 18; x++) expect(heightmap.vertices[y][x]).toBe(2);
+    }
+  });
+
+  /**
+   * Priced as the same work done by hand, so a second press on a plot that
+   * is already level is free rather than charging for 49 no-ops. This is
+   * also why the target elevation is rounded — a fractional one would leave
+   * every tile forever "needing" work.
+   */
+  it("plans nothing on ground that is already level", () => {
+    const heightmap = flatHeightmap(30, 30, 4);
+
+    expect(planAutoFlatten(heightmap, 15, 15, "both").tiles).toEqual([]);
+  });
+
+  it("clips the plot to the map rather than running off it", () => {
+    const heightmap = flatHeightmap(30, 30, 3);
+    for (let y = 0; y <= 30; y++) {
+      for (let x = 0; x <= 30; x++) heightmap.vertices[y][x] = (x + y) % 2 === 0 ? 3 : 5;
+    }
+
+    const { tiles } = planAutoFlatten(heightmap, 0, 0, "both");
+
+    expect(tiles.every((t) => t.x >= 0 && t.y >= 0)).toBe(true);
+    expect(tiles.length).toBeLessThan(AUTO_FLATTEN_SIZE * AUTO_FLATTEN_SIZE);
+  });
+
+  /**
+   * Some worlds forbid reshaping land inside the enemy's territory. A plot
+   * straddling that border levels the part it may and simply leaves the
+   * rest — and, since the blocked tiles never enter the plan, is not
+   * charged for them either.
+   */
+  it("drops tiles the caller forbids instead of failing the whole plan", () => {
+    const heightmap = flatHeightmap(30, 30, 3);
+    for (let y = 0; y <= 30; y++) {
+      for (let x = 0; x <= 30; x++) heightmap.vertices[y][x] = (x + y) % 2 === 0 ? 3 : 5;
+    }
+
+    const { tiles } = planAutoFlatten(heightmap, 15, 15, "both", AUTO_FLATTEN_SIZE, (tile) => tile.x <= 15);
+
+    expect(tiles.length).toBeGreaterThan(0);
+    expect(tiles.every((t) => t.x <= 15)).toBe(true);
+  });
+
+  it("under raiseOnly, levels up to the centre tile's highest corner", () => {
+    const heightmap = flatHeightmap(30, 30, 3);
+    heightmap.vertices[15][15] = 6;
+
+    const { elevation } = planAutoFlatten(heightmap, 15, 15, "raiseOnly");
+
+    expect(elevation).toBe(6);
+  });
+
+  it("under lowerOnly, levels down to the centre tile's lowest corner", () => {
+    const heightmap = flatHeightmap(30, 30, 3);
+    heightmap.vertices[15][15] = 1;
+
+    const { elevation } = planAutoFlatten(heightmap, 15, 15, "lowerOnly");
+
+    expect(elevation).toBe(1);
   });
 });
 

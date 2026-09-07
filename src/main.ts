@@ -80,7 +80,7 @@ import { mountCommandIcons } from "./ui/commandIcons";
 import { loadCommandIcons } from "./ui/pixelIcons";
 import { StatusPanel } from "./ui/statusPanel";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
-import { DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyFlower, applyForest, applyFungus, DEFAULT_FLOWER_RADIUS, applyReef, applyRoad, applyWall, applyMegalith, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
+import { AUTO_FLATTEN_SIZE, DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyFlower, applyForest, applyFungus, DEFAULT_FLOWER_RADIUS, applyReef, applyRoad, applyWall, applyMegalith, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, planAutoFlatten, raiseVertex } from "./world/heightmap";
 
 /**
  * The camera's fixed base scale — see layout()'s doc comment for why this
@@ -656,6 +656,52 @@ async function bootstrap(world: WorldDefinition) {
     dismissTutorialHint();
   };
 
+  /**
+   * The original's 自動整地 — 「Xボタンで建物を中心に7x7マスの平地を確保」,
+   * one of the two conveniences the original is praised for by name.
+   *
+   * Aimed at a *house*, not at the ground: the plot this levels is the one
+   * a particular building sits in, which is what makes it a single press
+   * rather than an accurate 49-tile drag with 平坦化. Only the player's own
+   * houses — this is a shortcut for tending your own village, not a way to
+   * reshape the ground under the enemy's.
+   *
+   * Priced at exactly what the same work costs by hand (one
+   * TERRAIN_EDIT_MANA_COST per tile that actually moves), and quoted in
+   * full before anything is spent, so this is an ergonomic convenience
+   * rather than a discount on terraforming.
+   */
+  const applyAutoFlattenAt = (localX: number, localY: number): void => {
+    const target = pickInspectableEntity(localX, localY);
+    if (!target || target.kind !== "house" || target.faction !== "player") {
+      showEntityInfo("自動整地は自分の家をタップしてください", "warning");
+      return;
+    }
+
+    const { elevation, tiles } = planAutoFlatten(
+      heightmap,
+      target.position.x,
+      target.position.y,
+      terrainEditRule,
+      AUTO_FLATTEN_SIZE,
+      // Same restriction the manual tools honour — see applyFlattenEditAt.
+      // Blocked tiles drop out of the plan, so they are neither levelled
+      // nor charged for, and the rest of the plot still levels.
+      (tile) => world.enemyTerritoryEditable || !simulation.isEnemyTerritory("player", tile),
+    );
+
+    if (tiles.length === 0) {
+      showEntityInfo("この家の周りはすでに平地です");
+      return;
+    }
+    if (!trySpendPlayerMana(tiles.length * TERRAIN_EDIT_MANA_COST)) return;
+
+    for (const tile of tiles) flattenTile(heightmap, tile.x, tile.y, elevation, terrainEditRule);
+    renderer.redraw(visibleBounds());
+    vibrate(30);
+    dismissTutorialHint();
+  };
+
   // Dispatches to whichever of the two above the current toolMode needs —
   // shared by the plain single-tap path (applyTool, below) and by ブラシ
   // continuous painting (see the pointer handlers further down).
@@ -685,6 +731,11 @@ async function bootstrap(world: WorldDefinition) {
     if (toolMode === "inspect") {
       const entity = pickInspectableEntity(local.x, local.y);
       if (entity) showEntityInfo(describeInspectableEntity(entity));
+      return;
+    }
+
+    if (toolMode === "autoFlatten") {
+      applyAutoFlattenAt(local.x, local.y);
       return;
     }
 

@@ -5,6 +5,7 @@ const ALL_KINDS: IconKind[] = [
   "raise",
   "lower",
   "flatten",
+  "autoFlatten",
   "shrine",
   "earthquake",
   "swamp",
