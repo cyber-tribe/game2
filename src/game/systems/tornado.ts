@@ -7,6 +7,7 @@ import {
   TORNADO_RADIUS,
   TORNADO_SPEED,
   TORNADO_WANDER,
+  TORNADO_WHIRLPOOL_INTERVAL,
 } from "../constants";
 import { createWhirlpool } from "../tornado";
 import type { OnImpactEffect } from "./effects";
@@ -66,24 +67,39 @@ export function createTornadoSystem(config: Partial<TornadoConfig> = {}): System
         y: pos.y + stepY * TORNADO_SPEED * deltaSeconds,
       };
 
-      // 水地形へ入ると渦巻きへ変化する — the interaction both miracles
-      // exist for. Checked against a genuine body of water (the same test
-      // drowning.ts uses), not a single half-submerged shoreline tile: a
-      // tornado grazing a puddle should not become a sea hazard.
-      if (heightmap && isInWaterPool(heightmap, next.x, next.y)) {
-        world.destroyEntity(entity);
-        createWhirlpool(world, next.x, next.y, stepX, stepY);
-        continue;
-      }
-
       const remaining = tornado.remaining - deltaSeconds;
       if (remaining <= 0) {
         world.destroyEntity(entity);
         continue;
       }
 
+      // 「海上では渦巻きを大量発生させる」 — the interaction both miracles
+      // exist for. Checked against a genuine body of water (the same test
+      // drowning.ts uses), not a single half-submerged shoreline tile: a
+      // tornado grazing a puddle should not become a sea hazard.
+      //
+      // The tornado is *not* consumed by the first one. game2 used to
+      // destroy it and leave a single 渦巻き behind, which made the
+      // original's stated tactic — 「敵陣の海岸付近に大量に仕掛けると土地を
+      // 広げにくくなるので効果的」 — impossible to play: one cast bought one
+      // whirlpool, so "大量" could only ever mean "cast it many times".
+      // It keeps crossing the water for the rest of its 一定時間, shedding
+      // one every TORNADO_WHIRLPOOL_INTERVAL.
+      const atSea = heightmap !== undefined && isInWaterPool(heightmap, next.x, next.y);
+      // Only counts up at sea: a tornado that spent a while over land does
+      // not arrive at the coast owing a backlog of whirlpools.
+      let sinceWhirlpool = atSea ? tornado.sinceWhirlpool + deltaSeconds : tornado.sinceWhirlpool;
+      if (atSea && sinceWhirlpool >= TORNADO_WHIRLPOOL_INTERVAL) {
+        sinceWhirlpool = 0;
+        createWhirlpool(world, next.x, next.y, stepX, stepY);
+      }
+
       world.add(entity, Position, next);
-      world.add(entity, Tornado, { remaining, headingX: stepX, headingY: stepY });
+      world.add(entity, Tornado, { remaining, headingX: stepX, headingY: stepY, sinceWhirlpool });
+
+      // Nothing to drag out at sea — walkers there are drowning.ts's
+      // business — and the loop below is the expensive part of this system.
+      if (atSea) continue;
 
       for (const walkerEntity of world.query(Walker, Position)) {
         const walkerPos = world.get(walkerEntity, Position)!;
