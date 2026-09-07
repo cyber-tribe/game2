@@ -1,5 +1,10 @@
 import type { ComponentType, System, World } from "../../ecs";
-import { ENEMY_AI_AGGRESSION_THRESHOLD, ENEMY_AI_DECISION_INTERVAL, ENEMY_AI_THREAT_RADIUS } from "../constants";
+import {
+  ENEMY_AI_AGGRESSION_THRESHOLD,
+  ENEMY_AI_DECISION_INTERVAL,
+  ENEMY_AI_ECONOMY_FLOOR,
+  ENEMY_AI_THREAT_RADIUS,
+} from "../constants";
 import { FactionState, House, Owner, Position, Walker, type BehaviorMode, type FactionId } from "../components";
 import { findFactionEntity } from "../faction";
 import { distance } from "./geometry";
@@ -14,6 +19,11 @@ export interface EnemyAiConfig {
   aggressionThreshold: number;
   /** Distance at which an opposing walker near a house forces "fight" mode. */
   threatRadius: number;
+  /**
+   * Houses the faction wants before it stops settling and marches — see
+   * ENEMY_AI_ECONOMY_FLOOR. Defence ignores it.
+   */
+  economyFloor: number;
 }
 
 /**
@@ -40,6 +50,7 @@ export function createEnemyAiSystem(config: Partial<EnemyAiConfig> = {}): System
   const decisionInterval = config.decisionInterval ?? ENEMY_AI_DECISION_INTERVAL;
   const aggressionThreshold = config.aggressionThreshold ?? ENEMY_AI_AGGRESSION_THRESHOLD;
   const threatRadius = config.threatRadius ?? ENEMY_AI_THREAT_RADIUS;
+  const economyFloor = config.economyFloor ?? ENEMY_AI_ECONOMY_FLOOR;
   let timeSinceDecision = decisionInterval;
 
   return (world, deltaSeconds) => {
@@ -54,11 +65,22 @@ export function createEnemyAiSystem(config: Partial<EnemyAiConfig> = {}): System
     if (state.finalBattle) return; // once the final battle starts, there's no going back to routine decisions
 
     const walkerCount = countOwned(world, factionId, Walker);
+    const houseCount = countOwned(world, factionId, House);
     const underThreat = isUnderThreat(world, factionId, opponentId, threatRadius);
     const hasLeader =
       state.leaderId !== undefined && world.isAlive(state.leaderId) && world.has(state.leaderId, Walker);
+    // An army is not a war effort. Marching means nobody settles, so a
+    // faction that goes aggressive before it has houses never builds one
+    // — see ENEMY_AI_ECONOMY_FLOOR. Being attacked overrides it: a
+    // faction that answers a raid by carrying on building loses either
+    // way.
+    const canAffordToMarch = houseCount >= economyFloor;
     const nextMode: BehaviorMode =
-      walkerCount >= aggressionThreshold || underThreat ? "fight" : hasLeader ? "settle" : "gather";
+      underThreat || (walkerCount >= aggressionThreshold && canAffordToMarch)
+        ? "fight"
+        : hasLeader
+          ? "settle"
+          : "gather";
 
     if (state.behaviorMode !== nextMode) {
       world.add(factionEntity, FactionState, { ...state, behaviorMode: nextMode });

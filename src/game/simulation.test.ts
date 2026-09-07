@@ -37,6 +37,9 @@ describe("Simulation", () => {
       initialWalkersPerFaction: 3,
       enemyAggressionThreshold: 3,
       enemyDecisionInterval: 1,
+      // Not what this test is about — see ENEMY_AI_ECONOMY_FLOOR, which
+      // would otherwise keep a faction with nothing built at home.
+      enemyEconomyFloor: 0,
     });
     aggressive.update(0.1);
     expect(aggressive.summarize().find((s) => s.id === "enemy")!.behaviorMode).toBe("fight");
@@ -129,6 +132,7 @@ describe("Simulation", () => {
       initialWalkersPerFaction: 0,
       enemyDecisionInterval: 1,
       enemyAggressionThreshold: 1, // keeps createEnemyAiSystem's own read of "fight" from overriding the behaviorMode set below
+      enemyEconomyFloor: 0, // nor is the economy floor what this test is about
     });
     const balancedLeader = setUpBehindEnemy(balanced);
     balanced.update(1);
@@ -141,6 +145,7 @@ describe("Simulation", () => {
       initialWalkersPerFaction: 0,
       enemyDecisionInterval: 1,
       enemyAggressionThreshold: 1,
+      enemyEconomyFloor: 0,
       enemyPersonality: "aggressive",
     });
     const aggressiveLeader = setUpBehindEnemy(aggressive);

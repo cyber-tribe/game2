@@ -82,6 +82,14 @@ export interface SimulationConfig {
   enemyDecisionInterval?: number;
   enemyAggressionThreshold?: number;
   /**
+   * Houses the enemy wants before it will march (see constants.ts's
+   * ENEMY_AI_ECONOMY_FLOOR). Same shape as the two knobs above — a world
+   * could tune how patient its enemy is — and it lets a test about some
+   * *other* reason the enemy fights opt out of this one. Defaults to the
+   * constant.
+   */
+  enemyEconomyFloor?: number;
+  /**
    * Same per-world "使用可能な奇跡の制限" (see game/worlds.ts's
    * WorldDefinition.allowedMiracles) applied to the enemy's own miracle
    * casting (enemyMiracles.ts), not just the player's toolbar — "敵の神は
@@ -269,6 +277,7 @@ export class Simulation {
         createEnemyAiSystem({
           decisionInterval: config.enemyDecisionInterval,
           aggressionThreshold: config.enemyAggressionThreshold,
+          economyFloor: config.enemyEconomyFloor,
         }),
       )
       .add(leaderSystem)
