@@ -9,11 +9,40 @@ import type { Point } from "./geometry";
  * リーダーはシンボルへ向かう（軍勢の誘導）". Runs before
  * createWanderTargetSystem so it can claim a MoveTarget first, and after
  * leaderSystem so state.leaderId is up to date.
+ *
+ * **The final battle is not led.** Once finalBattle is set (see
+ * armageddon.ts) every walker heads for shrinePosition itself, leader or
+ * no leader — 「全ての民が家を捨てて中央に集まり」, and the middle is a
+ * place, not a person.
+ *
+ * That is not a stylistic difference. Leader-following silently requires
+ * a live leader, and nothing appoints a new one during the final battle
+ * (leaderSystem only ever appoints while a faction is gathering — see
+ * leader.ts). Measured over five matches that reached 最終決戦, a
+ * faction's leader died mid-battle in four of them, and the moment it
+ * did, that faction's whole army stopped marching and went back to
+ * wandering: one side sat at the middle with 171 walkers while the other
+ * 54 drifted around the map, never meeting. Since Simulation.getOutcome()
+ * ends a match only when a faction has neither walkers nor houses, those
+ * matches ran forever — still undecided after 40 minutes.
  */
 export const goToShrineSystem: System = (world) => {
   for (const factionEntity of world.query(FactionState)) {
     const state = world.get(factionEntity, FactionState)!;
     if (state.behaviorMode !== "goToShrine") continue;
+
+    if (state.finalBattle) {
+      for (const entity of world.query(Position, Walker, Owner)) {
+        if (world.has(entity, Charmed)) continue;
+        // 病原菌 「ハルマゲドンにも参加できない」 — the sick sit it out.
+        if (world.has(entity, Infected)) continue;
+        if (world.get(entity, Owner)!.faction !== state.id) continue;
+
+        assignTarget(world, entity, state.shrinePosition);
+      }
+      continue;
+    }
+
     if (state.leaderId === undefined || !world.isAlive(state.leaderId)) continue;
 
     assignTarget(world, state.leaderId, state.shrinePosition);
