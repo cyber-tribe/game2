@@ -23,6 +23,7 @@ export type MiracleId =
   | "reef"
   | "road"
   | "wall"
+  | "megalith"
   | "fungus"
   | "perseus"
   | "hercules"
@@ -53,6 +54,7 @@ export const ALL_MIRACLES: readonly MiracleId[] = [
   "reef",
   "road",
   "wall",
+  "megalith",
   "fungus",
   "perseus",
   "hercules",

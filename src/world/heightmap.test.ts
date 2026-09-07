@@ -16,6 +16,9 @@ import {
   applyFungus,
   applyRoad,
   applyWall,
+  applyMegalith,
+  isBoulder,
+  MEGALITH_HEIGHT,
   isWall,
   WALL_ELEVATION_RISE,
   spreadFungus,
@@ -55,7 +58,7 @@ function flatHeightmap(
   const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
   const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
   return { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
-      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), wall: blankLayer(width, height), waterLevel };
+      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), wall: blankLayer(width, height), boulder: blankLayer(width, height), waterLevel };
 }
 
 describe("createHeightmap", () => {
@@ -1090,6 +1093,94 @@ describe("applyWall", () => {
     applyVolcano(heightmap, 10, 10, 1, 20, 0);
 
     expect(isWall(heightmap, 10, 10)).toBe(false);
+  });
+});
+
+describe("applyMegalith", () => {
+  it("heaves stone up around the cast point", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    applyMegalith(heightmap, 10, 10, 2);
+
+    expect(isBoulder(heightmap, 10, 10)).toBe(true);
+    expect(isBoulder(heightmap, 12, 10)).toBe(true);
+    expect(isBoulder(heightmap, 13, 10)).toBe(false);
+  });
+
+  it("raises a dome, highest at the centre — the slope is what stops the big houses", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    applyMegalith(heightmap, 10, 10, 2);
+
+    expect(heightmap.vertices[10][10]).toBe(5 + MEGALITH_HEIGHT);
+    expect(heightmap.vertices[10][11]).toBeGreaterThan(5);
+    expect(heightmap.vertices[10][11]).toBeLessThan(heightmap.vertices[10][10]);
+  });
+
+  it("cannot be built on", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    applyMegalith(heightmap, 10, 10, 0);
+
+    expect(isBuildable(heightmap, 10, 10)).toBe(false);
+  });
+
+  it("does not rise out of the sea or out of a crevice", () => {
+    const flooded = flatHeightmap(20, 20, MIN_ELEVATION);
+    const torn = flatHeightmap(20, 20, 5);
+    torn.crevice[10][10] = true;
+
+    expect(applyMegalith(flooded, 10, 10, 2)).toEqual([]);
+    expect(applyMegalith(torn, 10, 10, 0)).toEqual([]);
+  });
+
+  it("reports nothing raised when it raises nothing, so the caller can refuse the cast", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyMegalith(heightmap, 10, 10, 2);
+
+    expect(applyMegalith(heightmap, 10, 10, 2)).toEqual([]);
+  });
+
+  /**
+   * 「海へ沈めるまで消えない」 (docs/original-miracles.md #14) — the one
+   * thing that removes it, and the reason it is priced above a wall.
+   */
+  it("survives being dug at, right down to the water", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyMegalith(heightmap, 10, 10, 0);
+
+    while (heightmap.vertices[10][10] > MIN_ELEVATION) raiseVertex(heightmap, 10, 10, -1);
+
+    expect(heightmap.vertices[10][10]).toBe(MIN_ELEVATION);
+    expect(isBoulder(heightmap, 10, 10)).toBe(false);
+  });
+
+  it("is still there one step above the water", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyMegalith(heightmap, 10, 10, 0);
+
+    while (heightmap.vertices[10][10] > heightmap.waterLevel + 1) raiseVertex(heightmap, 10, 10, -1);
+
+    expect(isBoulder(heightmap, 10, 10)).toBe(true);
+  });
+
+  it("goes the same way when a plot is levelled into the water rather than dug", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyMegalith(heightmap, 10, 10, 0);
+
+    flattenTile(heightmap, 10, 10, MIN_ELEVATION, "both");
+
+    expect(isBoulder(heightmap, 10, 10)).toBe(false);
+  });
+
+  it("is buried by a volcano, which turns it into lava rock instead", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyMegalith(heightmap, 10, 10, 1);
+
+    applyVolcano(heightmap, 10, 10, 1, 20, 0);
+
+    expect(isBoulder(heightmap, 10, 10)).toBe(false);
+    expect(isRock(heightmap, 10, 10)).toBe(true);
   });
 });
 

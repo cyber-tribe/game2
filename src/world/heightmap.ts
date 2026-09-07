@@ -85,6 +85,19 @@ export interface Heightmap {
    */
   wall: boolean[][];
   /**
+   * Per-vertex: has a 地下巨石 come up here?
+   *
+   * The original's #14 「発動地点を大きく隆起させ岩を発生。大規模建築の
+   * 障害になり、海へ沈めるまで消えない」 — stone raised out of the ground
+   * purely to deny it. Its own layer rather than more rockHardness (the
+   * volcano's rock) because the two are not the same stone: lava rock
+   * cools, glows while it does (see IsoRenderer's volcanoGlowIntensity)
+   * and chips away under repeated terraforming, while a boulder is cold,
+   * inert, and — per the original's own wording — goes away only when it
+   * is put under the sea (see raiseVertex).
+   */
+  boulder: boolean[][];
+  /**
    * Current sea level — starts at MIN_ELEVATION and only ever rises, via
    * applyFlood. Anything at or below it is water, per docs/game-system.md's
    * 洪水, "海面を1段上昇させる".
@@ -149,7 +162,8 @@ export function createHeightmap(
   const road = Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
   const fungus = Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
   const wall = Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
-  return { width, height, terrain, vertices, rockHardness, forest, crevice, scorched, road, fungus, wall, waterLevel: MIN_ELEVATION };
+  const boulder = Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
+  return { width, height, terrain, vertices, rockHardness, forest, crevice, scorched, road, fungus, wall, boulder, waterLevel: MIN_ELEVATION };
 }
 
 /**
@@ -211,6 +225,13 @@ export function raiseVertex(heightmap: Heightmap, x: number, y: number, delta: n
 
   const hardnessRow = heightmap.rockHardness[y];
   if (hardnessRow[x] > 0) hardnessRow[x] -= 1;
+  // 「海へ沈めるまで消えない」 (docs/original-miracles.md #14), read
+  // literally: a 地下巨石 is not chipped away like lava rock, however long
+  // you dig at it — it is gone the moment the ground it stands on is under
+  // the sea, and not one tap before. That is the whole cost of casting it
+  // on someone's land: they cannot level it, they have to drown it, and
+  // what they get back is water rather than the plain they wanted.
+  if (heightmap.boulder[y][x] && row[x] <= heightmap.waterLevel) heightmap.boulder[y][x] = false;
   // Filling a fissure back in closes it. The original has 花 (#7) for
   // repairing torn ground and this will move there when that exists; until
   // then, terraforming is the only repair the game has, and a crevice
@@ -264,7 +285,13 @@ export function flattenTile(heightmap: Heightmap, tileX: number, tileY: number, 
     const row = heightmap.vertices[y];
     if (!row || row[x] === undefined) continue;
     const delta = clamped - row[x];
-    if (delta !== 0 && isTerrainEditAllowed(rule, delta)) row[x] = clamped;
+    if (delta === 0 || !isTerrainEditAllowed(rule, delta)) continue;
+    row[x] = clamped;
+    // Same rule as raiseVertex: a 地下巨石 whose ground ends up under the
+    // sea is gone. Levelling a plot down into the water has to remove it
+    // for the same reason digging does, or which tool the player reached
+    // for would decide whether the stone was destructible.
+    if (heightmap.boulder[y][x] && row[x] <= heightmap.waterLevel) heightmap.boulder[y][x] = false;
   }
 }
 
@@ -316,7 +343,8 @@ export function isBuildable(heightmap: Heightmap, x: number, y: number): boolean
     !isCrevice(heightmap, x, y) &&
     !isFungus(heightmap, x, y) &&
     !isScorched(heightmap, x, y) &&
-    !isWall(heightmap, x, y)
+    !isWall(heightmap, x, y) &&
+    !isBoulder(heightmap, x, y)
   );
 }
 
@@ -566,6 +594,7 @@ function tearCrevice(heightmap: Heightmap, x: number, y: number): void {
   if (x < 0 || y < 0 || x > heightmap.width || y > heightmap.height) return;
   heightmap.vertices[y][x] = MIN_ELEVATION;
   heightmap.crevice[y][x] = true;
+  heightmap.boulder[y][x] = false;
   // A fissure opening under a 城壁 takes the wall down with it — the ground
   // it stood on is gone. This is the answer to a wall, and the reason one
   // can be cast at all: 地震 has a direction (see applyEarthquake), so a
@@ -639,8 +668,11 @@ export function applyVolcano(
       heightmap.vertices[vy][vx] = elevation;
       heightmap.rockHardness[vy][vx] = hardness;
       // Nothing built survives being the side of a volcano — see wall's
-      // own doc comment on why a barrier has to be breakable at all.
+      // own doc comment on why a barrier has to be breakable at all. A
+      // 地下巨石 becomes part of the cone: still unbuildable, but lava rock
+      // now, which cools and chips like the rest of it.
       heightmap.wall[vy][vx] = false;
+      heightmap.boulder[vy][vx] = false;
       covered.push({ x: vx, y: vy });
     }
   }
@@ -722,8 +754,9 @@ function flowLava(
     const { x, y } = frontier.splice(lowest, 1)[0];
 
     heightmap.rockHardness[y][x] = hardness;
-    // Lava buries a 城壁 the same way the cone does.
+    // Lava buries a 城壁 and a 地下巨石 the same way the cone does.
     heightmap.wall[y][x] = false;
+    heightmap.boulder[y][x] = false;
     covered.push({ x, y });
 
     consider(x + 1, y);
@@ -1347,6 +1380,90 @@ export function applyWall(
       heightmap.wall[vy][vx] = true;
       heightmap.forest[vy][vx] = false;
       heightmap.vertices[vy][vx] = Math.min(MAX_ELEVATION, heightmap.vertices[vy][vx] + WALL_ELEVATION_RISE);
+      raised.push({ x: vx, y: vy });
+    }
+  }
+
+  return raised;
+}
+
+/**
+ * How far from its cast point a 地下巨石 raises stone, in vertices.
+ *
+ * Three, for the original's 「発動地点を**大きく**隆起させ」. Measured on
+ * flat ground: at radius 2 a cast denies 13 vertices outright and blocks
+ * castles on 21; at 3 those become 29 and 37 — a footprint in the same
+ * class as a volcano's cone, which is the company this miracle keeps at
+ * its price, while killing nobody.
+ */
+export const DEFAULT_MEGALITH_RADIUS = 3;
+
+/**
+ * How far the ground rises at the centre of a 地下巨石, tapering to
+ * nothing just past DEFAULT_MEGALITH_RADIUS.
+ *
+ * The 「大きく隆起させ」 half of the original's #14, and the half that does
+ * the real damage. The stone itself denies about a dozen vertices, but the
+ * slope it throws up ruins *flatness* much further out — and this game's
+ * bigger houses need a flat plot around them (see
+ * HOUSE_LEVEL_FLATNESS_REQUIREMENT), so a boulder dropped beside a
+ * settlement stops it growing without covering an inch of it. That is
+ * 「大規模建築の障害になり」 read as the original says it: an obstacle to
+ * *large* building in particular.
+ */
+export const MEGALITH_HEIGHT = 8;
+
+/** Whether the vertex nearest (x, y) is covered by a 地下巨石 — see Heightmap.boulder. */
+export function isBoulder(heightmap: Heightmap, x: number, y: number): boolean {
+  const vx = Math.round(x);
+  const vy = Math.round(y);
+  if (vx < 0 || vy < 0 || vx > heightmap.width || vy > heightmap.height) return false;
+  return heightmap.boulder[vy][vx];
+}
+
+/**
+ * The original's 地下巨石 (docs/original-miracles.md #14): heaves a dome of
+ * cold stone out of the ground, unbuildable and — unlike everything else
+ * that ruins ground in this game — not repairable. 花 does not touch it,
+ * terraforming does not wear it down; it goes only when the ground under
+ * it is put beneath the sea (see raiseVertex).
+ *
+ * Refused on water: stone raised in the sea is stone already sunk, so a
+ * cast there would pay for nothing. Refused on a crevice for the same
+ * reason a wall is — there is nothing there to raise.
+ *
+ * Returns the vertices it raised, so a cast that would do nothing can be
+ * refused rather than silently charged for.
+ */
+export function applyMegalith(
+  heightmap: Heightmap,
+  centerX: number,
+  centerY: number,
+  radius: number = DEFAULT_MEGALITH_RADIUS,
+): { x: number; y: number }[] {
+  const cx = Math.round(centerX);
+  const cy = Math.round(centerY);
+  const raised: { x: number; y: number }[] = [];
+
+  for (let dy = -radius; dy <= radius; dy++) {
+    const vy = cy + dy;
+    if (vy < 0 || vy > heightmap.height) continue;
+    for (let dx = -radius; dx <= radius; dx++) {
+      const vx = cx + dx;
+      if (vx < 0 || vx > heightmap.width) continue;
+      const distance = Math.hypot(dx, dy);
+      if (distance > radius) continue;
+      if (heightmap.boulder[vy][vx]) continue;
+      if (heightmap.crevice[vy][vx]) continue;
+      if (heightmap.vertices[vy][vx] <= heightmap.waterLevel) continue;
+
+      // A dome rather than a plateau: the taper is what makes the slope
+      // around the stone, and the slope is what stops the big houses.
+      const rise = Math.round(MEGALITH_HEIGHT * (1 - distance / (radius + 1)));
+      heightmap.vertices[vy][vx] = Math.min(MAX_ELEVATION, heightmap.vertices[vy][vx] + rise);
+      heightmap.boulder[vy][vx] = true;
+      heightmap.forest[vy][vx] = false;
+      heightmap.wall[vy][vx] = false;
       raised.push({ x: vx, y: vy });
     }
   }

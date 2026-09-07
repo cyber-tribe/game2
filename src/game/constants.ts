@@ -661,6 +661,18 @@ export const ROAD_MANA_COST = 8;
 export const WALL_MANA_COST = 12;
 
 /**
+ * Mana cost of one 地下巨石.
+ *
+ * Between the wall it resembles (12, breakable by any earthquake) and the
+ * volcano it does not (40, which kills everything under it and runs lava
+ * downhill besides). What this buys is permanence: nothing in this game
+ * repairs a boulder — 花 does not touch it, and terraforming will not wear
+ * it down — so a plot denied is denied until its owner digs it into the
+ * sea. That is worth more than a wall and less than a life.
+ */
+export const MEGALITH_MANA_COST = 24;
+
+/**
  * Mana cost of one 毒カビ outbreak. Cheap on purpose, and the price is a
  * design statement: the original's "複数設置すると大繁殖" only means
  * anything if casting several in one place is a real option, so this is

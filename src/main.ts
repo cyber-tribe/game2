@@ -10,6 +10,7 @@ import {
   FOREST_MANA_COST,
   ROAD_MANA_COST,
   WALL_MANA_COST,
+  MEGALITH_MANA_COST,
   FUNGUS_MANA_COST,
   TSUNAMI_MANA_COST,
   GUARDIAN_MANA_COST,
@@ -65,6 +66,7 @@ import { createTornado } from "./game/tornado";
 import { collapseSwampsNear, createSwamp } from "./game/swamp";
 import { burnFire } from "./game/fire";
 import { eruptVolcano } from "./game/volcano";
+import { raiseMegalith } from "./game/megalith";
 import { ALL_MIRACLES, WORLDS, nextWorldId, unlockedCountForPassword, type MiracleId, type WorldDefinition } from "./game/worlds";
 import { EntityLayer } from "./render/EntityLayer";
 import { describeInspectableEntity } from "./render/entityInfoLabel";
@@ -77,7 +79,7 @@ import { mountCommandIcons } from "./ui/commandIcons";
 import { loadCommandIcons } from "./ui/pixelIcons";
 import { StatusPanel } from "./ui/statusPanel";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
-import { DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyFlower, applyForest, applyFungus, DEFAULT_FLOWER_RADIUS, applyReef, applyRoad, applyWall, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
+import { DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyFlower, applyForest, applyFungus, DEFAULT_FLOWER_RADIUS, applyReef, applyRoad, applyWall, applyMegalith, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
 
 /**
  * The camera's fixed base scale — see layout()'s doc comment for why this
@@ -871,6 +873,25 @@ async function bootstrap(world: WorldDefinition) {
       return;
     }
 
+    if (toolMode === "megalith") {
+      // Pay only once the stone is actually up, same as the wall — and a
+      // cast on water or a crevice raises nothing (see applyMegalith).
+      if (!canAffordPlayerMana(MEGALITH_MANA_COST)) return;
+      const raised = applyMegalith(heightmap, vertex.x, vertex.y);
+      if (raised.length === 0) {
+        showEntityInfo("ここには巨石を起こせません", "warning");
+        return;
+      }
+      trySpendPlayerMana(MEGALITH_MANA_COST);
+      raiseMegalith(simulation.world, raised);
+      renderer.redraw(visibleBounds());
+      simulation.recordEvent("player", "megalith");
+      triggerShake(6);
+      vibrate([30, 20, 40]);
+      playMiracleSound("megalith");
+      return;
+    }
+
     if (toolMode === "fungus") {
       // Nothing takes root on water, rock, a crevice or a road.
       if (!canAffordPlayerMana(FUNGUS_MANA_COST)) return;
@@ -1239,6 +1260,7 @@ async function bootstrap(world: WorldDefinition) {
     flower: FLOWER_MANA_COST,
     road: ROAD_MANA_COST,
     wall: WALL_MANA_COST,
+    megalith: MEGALITH_MANA_COST,
     fungus: FUNGUS_MANA_COST,
     fireRain: FIRE_RAIN_MANA_COST,
     reef: REEF_MANA_COST,
