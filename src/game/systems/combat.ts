@@ -158,7 +158,8 @@ export function createHouseCaptureSystem(config: Partial<HouseCaptureConfig> = {
         }
 
         const house = world.get(houseEntity, House)!;
-        if (walker.strength > HOUSE_LEVELS[house.level].defense) {
+        const defense = HOUSE_LEVELS[house.level].defense;
+        if (walker.strength > defense) {
           world.add(houseEntity, Owner, { faction: walkerOwner.faction });
           world.add(houseEntity, House, { level: house.level, population: 0 });
           onImpact({ position: housePos, type: "houseCaptured" });
@@ -167,10 +168,22 @@ export function createHouseCaptureSystem(config: Partial<HouseCaptureConfig> = {
           if (walker.state === "guardian") {
             // See HeroCooldown's doc comment / guardianTargetingSystem —
             // without this a guardian instantly marches on to capture its
-            // next-nearest threatened target.
+            // next-nearest threatened target. A guardian also takes the
+            // house for nothing, which is now the whole of what makes it
+            // different from anyone else who captures one.
             world.add(walkerEntity, HeroCooldown, { remaining: HERO_ACTION_COOLDOWN });
           } else {
-            world.destroyEntity(walkerEntity);
+            // The storming costs what the house was worth to defend, and
+            // the rest of the group walks out the other side — the same
+            // arithmetic resolveWalkerFight already uses when two walkers
+            // meet ("the stronger one survives with its strength reduced
+            // by the loser's"). A walker is a group, not a person
+            // (docs/game-system.md 4節: 「見た目は1人でも実際は集団を
+            // 表す」), so an army of fifty spending itself entirely on one
+            // hut was never consistent with the rest of this model — and
+            // it is what made a ground war impossible to sustain: one
+            // mustered force, one house, start again.
+            world.add(walkerEntity, Walker, { ...walker, strength: walker.strength - defense });
           }
         } else {
           onImpact({ position: walkerPos, type: "combatDeath" });

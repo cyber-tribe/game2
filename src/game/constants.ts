@@ -291,6 +291,31 @@ export const ENEMY_AI_AGGRESSION_THRESHOLD = 4;
  */
 export const ENEMY_AI_ECONOMY_FLOOR = 16;
 
+/**
+ * How many houses' worth of defense the enemy musters before it marches —
+ * see systems/enemyAi.ts.
+ *
+ * One would be enough to *start* a ground war and is what this began as.
+ * It stopped being enough once taking a house cost a force the house's
+ * defense instead of consuming it whole (see systems/combat.ts): a force
+ * built to clear a hut's 3 exactly comes out the other side at 2 and can
+ * take nothing else, so the enemy went back to mustering from scratch for
+ * every single hut. Measured over three matches on the final world with
+ * nobody playing, houses the enemy took from the player in eight minutes:
+ *
+ * | muster bar | houses taken |
+ * |------------|--------------|
+ * | x1         | 0.7          |
+ * | **x3**     | **8.7**      |
+ * | x5         | 14.7         |
+ *
+ * Three rather than five: it is the smallest tested bar that lets one
+ * force take more than the house it was built for, and a shorter muster
+ * means the enemy is out on the map sooner. The run-to-run spread here is
+ * wide, so treat the exact figures as a shape rather than a target.
+ */
+export const ENEMY_MUSTER_HOUSES = 3;
+
 export const ENEMY_AI_THREAT_RADIUS = 4;
 
 /** Mana cost of conjuring a swamp — a "中" tier miracle, similar to an earthquake. */

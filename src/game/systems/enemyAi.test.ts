@@ -207,14 +207,16 @@ describe("createEnemyAiSystem", () => {
     expect(world.get(enemy, FactionState)!.behaviorMode).toBe("gather");
   });
 
-  it("marches once it has someone who can take one", () => {
+  it("marches once it has a force built for several of them", () => {
     const world = new World();
     const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
     addWalkers(world, 10);
     addHouse(world, "enemy", 1, 1);
     addHouse(world, "player", 10, 10); // defense 3
     const [champion] = world.query(Walker, Owner);
-    world.add(champion, Walker, { ...world.get(champion, Walker)!, strength: 4 });
+    // Past a hut's 3 several times over — see ENEMY_MUSTER_HOUSES, which
+    // musters for more than the one house a force used to be spent on.
+    world.add(champion, Walker, { ...world.get(champion, Walker)!, strength: 20 });
 
     createEnemyAiSystem({ decisionInterval: 5, aggressionThreshold: 4, economyFloor: 1 })(world, 5);
 

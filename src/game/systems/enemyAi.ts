@@ -3,6 +3,7 @@ import {
   ENEMY_AI_AGGRESSION_THRESHOLD,
   ENEMY_AI_DECISION_INTERVAL,
   ENEMY_AI_ECONOMY_FLOOR,
+  ENEMY_MUSTER_HOUSES,
   ENEMY_AI_THREAT_RADIUS,
 } from "../constants";
 import { FactionState, House, Owner, Position, Walker, type BehaviorMode, type FactionId } from "../components";
@@ -91,8 +92,13 @@ export function createEnemyAiSystem(config: Partial<EnemyAiConfig> = {}): System
     // "gather" until it has someone who can actually take a house, its
     // strongest walker reached 20 to 51 within a few minutes — enough for
     // a manor, sometimes a castle.
+    //
+    // It musters for ENEMY_MUSTER_HOUSES of them rather than one, because
+    // taking a house now costs a force what that house was worth to defend
+    // rather than consuming it whole (see systems/combat.ts) — a force
+    // built to clear the bar exactly is spent on its first hut.
     const target = weakestOpposingHouseDefense(world, opponentId);
-    const readyToTakeAHouse = target === undefined || strongestWalker(world, factionId) > target;
+    const readyToTakeAHouse = target === undefined || strongestWalker(world, factionId) > target * ENEMY_MUSTER_HOUSES;
     const nextMode: BehaviorMode =
       underThreat || (wantsToMarch && readyToTakeAHouse)
         ? "fight"
