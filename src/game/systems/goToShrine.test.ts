@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
-import { FactionState, MoveTarget, Owner, Position, Walker, type FactionId } from "../components";
+import { Charmed, FactionState, Infected, MoveTarget, Owner, Position, Walker, type FactionId } from "../components";
 import { goToShrineSystem } from "./goToShrine";
 
 function spawnWalker(world: World, faction: FactionId, x: number, y: number) {
@@ -11,7 +11,7 @@ function spawnWalker(world: World, faction: FactionId, x: number, y: number) {
   return entity;
 }
 
-function createFactionState(world: World, faction: FactionId, leaderId?: number) {
+function createFactionState(world: World, faction: FactionId, leaderId?: number, finalBattle = false) {
   const entity = world.createEntity();
   world.add(entity, FactionState, {
     id: faction,
@@ -19,6 +19,7 @@ function createFactionState(world: World, faction: FactionId, leaderId?: number)
     behaviorMode: "goToShrine",
     shrinePosition: { x: 9, y: 9 },
     leaderId,
+    finalBattle,
   });
   return entity;
 }
@@ -103,5 +104,69 @@ describe("goToShrineSystem", () => {
     createFactionState(world, "player", undefined);
 
     expect(() => goToShrineSystem(world, 1)).not.toThrow();
+  });
+
+  /**
+   * The final battle is not led — see this system's own doc comment on the
+   * matches that ran forever because it was.
+   */
+  describe("during the final battle", () => {
+    it("marches everyone to the middle itself rather than after the leader", () => {
+      const world = new World();
+      const leader = spawnWalker(world, "player", 3, 4);
+      const follower = spawnWalker(world, "player", 0, 0);
+      createFactionState(world, "player", leader, true);
+
+      goToShrineSystem(world, 1);
+
+      expect(world.get(follower, MoveTarget)).toEqual({ x: 9, y: 9 });
+    });
+
+    it("keeps marching after the leader dies", () => {
+      const world = new World();
+      const leader = spawnWalker(world, "player", 3, 4);
+      const follower = spawnWalker(world, "player", 0, 0);
+      createFactionState(world, "player", leader, true);
+      world.destroyEntity(leader);
+
+      goToShrineSystem(world, 1);
+
+      expect(world.get(follower, MoveTarget)).toEqual({ x: 9, y: 9 });
+    });
+
+    it("marches with no leader ever appointed at all", () => {
+      const world = new World();
+      const walker = spawnWalker(world, "player", 0, 0);
+      createFactionState(world, "player", undefined, true);
+
+      goToShrineSystem(world, 1);
+
+      expect(world.get(walker, MoveTarget)).toEqual({ x: 9, y: 9 });
+    });
+
+    it("leaves the other faction's walkers alone", () => {
+      const world = new World();
+      const theirs = spawnWalker(world, "enemy", 0, 0);
+      createFactionState(world, "player", undefined, true);
+
+      goToShrineSystem(world, 1);
+
+      expect(world.has(theirs, MoveTarget)).toBe(false);
+    });
+
+    /** 病原菌 「ハルマゲドンにも参加できない」, and Helen's captives are not free to go. */
+    it("still leaves out the sick and the charmed", () => {
+      const world = new World();
+      const sick = spawnWalker(world, "player", 0, 0);
+      world.add(sick, Infected, { remaining: 10 });
+      const captive = spawnWalker(world, "player", 1, 1);
+      world.add(captive, Charmed, { by: spawnWalker(world, "enemy", 2, 2) });
+      createFactionState(world, "player", undefined, true);
+
+      goToShrineSystem(world, 1);
+
+      expect(world.has(sick, MoveTarget)).toBe(false);
+      expect(world.has(captive, MoveTarget)).toBe(false);
+    });
   });
 });
