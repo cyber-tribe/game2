@@ -113,7 +113,7 @@ describe("houseCaptureSystem", () => {
   it("captures an enemy house when the attacking walker's strength beats its defense", () => {
     const world = new World();
     const house = createHouse(world, "enemy", 0, 0);
-    const attacker = createWalker(world, "player", 0, 0, HOUSE_LEVELS.hut.defense + 1);
+    createWalker(world, "player", 0, 0, HOUSE_LEVELS.hut.defense + 1);
 
     const captured: FactionId[] = [];
     createHouseCaptureSystem({ onCapture: (faction) => captured.push(faction) })(world, 0);
