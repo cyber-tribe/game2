@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyTsunami, applyVolcano, isBuildable, isRock, type Heightmap } from "../world/heightmap";
 import { FactionState, House, Owner, Position, Swamp, Walker } from "./components";
-import { ARMAGEDDON_MANA_COST, HOUSE_LEVELS, INITIAL_WALKER_SPREAD, MAX_MANA } from "./constants";
+import { ARMAGEDDON_MANA_COST, HOUSE_LEVELS, INITIAL_WALKER_SPREAD, MAX_MANA, MAX_WALKERS_PER_FACTION } from "./constants";
 import { drownFlood } from "./flood";
 import { Simulation } from "./simulation";
 import { createSwamp } from "./swamp";
@@ -179,65 +179,20 @@ describe("Simulation", () => {
     ]);
   });
 
-  it("exposes the same housesCap to every faction, derived from world size", () => {
-    const sim = new Simulation({ worldWidth: 20, worldHeight: 20 });
-
-    expect(sim.maxHousesPerFaction).toBeGreaterThan(0);
-    for (const summary of sim.summarize()) {
-      expect(summary.housesCap).toBe(sim.maxHousesPerFaction);
-    }
-  });
-
-  it("stops spawning new walkers once a faction's house count reaches its cap, past its one stalemate-escape walker", () => {
-    const sim = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 0 });
-    // TILES_PER_HOUSE_CAP=48 over a 10x10=100 tile world caps at 2 houses per faction.
-    expect(sim.maxHousesPerFaction).toBe(2);
-
-    for (const faction of ["player", "enemy"] as const) {
-      for (let i = 0; i < sim.maxHousesPerFaction; i++) {
-        const house = sim.world.createEntity();
-        sim.world.add(house, Position, { x: 1, y: 1 });
-        sim.world.add(house, Owner, { faction });
-        sim.world.add(house, House, { level: "castle", population: 0 }); // capacity 60
-      }
-    }
-
-    for (let i = 0; i < 100; i++) sim.update(1); // plenty of time/mana to spawn if the cap didn't hold
-
-    // Not asserting an exact walker count here: both factions start with
-    // zero walkers, so houseGrowth's stalemate-escape valve (see its doc
-    // comment) lets each spawn exactly one regardless of the cap —
-    // otherwise a faction already at the cap could never again produce a
-    // walker, risking a permanent deadlock if both sides land there with
-    // nothing left to fight with. With both factions' houses at the same
-    // (1, 1) here, those two escape-valve walkers can end up fighting (and
-    // destroying each other) depending on which way they wander first —
-    // real, but not deterministic enough to assert on at this level; see
-    // houseGrowth.test.ts's own escape-valve tests for that. What's worth
-    // asserting here is that the house cap itself still held throughout.
-    for (const summary of sim.summarize()) {
-      expect(summary.houses).toBe(summary.housesCap);
-    }
-  });
-
-  it("recovers from both factions being at the house cap with zero walkers, instead of deadlocking forever", () => {
-    // The scenario houseGrowth.ts's stalemate-escape valve exists to
-    // prevent: with no walkers left and every house already at the cap,
-    // neither the ordinary population-overflow spawn (houseGrowth.ts) nor
-    // settling into a new house (settle.ts) can ever create a walker again
-    // for either side — and with nothing left able to fight, capture, or
-    // shift the population ratio, ARMAGEDDON_POPULATION_RATIO could never
-    // be reached and the match would never end (see plan/0053-match-
-    // length-tuning.md). Far-apart positions here (unlike the same-(1,1)
-    // test above) keep this deterministic: the two escape-valve walkers
-    // shouldn't wander into combat range of each other in just a few ticks.
+  it("keeps producing walkers for a faction with nowhere left to settle, instead of freezing", () => {
+    // The shape of the old deadlock: both factions parked at a fixed house
+    // count with production switched off, nothing able to fight, capture,
+    // or move the population ratio, and so a match that could never end
+    // (plan/0118-terrain-based-house-limit.md). Land scarcity replaces
+    // that cap, and a faction that has run out of land now keeps turning
+    // population into walkers.
     const sim = new Simulation({ worldWidth: 20, worldHeight: 20, initialWalkersPerFaction: 0 });
 
     for (const [faction, x, y] of [
       ["player", 2, 2],
       ["enemy", 17, 17],
     ] as const) {
-      for (let i = 0; i < sim.maxHousesPerFaction; i++) {
+      for (let i = 0; i < 30; i++) {
         const house = sim.world.createEntity();
         sim.world.add(house, Position, { x, y });
         sim.world.add(house, Owner, { faction });
@@ -248,8 +203,24 @@ describe("Simulation", () => {
     for (let i = 0; i < 10; i++) sim.update(1);
 
     for (const summary of sim.summarize()) {
-      expect(summary.walkers).toBeGreaterThan(0);
+      expect(summary.walkers).toBeGreaterThan(1);
     }
+  });
+
+  it("stops spawning at MAX_WALKERS_PER_FACTION so the O(n²) systems stay bounded", () => {
+    const sim = new Simulation({ worldWidth: 20, worldHeight: 20, initialWalkersPerFaction: 0 });
+
+    for (let i = 0; i < 40; i++) {
+      const house = sim.world.createEntity();
+      sim.world.add(house, Position, { x: 2, y: 2 });
+      sim.world.add(house, Owner, { faction: "player" });
+      sim.world.add(house, House, { level: "castle", population: HOUSE_LEVELS.castle.capacity });
+    }
+
+    for (let i = 0; i < 200; i++) sim.update(1);
+
+    const player = sim.summarize().find((s) => s.id === "player")!;
+    expect(player.walkers).toBeLessThanOrEqual(MAX_WALKERS_PER_FACTION);
   });
 
   it("lets walkers wander, settle into houses, and start producing mana over time", () => {
@@ -549,7 +520,13 @@ describe("Simulation", () => {
     expect(sim.getMana("player")).toBe(0);
     expect(sim.getMana("enemy")).toBe(0);
 
-    sim.update(10); // manaSystem accrues mana over time from each faction's houses
+    // Several ticks rather than one big one: a house that accumulates a
+    // full capacity's worth in a single step immediately spends it on a
+    // walker (houseGrowth.ts) and is back to ~0 population, and a house
+    // with no population pays no mana (mana.ts). This used to pass on one
+    // update(10) only because a 10x10 world's placeholder house cap was 2,
+    // which stopped that spawn and left the population sitting there.
+    for (let i = 0; i < 10; i++) sim.update(1);
     expect(sim.getMana("player")).toBeGreaterThan(0);
   });
 

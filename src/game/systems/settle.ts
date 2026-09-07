@@ -1,41 +1,36 @@
 import type { Entity, System, World } from "../../ecs";
-import { isBuildable, type Heightmap } from "../../world/heightmap";
+import { countFlatNeighbors, isBuildable, type Heightmap } from "../../world/heightmap";
 import { Charmed, FactionState, House, Infected, MoveTarget, Owner, Position, Walker, type FactionId } from "../components";
-import { HOUSE_SPACING } from "../constants";
+import { HOUSE_SETTLE_FLATNESS_REQUIREMENT, HOUSE_SPACING, HOUSE_UPGRADE_FLATNESS_RADIUS } from "../constants";
 import { hasOtherSeekingWalkers } from "./gatherTargeting";
 import { distance } from "./geometry";
 
 export interface SettleConfig {
-  /** When given, a walker only settles on buildable (above sea level) land. */
-  heightmap: Heightmap;
   /**
-   * Caps how many houses a faction may ever hold — see houseGrowth.ts's
-   * HouseGrowthConfig.maxHousesPerFaction doc comment for why this exists.
-   * Settling is the OTHER path (besides houseGrowth's own population
-   * overflow) that creates a House entity, so without enforcing the same
-   * cap here too, a faction's house count can quietly drift past the cap
-   * over a long enough match (any walker already in flight when the cap
-   * was first reached still settles normally). Once that happens,
-   * houseGrowth's own cap check (`houseCount < maxHousesPerFaction`) never
-   * passes again for that faction — permanently blocking every future
-   * walker spawn — which, if it happens to both factions at once with no
-   * walkers left standing on either side, deadlocks the match forever
-   * (nothing left that can fight, capture, or ever tip the population
-   * ratio enough to trigger 最終決戦). Skipping settle at the cap instead
-   * leaves the walker "seeking" with no MoveTarget, so createWanderTarget
-   * System just sends it wandering again next tick — it stays around as
-   * available manpower rather than either vanishing into a house or
-   * getting stuck.
+   * When given, a walker only settles on buildable (above sea level) land
+   * that is also flat enough to build on — see
+   * HOUSE_SETTLE_FLATNESS_REQUIREMENT. Without a heightmap there is no
+   * terrain to judge, and any spot will do (tests that don't care).
    */
-  maxHousesPerFaction: number;
+  heightmap: Heightmap;
 }
 
 /**
  * A "seeking" walker that has arrived at its target (no MoveTarget left)
  * settles: it builds a hut where it stands and stops existing as a walker.
- * If a heightmap says the spot isn't buildable, it's left as-is — with no
+ * If a heightmap says the spot isn't buildable, or isn't flat enough to
+ * build on (HOUSE_SETTLE_FLATNESS_REQUIREMENT), it's left as-is — with no
  * MoveTarget, createWanderTargetSystem will hand it a fresh destination
- * next tick. Skipped entirely once a faction's FactionState.finalBattle is
+ * next tick, biased toward ground it can actually settle on.
+ *
+ * Those two terrain checks, plus HOUSE_SPACING, are the *whole* limit on
+ * how far a faction expands: there is no per-faction house cap any more
+ * (plan/0118-terrain-based-house-limit.md). A faction with nowhere left to
+ * build does not stop growing, it just stops converting walkers into
+ * houses — they stay "seeking" and pile up as manpower, which is what
+ * turns a finished economy into an army.
+ *
+ * Skipped entirely once a faction's FactionState.finalBattle is
  * set (the "最終決戦" miracle) — otherwise walkers converging on the
  * shared shrine would just found a peaceful town there instead of fighting.
  *
@@ -55,12 +50,10 @@ export interface SettleConfig {
  */
 export function createSettleSystem(config: Partial<SettleConfig> = {}): System {
   const heightmap = config.heightmap;
-  const maxHousesPerFaction = config.maxHousesPerFaction ?? Infinity;
 
   return (world) => {
     const warringFactions = factionsInFinalBattle(world);
     const gatheringLeaders = currentGatheringLeaders(world);
-    const houseCountByFaction = countHousesByFaction(world);
     // Rebuilt per tick and appended to as houses go up, so two walkers
     // standing together cannot both settle on the same spot in one pass.
     const occupied = world.query(Position, House).map((entity) => world.get(entity, Position)!);
@@ -76,10 +69,9 @@ export function createSettleSystem(config: Partial<SettleConfig> = {}): System {
 
       const owner = world.get(entity, Owner)!;
       if (warringFactions.has(owner.faction)) continue;
-      if ((houseCountByFaction.get(owner.faction) ?? 0) >= maxHousesPerFaction) continue;
 
       const pos = world.get(entity, Position)!;
-      if (heightmap && !isBuildable(heightmap, pos.x, pos.y)) continue;
+      if (heightmap && !isSettleable(heightmap, pos.x, pos.y)) continue;
       // Not on top of a house that is already there — see HOUSE_SPACING.
       // A walker refused here simply stays "seeking" and is given somewhere
       // else to be on a later tick (wanderTarget.ts), so nothing stalls.
@@ -97,9 +89,26 @@ export function createSettleSystem(config: Partial<SettleConfig> = {}): System {
 
       world.destroyEntity(entity);
       occupied.push({ x: pos.x, y: pos.y });
-      houseCountByFaction.set(owner.faction, (houseCountByFaction.get(owner.faction) ?? 0) + 1);
     }
   };
+}
+
+/**
+ * Whether a house could stand at (x, y) as far as the *ground* is
+ * concerned: dry, unspoiled land (isBuildable) that is also flat enough to
+ * build on (HOUSE_SETTLE_FLATNESS_REQUIREMENT). Says nothing about
+ * whether another house is already there — that's HOUSE_SPACING, which
+ * only createSettleSystem checks, since it needs the live world to know.
+ *
+ * Shared with wanderTarget.ts so idle walkers head for ground they can
+ * actually build on instead of rediscovering by trial and error that most
+ * of a rumpled map is unsettleable.
+ */
+export function isSettleable(heightmap: Heightmap, x: number, y: number): boolean {
+  return (
+    isBuildable(heightmap, x, y) &&
+    countFlatNeighbors(heightmap, x, y, HOUSE_UPGRADE_FLATNESS_RADIUS) >= HOUSE_SETTLE_FLATNESS_REQUIREMENT
+  );
 }
 
 function factionsInFinalBattle(world: World): Set<FactionId> {
@@ -122,11 +131,3 @@ function currentGatheringLeaders(world: World): Set<Entity> {
   return leaders;
 }
 
-function countHousesByFaction(world: World): Map<FactionId, number> {
-  const counts = new Map<FactionId, number>();
-  for (const entity of world.query(House, Owner)) {
-    const faction = world.get(entity, Owner)!.faction;
-    counts.set(faction, (counts.get(faction) ?? 0) + 1);
-  }
-  return counts;
-}

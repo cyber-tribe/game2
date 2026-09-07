@@ -13,7 +13,7 @@ import {
   type HouseLevel,
   type WalkerState,
 } from "./components";
-import { DEFAULT_WALKER_SPEED, FARMLAND_RADIUS, HOUSE_LEVELS, IMPACT_EFFECT_DURATION, INITIAL_WALKER_SPREAD, TILES_PER_HOUSE_CAP } from "./constants";
+import { DEFAULT_WALKER_SPEED, FARMLAND_RADIUS, HOUSE_LEVELS, IMPACT_EFFECT_DURATION, INITIAL_WALKER_SPREAD, MAX_WALKERS_PER_FACTION } from "./constants";
 import { createFaction, findFactionEntity, moveShrine } from "./faction";
 import { promoteHero } from "./hero";
 import { totalPopulation } from "./population";
@@ -136,8 +136,6 @@ export interface FactionSummary {
   id: FactionId;
   mana: number;
   houses: number;
-  /** Same value for every faction — see Simulation.maxHousesPerFaction. */
-  housesCap: number;
   walkers: number;
   behaviorMode: BehaviorMode;
   /** See population.ts's totalPopulation — houses' accumulated population plus one per walker. */
@@ -230,14 +228,13 @@ export class Simulation {
   private readonly worldCenter: { x: number; y: number };
 
   /**
-   * A faction stops spawning new walkers once it owns this many houses —
-   * see houseGrowth.ts's HouseGrowthConfig.maxHousesPerFaction doc comment
-   * for why this stand-in for real land scarcity exists. Exposed here so
-   * the HUD can show it: without visible feedback, hitting the cap looks
-   * identical to a stuck/broken game ("walkerが発生しない") rather than
-   * an intentional, explainable limit.
+   * A faction stops spawning new walkers once it has this many alive — see
+   * MAX_WALKERS_PER_FACTION. A performance guard, not the expansion limit:
+   * how far a faction spreads is decided by how much flat land it can find
+   * (settle.ts), which is why nothing exposes this to the HUD the way the
+   * old house cap was exposed.
    */
-  readonly maxHousesPerFaction: number;
+  readonly maxWalkersPerFaction = MAX_WALKERS_PER_FACTION;
 
   private readonly matchEvents: MatchEvent[] = [];
   private elapsedTime = 0;
@@ -272,12 +269,6 @@ export class Simulation {
     const initialWalkers = config.initialWalkersPerFaction ?? 3;
     this.spawnWalkers("player", playerShrine, initialWalkers);
     this.spawnWalkers("enemy", enemyShrine, initialWalkers);
-
-    const maxHousesPerFaction = Math.max(
-      1,
-      Math.floor((config.worldWidth * config.worldHeight) / TILES_PER_HOUSE_CAP),
-    );
-    this.maxHousesPerFaction = maxHousesPerFaction;
 
     this.scheduler
       .add(
@@ -360,14 +351,14 @@ export class Simulation {
           onImpact: (event) => this.recordImpactEffect(event),
         }),
       )
-      .add(createSettleSystem({ heightmap: config.heightmap, maxHousesPerFaction }))
+      .add(createSettleSystem({ heightmap: config.heightmap }))
       .add(
         createHouseUpgradeSystem({
           heightmap: config.heightmap,
           onReachCastle: (faction) => this.recordEvent(faction, "houseReachedCastle"),
         }),
       )
-      .add(createHouseGrowthSystem({ maxHousesPerFaction, heightmap: config.heightmap }))
+      .add(createHouseGrowthSystem({ maxWalkersPerFaction: this.maxWalkersPerFaction, heightmap: config.heightmap }))
       .add(manaSystem)
       .add(createEnemyTerraformSystem({ heightmap: config.heightmap, terrainEditRule: config.terrainEditRule }))
       .add(
@@ -524,7 +515,7 @@ export class Simulation {
    * callers can skip feedback (haptics, etc.) on a no-op tap.
    */
   releasePopulation(faction: FactionId): number {
-    return releasePopulation(this.world, faction, this.maxHousesPerFaction);
+    return releasePopulation(this.world, faction, this.maxWalkersPerFaction);
   }
 
   /**
@@ -567,7 +558,6 @@ export class Simulation {
         id: state.id,
         mana: state.mana,
         houses,
-        housesCap: this.maxHousesPerFaction,
         walkers,
         behaviorMode: state.behaviorMode,
         population: totalPopulation(this.world, state.id),

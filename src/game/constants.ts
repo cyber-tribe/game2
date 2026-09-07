@@ -22,8 +22,20 @@ export const INITIAL_WALKER_SPREAD = 1.5;
  * are invisible (they draw on top of each other), pay full mana each, and
  * — the reason this is a fix rather than tidying — die together to
  * anything with a radius.
+ *
+ * Raised from 1 to 3 when the placeholder per-faction house cap was
+ * replaced by real land scarcity (plan/0118-terrain-based-house-limit.md).
+ * At 1, houses could sit shoulder to shoulder and a 64x64 map held
+ * thousands of them, so *something* arbitrary had to stop expansion; at 3
+ * a house occupies a believable patch of ground (its own farmland reaches
+ * FARMLAND_RADIUS 2.5 at castle level, so neighbours' fields now barely
+ * touch instead of overlapping), and how many fit is decided by how much
+ * flat land there is. Measured on a fresh 64x64 map: 167 houses fit
+ * map-wide, both factions together, versus the ~85 *each* the old cap
+ * allowed — and unlike that cap it grows as land is flattened and shrinks
+ * as miracles wreck it.
  */
-export const HOUSE_SPACING = 1;
+export const HOUSE_SPACING = 3;
 
 /** Tiles per second for a freshly spawned walker. */
 export const DEFAULT_WALKER_SPEED = 1.5;
@@ -138,7 +150,8 @@ export const POPULATION_RELEASE_EFFICIENCY = 0.75;
  * Ceiling on how much of a faction's total mana rate hut-level houses can
  * contribute, however many of them there are — see manaSystem. Population
  * growth spawns new hut-level houses automatically (see houseGrowth.ts),
- * capped only by maxHousesPerFaction (50 on a 20x20 map), so without this
+ * limited only by how much flat land is left (see
+ * HOUSE_SETTLE_FLATNESS_REQUIREMENT), so without this
  * a faction could fund EARTHQUAKE_MANA_COST-tier miracle spam purely by
  * letting houses pile up, never once flattening land to level any of them
  * up — the opposite of docs/game-system.md's growth loop. Lodge and above
@@ -167,6 +180,52 @@ export const HOUSE_LEVEL_FLATNESS_REQUIREMENT: Record<HouseLevel, number> = {
   manor: 10,
   castle: 18,
 };
+
+/**
+ * Minimum countFlatNeighbors(heightmap, x, y, HOUSE_UPGRADE_FLATNESS_RADIUS)
+ * a walker needs under it to found a house there — docs/game-system.md's
+ * 「平地を探して定住し家を建てる」, which settle.ts previously did not
+ * check at all (any dry, non-rock vertex would do).
+ *
+ * This is what limits a faction's expansion now that the placeholder
+ * TILES_PER_HOUSE_CAP is gone (plan/0118-terrain-based-house-limit.md):
+ * land runs out, not a counter. Set to 9 of the window's 25 vertices from
+ * measurements on a fresh 64x64 map — 703 of 4096 vertices qualify
+ * untouched, which HOUSE_SPACING then packs down to 167 houses for both
+ * factions to share, close to the ~85 each the old cap handed out. The
+ * point is not the number but where it comes from: flattening land makes
+ * more of it, an earthquake or a volcano takes it away, and the two
+ * factions get different amounts depending on the ground they hold.
+ *
+ * Deliberately separate from HOUSE_LEVEL_FLATNESS_REQUIREMENT.hut (0):
+ * founding a house needs a flat patch, but a hut already standing is not
+ * demolished the moment the ground under it shifts — houseUpgrade.ts
+ * downgrades it to hut and leaves it there.
+ */
+export const HOUSE_SETTLE_FLATNESS_REQUIREMENT = 9;
+
+/**
+ * Hard ceiling on live walkers per faction — a performance guard, not a
+ * game rule, and the one number here that is deliberately arbitrary.
+ *
+ * With land scarcity replacing the old house cap, a faction that has
+ * filled its land keeps producing: houses stay full, and every walker they
+ * spawn now has nowhere to settle, so walkers accumulate as an army
+ * instead of production shutting off. That is the intended behaviour (it
+ * is the pressure that turns a finished economy into a war, and the
+ * original is on record as letting followers pile up until the machine
+ * struggled — docs/original-system.md §4), but createWalkerCombatSystem
+ * and the gather systems are O(n²) over every walker on the map, so it
+ * cannot be unbounded.
+ *
+ * 120 per faction leaves ~29k pair checks per tick at a full board, which
+ * the prototype absorbs comfortably, and sits far above anything a normal
+ * match reaches — the old house cap kept walkers to a few dozen. Unlike
+ * that cap, hitting this one cannot freeze a match: 240 walkers wandering
+ * a 64x64 map meet and fight, attrition drops both sides back under it,
+ * and production resumes. Raise it once spatial partitioning lands.
+ */
+export const MAX_WALKERS_PER_FACTION = 120;
 
 /**
  * Radius (in tiles) of the farmland tint EntityLayer draws around each
@@ -203,26 +262,6 @@ export const DROWNING_BREATH_SECONDS = 4;
  * happened, not a lingering marker of the spot.
  */
 export const IMPACT_EFFECT_DURATION = 0.5;
-
-/**
- * Placeholder land-scarcity proxy: roughly how many map tiles a faction
- * needs per house it's allowed to build, used to derive
- * HouseGrowthConfig.maxHousesPerFaction from world size until real
- * terrain-based flat-land scarcity is implemented.
- *
- * Raised from 8 to 12 alongside the map going from 20x20 to 32x32
- * (plan/0055-map-expansion.md), then to 48 when every world became a fixed
- * 64x64 (plan/0062-original-scale-map.md) — in both cases deliberately
- * scaled right along with the tile count (so maxHousesPerFaction itself
- * stays roughly flat, ~85, across all three sizes) rather than growing
- * with it. A bigger map is meant to buy more geographic space (room for
- * front lines, travel distance between shrines, terrain features) per
- * docs/game-system.md's own framing of what a larger world is for, not a
- * proportionally larger army: maxHousesPerFaction (and so, indirectly, how
- * many walkers can ever exist at once) drives the cost of the O(n²)
- * combat/gather systems.
- */
-export const TILES_PER_HOUSE_CAP = 48;
 
 /** Mana cost of raising or lowering one terrain vertex by one step. */
 export const TERRAIN_EDIT_MANA_COST = 1;

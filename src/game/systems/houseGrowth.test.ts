@@ -69,48 +69,59 @@ describe("createHouseGrowthSystem", () => {
     expect(world.get(house, House)!.population).toBeCloseTo(capacity * 0.5);
   });
 
-  it("stops spawning once the faction is at its house cap, stalling population at capacity", () => {
-    const world = new World();
-    const capacity = HOUSE_LEVELS.hut.capacity;
-    createExistingWalker(world, 9, 9); // already has a walker, so the stalemate-escape valve doesn't apply
-    createHut(world, 0, 0);
-    const house = createHut(world, 1, 1, capacity - 1);
-
-    const system = createHouseGrowthSystem({ growthRate: capacity * 3, maxHousesPerFaction: 2 });
-    system(world, 1);
-
-    expect(world.query(Walker)).toHaveLength(1); // still just the pre-existing one
-    expect(world.get(house, House)!.population).toBe(capacity);
-  });
-
-  it("resumes spawning once a house is destroyed and the faction drops back under the cap", () => {
+  it("stops spawning once the faction is at its walker ceiling, stalling population at capacity", () => {
     const world = new World();
     const capacity = HOUSE_LEVELS.hut.capacity;
     createExistingWalker(world, 9, 9);
-    const other = createHut(world, 0, 0);
-    createHut(world, 1, 1, capacity - 1);
+    createExistingWalker(world, 8, 8);
+    const house = createHut(world, 1, 1, capacity - 1);
 
-    const system = createHouseGrowthSystem({ growthRate: capacity, maxHousesPerFaction: 2 });
-    system(world, 1);
-    expect(world.query(Walker)).toHaveLength(1); // still just the pre-existing one
-
-    world.destroyEntity(other);
+    const system = createHouseGrowthSystem({ growthRate: capacity * 3, maxWalkersPerFaction: 2 });
     system(world, 1);
 
-    expect(world.query(Walker)).toHaveLength(2);
+    expect(world.query(Walker)).toHaveLength(2); // still just the pre-existing pair
+    expect(world.get(house, House)!.population).toBe(capacity);
   });
 
-  it("bypasses the house cap for a faction's first walker when it currently has none (stalemate escape valve)", () => {
+  it("resumes spawning once a walker dies and the faction drops back under the ceiling", () => {
     const world = new World();
     const capacity = HOUSE_LEVELS.hut.capacity;
-    createHut(world, 0, 0); // grows too, but stays far below capacity this tick — see growthRate below
-    const house = createHut(world, 1, 1, capacity - 1); // no pre-existing walker anywhere for "player"
+    const doomed = createExistingWalker(world, 9, 9);
+    createExistingWalker(world, 8, 8);
+    createHut(world, 1, 1, capacity - 1);
 
-    // Small enough that the (0, 0) house's own growth this tick doesn't
-    // also reach capacity — otherwise both houses would overflow on the
-    // very same tick and query() iteration order (not this test) would
-    // decide which one wins the single escape-valve spawn.
-    const system = createHouseGrowthSystem({ growthRate: 1, maxHousesPerFaction: 2 });
+    const system = createHouseGrowthSystem({ growthRate: capacity, maxWalkersPerFaction: 2 });
+    system(world, 1);
+    expect(world.query(Walker)).toHaveLength(2);
+
+    world.destroyEntity(doomed);
+    system(world, 1);
+
+    expect(world.query(Walker)).toHaveLength(2); // the survivor plus one freshly spawned
+  });
+
+  it("keeps producing for a faction with nowhere left to build, however many houses it owns", () => {
+    const world = new World();
+    const capacity = HOUSE_LEVELS.hut.capacity;
+    // The old house cap switched production off at a fixed house count,
+    // which is what let both factions freeze at once with nothing able to
+    // change (plan/0118-terrain-based-house-limit.md). House count is not
+    // this system's business any more: walkers it cannot settle are the
+    // army it fights with.
+    for (let i = 0; i < 20; i++) createHut(world, i, 0, capacity);
+
+    const system = createHouseGrowthSystem({ growthRate: 1, maxWalkersPerFaction: 120 });
+    system(world, 1);
+
+    expect(world.query(Walker)).toHaveLength(20);
+  });
+
+  it("always spawns for a faction with no walkers at all, whatever its house count", () => {
+    const world = new World();
+    const capacity = HOUSE_LEVELS.hut.capacity;
+    const house = createHut(world, 1, 1, capacity - 1);
+
+    const system = createHouseGrowthSystem({ growthRate: 1, maxWalkersPerFaction: 1 });
     system(world, 1);
 
     const walkers = world.query(Walker, Position, Owner);
@@ -119,18 +130,15 @@ describe("createHouseGrowthSystem", () => {
     expect(world.get(house, House)!.population).toBe(0);
   });
 
-  it("only bypasses the cap once — a second overflow on the same tick still respects it", () => {
+  it("treats maxWalkersPerFaction as unlimited when omitted", () => {
     const world = new World();
     const capacity = HOUSE_LEVELS.hut.capacity;
-    createHut(world, 0, 0);
-    const house = createHut(world, 1, 1, capacity - 1); // no pre-existing walker
+    const house = createHut(world, 1, 1, capacity * 3);
 
-    // Enough growth to overflow this one house's capacity twice in a single tick.
-    const system = createHouseGrowthSystem({ growthRate: capacity * 2, maxHousesPerFaction: 2 });
-    system(world, 1);
+    createHouseGrowthSystem({ growthRate: 0 })(world, 1);
 
-    expect(world.query(Walker)).toHaveLength(1); // the escape-valve spawn, not a second one
-    expect(world.get(house, House)!.population).toBe(capacity); // the second overflow's worth stalls at capacity
+    expect(world.query(Walker)).toHaveLength(3);
+    expect(world.get(house, House)!.population).toBe(0);
   });
 
   it("scales growthRate by the heightmap's terrain multiplier when one is given", () => {

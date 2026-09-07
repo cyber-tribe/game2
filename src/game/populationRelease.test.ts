@@ -12,6 +12,14 @@ function createHouse(world: World, x: number, y: number, population: number, fac
   return entity;
 }
 
+function createWalker(world: World, faction: "player" | "enemy") {
+  const entity = world.createEntity();
+  world.add(entity, Position, { x: 0, y: 0 });
+  world.add(entity, Owner, { faction });
+  world.add(entity, Walker, { strength: 1, state: "seeking", speed: 1 });
+  return entity;
+}
+
 describe("releasePopulation", () => {
   it("does nothing when no house has reached the minimum fraction", () => {
     const world = new World();
@@ -71,15 +79,29 @@ describe("releasePopulation", () => {
     expect(world.query(Walker)).toHaveLength(0);
   });
 
-  it("does nothing once the faction is already at its house cap", () => {
+  it("does nothing once the faction is already at its walker ceiling", () => {
     const world = new World();
     const capacity = HOUSE_LEVELS.hut.capacity;
     createHouse(world, 0, 0, capacity);
     createHouse(world, 1, 1, capacity);
+    createWalker(world, "player");
+    createWalker(world, "player");
 
     const released = releasePopulation(world, "player", 2);
 
     expect(released).toBe(0);
-    expect(world.query(Walker)).toHaveLength(0);
+    expect(world.query(Walker)).toHaveLength(2); // still just the two already standing
+  });
+
+  it("releases only as many walkers as the ceiling still has room for", () => {
+    const world = new World();
+    const capacity = HOUSE_LEVELS.hut.capacity;
+    for (let i = 0; i < 5; i++) createHouse(world, i, 0, capacity);
+    createWalker(world, "player");
+
+    const released = releasePopulation(world, "player", 3);
+
+    expect(released).toBe(2); // 3 - the one already alive
+    expect(world.query(Walker)).toHaveLength(3);
   });
 });
