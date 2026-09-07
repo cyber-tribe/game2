@@ -71,7 +71,7 @@ import { ALL_MIRACLES, WORLDS, nextWorldId, unlockedCountForPassword, type Mirac
 import { EntityLayer } from "./render/EntityLayer";
 import { describeInspectableEntity } from "./render/entityInfoLabel";
 import { Hud } from "./render/Hud";
-import { IsoRenderer, isWithinTileBounds, visibleTileBounds, type TileBounds } from "./render/IsoRenderer";
+import { IsoRenderer, visibleTileBounds, type TileBounds } from "./render/IsoRenderer";
 import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
 import { Minimap } from "./render/Minimap";
 import { GAME_PALETTE } from "./render/palette";
@@ -431,14 +431,30 @@ async function bootstrap(world: WorldDefinition) {
   // in/out right at the screen edge).
   const visibleBounds = () => visibleTileBounds(screenCornersInWorldSpace(), heightmap.width, heightmap.height);
 
-  // The same rectangle with no padding — see isOwnFactionVisible below,
-  // the one caller. Reusing visibleBounds()'s own padded result there let
-  // a faction sitting up to a dozen tiles outside the real screen still
-  // count as "visible", making the "must actually see your own base" rule
-  // nearly toothless (per feedback: "自勢力が映っていないと奇跡を発動
-  // できない制約が崩れています"). That gameplay rule needs the actual
-  // screen rectangle, not redraw()'s deliberately padded one.
+  // Whether a tile-space point is actually being drawn on screen right
+  // now — projected to the surface it stands on and tested against the
+  // canvas itself, so the current pan, zoom and rotation all count.
+  //
+  // This used to ask visibleTileBounds instead, i.e. the axis-aligned
+  // *bounding box* of the screen's four corners. In tile space the screen
+  // is a long thin diamond, and its bounding box is far larger than it:
+  // on the 480x900 viewport this game is built for, the box measures 36
+  // tiles on each axis while the diamond it contains is only 15 tiles
+  // across its narrow axis. Everything in that difference is ground the
+  // player cannot see and, per the original's own rule
+  // (docs/original-miracles.md's Close-Up Map — 「現在、見えている
+  // クローズ・アップ・マップの範囲に」), should never have been able to
+  // reach.
+  // The screen's own tile bounding box, for the minimap's "you are here"
+  // rectangle only — a box is the right shape for that indicator, and it
+  // is no longer used to decide anything about casting (see isOnScreen).
   const strictVisibleBounds = () => visibleTileBounds(screenCornersInWorldSpace(), heightmap.width, heightmap.height, 0);
+
+  const isOnScreen = (point: { x: number; y: number }): boolean => {
+    const local = renderer.project(point.x, point.y);
+    const screen = renderer.view.toGlobal({ x: local.sx, y: local.sy });
+    return screen.x >= 0 && screen.x <= app.screen.width && screen.y >= 0 && screen.y <= app.screen.height;
+  };
 
   // docs/game-system.md-inspired original-game rule: the player can only
   // act with their god-given powers while at least one of their own
@@ -446,14 +462,19 @@ async function bootstrap(world: WorldDefinition) {
   // see plan/0063-visibility-gated-casting.md. Without this, a much
   // bigger, freely-pannable map (plan/0062-original-scale-map.md) lets a
   // single tap snipe anywhere on the map instantly, with no need to
-  // actually travel there first. The enemy AI is exempt — it has no
-  // "camera" to speak of, so this only ever constrains the human player.
+  // actually travel there first.
+  //
+  // The enemy god plays by the same rule, through its own stand-in for a
+  // screen — see systems/aiViewport.ts. This check stays player-only
+  // because the *camera* is player-only; the reach limit behind it is
+  // not, and treating "has no camera" as "needs no reach limit" is
+  // exactly the bug that let the enemy strike a capital it had nobody
+  // within forty tiles of.
   const isOwnFactionVisible = (): boolean => {
-    const bounds = strictVisibleBounds();
     const shrine = simulation.getShrinePosition("player");
-    if (shrine && isWithinTileBounds(shrine, bounds)) return true;
+    if (shrine && isOnScreen(shrine)) return true;
     for (const entity of simulation.listInspectableEntities()) {
-      if (entity.faction === "player" && isWithinTileBounds(entity.position, bounds)) return true;
+      if (entity.faction === "player" && isOnScreen(entity.position)) return true;
     }
     return false;
   };

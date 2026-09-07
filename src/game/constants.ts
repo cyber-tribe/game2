@@ -673,6 +673,24 @@ export const WALL_MANA_COST = 12;
 export const MEGALITH_MANA_COST = 24;
 
 /**
+ * The enemy god's own "screen", in tiles — see systems/aiViewport.ts for
+ * what these two axes are and why the shape (not the size) is the point.
+ *
+ * Measured off the player's, rather than picked. The camera renders at a
+ * fixed base scale (BASE_MAP_SCALE = 1) with 64x32 px tiles, so a screen
+ * `width` x `height` pixels across shows `width / 32` tiles of (x - y)
+ * and `height / 16` tiles of (x + y). On the 480x900 phone viewport this
+ * game is built for that is 15 and 56.25 — a view four times longer than
+ * it is wide, which is what an isometric screen is.
+ *
+ * Deliberately not tracking the human's actual camera: a player who
+ * pinches out or rotates would otherwise hand the enemy god a longer
+ * reach by doing so.
+ */
+export const ENEMY_VIEWPORT_ACROSS_TILES = 15;
+export const ENEMY_VIEWPORT_ALONG_TILES = 56.25;
+
+/**
  * Mana cost of one 毒カビ outbreak. Cheap on purpose, and the price is a
  * design statement: the original's "複数設置すると大繁殖" only means
  * anything if casting several in one place is a real option, so this is
