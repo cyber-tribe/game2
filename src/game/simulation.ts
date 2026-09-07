@@ -189,6 +189,7 @@ export type MatchEventType =
   | "reef"
   | "road"
   | "wall"
+  | "megalith"
   | "fungus"
   | "houseCaptured"
   | "houseBurned"

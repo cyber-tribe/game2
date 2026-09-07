@@ -8,7 +8,7 @@
  * later — see main.ts's onEnemyAction, which already does this for the
  * screen-shake/toast but had no audio equivalent before this.
  */
-export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "holyWater" | "tornado" | "firePillar" | "lightning" | "storm" | "plague" | "hurricane" | "volcano" | "perseus" | "hercules" | "odysseus" | "achilles" | "adonis" | "helen" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "wall" | "fungus";
+export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "holyWater" | "tornado" | "firePillar" | "lightning" | "storm" | "plague" | "hurricane" | "volcano" | "perseus" | "hercules" | "odysseus" | "achilles" | "adonis" | "helen" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "wall" | "megalith" | "fungus";
 
 /** Every MiracleSoundType, for tests and any future UI that wants to list them. */
 export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
@@ -38,6 +38,7 @@ export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
   "reef",
   "road",
   "wall",
+  "megalith",
   "fungus",
 ];
 
@@ -246,6 +247,13 @@ export const RECIPES: Record<MiracleSoundType, MiracleSoundRecipe> = {
   wall: {
     tones: [{ waveform: "square", startFrequency: 130, endFrequency: 80, delay: 0, duration: 0.16, peakGain: 0.16 }],
     noise: { delay: 0.02, duration: 0.18, peakGain: 0.12, filterFrequency: 1400 },
+  },
+  // Something enormous coming up from underneath: a low tone that *rises*
+  // (the only rising tone here — every other stone sound falls, because
+  // every other stone is being put down) under a long, dull rumble.
+  megalith: {
+    tones: [{ waveform: "triangle", startFrequency: 60, endFrequency: 110, delay: 0, duration: 0.55, peakGain: 0.18 }],
+    noise: { delay: 0, duration: 0.6, peakGain: 0.16, filterFrequency: 500 },
   },
   // A wet, sagging note under a dull hiss — something spreading, not
   // striking. Low-passed hard so it never sounds like the fire's crackle.

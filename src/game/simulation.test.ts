@@ -14,7 +14,7 @@ function flatHeightmap(width: number, height: number, elevation: number): Height
   const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
   const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
   return { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
-      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), wall: blankLayer(width, height), waterLevel: 0 };
+      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), wall: blankLayer(width, height), boulder: blankLayer(width, height), waterLevel: 0 };
 }
 
 describe("Simulation", () => {
@@ -485,7 +485,7 @@ describe("Simulation", () => {
     );
     const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
     const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
-      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), wall: blankLayer(width, height), waterLevel: 0 };
+      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), wall: blankLayer(width, height), boulder: blankLayer(width, height), waterLevel: 0 };
 
     const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
 
@@ -554,7 +554,7 @@ describe("Simulation", () => {
     const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(5));
     const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
     const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
-      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), wall: blankLayer(width, height), waterLevel: 0 };
+      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), wall: blankLayer(width, height), boulder: blankLayer(width, height), waterLevel: 0 };
 
     const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
 
@@ -577,7 +577,7 @@ describe("Simulation", () => {
       vertices: Array.from({ length: height + 1 }, () => Array(width + 1).fill(5)),
       rockHardness: Array.from({ length: height + 1 }, () => Array(width + 1).fill(0)),
       forest: blankLayer(width, height),
-      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), wall: blankLayer(width, height),
+      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), wall: blankLayer(width, height), boulder: blankLayer(width, height),
       waterLevel: 0,
     });
 
@@ -629,7 +629,7 @@ describe("Simulation", () => {
     const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(5));
     const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
     const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
-      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), wall: blankLayer(width, height), waterLevel: 0 };
+      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), wall: blankLayer(width, height), boulder: blankLayer(width, height), waterLevel: 0 };
 
     const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
 
@@ -766,7 +766,7 @@ describe("Simulation", () => {
     const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(1)); // uniformly low land
     const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
     const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
-      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), wall: blankLayer(width, height), waterLevel: 0 };
+      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), wall: blankLayer(width, height), boulder: blankLayer(width, height), waterLevel: 0 };
 
     const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
 
@@ -792,7 +792,7 @@ describe("Simulation", () => {
     const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(1));
     const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
     const heightmap: Heightmap = { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
-      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), wall: blankLayer(width, height), waterLevel: 0 };
+      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), wall: blankLayer(width, height), boulder: blankLayer(width, height), waterLevel: 0 };
 
     const sim = new Simulation({ worldWidth: width, worldHeight: height, heightmap });
     for (let i = 0; i < 200; i++) sim.update(0.1);

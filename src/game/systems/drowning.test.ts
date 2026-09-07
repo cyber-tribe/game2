@@ -13,7 +13,7 @@ function flatHeightmap(width: number, height: number, elevation: number, waterLe
   const vertices = Array.from({ length: height + 1 }, () => Array(width + 1).fill(elevation));
   const rockHardness = Array.from({ length: height + 1 }, () => Array(width + 1).fill(0));
   return { width, height, terrain: "grass", vertices, rockHardness, forest: blankLayer(width, height),
-      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), wall: blankLayer(width, height), waterLevel };
+      crevice: blankLayer(width, height), scorched: blankLayer(width, height), road: blankLayer(width, height), fungus: blankLayer(width, height), wall: blankLayer(width, height), boulder: blankLayer(width, height), waterLevel };
 }
 
 /** Digs a real 2x2-tile pool of water (see isInWaterPool) at tiles (x,y)..(x+1,y+1). */
