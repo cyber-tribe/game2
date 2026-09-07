@@ -845,6 +845,27 @@ ICONS.update({
         "................",
         "................",
     ],
+    # 地下巨石: one big domed stone heaved up through cracked ground. The
+    # broken ground line under it is what separates this from any other
+    # rock in the set — the stone came from below, it was not put there.
+    "megalith": [
+        "................",
+        "................",
+        "................",
+        "......oooo......",
+        "....ossSSSSo....",
+        "...ossssSSSSo...",
+        "...osssssSSSo...",
+        "..oddsssssSSSo..",
+        "..odddsssssSSo..",
+        "...odddssssso...",
+        "...oddddsssso...",
+        ".oooooooooooooo.",
+        "..oo..o..o..oo..",
+        "................",
+        "................",
+        "................",
+    ],
     # 毒カビ: toadstools with spores drifting off them. Purple (the mana
     # tones) rather than the swamp's own murk, and a hard silhouette of caps
     # and stems, so it never reads as "another swamp" in the panel.
@@ -904,6 +925,7 @@ ICON_KINDS = (
     "reef",
     "road",
     "wall",
+    "megalith",
     "fungus",
     "tsunami",
     "armageddon",

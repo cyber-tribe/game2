@@ -40,6 +40,7 @@ const TOOL_ICON: Record<ToolMode, IconKind> = {
   reef: "reef",
   road: "road",
   wall: "wall",
+  megalith: "megalith",
   fungus: "fungus",
   armageddon: "armageddon",
   inspect: "inspect",

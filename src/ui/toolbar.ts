@@ -29,6 +29,7 @@ export type ToolMode =
   | "reef"
   | "road"
   | "wall"
+  | "megalith"
   | "fungus"
   | "armageddon"
   | "inspect";
