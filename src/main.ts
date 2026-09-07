@@ -71,6 +71,7 @@ import { ALL_MIRACLES, WORLDS, nextWorldId, unlockedCountForPassword, type Mirac
 import { EntityLayer } from "./render/EntityLayer";
 import { describeInspectableEntity } from "./render/entityInfoLabel";
 import { Hud } from "./render/Hud";
+import { MIRACLE_SCHOOLS } from "./game/miracleSchools";
 import { IsoRenderer, visibleTileBounds, type TileBounds } from "./render/IsoRenderer";
 import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
 import { Minimap } from "./render/Minimap";
@@ -262,6 +263,14 @@ async function bootstrap(world: WorldDefinition) {
     armageddon: 10,
     volcano: 8,
     earthquake: 6,
+    fireRain: 4,
+    lightning: 6,
+    // Neither of these lands with any weight — a spring wells up and a
+    // plague shows nothing at all (see game/plague.ts) — so shaking the
+    // camera for them would promise damage that isn't there.
+    holyWater: 0,
+    plague: 0,
+    swamp: 0,
     perseus: 3,
     guardian: 3,
   };
@@ -327,6 +336,7 @@ async function bootstrap(world: WorldDefinition) {
     enemyAggressionThreshold: world.enemyAggressionThreshold,
     allowedMiracles: world.allowedMiracles,
     enemyPersonality: world.enemyPersonality,
+    enemySchool: world.enemySchool,
     instantDrowning: world.instantDrowning,
     onEnemyAction,
   });
@@ -1407,6 +1417,11 @@ function showWorldSelect(): void {
         // doc comment in game/worlds.ts).
         const personalityLabel =
           world.enemyPersonality !== "balanced" ? `・敵の気質: ${ENEMY_PERSONALITY_LABELS[world.enemyPersonality]}` : "";
+        // Always shown, unlike the two labels above: every god has a
+        // school and it decides what the player will be hit with all
+        // match (see game/miracleSchools.ts), so there is no "default"
+        // worth leaving unsaid.
+        const schoolLabel = `・敵の系統: ${MIRACLE_SCHOOLS.find(({ id }) => id === world.enemySchool)!.label}`;
         // WORLDS is itself ordered by difficulty (see its own doc comment),
         // so the world's own position in the list doubles as a simple
         // difficulty indicator — no separate derived score needed. Map
@@ -1414,7 +1429,7 @@ function showWorldSelect(): void {
         // fixed 64x64 (see plan/0062-original-scale-map.md).
         detail.textContent = locked
           ? "パスワードが必要です"
-          : `${TERRAIN_LABELS[world.terrain]}${ruleLabel}${personalityLabel}・難易度${index + 1}/${WORLDS.length}`;
+          : `${TERRAIN_LABELS[world.terrain]}${ruleLabel}${personalityLabel}${schoolLabel}・難易度${index + 1}/${WORLDS.length}`;
 
         button.append(name, detail);
         if (!locked) {

@@ -1,15 +1,27 @@
 import type { System, World } from "../../ecs";
 import {
   applyEarthquake,
+  applyFireRain,
   applyVolcano,
   DEFAULT_EARTHQUAKE_RADIUS,
   DEFAULT_VOLCANO_RADIUS,
   type Heightmap,
 } from "../../world/heightmap";
 import { triggerArmageddon } from "../armageddon";
+import { burnFire } from "../fire";
+import { createHolyWater } from "../holyWater";
+import { strikeLightning } from "../lightning";
+import { ENEMY_SIGNATURE_MIRACLE, type MiracleSchool } from "../miracleSchools";
+import { seedPlague } from "../plague";
+import { collapseSwampsNear, createSwamp } from "../swamp";
 import { FactionState, House, Owner, Position, Walker, type FactionId } from "../components";
 import {
   ARMAGEDDON_MANA_COST,
+  FIRE_RAIN_MANA_COST,
+  HOLY_WATER_MANA_COST,
+  LIGHTNING_MANA_COST,
+  PLAGUE_MANA_COST,
+  SWAMP_MANA_COST,
   ARMAGEDDON_POPULATION_RATIO,
   EARTHQUAKE_MANA_COST,
   ENEMY_PERSONALITY_TUNING,
@@ -24,9 +36,9 @@ import {
 import { findFactionEntity, trySpendMana } from "../faction";
 import { promoteHero } from "../hero";
 import { totalPopulation } from "../population";
-import { collapseSwampsNear } from "../swamp";
 import { eruptVolcano } from "../volcano";
 import { ALL_MIRACLES, type EnemyPersonality, type MiracleId } from "../worlds";
+import type { OnImpactEffect } from "./effects";
 import { distance, type Point } from "./geometry";
 import { chooseAiViewport } from "./aiViewport";
 
@@ -40,6 +52,11 @@ import { chooseAiViewport } from "./aiViewport";
 export type EnemyMiracleEvent =
   | { type: "earthquake"; position: Point }
   | { type: "volcano"; position: Point }
+  | { type: "plague"; position: Point }
+  | { type: "swamp"; position: Point }
+  | { type: "lightning"; position: Point }
+  | { type: "fireRain"; position: Point }
+  | { type: "holyWater"; position: Point }
   | { type: "perseus" }
   | { type: "guardian" }
   | { type: "armageddon" };
@@ -80,6 +97,14 @@ export interface EnemyMiracleConfig {
    * test can shrink it instead of building a 60-tile map.
    */
   viewport: { across: number; along: number };
+  /**
+   * Which of the original's six schools this god draws from — see
+   * miracleSchools.ts's ENEMY_SIGNATURE_MIRACLE and worlds.ts's
+   * WorldDefinition.enemySchool.
+   */
+  school: MiracleSchool;
+  /** Impact effects the cast produces, for the renderer — see systems/effects.ts. */
+  onImpact: OnImpactEffect;
   /** Called once per miracle actually cast — see EnemyMiracleEvent. */
   onAction: (event: EnemyMiracleEvent) => void;
 }
@@ -152,6 +177,8 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
   const allowedMiracles = config.allowedMiracles ?? ALL_MIRACLES;
   const tuning = ENEMY_PERSONALITY_TUNING[config.personality ?? "balanced"];
   const viewport = config.viewport ?? { across: ENEMY_VIEWPORT_ACROSS_TILES, along: ENEMY_VIEWPORT_ALONG_TILES };
+  const school = config.school ?? "earth";
+  const onImpact = config.onImpact ?? (() => {});
   const onAction = config.onAction ?? (() => {});
   let timeSincePass = decisionInterval;
   let elapsed = 0;
@@ -214,6 +241,23 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
       }
     }
 
+    // The god's own school — see miracleSchools.ts's
+    // ENEMY_SIGNATURE_MIRACLE. 地震 is 地's own signature, so an earth god
+    // simply falls through to the branch below.
+    const signature = ENEMY_SIGNATURE_MIRACLE[school];
+    if (signature !== "earthquake" && allowedMiracles.includes(signature)) {
+      const signatureTarget = densestReachableCluster(world, factionId, opponentId, DEFAULT_EARTHQUAKE_RADIUS, viewport, rng);
+      if (signatureTarget && castSignature(world, heightmap, factionId, signature, signatureTarget, rng, onImpact)) {
+        onAction({ type: signature as EnemyMiracleEvent["type"], position: signatureTarget });
+      }
+      // Saves up for its own miracle rather than spending the difference
+      // on 地震: a 水 god that casts two earthquakes for every spring is
+      // not a 水 god, it is an earth god with a hobby. A pass it cannot
+      // afford is a pass it does nothing on — which is also what makes
+      // the pricier schools cast in bursts instead of on a metronome.
+      return;
+    }
+
     if (!allowedMiracles.includes("earthquake")) return;
     const target = densestReachableCluster(world, factionId, opponentId, DEFAULT_EARTHQUAKE_RADIUS, viewport, rng);
     if (target && trySpendMana(world, factionId, EARTHQUAKE_MANA_COST)) {
@@ -226,6 +270,62 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
       onAction({ type: "earthquake", position: target });
     }
   };
+}
+
+/**
+ * Casts one school's signature miracle at `target`, spending the mana for
+ * it. Returns false without spending anything when the faction can't
+ * afford it, or — for 病原菌, which needs someone to infect — when the
+ * cast would do nothing at all; the caller then falls through to a
+ * cheaper miracle, exactly as the player's own tap does (see main.ts).
+ *
+ * 地震 is deliberately absent: it is 地's signature and the fallback every
+ * god shares, so it stays in the system's own last branch rather than
+ * being reachable from two places.
+ */
+function castSignature(
+  world: World,
+  heightmap: Heightmap,
+  factionId: FactionId,
+  signature: MiracleId,
+  target: Point,
+  rng: () => number,
+  onImpact: OnImpactEffect,
+): boolean {
+  switch (signature) {
+    case "plague":
+      // Checked before charging, like the player's own cast: a plague on
+      // empty ground is a cast that does nothing.
+      if (totalMana(world, factionId) < PLAGUE_MANA_COST) return false;
+      if (seedPlague(world, target) === 0) return false;
+      return trySpendMana(world, factionId, PLAGUE_MANA_COST);
+    case "swamp":
+      if (!trySpendMana(world, factionId, SWAMP_MANA_COST)) return false;
+      createSwamp(world, target.x, target.y);
+      return true;
+    case "lightning":
+      if (!trySpendMana(world, factionId, LIGHTNING_MANA_COST)) return false;
+      strikeLightning(world, heightmap, target, rng, onImpact);
+      return true;
+    case "fireRain":
+      if (!trySpendMana(world, factionId, FIRE_RAIN_MANA_COST)) return false;
+      burnFire(world, applyFireRain(heightmap, target.x, target.y), onImpact);
+      return true;
+    case "holyWater":
+      // The spring belongs to whoever cast it, so this one takes the
+      // opponent's people rather than killing them (see systems/holyWater.ts).
+      if (!trySpendMana(world, factionId, HOLY_WATER_MANA_COST)) return false;
+      createHolyWater(world, factionId, target.x, target.y);
+      return true;
+    default:
+      return false;
+  }
+}
+
+/** A faction's current mana, for the one cast that has to look before it acts. */
+function totalMana(world: World, factionId: FactionId): number {
+  const factionEntity = findFactionEntity(world, factionId);
+  return factionEntity === undefined ? 0 : world.get(factionEntity, FactionState)!.mana;
 }
 
 /**

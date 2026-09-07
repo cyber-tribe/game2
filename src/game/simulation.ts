@@ -48,6 +48,7 @@ import { createWhirlpoolSystem } from "./systems/whirlpool";
 import { createSwampSystem } from "./systems/swamp";
 import { createWanderTargetSystem } from "./systems/wanderTarget";
 import { ALL_MIRACLES, type EnemyPersonality, type MiracleId } from "./worlds";
+import type { MiracleSchool } from "./miracleSchools";
 
 export interface SimulationConfig {
   worldWidth: number;
@@ -106,6 +107,12 @@ export interface SimulationConfig {
    * omitted, which is fine for tests that don't care about it.
    */
   enemyPersonality?: EnemyPersonality;
+  /**
+   * Which of the original's six schools the enemy god draws its own
+   * miracles from — see worlds.ts's WorldDefinition.enemySchool. Defaults
+   * to 地, whose signature is the 地震 this AI has always cast.
+   */
+  enemySchool?: MiracleSchool;
   /**
    * Called whenever the enemy actually casts a miracle (see
    * enemyMiracles.ts's EnemyMiracleEvent) — lets main.ts surface it
@@ -370,8 +377,15 @@ export class Simulation {
           decisionInterval: config.enemyDecisionInterval,
           allowedMiracles: config.allowedMiracles ?? ALL_MIRACLES,
           personality: config.enemyPersonality,
+          school: config.enemySchool,
+          onImpact: (event) => this.recordImpactEffect(event),
           onAction: (event) => {
             this.recordEvent("enemy", event.type);
+            // Cheap and unconditional: several of these reshape the ground
+            // without moving any elevation (火の雨's ash, 雷's scorch), and
+            // the renderer only rebuilds the mesh when something tells it
+            // to — see consumeTerrainChanged.
+            this.terrainChanged = true;
             config.onEnemyAction?.(event);
           },
         }),

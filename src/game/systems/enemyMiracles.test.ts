@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
 import type { Heightmap } from "../../world/heightmap";
-import { FactionState, House, Owner, Position, Walker } from "../components";
+import { FactionState, House, Infected, Owner, Position, Swamp, Walker } from "../components";
 import {
   ARMAGEDDON_MANA_COST,
   ARMAGEDDON_POPULATION_RATIO,
@@ -426,6 +426,98 @@ describe("createEnemyMiracleSystem", () => {
     })(world, 8);
 
     expect(events).toEqual([{ type: "earthquake", position: { x: 1, y: 1 } }]);
+  });
+
+  /**
+   * Each world's god draws from one of the original's six schools — see
+   * miracleSchools.ts's ENEMY_SIGNATURE_MIRACLE and worlds.ts's
+   * WorldDefinition.enemySchool.
+   */
+  it("casts its own school's miracle rather than the earthquake every god shares", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: 999 });
+    createFaction(world, "player", { x: 5, y: 5 });
+    createHouse(world, "player", 5, 5);
+
+    const events: unknown[] = [];
+    const heightmap = flatHeightmap(20, 20, 5);
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap,
+      worldCenter: WORLD_CENTER,
+      school: "plant",
+      onAction: (event) => events.push(event),
+    })(world, 8);
+
+    expect(events).toEqual([{ type: "swamp", position: { x: 5, y: 5 } }]);
+    expect(world.query(Swamp)).toHaveLength(1);
+  });
+
+  it("saves for its own miracle instead of spending the difference on an earthquake", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    // Enough for an earthquake (20), nowhere near a spring (45).
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: EARTHQUAKE_MANA_COST });
+    createFaction(world, "player", { x: 5, y: 5 });
+    createHouse(world, "player", 5, 5);
+
+    const events: unknown[] = [];
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap: flatHeightmap(20, 20, 5),
+      worldCenter: WORLD_CENTER,
+      school: "water",
+      onAction: (event) => events.push(event),
+    })(world, 8);
+
+    expect(events).toEqual([]);
+    expect(world.get(enemy, FactionState)!.mana).toBe(EARTHQUAKE_MANA_COST);
+  });
+
+  it("falls back on the earthquake when this world hasn't unlocked its school's own miracle", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: 999 });
+    createFaction(world, "player", { x: 5, y: 5 });
+    createHouse(world, "player", 5, 5);
+
+    const events: unknown[] = [];
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap: flatHeightmap(20, 20, 5),
+      worldCenter: WORLD_CENTER,
+      school: "fire", // 火の雨 not among the miracles this world allows
+      allowedMiracles: ["earthquake"],
+      onAction: (event) => events.push(event),
+    })(world, 8);
+
+    expect(events).toEqual([{ type: "earthquake", position: { x: 5, y: 5 } }]);
+  });
+
+  /** 病原菌 on ground with nobody on it is a cast that does nothing. */
+  it("keeps its mana when its own miracle would achieve nothing", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: 999 });
+    createFaction(world, "player", { x: 5, y: 5 });
+    createHouse(world, "player", 5, 5);
+    // Already infected, so there is nobody left for a second plague to take.
+    for (const entity of world.query(House, Owner)) {
+      if (world.get(entity, Owner)!.faction === "player") world.add(entity, Infected, { remaining: 10 });
+    }
+
+    const events: unknown[] = [];
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap: flatHeightmap(20, 20, 5),
+      worldCenter: WORLD_CENTER,
+      school: "human",
+      onAction: (event) => events.push(event),
+    })(world, 8);
+
+    expect(events).toEqual([]);
+    expect(world.get(enemy, FactionState)!.mana).toBe(999);
   });
 
   it("falls through to earthquake when a decisive population lead exists but armageddon isn't unlocked yet", () => {
