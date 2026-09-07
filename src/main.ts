@@ -22,7 +22,9 @@ import {
   HELEN_MANA_COST,
   MAX_MANA,
   SHRINE_MOVE_MANA_COST,
+  SWAMP_CAPACITY,
   SWAMP_MANA_COST,
+  SWAMP_RADIUS,
   HOLY_WATER_MANA_COST,
   TORNADO_MANA_COST,
   FIRE_PILLAR_MANA_COST,
@@ -349,6 +351,7 @@ async function bootstrap(world: WorldDefinition) {
     enemyPersonality: world.enemyPersonality,
     enemySchool: world.enemySchool,
     instantDrowning: world.instantDrowning,
+    bottomlessSwamp: world.bottomlessSwamp,
     onEnemyAction,
   });
 
@@ -842,7 +845,9 @@ async function bootstrap(world: WorldDefinition) {
 
     if (toolMode === "swamp") {
       if (!trySpendPlayerMana(SWAMP_MANA_COST)) return;
-      createSwamp(simulation.world, vertex.x, vertex.y);
+      // 「面ごとに底なしかどうか設定される」 — the enemy god's own swamps on
+      // this stage are the same kind (see Simulation's bottomlessSwamp).
+      createSwamp(simulation.world, vertex.x, vertex.y, SWAMP_RADIUS, SWAMP_CAPACITY, world.bottomlessSwamp);
       simulation.recordEvent("player", "swamp");
       vibrate(25);
       playMiracleSound("swamp");

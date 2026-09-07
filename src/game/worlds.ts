@@ -200,6 +200,20 @@ export interface WorldDefinition {
    * hazard concept.
    */
   instantDrowning: boolean;
+  /**
+   * Whether this world's 沼 are 底なし — permanent, never filling up —
+   * rather than the kind that swallows a few walkers and dries up.
+   * 「面ごとに底なしかどうか設定される」 (docs/original-miracles.md #8):
+   * which kind a stage gets is the stage's own property in the original,
+   * so it lives here rather than being one global rule.
+   *
+   * Not a monotonic difficulty axis. A bottomless swamp is stronger for
+   * *whoever casts it*, and both gods cast it — the enemy's own 沼 become
+   * permanent on the same worlds. It changes what the miracle is on that
+   * stage (denying ground rather than killing a few), not how hard the
+   * stage is.
+   */
+  bottomlessSwamp: boolean;
 }
 
 /**
@@ -241,32 +255,34 @@ interface GodDefinition {
    * enemyTerritoryEditable.
    */
   territoryEditable: boolean;
+  /** Whether this god's stages use 底なし沼 — see WorldDefinition.bottomlessSwamp. */
+  bottomlessSwamp: boolean;
 }
 
 export const GODS: readonly GodDefinition[] = [
   // The first six are one per school, in the order docs/original-miracles.md
   // lists them, each introducing its own signature miracle.
-  { id: "gaia", name: "大地神ガイア", school: "earth", personality: "balanced", terrain: "grass", terrainEditRule: "both", unlocks: ["earthquake"], territoryEditable: true },
-  { id: "demeter", name: "豊穣神デメテル", school: "plant", personality: "balanced", terrain: "grass", terrainEditRule: "both", unlocks: ["swamp", "forest"], territoryEditable: true },
-  { id: "aiolos", name: "風神アイオロス", school: "air", personality: "balanced", terrain: "snow", terrainEditRule: "both", unlocks: ["lightning", "shrine"], territoryEditable: true },
-  { id: "hera", name: "女王神ヘラ", school: "human", personality: "balanced", terrain: "desert", terrainEditRule: "both", unlocks: ["plague", "perseus"], territoryEditable: true },
-  { id: "hephaistos", name: "鍛冶神ヘパイストス", school: "fire", personality: "aggressive", terrain: "rock", terrainEditRule: "both", unlocks: ["fireRain", "firePillar"], territoryEditable: true },
-  { id: "poseidon", name: "海神ポセイドン", school: "water", personality: "defensive", terrain: "grass", terrainEditRule: "raiseOnly", unlocks: ["holyWater", "reef"], territoryEditable: true },
+  { id: "gaia", name: "大地神ガイア", school: "earth", personality: "balanced", terrain: "grass", terrainEditRule: "both", unlocks: ["earthquake"], bottomlessSwamp: false, territoryEditable: true },
+  { id: "demeter", name: "豊穣神デメテル", school: "plant", personality: "balanced", terrain: "grass", terrainEditRule: "both", unlocks: ["swamp", "forest"], bottomlessSwamp: false, territoryEditable: true },
+  { id: "aiolos", name: "風神アイオロス", school: "air", personality: "balanced", terrain: "snow", terrainEditRule: "both", unlocks: ["lightning", "shrine"], bottomlessSwamp: false, territoryEditable: true },
+  { id: "hera", name: "女王神ヘラ", school: "human", personality: "balanced", terrain: "desert", terrainEditRule: "both", unlocks: ["plague", "perseus"], bottomlessSwamp: false, territoryEditable: true },
+  { id: "hephaistos", name: "鍛冶神ヘパイストス", school: "fire", personality: "aggressive", terrain: "rock", terrainEditRule: "both", unlocks: ["fireRain", "firePillar"], bottomlessSwamp: false, territoryEditable: true },
+  { id: "poseidon", name: "海神ポセイドン", school: "water", personality: "defensive", terrain: "grass", terrainEditRule: "raiseOnly", unlocks: ["holyWater", "reef"], bottomlessSwamp: false, territoryEditable: true },
   // The second six revisit the schools with a different temperament each,
   // and hand the player the terrain-shaping miracles.
-  { id: "atlas", name: "巨神アトラス", school: "earth", personality: "aggressive", terrain: "desert", terrainEditRule: "both", unlocks: ["road", "wall"], territoryEditable: true },
-  { id: "persephone", name: "冥后ペルセポネ", school: "plant", personality: "defensive", terrain: "snow", terrainEditRule: "lowerOnly", unlocks: ["fungus", "flower"], territoryEditable: true },
-  { id: "boreas", name: "北風神ボレアス", school: "air", personality: "aggressive", terrain: "grass", terrainEditRule: "both", unlocks: ["tornado", "storm"], territoryEditable: true },
-  { id: "athena", name: "戦神アテナ", school: "human", personality: "defensive", terrain: "desert", terrainEditRule: "raiseOnly", unlocks: ["guardian", "helen"], territoryEditable: true },
-  { id: "prometheus", name: "先知神プロメテウス", school: "fire", personality: "aggressive", terrain: "rock", terrainEditRule: "lowerOnly", unlocks: ["volcano", "achilles"], territoryEditable: true },
-  { id: "thetis", name: "海精テティス", school: "water", personality: "balanced", terrain: "snow", terrainEditRule: "both", unlocks: ["tsunami", "odysseus"], territoryEditable: true },
+  { id: "atlas", name: "巨神アトラス", school: "earth", personality: "aggressive", terrain: "desert", terrainEditRule: "both", unlocks: ["road", "wall"], bottomlessSwamp: false, territoryEditable: true },
+  { id: "persephone", name: "冥后ペルセポネ", school: "plant", personality: "defensive", terrain: "snow", terrainEditRule: "lowerOnly", unlocks: ["fungus", "flower"], bottomlessSwamp: true, territoryEditable: true },
+  { id: "boreas", name: "北風神ボレアス", school: "air", personality: "aggressive", terrain: "grass", terrainEditRule: "both", unlocks: ["tornado", "storm"], bottomlessSwamp: false, territoryEditable: true },
+  { id: "athena", name: "戦神アテナ", school: "human", personality: "defensive", terrain: "desert", terrainEditRule: "raiseOnly", unlocks: ["guardian", "helen"], bottomlessSwamp: false, territoryEditable: true },
+  { id: "prometheus", name: "先知神プロメテウス", school: "fire", personality: "aggressive", terrain: "rock", terrainEditRule: "lowerOnly", unlocks: ["volcano", "achilles"], bottomlessSwamp: false, territoryEditable: true },
+  { id: "thetis", name: "海精テティス", school: "water", personality: "balanced", terrain: "snow", terrainEditRule: "both", unlocks: ["tsunami", "odysseus"], bottomlessSwamp: false, territoryEditable: true },
   // The last four close out the roster of heroes and the two miracles that
   // end matches outright, and their realms are off-limits to the player's
   // own spade.
-  { id: "kronos", name: "時神クロノス", school: "earth", personality: "defensive", terrain: "rock", terrainEditRule: "raiseOnly", unlocks: ["megalith", "hercules"], territoryEditable: false },
-  { id: "dionysos", name: "酒神ディオニュソス", school: "plant", personality: "aggressive", terrain: "desert", terrainEditRule: "lowerOnly", unlocks: ["adonis"], territoryEditable: false },
-  { id: "zephyros", name: "西風神ゼピュロス", school: "air", personality: "defensive", terrain: "snow", terrainEditRule: "raiseOnly", unlocks: ["hurricane"], territoryEditable: false },
-  { id: "hades", name: "冥王ハデス", school: "fire", personality: "aggressive", terrain: "rock", terrainEditRule: "lowerOnly", unlocks: ["armageddon"], territoryEditable: false },
+  { id: "kronos", name: "時神クロノス", school: "earth", personality: "defensive", terrain: "rock", terrainEditRule: "raiseOnly", unlocks: ["megalith", "hercules"], bottomlessSwamp: false, territoryEditable: false },
+  { id: "dionysos", name: "酒神ディオニュソス", school: "plant", personality: "aggressive", terrain: "desert", terrainEditRule: "lowerOnly", unlocks: ["adonis"], bottomlessSwamp: true, territoryEditable: false },
+  { id: "zephyros", name: "西風神ゼピュロス", school: "air", personality: "defensive", terrain: "snow", terrainEditRule: "raiseOnly", unlocks: ["hurricane"], bottomlessSwamp: false, territoryEditable: false },
+  { id: "hades", name: "冥王ハデス", school: "fire", personality: "aggressive", terrain: "rock", terrainEditRule: "lowerOnly", unlocks: ["armageddon"], bottomlessSwamp: true, territoryEditable: false },
 ];
 
 /** How many stages each god gets — 「各3ステージが用意されている」. */
@@ -333,6 +349,7 @@ function buildWorlds(): WorldDefinition[] {
         // Tied to the terrain's own lava theming, not to difficulty — see
         // WorldDefinition.instantDrowning.
         instantDrowning: god.terrain === "rock",
+        bottomlessSwamp: god.bottomlessSwamp,
       });
     }
   });

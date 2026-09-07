@@ -130,6 +130,15 @@ export interface SimulationConfig {
    * that don't care about it.
    */
   instantDrowning?: boolean;
+  /**
+   * Same per-world 底なし setting (see game/worlds.ts's
+   * WorldDefinition.bottomlessSwamp) applied to the enemy god's own 沼
+   * casts, so both sides conjure the same kind of swamp on a given stage.
+   * The player's own casts pass it to createSwamp directly (main.ts).
+   * Defaults to false — the draining kind — which is what tests that don't
+   * care about it should get.
+   */
+  bottomlessSwamp?: boolean;
 }
 
 export interface FactionSummary {
@@ -392,6 +401,7 @@ export class Simulation {
           allowedMiracles: config.allowedMiracles ?? ALL_MIRACLES,
           personality: config.enemyPersonality,
           school: config.enemySchool,
+          bottomlessSwamp: config.bottomlessSwamp,
           onImpact: (event) => this.recordImpactEffect(event),
           onAction: (event) => {
             this.recordEvent("enemy", event.type);

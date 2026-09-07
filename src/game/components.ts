@@ -167,13 +167,25 @@ export interface FactionState {
 
 /**
  * A hazard placed at a Position: any walker that wanders within `radius`
- * drowns. Consumes one unit of `remainingCapacity` per walker swallowed
- * and disappears once it hits zero — per docs/game-system.md, "一定数を
- * 飲み込むと消えるタイプ". The permanent variant isn't implemented.
+ * drowns.
+ *
+ * The original has both kinds, and which one a stage gets is the stage's
+ * own property: 「面ごとに底なしかどうか設定される」
+ * (docs/original-miracles.md #8). game2 picks it per world — see
+ * game/worlds.ts's WorldDefinition.bottomlessSwamp.
+ *
+ * - `bottomless: false` — 「一定数を飲み込むと消えるタイプ」: consumes one
+ *   unit of `remainingCapacity` per walker swallowed and dries up once it
+ *   hits zero.
+ * - `bottomless: true` — 底なし沼: never fills and never dries up. The
+ *   ground it stands on is lost for the rest of the match, so a swamp is a
+ *   place the enemy can no longer walk rather than a trap with a budget.
+ *   `remainingCapacity` is left untouched and unread in this case.
  */
 export interface Swamp {
   radius: number;
   remainingCapacity: number;
+  bottomless: boolean;
 }
 
 /**
