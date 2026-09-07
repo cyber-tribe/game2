@@ -1,11 +1,61 @@
 import { describe, expect, it } from "vitest";
-import { ALL_MIRACLES, WORLDS, nextWorldId, unlockedCountForPassword, type EnemyPersonality } from "./worlds";
+import { ENEMY_SIGNATURE_MIRACLE, MIRACLE_SCHOOLS } from "./miracleSchools";
+import { ALL_MIRACLES, GODS, STAGES_PER_GOD, WORLDS, nextWorldId, unlockedCountForPassword, type EnemyPersonality } from "./worlds";
 
 const KNOWN_PERSONALITIES: readonly EnemyPersonality[] = ["balanced", "aggressive", "defensive"];
 
 describe("WORLDS", () => {
   it("has at least one selectable world", () => {
     expect(WORLDS.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * 「敵として16人の神が登場し、各3ステージが用意されている」 — and the
+   * resulting 全48面 is a number the original itself calls out (as a
+   * 賛否両論点: 「ステージ数が全48面と少ない」). game2 shipped 6.
+   */
+  it("runs the original's 16 gods of 3 stages each — 全48面", () => {
+    expect(GODS).toHaveLength(16);
+    expect(STAGES_PER_GOD).toBe(3);
+    expect(WORLDS).toHaveLength(48);
+  });
+
+  it("keeps a god's three stages as the same opponent, differing only in difficulty", () => {
+    for (let i = 0; i < GODS.length; i++) {
+      const stages = WORLDS.slice(i * STAGES_PER_GOD, (i + 1) * STAGES_PER_GOD);
+      expect(stages).toHaveLength(STAGES_PER_GOD);
+      for (const stage of stages) {
+        expect(stage.enemySchool).toBe(stages[0].enemySchool);
+        expect(stage.enemyPersonality).toBe(stages[0].enemyPersonality);
+        expect(stage.terrain).toBe(stages[0].terrain);
+        expect(stage.terrainEditRule).toBe(stages[0].terrainEditRule);
+        // One toolset per god, so all three matches are played with what
+        // the player gained when this god appeared.
+        expect(stage.allowedMiracles).toEqual(stages[0].allowedMiracles);
+      }
+    }
+  });
+
+  /**
+   * A god falls back on 地震 when its school's signature isn't unlocked
+   * (see enemyMiracles.ts), so a world select describing a 火 god the
+   * player then never sees cast fire would simply be a lie.
+   */
+  it("has every god's own school signature already unlocked when it appears", () => {
+    for (const world of WORLDS) {
+      expect(world.allowedMiracles).toContain(ENEMY_SIGNATURE_MIRACLE[world.enemySchool]);
+    }
+  });
+
+  it("covers all six schools across the roster", () => {
+    const schools = new Set(WORLDS.map((world) => world.enemySchool));
+    expect(schools.size).toBe(MIRACLE_SCHOOLS.length);
+  });
+
+  it("unlocks each miracle exactly once across the campaign", () => {
+    const unlocks = GODS.flatMap((god) => god.unlocks);
+    expect(new Set(unlocks).size).toBe(unlocks.length);
+    expect(new Set(unlocks)).toEqual(new Set(ALL_MIRACLES));
   });
 
   it("gives every world a unique id", () => {
