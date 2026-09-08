@@ -19,10 +19,19 @@ const ELEVATION_STEP = 16;
 const ELEVATION_EASE_TIME_CONSTANT = 0.05;
 
 /**
- * Terrain renders as a true per-vertex mesh — each tile a pair of triangles
- * using its own 4 corners' actual heights, shaded by how much each
- * triangle's own slope faces a fixed light (see triangleBrightness) —
- * rather than a flat-topped block with a separate vertical "cliff wall".
+ * Terrain renders as a true per-vertex mesh — one square per tile, using
+ * its own 4 corners' actual heights, shaded by how much that square's own
+ * slope faces a fixed light (see faceBrightnessOf) — rather than a
+ * flat-topped block with a separate vertical "cliff wall".
+ *
+ * Squares, not triangles, because the reference art's land is a grid of
+ * quads: one cell per map square, continuous across the cell, with no
+ * diagonal seam anywhere in it. This renderer used to split each tile into
+ * two independently-shaded triangles, which put a crease down one diagonal
+ * of every uneven tile — and always the *same* diagonal, so rough ground
+ * picked up a faint corduroy grain running one way across the whole world.
+ * See fillTerrainQuad and polygonNormal for how a tile whose 4 corners do
+ * not lie in one plane still gets a single normal to shade by.
  * Per feedback holding this renderer's own output up against a reference
  * screenshot: "そもそも2段3段の段差があっても坂になるだけで、断層には
  * なりません" ("even a 2-3 unit step just becomes a slope, not a cliff") —
@@ -37,29 +46,29 @@ const ELEVATION_EASE_TIME_CONSTANT = 0.05;
  * legibility.md) — but no amount of tuning a wall's *color* fixes a slope
  * being rendered as a wall in the first place. This mesh needs none of
  * that: a small height difference between adjacent tiles becomes a
- * gently-tilted, gently-shaded triangle purely from its own geometry; a
+ * gently-tilted, gently-shaded square purely from its own geometry; a
  * genuinely steep one becomes a dramatically-shaded, steeply-tilted one —
  * both from the exact same code path, with no separate threshold, bucket,
  * or wall-vs-slope decision anywhere.
  */
 
 /**
- * The fixed light direction every triangle (interior slopes and the map's
- * own edge walls alike, see triangleBrightness/drawEdgeWall) is shaded
+ * The fixed light direction every face (interior slopes and the map's
+ * own edge walls alike, see faceBrightnessOf/drawEdgeWall) is shaded
  * against, expressed in the same (x, y, elevation) space toScreen projects
  * from — i.e. before isometric projection distorts angles, not in screen
  * pixels. Sits mostly overhead with a north-east tilt (-y/+x), continuing
  * the same "sun in the north-east" convention plan/0073-grass-cliff-
  * legibility.md picked for its own (now-removed) north/east-lit cliff
  * walls — a face tilted toward -y/+x still reads as the brighter one.
- * Pre-normalized so triangleBrightness's dot product needs no further
+ * Pre-normalized so faceBrightness's dot product needs no further
  * scaling.
  */
 const LIGHT_DIRECTION = normalize3({ x: 1, y: -1, z: 2 });
 
 /**
- * triangleBrightness's own output for a perfectly flat, upward-facing
- * triangle — i.e. dot(LIGHT_DIRECTION, {x:0,y:0,z:1}). Used to calibrate
+ * faceBrightness's own output for a perfectly flat, upward-facing
+ * face — i.e. dot(LIGHT_DIRECTION, {x:0,y:0,z:1}). Used to calibrate
  * relative brightness so flat ground (by far the most common case) always
  * renders at exactly its own base color, unmodified — only sloped or
  * vertical faces shift away from 1.
@@ -72,11 +81,11 @@ const MAX_SLOPE_DARKEN = 0.55;
 const MAX_SLOPE_LIGHTEN = 0.25;
 
 /**
- * How close two adjacent corner heights need to be to treat a triangle as
- * "exactly flat" (see redraw()'s isFlatTriangle) — filters out floating-
- * point noise from the easing animation (see update()) so a barely-
- * mid-ease triangle doesn't flicker between the dithered flat look and a
- * faintly-shaded sloped one for a difference of a few hundredths of a unit.
+ * How close a tile's corner heights need to be to each other to treat it
+ * as "exactly flat" (see fillTerrainQuad) — filters out floating-point
+ * noise from the easing animation (see update()) so a barely-mid-ease tile
+ * doesn't flicker between the dithered flat look and a faintly-shaded
+ * sloped one for a difference of a few hundredths of a unit.
  */
 const FLAT_EPSILON = 0.02;
 
@@ -91,22 +100,37 @@ function normalize3(v: Vec3): Vec3 {
   return { x: v.x / len, y: v.y / len, z: v.z / len };
 }
 
-/** The (non-normalized) normal of the plane through 3 points, via (b-a) x (c-a). */
-function triangleNormal(a: Vec3, b: Vec3, c: Vec3): Vec3 {
-  const ux = b.x - a.x;
-  const uy = b.y - a.y;
-  const uz = b.z - a.z;
-  const vx = c.x - a.x;
-  const vy = c.y - a.y;
-  const vz = c.z - a.z;
-  return { x: uy * vz - uz * vy, y: uz * vx - ux * vz, z: ux * vy - uy * vx };
+/**
+ * The (non-normalized) normal of a closed polygon, by Newell's method.
+ *
+ * For a planar polygon this is exactly the plane's normal — so for a
+ * triangle it agrees with the usual (b-a) x (c-a) cross product. What
+ * makes it the right tool here is the case a cross product cannot answer:
+ * a terrain tile's 4 corners can warp into a saddle, and Newell's gives
+ * such a polygon the area-weighted average of its own surface rather than
+ * arbitrarily privileging one diagonal. That is what lets a tile be drawn
+ * as one square instead of two triangles — see fillTerrainQuad.
+ */
+function polygonNormal(points: readonly Vec3[]): Vec3 {
+  let x = 0;
+  let y = 0;
+  let z = 0;
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    const q = points[(i + 1) % points.length];
+    x += (p.y - q.y) * (p.z + q.z);
+    y += (p.z - q.z) * (p.x + q.x);
+    z += (p.x - q.x) * (p.y + q.y);
+  }
+  return { x, y, z };
 }
 
 /**
- * A triangle/wall's brightness relative to flat ground (1 = unmodified),
- * from how directly its own face (given as a, b, c in (x, y, elevation)
- * space, or a precomputed normal — see drawEdgeWall) points toward
- * LIGHT_DIRECTION. >1 for a face tilted toward the light (lightens, capped
+ * A face's brightness relative to flat ground (1 = unmodified), from how
+ * directly its normal points toward LIGHT_DIRECTION — given here as that
+ * normal, so a terrain square passes its polygon normal (faceBrightnessOf)
+ * and an edge wall its fixed per-direction one (drawEdgeWall).
+ * >1 for a face tilted toward the light (lightens, capped
  * by MAX_SLOPE_LIGHTEN below), <1 for one tilted away (darkens, capped by
  * MAX_SLOPE_DARKEN) — see shadeColor for how this turns into an actual
  * color.
@@ -124,8 +148,8 @@ function faceBrightness(normal: Vec3): number {
   return 1 + MAX_SLOPE_LIGHTEN * Math.min(1, deviation / (1 - FLAT_FACE_BRIGHTNESS));
 }
 
-function triangleBrightness(a: Vec3, b: Vec3, c: Vec3): number {
-  return faceBrightness(triangleNormal(a, b, c));
+function faceBrightnessOf(points: readonly Vec3[]): number {
+  return faceBrightness(polygonNormal(points));
 }
 
 /** Tints `color` toward black (brightness < 1) or white (brightness > 1) — see faceBrightness. */
@@ -392,7 +416,7 @@ const FUNGUS_FILL = {
 
 /**
  * What is on top of a tile's ordinary terrain, if anything — see
- * redraw()'s own precedence and fillTerrainTriangle. Only surfaces that
+ * redraw()'s own precedence and fillTerrainQuad. Only surfaces that
  * are still *ground* (walkable, shaded and dithered like terrain) belong
  * here; water, rock and crevices replace the ground entirely and are
  * handled by hasOwnColor instead.
@@ -569,7 +593,7 @@ export function isWithinTileBounds(point: { x: number; y: number }, bounds: Tile
 
 /**
  * Renders a heightmap as a true per-vertex isometric mesh: each tile is a
- * pair of triangles using its own 4 corners' actual heights, so a height
+ * square using its own 4 corners' actual heights, so a height
  * difference between tiles reads as a continuous, shaded slope rather than
  * a flat block with a separate vertical cliff face — see redraw() and
  * LIGHT_DIRECTION's own doc comment for why (plan/0073-grass-cliff-
@@ -867,7 +891,7 @@ export class IsoRenderer {
           // Water always reads as a single flat, unshaded plane — never a
           // sloped/shaded seabed showing through — at its own tile's
           // average depth, same as before this became a per-vertex mesh.
-          // No stroke (see fillTerrainTriangle's own doc comment on why):
+          // No stroke (see fillTerrainQuad's own doc comment on why):
           // a whole lake is one continuous color, so outlining every tile
           // seam would draw a visible grid across it for no reason. A
           // simple pixel wave animation (see WATER_FRAMES/waterFrameIndex)
@@ -880,17 +904,17 @@ export class IsoRenderer {
             .poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy])
             .fill(WATER_FRAMES[waterFrameIndex(this.elapsedTime)]);
         } else {
-          const a: Vec3 = { x, y, z: h00 };
-          const b: Vec3 = { x: x + 1, y, z: h10 };
-          const c: Vec3 = { x: x + 1, y: y + 1, z: h11 };
-          const d2: Vec3 = { x, y: y + 1, z: h01 };
-          // Split along the (x,y)-(x+1,y+1) diagonal into 2 triangles —
-          // 3 points are always planar, so each triangle (unlike the full
-          // 4-corner quad, which can warp into a non-planar "saddle" when
-          // all 4 corners differ) has one well-defined normal to shade by.
+          // One square per map cell, the way the reference art's land grid
+          // is built — see fillTerrainQuad for why this is not split into
+          // triangles and how a saddle-shaped tile still gets a normal.
+          const corners: [Vec3, Vec3, Vec3, Vec3] = [
+            { x, y, z: h00 },
+            { x: x + 1, y, z: h10 },
+            { x: x + 1, y: y + 1, z: h11 },
+            { x, y: y + 1, z: h01 },
+          ];
           const hasOwnColor = isRock || isCreviceTile || isWallTile || isBoulderTile;
-          this.fillTerrainTriangle(graphics, a, b, c, baseColor, terrain, hasOwnColor, surface);
-          this.fillTerrainTriangle(graphics, a, c, d2, baseColor, terrain, hasOwnColor, surface);
+          this.fillTerrainQuad(graphics, corners, baseColor, terrain, hasOwnColor, surface);
         }
 
         // The map's own outer edge always gets a genuine vertical wall
@@ -942,50 +966,69 @@ export class IsoRenderer {
   }
 
   /**
-   * Fills one terrain triangle (`a`, `b`, `c` in (x, y, elevation) space)
-   * with its base color, tinted by triangleBrightness — see that function
-   * and LIGHT_DIRECTION's own doc comment. Every terrain gets its own
-   * dithered look (see TERRAIN_FILL) only when the triangle is exactly
-   * flat: a sloped triangle shades as a plain tinted color instead — a
-   * dithered *and* tilted face wasn't worth the complexity, and it
-   * usefully doubles as a visible reward for actually flattening land
-   * (the core "flatten to build" loop, see createHeightmap's own doc
-   * comment): a manicured, flattened plot reads distinctly from the rough,
-   * gently-shaded slopes of untouched terrain right next to it.
+   * Fills one terrain tile as a single square (`corners` in (x, y,
+   * elevation) space, wound a -> b -> c -> d around the tile) with its
+   * base color, tinted by the brightness of that square's own face — see
+   * faceBrightnessOf and LIGHT_DIRECTION's own doc comment.
    *
-   * Deliberately no stroke on the triangle's own outline: two adjacent
-   * triangles that end up the exact same shaded color (the ordinary case
-   * on flat or gently-sloped ground, since brightness is continuous) are
-   * meant to read as one seamless surface. An outline on every triangle
-   * regardless drew a fine diamond-grid wireframe over the *entire* map —
-   * on real mobile hardware, glaringly visible even over otherwise flat
-   * grass — per feedback: "これじゃ視認性が悪すぎます、原作に可能な限り
-   * 揃えてください". The reference art itself never outlines a facet
-   * seam; only an actual brightness change (a real slope or cliff) reads
-   * as an edge there, exactly like this now does with the stroke gone.
+   * One square, not two triangles. The reference art's land is a grid of
+   * quads — one texture cell per map square, continuous across the cell —
+   * and splitting each into a pair of independently-shaded triangles put a
+   * seam down a diagonal that the original has nothing corresponding to.
+   * On a saddle-shaped tile (all 4 corners at different heights) the two
+   * halves took visibly different brightnesses, so the diagonal showed as
+   * a crease; worse, *which* diagonal it fell along was an arbitrary
+   * choice of this code, and every tile on the map made the same one — so
+   * rough ground read with a faint corduroy grain running one way across
+   * the whole world. Newell's method (see polygonNormal) gives such a tile
+   * one area-weighted normal, so the square shades as the single surface
+   * it is meant to be.
+   *
+   * Every terrain gets its own dithered look (see TERRAIN_FILL) only when
+   * the tile is exactly flat: a sloped tile shades as a plain tinted color
+   * instead — a dithered *and* tilted face wasn't worth the complexity,
+   * and it usefully doubles as a visible reward for actually flattening
+   * land (the core "flatten to build" loop, see createHeightmap's own doc
+   * comment): a manicured, flattened plot reads distinctly from the rough,
+   * gently-shaded slopes of untouched terrain right next to it. "Flat" now
+   * means all four corners agree, which is what the player was asked to
+   * produce in the first place — under the old split, a tile with three
+   * corners level and one raised handed the dither texture to whichever
+   * triangle happened to miss the odd corner.
+   *
+   * Deliberately no stroke on the tile's own outline: two adjacent tiles
+   * that end up the exact same shaded color (the ordinary case on flat or
+   * gently-sloped ground, since brightness is continuous) are meant to
+   * read as one seamless surface. An outline on every tile regardless drew
+   * a fine diamond-grid wireframe over the *entire* map — on real mobile
+   * hardware, glaringly visible even over otherwise flat grass — per
+   * feedback: "これじゃ視認性が悪すぎます、原作に可能な限り揃えてくだ
+   * さい". The reference art itself never outlines a facet seam; only an
+   * actual brightness change (a real slope or cliff) reads as an edge
+   * there, exactly like this now does with the stroke gone.
    */
-  private fillTerrainTriangle(
+  private fillTerrainQuad(
     graphics: Graphics,
-    a: Vec3,
-    b: Vec3,
-    c: Vec3,
+    corners: readonly [Vec3, Vec3, Vec3, Vec3],
     baseColor: number,
     terrain: Heightmap["terrain"],
     hasOwnColor: boolean,
     surface: GroundSurface = "terrain",
   ): void {
-    const pa = this.toScreen(a.x, a.y, a.z);
-    const pb = this.toScreen(b.x, b.y, b.z);
-    const pc = this.toScreen(c.x, c.y, c.z);
-    const isFlat = Math.abs(a.z - b.z) < FLAT_EPSILON && Math.abs(b.z - c.z) < FLAT_EPSILON;
+    const points: number[] = [];
+    for (const corner of corners) {
+      const projected = this.toScreen(corner.x, corner.y, corner.z);
+      points.push(projected.sx, projected.sy);
+    }
+    const isFlat = corners.every((corner) => Math.abs(corner.z - corners[0].z) < FLAT_EPSILON);
 
     // Two separate questions, and both have to be asked.
     //
     // `hasOwnColor` keeps the flat-tile shortcut from swallowing tiles that
-    // are not ordinary ground: a flat triangle normally takes a dither
-    // texture and ignores baseColor entirely, which silently painted
-    // freshly-torn crevices as grass (a crevice is carved dead flat to the
-    // floor, so it hit that path every time).
+    // are not ordinary ground: a flat tile normally takes a dither texture
+    // and ignores baseColor entirely, which silently painted freshly-torn
+    // crevices as grass (a crevice is carved dead flat to the floor, so it
+    // hit that path every time).
     //
     // `surface` picks *which* texture ordinary flat ground gets — canopy,
     // paving, rot or bare terrain. All of them still want a texture; they
@@ -995,9 +1038,9 @@ export class IsoRenderer {
         ? surface === "terrain"
           ? TERRAIN_FILL[terrain]
           : SURFACE_FILL[surface]
-        : shadeColor(baseColor, isFlat ? 1 : triangleBrightness(a, b, c));
+        : shadeColor(baseColor, isFlat ? 1 : faceBrightnessOf(corners));
 
-    graphics.poly([pa.sx, pa.sy, pb.sx, pb.sy, pc.sx, pc.sy]).fill(fill);
+    graphics.poly(points).fill(fill);
   }
 
   /**
