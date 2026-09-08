@@ -15,6 +15,7 @@ const TOOL_ICON: Record<ToolMode, IconKind> = {
   raise: "raise",
   lower: "lower",
   flatten: "flatten",
+  autoFlatten: "autoFlatten",
   shrine: "shrine",
   earthquake: "earthquake",
   swamp: "swamp",
