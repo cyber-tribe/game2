@@ -85,7 +85,7 @@ export function isAdvancingHeroState(state: WalkerState): boolean {
  * its own per-kind check. Notably NOT used by swampSystem: heroes drown
  * in swamps just like anyone else.
  */
-export function isHeroState(state: WalkerState): boolean {
+export function isHeroState(state: WalkerState): state is HeroKind {
   return (HERO_KINDS as readonly string[]).includes(state);
 }
 

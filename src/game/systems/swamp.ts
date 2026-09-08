@@ -1,5 +1,6 @@
 import type { System } from "../../ecs";
 import { Position, Swamp, Walker } from "../components";
+import { resistsSchool } from "../miracleSchools";
 import type { OnImpactEffect } from "./effects";
 import { distance } from "./geometry";
 
@@ -30,6 +31,9 @@ export function createSwampSystem(config: Partial<SwampConfig> = {}): System {
 
       for (const walkerEntity of world.query(Walker, Position)) {
         if (!world.isAlive(swampEntity)) break;
+
+        // 沼「※アドニス除く」 — 「同じカテゴリーの攻撃神技は効果がない」 — see miracleSchools.ts's resistsSchool.
+        if (resistsSchool(world.get(walkerEntity, Walker)!.state, "plant")) continue;
 
         const walkerPos = world.get(walkerEntity, Position)!;
         const swamp = world.get(swampEntity, Swamp)!;

@@ -1,4 +1,5 @@
 import type { World } from "../ecs";
+import { resistsSchool } from "./miracleSchools";
 import { House, Position, Walker } from "./components";
 
 /**
@@ -30,6 +31,9 @@ export function eruptVolcano(world: World, covered: readonly { x: number; y: num
   }
 
   for (const entity of world.query(Position, Walker)) {
+    // 火山は火の神技なので「※アキレス以外」——溶岩の上を歩いて焼死する
+    // のは他の全員である。see miracleSchools.ts's resistsSchool.
+    if (resistsSchool(world.get(entity, Walker)!.state, "fire")) continue;
     if (isBuried(world.get(entity, Position)!)) world.destroyEntity(entity);
   }
 }

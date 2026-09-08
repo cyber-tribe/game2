@@ -126,3 +126,26 @@ describe("createHolyWaterSystem", () => {
     expect(world.get(enemy, FactionState)!.leaderId).toBe(replacement);
   });
 });
+
+/** 聖水の泉「※トロイのヘレン除く」 — 水 の神技なので、水 の英雄は寝返らない。 */
+describe("holyWaterSystem and the water school's own hero", () => {
+  it("does not turn トロイのヘレン", () => {
+    const world = new World();
+    const helen = spawnWalker(world, "enemy", 5, 5, "helen");
+    createHolyWater(world, "player", 5, 5);
+
+    createHolyWaterSystem()(world, 0.1);
+
+    expect(world.get(helen, Owner)).toEqual({ faction: "enemy" });
+  });
+
+  it("still turns a hero from any other school", () => {
+    const world = new World();
+    const perseus = spawnWalker(world, "enemy", 5, 5, "perseus");
+    createHolyWater(world, "player", 5, 5);
+
+    createHolyWaterSystem()(world, 0.1);
+
+    expect(world.get(perseus, Owner)).toEqual({ faction: "player" });
+  });
+});

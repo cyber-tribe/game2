@@ -134,3 +134,28 @@ describe("swampSystem", () => {
     expect(impacts).toEqual([{ position: { x: 5, y: 5 }, type: "drowned" }]);
   });
 });
+
+/** 沼「※アドニス除く」 — 植物 の神技なので、植物 の英雄が沈まない。 */
+describe("swampSystem and the plant school's own hero", () => {
+  it("does not swallow アドニス", () => {
+    const world = new World();
+    const adonis = createWalker(world, 5, 5, "adonis");
+    createSwamp(world, 5, 5);
+
+    createSwampSystem()(world, 0.1);
+
+    expect(world.isAlive(adonis)).toBe(true);
+  });
+
+  it("still swallows every other hero", () => {
+    const world = new World();
+    const hercules = createWalker(world, 5, 5, "hercules");
+    const achilles = createWalker(world, 5, 5, "achilles");
+    createSwamp(world, 5, 5);
+
+    createSwampSystem()(world, 0.1);
+
+    expect(world.isAlive(hercules)).toBe(false);
+    expect(world.isAlive(achilles)).toBe(false);
+  });
+});
