@@ -1,6 +1,7 @@
 import type { System } from "../../ecs";
-import { HOUSE_LEVELS, HUT_MANA_RATE_CAP, MAX_MANA } from "../constants";
+import { FOLLOWER_MANA_RATE, HOUSE_LEVELS, HUT_MANA_RATE_CAP, MAX_MANA } from "../constants";
 import { FactionState, House, Infected, Owner } from "../components";
+import { fieldPopulation } from "../population";
 
 /**
  * Each faction's mana grows at the combined mana rate of every house it
@@ -45,7 +46,14 @@ export const manaSystem: System = (world, deltaSeconds) => {
       }
     }
 
-    const manaRate = Math.min(HUT_MANA_RATE_CAP, hutManaRate) + otherManaRate;
+    // 「マナは信者数と時間経過に応じて蓄積される」: followers out on the
+    // field believe too. Pooled with the huts and capped with them — see
+    // FOLLOWER_MANA_RATE — so an established village, already at the
+    // ceiling, notices nothing, while a faction that has just marched or
+    // sprogged its people out of doors keeps the income those people were
+    // producing indoors instead of dropping to zero.
+    const fieldManaRate = fieldPopulation(world, faction.id) * FOLLOWER_MANA_RATE;
+    const manaRate = Math.min(HUT_MANA_RATE_CAP, hutManaRate + fieldManaRate) + otherManaRate;
     world.add(factionEntity, FactionState, {
       ...faction,
       mana: Math.min(MAX_MANA, faction.mana + manaRate * deltaSeconds),
