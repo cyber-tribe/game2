@@ -1181,7 +1181,7 @@ async function bootstrap(world: WorldDefinition) {
 
     if (toolMode === "volcano") {
       if (!trySpendPlayerMana(VOLCANO_MANA_COST)) return;
-      eruptVolcano(simulation.world, applyVolcano(heightmap, vertex.x, vertex.y));
+      eruptVolcano(simulation.world, applyVolcano(heightmap, vertex.x, vertex.y), vertex);
       renderer.redraw(visibleBounds());
       simulation.recordEvent("player", "volcano");
       triggerShake(8);

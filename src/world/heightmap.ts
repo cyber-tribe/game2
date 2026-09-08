@@ -755,6 +755,25 @@ export const VOLCANO_CRATER_DEPTH = 3;
 export const VOLCANO_OUTER_DROP = 6;
 
 /**
+ * How far beyond the cone's own footprint the eruption's puddles form, in
+ * vertices — 原作「火山の外周には水たまりができ、溶岩流をそこで止める」.
+ */
+export const VOLCANO_PUDDLE_RING = 2;
+
+/**
+ * How many puddles one eruption melts out around its base.
+ *
+ * Deliberately a handful rather than a closed moat. A ring of water all the
+ * way around would seal the crater and there would be no lava flow at all —
+ * and the flow is what the miracle is played around (see flowLava). Five
+ * puddles on a ring of roughly twenty vertices block a few directions and
+ * leave the rest open, so the lava picks its way out between them, which is
+ * both what 「水たまり」 (plural, scattered) says and the more interesting
+ * shape.
+ */
+export const VOLCANO_PUDDLES = 5;
+
+/**
  * Heaves the footprint within `radius` of (centerX, centerY) into a real
  * cone-with-crater shape and covers it in rock — docs/game-system.md's
  * "対象地点を高く隆起させ、岩石で覆う", refined per plan/0087's "外側：
@@ -780,6 +799,8 @@ export function applyVolcano(
   radius: number = DEFAULT_VOLCANO_RADIUS,
   hardness: number = VOLCANO_ROCK_HARDNESS,
   lavaVolume: number = DEFAULT_LAVA_VOLUME,
+  puddles: number = VOLCANO_PUDDLES,
+  rng: () => number = Math.random,
 ): { x: number; y: number }[] {
   const cx = Math.round(centerX);
   const cy = Math.round(centerY);
@@ -812,8 +833,59 @@ export function applyVolcano(
     }
   }
 
+  // Melted before the lava runs, because they are what it runs *around* —
+  // see meltPuddles and flowLava's "water is where the flow ends".
+  covered.push(...meltPuddles(heightmap, cx, cy, radius + VOLCANO_PUDDLE_RING, puddles, rng));
   covered.push(...flowLava(heightmap, cx, cy, radius, hardness, lavaVolume));
   return covered;
+}
+
+/**
+ * Sinks a few vertices around the cone's skirt to sea level — 原作「火山の
+ * 外周には水たまりができ、溶岩流をそこで止める」.
+ *
+ * Scattered on a ring rather than drawn as one, for the reason
+ * VOLCANO_PUDDLES gives: a closed moat would bottle the eruption up
+ * entirely. Their angles are evenly spaced and then jittered, so an
+ * eruption never produces the same rosette twice but also never drops all
+ * five puddles on one side.
+ *
+ * Returns them as covered ground: a house that finds itself in a new pond
+ * is as gone as one under the lava, and eruptVolcano is what clears it.
+ */
+function meltPuddles(
+  heightmap: Heightmap,
+  centerX: number,
+  centerY: number,
+  ringRadius: number,
+  count: number,
+  rng: () => number,
+): { x: number; y: number }[] {
+  const melted: { x: number; y: number }[] = [];
+  if (count <= 0 || ringRadius <= 0) return melted;
+
+  for (let i = 0; i < count; i++) {
+    const angle = ((i + rng()) / count) * Math.PI * 2;
+    const x = Math.round(centerX + Math.cos(angle) * ringRadius);
+    const y = Math.round(centerY + Math.sin(angle) * ringRadius);
+    if (x < 0 || y < 0 || x > heightmap.width || y > heightmap.height) continue;
+    if (heightmap.vertices[y][x] <= heightmap.waterLevel) continue; // already water
+
+    heightmap.vertices[y][x] = heightmap.waterLevel;
+    // Water is not rock, and nothing built stands in it. A crevice that
+    // filled with water is simply a pond, so the tear is cleared too.
+    heightmap.rockHardness[y][x] = 0;
+    heightmap.crevice[y][x] = false;
+    heightmap.wall[y][x] = false;
+    heightmap.boulder[y][x] = false;
+    heightmap.forest[y][x] = false;
+    heightmap.fungus[y][x] = false;
+    heightmap.road[y][x] = false;
+    heightmap.scorched[y][x] = false;
+    melted.push({ x, y });
+  }
+
+  return melted;
 }
 
 /**

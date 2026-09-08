@@ -246,7 +246,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
     if (allowedMiracles.includes("volcano") && populationRatio >= VOLCANO_POPULATION_RATIO * tuning.volcanoRatioMultiplier) {
       const target = densestReachableCluster(world, factionId, opponentId, DEFAULT_VOLCANO_RADIUS, viewport, rng);
       if (target && trySpendMana(world, factionId, VOLCANO_MANA_COST)) {
-        eruptVolcano(world, applyVolcano(heightmap, target.x, target.y));
+        eruptVolcano(world, applyVolcano(heightmap, target.x, target.y, undefined, undefined, undefined, undefined, rng), target, rng);
         onAction({ type: "volcano", position: target });
         return;
       }
