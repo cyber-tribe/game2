@@ -84,7 +84,7 @@ import { mountCommandIcons } from "./ui/commandIcons";
 import { loadCommandIcons } from "./ui/pixelIcons";
 import { StatusPanel } from "./ui/statusPanel";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
-import { AUTO_FLATTEN_SIZE, DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyFlower, applyForest, applyFungus, DEFAULT_FLOWER_RADIUS, applyReef, applyRoad, applyWall, applyMegalith, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, megalithScatterCandidates, planAutoFlatten, raiseVertex } from "./world/heightmap";
+import { AUTO_FLATTEN_SIZE, DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyFlower, applyForest, applyFungus, DEFAULT_FLOWER_RADIUS, applyReef, applyRoad, applyWall, applyMegalith, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, megalithScatterCandidates, planAutoFlatten, raiseVertex, touchesLand } from "./world/heightmap";
 
 /**
  * The camera's fixed base scale — see layout()'s doc comment for why this
@@ -682,6 +682,13 @@ async function bootstrap(world: WorldDefinition) {
       showEntityInfo("この面では敵の陣地を直接操作できません", "warning");
       return;
     }
+    // 「どこでも↑↓」「海上に土地↑↓」 — × on 43 of the original's 48 stages,
+    // where the spade reaches only ground that already touches land. See
+    // WorldDefinition's openTerraforming.
+    if (!world.openTerraforming && !touchesLand(heightmap, vertex.x, vertex.y)) {
+      showEntityInfo("この面では何もない海に土地を起こせません", "warning");
+      return;
+    }
     if (!trySpendPlayerMana(TERRAIN_EDIT_MANA_COST)) return;
     raiseVertex(heightmap, vertex.x, vertex.y, delta);
     renderer.redraw(visibleBounds());
@@ -750,6 +757,12 @@ async function bootstrap(world: WorldDefinition) {
    * reading as a tap that failed to register.
    */
   const applySprogAt = (localX: number, localY: number): void => {
+    // 「スプログ」 is one of the ten per-stage settings, and ゼウス's three
+    // stages turn it off — see WorldDefinition's sprogAllowed.
+    if (!world.sprogAllowed) {
+      showEntityInfo("この面ではスプログが使えません", "warning");
+      return;
+    }
     const target = pickInspectableEntity(localX, localY);
     if (!target || target.kind !== "house" || target.faction !== "player") {
       showEntityInfo("スプログは自分の家をタップしてください", "warning");
@@ -1500,6 +1513,11 @@ async function bootstrap(world: WorldDefinition) {
   for (const miracle of ALL_MIRACLES) {
     if (world.allowedMiracles.includes(miracle)) continue;
     document.querySelector<HTMLButtonElement>(`#toolbar [data-tool="${miracle}"]`)?.setAttribute("disabled", "true");
+  }
+  // スプログ is not a miracle (it costs no mana) but it is one of the ten
+  // per-stage settings, so it goes dark the same way — see sprogAllowed.
+  if (!world.sprogAllowed) {
+    document.querySelector<HTMLButtonElement>('#toolbar [data-tool="sprog"]')?.setAttribute("disabled", "true");
   }
   // Syncs the toolbar's visual "pressed" state with toolMode's actual
   // default set above — index.html hardcodes "raise" as pressed, which is

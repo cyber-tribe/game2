@@ -21,6 +21,7 @@ import {
   applyRoad,
   applyWall,
   isLevelVertex,
+  touchesLand,
   applyMegalith,
   DEFAULT_MEGALITH_RADIUS,
   isBoulder,
@@ -1687,6 +1688,36 @@ describe("raiseVertex under a 城壁", () => {
     raiseVertex(heightmap, 12, 10, 1);
 
     expect(heightmap.vertices[10][12]).toBe(6);
+  });
+});
+
+/** 「どこでも↑↓」「海上に土地↑↓」 — see game/worlds.ts's openTerraforming. */
+describe("touchesLand", () => {
+  function seaWithIsland(size: number): Heightmap {
+    const heightmap = createHeightmap(size, size, "grass");
+    for (const row of heightmap.vertices) row.fill(heightmap.waterLevel);
+    heightmap.vertices[10][10] = 3;
+    return heightmap;
+  }
+
+  it("is true on the land itself", () => {
+    expect(touchesLand(seaWithIsland(20), 10, 10)).toBe(true);
+  });
+
+  it("is true one step out from a coast, so a shore can be widened", () => {
+    const heightmap = seaWithIsland(20);
+
+    expect(touchesLand(heightmap, 11, 10)).toBe(true);
+    expect(touchesLand(heightmap, 10, 11)).toBe(true);
+  });
+
+  it("is false in open sea", () => {
+    expect(touchesLand(seaWithIsland(20), 15, 15)).toBe(false);
+  });
+
+  /** Two steps out is open sea: the coast has to be grown, not jumped. */
+  it("is false just past the reach of a coast", () => {
+    expect(touchesLand(seaWithIsland(20), 12, 10)).toBe(false);
   });
 });
 

@@ -1411,6 +1411,30 @@ export function isLevelVertex(heightmap: Heightmap, x: number, y: number): boole
   return true;
 }
 
+/**
+ * Whether a vertex touches land that is already above water — what the
+ * spade can reach on a stage whose 「どこでも↑↓／海上に土地↑↓」 are ×
+ * (see game/worlds.ts's openTerraforming).
+ *
+ * The vertex itself counts, so raising a coast outward works one step at a
+ * time; open sea, with nothing dry on any side, does not. That is the
+ * difference between widening the island you were given and conjuring a new
+ * one wherever you like.
+ */
+export function touchesLand(heightmap: Heightmap, x: number, y: number): boolean {
+  for (const [dx, dy] of [
+    [0, 0],
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ] as const) {
+    const elevation = heightmap.vertices[y + dy]?.[x + dx];
+    if (elevation !== undefined && elevation > heightmap.waterLevel) return true;
+  }
+  return false;
+}
+
 /** How far from its cast point a fungus outbreak starts, in vertices. */
 export const DEFAULT_FUNGUS_RADIUS = 1;
 
