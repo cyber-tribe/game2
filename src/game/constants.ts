@@ -118,21 +118,32 @@ export const HOUSE_LEVEL_LABELS: Record<HouseLevel, string> = {
 };
 
 /**
- * Minimum house.population / capacity fraction releasePopulation requires
- * before it'll empty a house early — see that function's doc comment.
- * Below this, giving up the house's progress toward a real, full-strength
- * spawn isn't judged worth the walker it would produce.
+ * Minimum house.population / capacity fraction sprogHouse requires before
+ * it'll push anyone out early — see that function's doc comment. Below
+ * this, giving up the house's progress toward a real, full-strength spawn
+ * isn't judged worth the walker it would produce.
  */
 export const POPULATION_RELEASE_MIN_FRACTION = 0.5;
 
 /**
  * Share of a released walker's population fraction that becomes its
- * strength — see releasePopulation. Kept below 1 so cashing population out
- * early is a genuine trade-off (a weaker walker, sooner) against letting a
- * house grow all the way to capacity on its own (strength 1, per
+ * strength — see sprogHouse. Kept below 1 so cashing population out early
+ * is a genuine trade-off (a weaker walker, sooner) against letting a house
+ * grow all the way to capacity on its own (strength 1, per
  * createHouseGrowthSystem) — not a strictly better way to grow.
  */
 export const POPULATION_RELEASE_EFFICIENCY = 0.75;
+
+/**
+ * How much of a house's population one スプログ pushes out — the original
+ * says 「信者の**一部**が追い出される」, not all of them. Half leaves the
+ * house still standing on real progress rather than back at zero, which is
+ * what makes the command "don't wait for capacity" instead of "cash this
+ * house in". Taking a share of what is *left* each time also makes repeated
+ * presses run themselves dry: a full house yields two walkers before it
+ * drops under POPULATION_RELEASE_MIN_FRACTION and refuses.
+ */
+export const SPROG_FRACTION = 0.5;
 
 /**
  * Ceiling on how much of a faction's total mana rate hut-level houses can

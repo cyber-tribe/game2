@@ -39,7 +39,7 @@ const ALL_KINDS: IconKind[] = [
   "gather",
   "goToShrine",
   "fight",
-  "releasePopulation",
+  "sprog",
   "mana",
   "population",
 ];

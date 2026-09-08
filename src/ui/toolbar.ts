@@ -5,6 +5,7 @@ export type ToolMode =
   | "lower"
   | "flatten"
   | "autoFlatten"
+  | "sprog"
   | "shrine"
   | "earthquake"
   | "swamp"

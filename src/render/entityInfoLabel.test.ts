@@ -5,6 +5,7 @@ import { describeInspectableEntity } from "./entityInfoLabel";
 describe("describeInspectableEntity", () => {
   it("describes a player walker with its strength and state", () => {
     const text = describeInspectableEntity({
+      entity: 1,
       kind: "walker",
       faction: "player",
       position: { x: 1, y: 1 },
@@ -17,6 +18,7 @@ describe("describeInspectableEntity", () => {
 
   it("describes an enemy walker as 敵", () => {
     const text = describeInspectableEntity({
+      entity: 1,
       kind: "walker",
       faction: "enemy",
       position: { x: 1, y: 1 },
@@ -29,6 +31,7 @@ describe("describeInspectableEntity", () => {
 
   it("describes a house with its level, population, and capacity", () => {
     const text = describeInspectableEntity({
+      entity: 1,
       kind: "house",
       faction: "player",
       position: { x: 5, y: 5 },

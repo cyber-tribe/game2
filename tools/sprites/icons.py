@@ -770,7 +770,7 @@ ICONS.update({
         "................",
     ],
     # Release population: a figure stepping out through a doorway.
-    "releasePopulation": [
+    "sprog": [
         "................",
         "..oooooo........",
         "..oSSSSo........",
@@ -918,7 +918,7 @@ ICON_KINDS = (
     "gather",
     "goToShrine",
     "fight",
-    "releasePopulation",
+    "sprog",
     "inspect",
     "raise",
     "lower",
