@@ -110,13 +110,14 @@ describe("Simulation", () => {
       // Strong enough to take the player's hut below (defense 3), so the
       // enemy AI leaves the "fight" mode this test sets rather than
       // sending the faction off to muster — see ENEMY_AI's own muster
-      // rule. totalPopulation counts a walker as 1 whatever its strength,
-      // so this doesn't move the population ratio the test is about.
+      // rule. A walker's strength IS its head count (population.ts's
+      // walkerFollowers), so this one is four of the eight people the
+      // ratio below is made of.
       sim.world.add(leader, Walker, { strength: 4, state: "seeking", speed: 1 });
       const enemyHouse = sim.world.createEntity();
       sim.world.add(enemyHouse, Position, { x: 4, y: 4 });
       sim.world.add(enemyHouse, Owner, { faction: "enemy" });
-      sim.world.add(enemyHouse, House, { level: "hut", population: 7 }); // + leader's own +1 = myPopulation 8
+      sim.world.add(enemyHouse, House, { level: "hut", population: 4 }); // + the leader's 4 = myPopulation 8
       const playerHouse = sim.world.createEntity();
       sim.world.add(playerHouse, Position, { x: 15, y: 15 });
       sim.world.add(playerHouse, Owner, { faction: "player" });

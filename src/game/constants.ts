@@ -162,6 +162,26 @@ export const SPROG_FRACTION = 0.5;
  */
 export const HUT_MANA_RATE_CAP = 5 * HOUSE_LEVELS.hut.manaRate;
 
+/**
+ * Mana per second from one follower who is out on the field rather than
+ * living in a house — 「マナは**信者数**と時間経過に応じて蓄積される」.
+ *
+ * Exactly what that person produced while indoors in a hut
+ * (manaRate / capacity), so stepping outside is income-neutral. It used to
+ * be a total loss: a walker only ever *left* a house, taking its share of
+ * that house's population with it, so mustering an army or sprogging a town
+ * cut the faction's income to nothing while the people involved were still
+ * very much alive and still believers. The original praises スプログ for
+ * making the game move faster; it cannot be the button that bankrupts you.
+ *
+ * Counted inside HUT_MANA_RATE_CAP rather than beside it (see manaSystem):
+ * people standing in a field are the least-developed state a faction's
+ * population can be in, so they belong under the same ceiling as its
+ * least-developed housing. Letting them earn outside it would mean emptying
+ * every hut out-earned upgrading them.
+ */
+export const FOLLOWER_MANA_RATE = HOUSE_LEVELS.hut.manaRate / HOUSE_LEVELS.hut.capacity;
+
 /** How far around a house (in tiles) countFlatNeighbors looks when checking for an upgrade. */
 export const HOUSE_UPGRADE_FLATNESS_RADIUS = 2;
 
