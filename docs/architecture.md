@@ -78,7 +78,8 @@ game2/
 │   │                       applyVolcano(範囲内をMAX_ELEVATIONまで隆起させ岩化)、
 │   │                       applyFlood(waterLevelを底上げする、地形頂点自体は不変)
 │   └── render/
-│       ├── IsoRenderer.ts … heightmapを1タイル1枚の正方形ポリゴンとして描画し、
+│       ├── IsoRenderer.ts … heightmapを1タイル1枚の正方形ポリゴン（タイル軸に沿った
+│       │                    織りのテクスチャ付き）として描画し、
 │       │                    タイル座標→画面座標への投影(project)・クリック位置→頂点の
 │       │                    逆引き(pickVertex)・編集後の再描画(redraw)を提供
 │       ├── EntityLayer.ts … ECS World上のSwamp/Walker/Houseを描画
