@@ -2,6 +2,7 @@ import { Graphics, Texture } from "pixi.js";
 import { describe, expect, it, vi } from "vitest";
 import { REEF_HARDNESS, VOLCANO_ROCK_HARDNESS, type Heightmap } from "../world/heightmap";
 import {
+  EDGE_STRATA,
   IsoRenderer,
   TERRAIN_COLOR,
   TILE_HEIGHT,
@@ -249,6 +250,35 @@ describe("IsoRenderer.redraw (sloped mesh)", () => {
     expect(raisedFillCount).toBeGreaterThan(flatFillCount);
   });
 
+  /**
+   * The cut side of the world is earth, not the surface extruded: the
+   * original's slab shows a light band under the rim, browner ground below
+   * it, and near-black rock at the bottom, whatever is growing on top.
+   * Painting it in the terrain's own color made a green field a world of
+   * grass all the way down.
+   */
+  it("paints the map-edge wall in earth strata rather than the terrain's own color", () => {
+    const wallColorsFor = (terrain: Heightmap["terrain"]) => {
+      const heightmap = flatHeightmap(3, 3, 5);
+      heightmap.terrain = terrain;
+      const renderer = new IsoRenderer(heightmap);
+      const fills = drawInstructions(renderer).filter((i) => i.action === "fill");
+      return new Set(fills.filter((f) => f.data.style!.texture === Texture.WHITE).map((f) => f.data.style!.color));
+    };
+
+    const desert = wallColorsFor("desert");
+    // Three strata (see EDGE_STRATA), each in one of two directional tones
+    // (see drawEdgeWall's fixed outward normal per direction).
+    expect(desert.size).toBe(EDGE_STRATA.length * 2);
+
+    // The same earth under every surface: what a stage grows on top does not
+    // change what it is made of underneath. Extruding the surface color gave
+    // each terrain its own coloured underside, which is the bug.
+    expect(wallColorsFor("grass")).toEqual(desert);
+    expect(wallColorsFor("snow")).toEqual(desert);
+    expect(wallColorsFor("rock")).toEqual(desert);
+  });
+
   it("shades a map-edge wall darker than the flat top it descends from, in one of two directional tones", () => {
     // A uniform flat map relies purely on the map's own true outer edge for
     // its walls — every interior tile boundary here is perfectly flat and
@@ -270,15 +300,18 @@ describe("IsoRenderer.redraw (sloped mesh)", () => {
     const wallColors = new Set(
       fills.filter((f) => f.data.style!.texture === Texture.WHITE).map((f) => f.data.style!.color),
     );
-    expect(wallColors.size).toBe(2);
+    expect(wallColors.size).toBe(EDGE_STRATA.length * 2);
 
-    const DESERT = TERRAIN_COLOR.desert;
-    const [tr, tg, tb] = channels(DESERT);
+    // Every band is a *shaded* version of its own stratum: a vertical face
+    // never comes out at full brightness, whichever way it looks.
     for (const wallColor of wallColors) {
-      const [wr, wg, wb] = channels(wallColor);
-      expect(wr).toBeLessThan(tr);
-      expect(wg).toBeLessThan(tg);
-      expect(wb).toBeLessThan(tb);
+      const stratum = EDGE_STRATA.find((band) => {
+        const [br, bg, bb] = channels(band.color);
+        const [wr, wg, wb] = channels(wallColor);
+        return wr <= br && wg <= bg && wb <= bb;
+      });
+      expect(stratum).toBeDefined();
+      expect(wallColor).not.toBe(stratum!.color);
     }
   });
 
@@ -293,7 +326,8 @@ describe("IsoRenderer.redraw (sloped mesh)", () => {
     heightmap.terrain = "desert";
     const renderer = new IsoRenderer(heightmap);
     const fills = drawInstructions(renderer).filter((i) => i.action === "fill");
-    expect(fills).toHaveLength(6); // 2 flat top triangles + 4 edge walls
+    // 2 flat top triangles + 4 edge walls, each in EDGE_STRATA bands.
+    expect(fills).toHaveLength(2 + 4 * EDGE_STRATA.length);
 
     // redraw() fills a tile's own 2 triangles first, then always draws its
     // 4 edge walls in north/east/south/west order (see its own body) — a
@@ -302,7 +336,11 @@ describe("IsoRenderer.redraw (sloped mesh)", () => {
     // geometry (a wall's own first point can coincide with another fill's,
     // since toScreen can map distinct (x, y, elevation) triples onto the
     // same screen point).
-    const [topA, topB, north, east, south, west] = fills.map((f) => f.data.style!.color);
+    const colors = fills.map((f) => f.data.style!.color);
+    const [topA, topB] = colors;
+    // The topmost band of each wall, in north/east/south/west order.
+    const bandsPerWall = EDGE_STRATA.length;
+    const [north, east, south, west] = [0, 1, 2, 3].map((i) => colors[2 + i * bandsPerWall]);
 
     expect(topA).toBe(topB); // flat, so both triangles are the same unshaded desert color
     expect(north).toBe(east);
