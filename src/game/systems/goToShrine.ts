@@ -43,7 +43,26 @@ export const goToShrineSystem: System = (world) => {
       continue;
     }
 
-    if (state.leaderId === undefined || !world.isAlive(state.leaderId)) continue;
+    // No leader yet — everyone walks to the symbol itself, and whoever
+    // gets there first is promoted (leaderSystem). This is the first half
+    // of the original's own description of the order: 「フィールド上の
+    // 信者達を、シンボルへ集める。…最初に辿り着いた信者は「リーダー」と
+    // なり、以後一般信者はリーダーの元へ集うようになる」.
+    //
+    // Without it the order could not start itself. Leader-following needs a
+    // leader, nothing here sent anyone to the shrine to become one, and
+    // leaderSystem only promotes a walker that has actually arrived — so a
+    // player who picked 集結シンボルへ before ever gathering got a mode that
+    // did nothing at all, and their walkers wandered off and settled.
+    if (state.leaderId === undefined || !world.isAlive(state.leaderId)) {
+      for (const entity of world.query(Position, Walker, Owner)) {
+        if (world.has(entity, Charmed)) continue;
+        if (world.get(entity, Owner)!.faction !== state.id) continue;
+
+        assignTarget(world, entity, state.shrinePosition);
+      }
+      continue;
+    }
 
     assignTarget(world, state.leaderId, state.shrinePosition);
 

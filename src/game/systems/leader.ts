@@ -35,7 +35,13 @@ export const leaderSystem: System = (world) => {
     ) {
       continue;
     }
-    if (state.behaviorMode !== "gather") continue;
+    // Either mustering order can produce a leader. 集結 walks a faction to
+    // the shrine to merge; 集結シンボルへ walks it there to march — and the
+    // original attaches the promotion to *arriving at the symbol*
+    // (「最初に辿り着いた信者は「リーダー」となり」), not to which of the two
+    // orders sent them. Restricting it to "gather" meant 集結シンボルへ could
+    // never appoint the leader it then needs someone to follow.
+    if (state.behaviorMode !== "gather" && state.behaviorMode !== "goToShrine") continue;
 
     let nextLeader: Entity | undefined;
     let nextLeaderDistance = GATHER_RANGE;

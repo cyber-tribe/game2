@@ -4,10 +4,18 @@ import { FactionState, Owner, Position, Walker, type FactionId } from "../compon
 import { distance } from "./geometry";
 
 /**
- * Under "gather" behaviorMode, a faction's own seeking walkers within
+ * Under either mustering order, a faction's own seeking walkers within
  * GATHER_RANGE of each other merge into one, combining strength — per
  * docs/game-system.md, "ウォーカー同士が合流して1体の強いウォーカーに
- * なる". Factions not in "gather" mode are untouched.
+ * なる". Factions under 定住 or 戦闘 are untouched.
+ *
+ * 集結シンボルへ merges too, not just 集結. The original describes the two
+ * as one order and says the merging is the *reason* to give it:
+ * 「以後一般信者はリーダーの元へ集うようになる。…よって多数の信者を合体
+ * させ、強力なヒーローを生み出すのに不可欠な操作である」. Marching without
+ * merging leaves a crowd standing on the leader's toes — and since a
+ * mustering faction founds no houses either (see settle.ts), that crowd
+ * would do nothing at all.
  */
 export const gatherSystem: System = (world) => {
   const gatheringFactions = factionsInGatherMode(world);
@@ -35,7 +43,7 @@ function factionsInGatherMode(world: World): Set<FactionId> {
   const factions = new Set<FactionId>();
   for (const entity of world.query(FactionState)) {
     const state = world.get(entity, FactionState)!;
-    if (state.behaviorMode === "gather") factions.add(state.id);
+    if (state.behaviorMode === "gather" || state.behaviorMode === "goToShrine") factions.add(state.id);
   }
   return factions;
 }
