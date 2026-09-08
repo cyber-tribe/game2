@@ -21,7 +21,9 @@ import {
   HOLY_WATER_MANA_COST,
   LIGHTNING_MANA_COST,
   PLAGUE_MANA_COST,
+  SWAMP_CAPACITY,
   SWAMP_MANA_COST,
+  SWAMP_RADIUS,
   ARMAGEDDON_POPULATION_RATIO,
   EARTHQUAKE_MANA_COST,
   ENEMY_PERSONALITY_TUNING,
@@ -91,6 +93,13 @@ export interface EnemyMiracleConfig {
    * thresholds, unchanged.
    */
   personality: EnemyPersonality;
+  /**
+   * Whether this world's 沼 are 底なし (see game/worlds.ts's
+   * WorldDefinition.bottomlessSwamp). Passed through so the enemy god's
+   * own swamps match the player's on the same stage — the setting is the
+   * stage's, not the caster's. Defaults to false.
+   */
+  bottomlessSwamp: boolean;
   /**
    * The enemy god's own view, in tiles across (x - y) and along (x + y) —
    * see aiViewport.ts and ENEMY_VIEWPORT_ACROSS_TILES. Injectable so a
@@ -178,6 +187,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
   const tuning = ENEMY_PERSONALITY_TUNING[config.personality ?? "balanced"];
   const viewport = config.viewport ?? { across: ENEMY_VIEWPORT_ACROSS_TILES, along: ENEMY_VIEWPORT_ALONG_TILES };
   const school = config.school ?? "earth";
+  const bottomlessSwamp = config.bottomlessSwamp ?? false;
   const onImpact = config.onImpact ?? (() => {});
   const onAction = config.onAction ?? (() => {});
   let timeSincePass = decisionInterval;
@@ -247,7 +257,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
     const signature = ENEMY_SIGNATURE_MIRACLE[school];
     if (signature !== "earthquake" && allowedMiracles.includes(signature)) {
       const signatureTarget = densestReachableCluster(world, factionId, opponentId, DEFAULT_EARTHQUAKE_RADIUS, viewport, rng);
-      if (signatureTarget && castSignature(world, heightmap, factionId, signature, signatureTarget, rng, onImpact)) {
+      if (signatureTarget && castSignature(world, heightmap, factionId, signature, signatureTarget, rng, onImpact, bottomlessSwamp)) {
         onAction({ type: signature as EnemyMiracleEvent["type"], position: signatureTarget });
       }
       // Saves up for its own miracle rather than spending the difference
@@ -291,6 +301,7 @@ function castSignature(
   target: Point,
   rng: () => number,
   onImpact: OnImpactEffect,
+  bottomlessSwamp: boolean,
 ): boolean {
   switch (signature) {
     case "plague":
@@ -301,7 +312,7 @@ function castSignature(
       return trySpendMana(world, factionId, PLAGUE_MANA_COST);
     case "swamp":
       if (!trySpendMana(world, factionId, SWAMP_MANA_COST)) return false;
-      createSwamp(world, target.x, target.y);
+      createSwamp(world, target.x, target.y, SWAMP_RADIUS, SWAMP_CAPACITY, bottomlessSwamp);
       return true;
     case "lightning":
       if (!trySpendMana(world, factionId, LIGHTNING_MANA_COST)) return false;

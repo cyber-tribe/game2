@@ -52,6 +52,24 @@ describe("WORLDS", () => {
     expect(schools.size).toBe(MIRACLE_SCHOOLS.length);
   });
 
+  /**
+   * 「面ごとに底なしかどうか設定される」 — a stage property, and deliberately
+   * not a difficulty axis: a 底なし沼 is stronger for *whoever casts it*,
+   * and the enemy god casts 沼 too (it is 植物's signature). So it is only
+   * checked to actually vary, never to escalate.
+   */
+  it("uses 底なし沼 on some stages and the draining kind on others", () => {
+    expect(WORLDS.some((world) => world.bottomlessSwamp)).toBe(true);
+    expect(WORLDS.some((world) => !world.bottomlessSwamp)).toBe(true);
+  });
+
+  it("only sets 底なし沼 on worlds that have 沼 unlocked at all", () => {
+    for (const world of WORLDS) {
+      if (!world.bottomlessSwamp) continue;
+      expect(world.allowedMiracles).toContain("swamp");
+    }
+  });
+
   it("unlocks each miracle exactly once across the campaign", () => {
     const unlocks = GODS.flatMap((god) => god.unlocks);
     expect(new Set(unlocks).size).toBe(unlocks.length);

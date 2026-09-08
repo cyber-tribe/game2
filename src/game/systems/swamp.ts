@@ -14,8 +14,12 @@ export interface SwampConfig {
  * guardian steps into the same swamp as anyone else; nothing here
  * special-cases isHeroState (unlike drowning.ts's open-water immunity
  * or houseCaptureSystem's burn/capture split, which stay as they are).
- * Each drowning consumes one unit of the swamp's remainingCapacity;
- * once it hits zero the swamp itself dries up and is removed.
+ * On an ordinary swamp each drowning consumes one unit of the swamp's
+ * remainingCapacity, and once it hits zero the swamp itself dries up and
+ * is removed. A 底なし沼 (Swamp.bottomless — set per world, see
+ * WorldDefinition.bottomlessSwamp) never fills: it keeps swallowing for
+ * the rest of the match, so the ground it covers is simply gone rather
+ * than being a trap with a budget.
  */
 export function createSwampSystem(config: Partial<SwampConfig> = {}): System {
   const onImpact = config.onImpact ?? (() => {});
@@ -33,6 +37,8 @@ export function createSwampSystem(config: Partial<SwampConfig> = {}): System {
 
         world.destroyEntity(walkerEntity);
         onImpact({ position: walkerPos, type: "drowned" });
+
+        if (swamp.bottomless) continue;
 
         const remainingCapacity = swamp.remainingCapacity - 1;
         if (remainingCapacity <= 0) {
