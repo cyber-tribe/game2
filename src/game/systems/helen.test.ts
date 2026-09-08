@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
 import { Charmed, House, MoveTarget, Owner, Position, Walker, type FactionId, type WalkerState } from "../components";
-import { HELEN_CHARM_CAPACITY, HELEN_CHARM_RADIUS } from "../constants";
+import { HELEN_CAPTIVE_DRAIN_RATE, HELEN_CHARM_RADIUS } from "../constants";
 import { createHouseCaptureSystem, createWalkerCombatSystem } from "./combat";
 import { charmedBy, createHelenSystem } from "./helen";
 import { createSettleSystem } from "./settle";
@@ -48,14 +48,19 @@ describe("createHelenSystem", () => {
     expect(world.has(far, Charmed)).toBe(false);
   });
 
-  it("holds only as many as she can carry", () => {
+  /**
+   * 「戦闘を行わないためにパワーの減りが遅く、かなり多くの敵ウォーカーを
+   * 拘束出来る」 — no cap. What bounds her is that the ones she takes wear
+   * out (see the drain tests below), not a number game2 invented.
+   */
+  it("takes everyone in reach, however many that is", () => {
     const world = new World();
     const helen = spawnWalker(world, "player", 10, 10, "helen");
-    for (let i = 0; i < HELEN_CHARM_CAPACITY + 3; i++) spawnWalker(world, "enemy", 10.5, 10);
+    for (let i = 0; i < 12; i++) spawnWalker(world, "enemy", 10.5, 10);
 
     createHelenSystem()(world, 0.1);
 
-    expect(charmedBy(world, helen)).toHaveLength(HELEN_CHARM_CAPACITY);
+    expect(charmedBy(world, helen)).toHaveLength(12);
   });
 
   /** 「建物から引き離し連れ回す」 — the whole effect is being walked away. */
@@ -157,14 +162,15 @@ describe("トロイのヘレン — 敵と戦わない", () => {
   });
 
   /**
-   * 「敵信者を魅了して**建物を更地にさせ**、信者が死ぬまで外を連れ回し続ける」
-   * — the other half of 「敵の人口・建築基盤を崩す」. Without it she only
-   * ever cost a faction its people and never touched its 建築基盤.
+   * 「敵建物に接触して竪琴を一閃すると建物が消滅し、現れたウォーカーを拘束
+   * する」 — she levels the building herself, and the people who were inside
+   * come out already hers. This used to have the *charmed* pull down their
+   * own side's houses instead (plan/0133), on a compressed reading of the
+   * catalogue article.
    */
-  it("has the people she holds pull down their own side's houses", () => {
+  it("levels an enemy house she reaches", () => {
     const world = new World();
     spawnWalker(world, "player", 5, 5, "helen");
-    spawnWalker(world, "enemy", 5.5, 5);
     const house = world.createEntity();
     world.add(house, Position, { x: 5.5, y: 5 });
     world.add(house, Owner, { faction: "enemy" });
@@ -175,10 +181,61 @@ describe("トロイのヘレン — 敵と戦わない", () => {
     expect(world.isAlive(house)).toBe(false);
   });
 
-  it("does not have them pull down the houses of the side that charmed them", () => {
+  it("takes the people who were inside it, carrying that house's whole population", () => {
+    const world = new World();
+    const helen = spawnWalker(world, "player", 5, 5, "helen");
+    const house = world.createEntity();
+    world.add(house, Position, { x: 5.5, y: 5 });
+    world.add(house, Owner, { faction: "enemy" });
+    world.add(house, House, { level: "hut", population: 7 });
+
+    createHelenSystem()(world, 0.1);
+
+    const [freed] = charmedBy(world, helen);
+    expect(freed).toBeDefined();
+    expect(world.get(freed, Owner)).toEqual({ faction: "enemy" });
+    // Rounded down by one tick of the drain, which runs before she acts.
+    expect(world.get(freed, Walker)!.strength).toBeCloseTo(7);
+  });
+
+  it("still turns out one person from an empty house — somebody opened the door", () => {
+    const world = new World();
+    const helen = spawnWalker(world, "player", 5, 5, "helen");
+    const house = world.createEntity();
+    world.add(house, Position, { x: 5.5, y: 5 });
+    world.add(house, Owner, { faction: "enemy" });
+    world.add(house, House, { level: "hut", population: 0 });
+
+    createHelenSystem()(world, 0.1);
+
+    expect(charmedBy(world, helen)).toHaveLength(1);
+  });
+
+  /**
+   * A razed house's id must not come back as the person who walked out of
+   * it. World recycles ids the instant one is freed, so creating the walker
+   * after the destroy hands it the house's own id and every handle anyone
+   * still holds to that house starts reporting a live building — see
+   * systems/effects.ts, and razeReachedHouses for the ordering that avoids
+   * it. This caught it the first time.
+   */
+  it("does not hand the freed walker the razed house's own entity id", () => {
+    const world = new World();
+    const helen = spawnWalker(world, "player", 5, 5, "helen");
+    const house = world.createEntity();
+    world.add(house, Position, { x: 5.5, y: 5 });
+    world.add(house, Owner, { faction: "enemy" });
+    world.add(house, House, { level: "hut", population: 3 });
+
+    createHelenSystem()(world, 0.1);
+
+    expect(world.isAlive(house)).toBe(false);
+    expect(charmedBy(world, helen)).not.toContain(house);
+  });
+
+  it("leaves her own side's houses alone", () => {
     const world = new World();
     spawnWalker(world, "player", 5, 5, "helen");
-    spawnWalker(world, "enemy", 5.5, 5);
     const ownHouse = world.createEntity();
     world.add(ownHouse, Position, { x: 5.5, y: 5 });
     world.add(ownHouse, Owner, { faction: "player" });
@@ -189,10 +246,9 @@ describe("トロイのヘレン — 敵と戦わない", () => {
     expect(world.isAlive(ownHouse)).toBe(true);
   });
 
-  it("leaves a house they are nowhere near standing", () => {
+  it("leaves a house she is nowhere near standing", () => {
     const world = new World();
     spawnWalker(world, "player", 5, 5, "helen");
-    spawnWalker(world, "enemy", 5.5, 5);
     const distant = world.createEntity();
     world.add(distant, Position, { x: 25, y: 25 });
     world.add(distant, Owner, { faction: "enemy" });
@@ -201,6 +257,20 @@ describe("トロイのヘレン — 敵と戦わない", () => {
     createHelenSystem()(world, 0.1);
 
     expect(world.isAlive(distant)).toBe(true);
+  });
+
+  /** 「最も近い敵ウォーカーまたは敵建物を目指して」. */
+  it("walks toward an enemy house when there is no walker to take", () => {
+    const world = new World();
+    const helen = spawnWalker(world, "player", 0, 0, "helen");
+    const house = world.createEntity();
+    world.add(house, Position, { x: 9, y: 0 });
+    world.add(house, Owner, { faction: "enemy" });
+    world.add(house, House, { level: "hut", population: 1 });
+
+    createHelenSystem()(world, 0.1);
+
+    expect(world.get(helen, MoveTarget)).toEqual({ x: 9, y: 0 });
   });
 
   /**
@@ -223,7 +293,12 @@ describe("トロイのヘレン — 敵と戦わない", () => {
 });
 
 describe("トロイのヘレン — houses", () => {
-  it("walks past an enemy house without touching it", () => {
+  /**
+   * She takes a house apart in her own system, never through the assault
+   * path: 「戦闘することが出来ず」 means she must not be consumed capturing
+   * one, and what she leaves is level ground, not a captured building.
+   */
+  it("never captures a house the way a walker does", () => {
     const world = new World();
     const helen = spawnWalker(world, "player", 5, 5, "helen");
     world.add(helen, Walker, { strength: 99, state: "helen", speed: 1 });
@@ -253,5 +328,57 @@ describe("トロイのヘレン — houses", () => {
     createHouseCaptureSystem()(world, 0.1);
 
     expect(world.get(house, Owner)!.faction).toBe("player");
+  });
+});
+
+/** 「拘束した敵ウォーカーは歩き回っているうちに次第にパワーが減少し、力尽きると死んでしまう」. */
+describe("トロイのヘレン — 拘束した者は力尽きる", () => {
+  it("wears a captive down as she leads it around", () => {
+    const world = new World();
+    spawnWalker(world, "player", 5, 5, "helen");
+    const captive = spawnWalker(world, "enemy", 5.5, 5);
+    const helenSystem = createHelenSystem();
+
+    helenSystem(world, 0.1); // charmed here
+    helenSystem(world, 1);
+
+    expect(world.get(captive, Walker)!.strength).toBeCloseTo(1 - HELEN_CAPTIVE_DRAIN_RATE);
+  });
+
+  it("kills one that runs out", () => {
+    const world = new World();
+    spawnWalker(world, "player", 5, 5, "helen");
+    const captive = spawnWalker(world, "enemy", 5.5, 5);
+    const helenSystem = createHelenSystem();
+
+    helenSystem(world, 0.1);
+    helenSystem(world, 1 / HELEN_CAPTIVE_DRAIN_RATE);
+
+    expect(world.isAlive(captive)).toBe(false);
+  });
+
+  it("leaves a walker nobody is holding at full strength", () => {
+    const world = new World();
+    const free = spawnWalker(world, "enemy", 30, 30);
+
+    createHelenSystem()(world, 100);
+
+    expect(world.get(free, Walker)!.strength).toBe(1);
+  });
+
+  /** A castle's worth of prisoners lasts proportionally longer, not forever. */
+  it("takes longer over a crowd than over one person", () => {
+    const world = new World();
+    spawnWalker(world, "player", 5, 5, "helen");
+    const house = world.createEntity();
+    world.add(house, Position, { x: 5.5, y: 5 });
+    world.add(house, Owner, { faction: "enemy" });
+    world.add(house, House, { level: "castle", population: 60 });
+    const helenSystem = createHelenSystem();
+
+    helenSystem(world, 0.1);
+    helenSystem(world, 1 / HELEN_CAPTIVE_DRAIN_RATE);
+
+    expect(world.query(Charmed)).toHaveLength(1);
   });
 });
