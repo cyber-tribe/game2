@@ -93,7 +93,9 @@ game2/
 │       │                    橋渡しするwireToolbar()
 │       ├── pixelIcons.ts  … 各コマンド用の16x16 pixel iconをcanvasに描画（emoji代替）
 │       ├── commandIcons.ts… 上記iconを#toolbarの各ボタンへ差し込むmountCommandIcons()
-│       └── statusPanel.ts … コマンドパネル内のマナ計/人口比較バー（pixel meter）
+│       ├── statusPanel.ts … コマンドパネル内のマナ計/人口比較バー（pixel meter）
+│       └── panelFrame.ts  … コマンドパネルの石板化——雷文（グリークキー）の帯と
+│                            石の肌理をGAME_PALETTEから生成しCSS変数へ流す
 ├── plan/
 │   ├── README.md        … タスクごとの実装記録の運用ルール
 │   └── archived/         … 完了済みタスクの実装記録（1タスク1ファイル）
