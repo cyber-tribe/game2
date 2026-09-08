@@ -487,30 +487,23 @@ export const HELEN_MANA_COST = 32;
  */
 export const HELEN_CHARM_RADIUS = 3;
 
-/**
- * How many enemy walkers トロイのヘレン can hold at once.
- *
- * The limit is what keeps her from quietly absorbing an entire army, and
- * it is also what can get her killed: the enemy she has no room left for
- * walks right up to her. Casting her into a crowd is a gamble, which is
- * the shape a hero who cannot fight ought to have.
- */
-export const HELEN_CHARM_CAPACITY = 4;
-
 /** How closely a charmed walker trails トロイのヘレン, in tiles. */
 export const HELEN_FOLLOW_DISTANCE = 1;
 
 /**
- * How close a walker トロイのヘレン has charmed must come to one of its own
- * side's houses to pull it down — 「敵信者を魅了して**建物を更地にさせ**、
- * 信者が死ぬまで外を連れ回し続ける」.
+ * How fast a walker トロイのヘレン is holding loses strength, per second —
+ * 「拘束した敵ウォーカーは歩き回っているうちに次第にパワーが減少し、力尽きる
+ * と死んでしまう」 (systems/helen.ts).
  *
- * Small: they have to actually reach the building, not merely be led past
- * the settlement. Helen takes people where they stand, which is normally at
- * home, and then walks them out — so the razing happens on the way out,
- * once, rather than being a radius she sweeps a town with.
+ * This is what bounds the miracle, and it replaced a cap on how many she
+ * could hold at once. The original says she takes 「かなり多くの敵ウォーカー」
+ * and never mentions a limit; what it does say is that the ones she takes
+ * wear out. Slow enough that she is worth casting for the walking-away
+ * alone — a strength-1 follower lasts about half a minute, long enough to
+ * be led well clear of home — and fast enough that a razed castle's sixty
+ * do not follow her for the rest of the match.
  */
-export const HELEN_RAZE_RADIUS = 1.2;
+export const HELEN_CAPTIVE_DRAIN_RATE = 0.03;
 
 export const GUARDIAN_MANA_COST = 25;
 
