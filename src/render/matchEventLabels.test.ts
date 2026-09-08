@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { describeMatchEvent, formatMatchTime } from "./matchEventLabels";
+import { MAX_STAGE_MARKS } from "../game/constants";
+import { describeMatchEvent, describeStageRating, formatMatchTime } from "./matchEventLabels";
 
 describe("describeMatchEvent", () => {
   it("describes a plain miracle event with the acting faction as subject", () => {
@@ -30,5 +31,27 @@ describe("formatMatchTime", () => {
 
   it("truncates fractional seconds rather than rounding", () => {
     expect(formatMatchTime(59.9)).toBe("0:59");
+  });
+});
+/**
+ * 「面の評価は稲妻マーク10個（約5万点）が上限」 — the original shows the
+ * stage's rating as a row of ten bolts, not as a number.
+ */
+describe("describeStageRating", () => {
+  it("draws ten marks, whatever the score", () => {
+    for (const marks of [0, 3, 7, 10]) {
+      expect([...describeStageRating(marks)].length).toBe(MAX_STAGE_MARKS);
+    }
+  });
+
+  it("fills as many as were earned", () => {
+    expect(describeStageRating(0)).toBe("・・・・・・・・・・");
+    expect(describeStageRating(3)).toBe("⚡⚡⚡・・・・・・・");
+    expect(describeStageRating(MAX_STAGE_MARKS)).toBe("⚡".repeat(MAX_STAGE_MARKS));
+  });
+
+  it("clamps rather than drawing a broken row", () => {
+    expect(describeStageRating(-2)).toBe(describeStageRating(0));
+    expect(describeStageRating(99)).toBe(describeStageRating(MAX_STAGE_MARKS));
   });
 });

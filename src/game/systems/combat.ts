@@ -12,6 +12,16 @@ function withinRange(a: Point, b: Point): boolean {
 export interface WalkerCombatConfig {
   /** Called once per walker destroyed in a fight — see systems/effects.ts. */
   onImpact: OnImpactEffect;
+  /**
+   * Called with the faction whose walker was left standing — 「ウォーカー
+   * 同士の直接戦闘に勝つ」, one of the four score sources (see game/score.ts).
+   *
+   * Not called on a tie: both walkers die, and nobody won. Reported from
+   * inside the fight because the match event log deliberately does not
+   * record every skirmish — a recap of a hundred scuffles would be no
+   * recap at all.
+   */
+  onFightWon: (winner: FactionId) => void;
 }
 
 /**
@@ -26,6 +36,7 @@ export interface WalkerCombatConfig {
  */
 export function createWalkerCombatSystem(config: Partial<WalkerCombatConfig> = {}): System {
   const onImpact = config.onImpact ?? (() => {});
+  const onFightWon = config.onFightWon ?? (() => {});
 
   return (world) => {
     const walkers = world.query(Position, Walker, Owner);
@@ -48,18 +59,26 @@ export function createWalkerCombatSystem(config: Partial<WalkerCombatConfig> = {
         // 集合 cannot be fought either. See protection.ts.
         if (isShieldedAtMagnet(world, a) || isShieldedAtMagnet(world, b)) continue;
 
-        resolveWalkerFight(world, a, b, onImpact);
+        resolveWalkerFight(world, a, b, onImpact, onFightWon);
         if (!world.isAlive(a)) break;
       }
     }
   };
 }
 
-function resolveWalkerFight(world: World, a: Entity, b: Entity, onImpact: OnImpactEffect): void {
+function resolveWalkerFight(
+  world: World,
+  a: Entity,
+  b: Entity,
+  onImpact: OnImpactEffect,
+  onFightWon: (winner: FactionId) => void,
+): void {
   const walkerA = world.get(a, Walker)!;
   const walkerB = world.get(b, Walker)!;
   const posA = world.get(a, Position)!;
   const posB = world.get(b, Position)!;
+  const factionA = world.get(a, Owner)!.faction;
+  const factionB = world.get(b, Owner)!.faction;
 
   // トロイのヘレン: 「戦闘することが出来ず、**神業でしか潰せない**」. She
   // deals no damage and takes none — a fight involving her simply does not
@@ -82,11 +101,13 @@ function resolveWalkerFight(world: World, a: Entity, b: Entity, onImpact: OnImpa
     world.add(a, Walker, { ...walkerA, strength: walkerA.strength - walkerB.strength });
     world.destroyEntity(b);
     onImpact({ position: posB, type: "combatDeath" });
+    onFightWon(factionA);
     splitAdonis(world, a);
   } else if (walkerB.strength > walkerA.strength) {
     world.add(b, Walker, { ...walkerB, strength: walkerB.strength - walkerA.strength });
     world.destroyEntity(a);
     onImpact({ position: posA, type: "combatDeath" });
+    onFightWon(factionB);
     splitAdonis(world, b);
   } else {
     world.destroyEntity(a);

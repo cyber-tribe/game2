@@ -1,4 +1,5 @@
 import type { FactionId } from "../game/components";
+import { MAX_STAGE_MARKS } from "../game/constants";
 import type { MatchEventType } from "../game/simulation";
 
 // "{subject}" is the faction that caused the event ("あなた"/"敵");
@@ -25,6 +26,7 @@ const MATCH_EVENT_TEMPLATE: Record<MatchEventType, string> = {
   helen: "{subject}のリーダーがトロイのヘレンになった",
   guardian: "{subject}がリーダーを守護者化した",
   heroLost: "{subject}が英雄を失った",
+  leaderLost: "{subject}がリーダーを失った",
   armageddon: "{subject}が最終決戦を発動した",
   tsunami: "{subject}が津波を起こした",
   whirlpool: "{subject}が渦巻きを呼んだ",
@@ -64,4 +66,18 @@ export function formatMatchTime(seconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const remainingSeconds = totalSeconds % 60;
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
+/**
+ * The stage's rating as the original shows it — 「面の評価は稲妻マーク10個
+ * （約5万点）が上限」 (docs/original-miracles.md).
+ *
+ * Drawn as filled and empty marks rather than as a number, because the
+ * original's own display is a row of ten lightning bolts: what it tells the
+ * player is "this much of what was available", and a bare 7 does not say
+ * out of what.
+ */
+export function describeStageRating(marks: number, max: number = MAX_STAGE_MARKS): string {
+  const filled = Math.min(Math.max(0, Math.round(marks)), max);
+  return "⚡".repeat(filled) + "・".repeat(max - filled);
 }
