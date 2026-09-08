@@ -590,6 +590,33 @@ describe("applyEarthquake", () => {
     }
   });
 
+  /**
+   * game/quake.ts needs the line itself to hold the ground still shaking
+   * (「地震が続いている間は修復が出来ない」), so the tear reports what it
+   * tore rather than leaving the caller to guess a centre and a radius.
+   */
+  it("reports the vertices it tore, in the order it tore them", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    const torn = applyEarthquake(heightmap, 5, 10, 1, 0, 6, straight);
+
+    expect(torn).toEqual([6, 7, 8, 9, 10, 11].map((x) => ({ x, y: 10 })));
+  });
+
+  it("reports nothing at all when the crack leaves the map before tearing anything", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    expect(applyEarthquake(heightmap, 20, 10, 1, 0, 6, straight)).toEqual([]);
+  });
+
+  it("stops reporting where it stops tearing, at the map's edge", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    const torn = applyEarthquake(heightmap, 17, 10, 1, 0, 6, straight);
+
+    expect(torn).toEqual([18, 19, 20].map((x) => ({ x, y: 10 })));
+  });
+
   it("runs the other way when aimed the other way — the direction is the point", () => {
     const heightmap = flatHeightmap(20, 20, 5);
 

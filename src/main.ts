@@ -64,6 +64,7 @@ import { applyHurricane } from "./game/hurricane";
 import { createFirePillar } from "./game/firePillar";
 import { strikeLightning } from "./game/lightning";
 import { seedPlague } from "./game/plague";
+import { createQuake, isGroundShaking } from "./game/quake";
 import { createStorm } from "./game/storm";
 import { createTornado, createWhirlpool } from "./game/tornado";
 import { collapseSwampsNear, createSwamp } from "./game/swamp";
@@ -624,6 +625,13 @@ async function bootstrap(world: WorldDefinition) {
       showEntityInfo("この面では敵の陣地を直接操作できません", "warning");
       return;
     }
+    // Also before flattenTargetElevation is seeded, and for the same reason
+    // — a tile refused here must not get to decide what the rest of the
+    // gesture levels toward. See game/quake.ts.
+    if (isGroundShaking(simulation.world, tile.x, tile.y)) {
+      showEntityInfo("地震が続いている間は土地を直せません", "warning");
+      return;
+    }
     if (flattenTargetElevation === undefined) {
       // The tile's own corners decide the target, biased by direction
       // when this match restricts one — per TerrainEditRule's own doc
@@ -689,6 +697,12 @@ async function bootstrap(world: WorldDefinition) {
       showEntityInfo("この面では何もない海に土地を起こせません", "warning");
       return;
     }
+    // 「地震が続いている間は修復が出来ない」 — checked before spending, like
+    // the two restrictions above. See game/quake.ts.
+    if (isGroundShaking(simulation.world, vertex.x, vertex.y)) {
+      showEntityInfo("地震が続いている間は土地を直せません", "warning");
+      return;
+    }
     if (!trySpendPlayerMana(TERRAIN_EDIT_MANA_COST)) return;
     raiseVertex(heightmap, vertex.x, vertex.y, delta);
     renderer.redraw(visibleBounds());
@@ -726,11 +740,22 @@ async function bootstrap(world: WorldDefinition) {
       // Same restriction the manual tools honour — see applyFlattenEditAt.
       // Blocked tiles drop out of the plan, so they are neither levelled
       // nor charged for, and the rest of the plot still levels.
-      (tile) => world.enemyTerritoryEditable || !simulation.isEnemyTerritory("player", tile),
+      // Shaking ground drops out the same way (「地震が続いている間は修復が
+      // 出来ない」, see game/quake.ts) — a quake through a village's plot
+      // levels what it has not torn and leaves the rest for later.
+      (tile) =>
+        (world.enemyTerritoryEditable || !simulation.isEnemyTerritory("player", tile)) &&
+        !isGroundShaking(simulation.world, tile.x, tile.y),
     );
 
     if (tiles.length === 0) {
-      showEntityInfo("この家の周りはすでに平地です");
+      // Nothing left to level is the ordinary case; a plot entirely inside
+      // a fissure's shaking is the one worth naming, since it is temporary.
+      showEntityInfo(
+        isGroundShaking(simulation.world, target.position.x, target.position.y)
+          ? "地震が続いている間は土地を直せません"
+          : "この家の周りはすでに平地です",
+      );
       return;
     }
     if (!trySpendPlayerMana(tiles.length * TERRAIN_EDIT_MANA_COST)) return;
@@ -880,7 +905,11 @@ async function bootstrap(world: WorldDefinition) {
       // where I struck" gives one for free — and never cracks the ground
       // back toward your own settlement.
       const from = simulation.getShrinePosition("player") ?? vertex;
-      applyEarthquake(heightmap, vertex.x, vertex.y, vertex.x - from.x, vertex.y - from.y);
+      const fissure = applyEarthquake(heightmap, vertex.x, vertex.y, vertex.x - from.x, vertex.y - from.y);
+      // 「地震が続いている間は修復が出来ない」 — the ground along the crack
+      // goes on moving for a while, and no spade works on it until it
+      // stops. See game/quake.ts.
+      createQuake(simulation.world, fissure);
       collapseSwampsNear(simulation.world, vertex.x, vertex.y, DEFAULT_EARTHQUAKE_RADIUS);
       renderer.redraw(visibleBounds());
       simulation.recordEvent("player", "earthquake");

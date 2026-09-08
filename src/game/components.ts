@@ -354,6 +354,24 @@ export interface Detour {
   turn: number;
 }
 
+/**
+ * Ground still shaking from a 地震 — 原作「地震が続いている間は修復が
+ * 出来ない」. Not a hazard in its own right: nothing standing on it is hurt
+ * (the crevice does that, see systems/crevice.ts). What it does is deny the
+ * spade, so the fissure cannot be filled back in the instant it is torn.
+ *
+ * `path` is the fissure itself, as applyEarthquake tore it, because a quake
+ * is a line rather than a disc — a centre and a radius would either miss
+ * the far end of a ten-vertex crack or freeze a huge circle of untouched
+ * ground. See game/quake.ts.
+ */
+export interface Quake {
+  /** Seconds of shaking left; the quake is removed at zero. */
+  remaining: number;
+  /** The vertices the fissure tore, in the order it tore them. */
+  path: readonly { x: number; y: number }[];
+}
+
 export const Position = defineComponent<Position>("Position");
 export const Owner = defineComponent<Owner>("Owner");
 export const Walker = defineComponent<Walker>("Walker");
@@ -371,3 +389,4 @@ export const Charmed = defineComponent<Charmed>("Charmed");
 export const HeroCooldown = defineComponent<HeroCooldown>("HeroCooldown");
 export const Drowning = defineComponent<Drowning>("Drowning");
 export const Detour = defineComponent<Detour>("Detour");
+export const Quake = defineComponent<Quake>("Quake");

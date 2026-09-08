@@ -675,6 +675,12 @@ export const DEFAULT_EARTHQUAKE_RADIUS = 2;
  * The crack is carved to MIN_ELEVATION and marked in `crevice`, which is
  * what makes it lethal (see systems/crevice.ts) and unbuildable (see
  * isBuildable). It wanders as it runs, so it reads as torn ground.
+ *
+ * Returns the vertices it tore, in the order it tore them. That is what
+ * game/quake.ts holds on to so the ground can go on shaking along the
+ * fissure for a while afterwards — 「地震が続いている間は修復が出来ない」 —
+ * and it is a line rather than a disc, so the caller needs the line itself
+ * rather than a centre and a radius.
  */
 export function applyEarthquake(
   heightmap: Heightmap,
@@ -684,7 +690,7 @@ export function applyEarthquake(
   directionY: number,
   length: number = DEFAULT_EARTHQUAKE_LENGTH,
   rng: () => number = Math.random,
-): void {
+): { x: number; y: number }[] {
   const magnitude = Math.hypot(directionX, directionY);
   // A cast with no direction at all still has to do something rather than
   // silently no-op; east is as good as any other arbitrary choice.
@@ -693,6 +699,7 @@ export function applyEarthquake(
 
   let x = originX;
   let y = originY;
+  const torn: { x: number; y: number }[] = [];
 
   for (let step = 0; step < length; step++) {
     // Perpendicular wander, so the crack drifts off its heading without
@@ -703,7 +710,7 @@ export function applyEarthquake(
 
     const vx = Math.round(x);
     const vy = Math.round(y);
-    if (vx < 0 || vy < 0 || vx > heightmap.width || vy > heightmap.height) return;
+    if (vx < 0 || vy < 0 || vx > heightmap.width || vy > heightmap.height) return torn;
 
     // The centreline only. A tile renders as torn if any of its four
     // corners is, so one marked vertex already reads as a crack a couple of
@@ -712,7 +719,10 @@ export function applyEarthquake(
     // need the extra width either — creviceSystem samples every tick, and a
     // walker crossing a one-vertex band is inside it for tens of ticks.
     tearCrevice(heightmap, vx, vy);
+    torn.push({ x: vx, y: vy });
   }
+
+  return torn;
 }
 
 function tearCrevice(heightmap: Heightmap, x: number, y: number): void {

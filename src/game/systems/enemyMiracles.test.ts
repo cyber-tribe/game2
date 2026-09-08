@@ -12,6 +12,7 @@ import {
   VOLCANO_POPULATION_RATIO,
 } from "../constants";
 import { createFaction } from "../faction";
+import { isGroundShaking } from "../quake";
 import { createEnemyMiracleSystem } from "./enemyMiracles";
 function blankLayer(width: number, height: number): boolean[][] {
   return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
@@ -259,6 +260,31 @@ describe("createEnemyMiracleSystem", () => {
     const touched = heightmap.vertices.some((row) => row.some((h) => h !== 5));
     expect(touched).toBe(true);
     expect(events).toEqual([{ type: "earthquake", position: { x: 5, y: 5 } }]);
+  });
+
+  /**
+   * 「地震が続いている間は修復が出来ない」. The god's quake has to hold the
+   * ground the same way the player's does — an enemy 地震 the defender
+   * could fill back in on the next tap would be a mana tax, not a weapon.
+   */
+  it("leaves the ground it cracked shaking, so the defender cannot repair it yet", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: EARTHQUAKE_MANA_COST });
+    createFaction(world, "player", { x: 9, y: 9 });
+    createHouse(world, "player", 5, 5);
+
+    const heightmap = flatHeightmap(10, 10, 5);
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap,
+      worldCenter: WORLD_CENTER,
+      rng: () => 0,
+    })(world, 8);
+
+    expect(isGroundShaking(world, 5, 5)).toBe(true);
+    // And only around the crack it actually tore.
+    expect(isGroundShaking(world, 0, 0)).toBe(false);
   });
 
   it("escalates to a volcano once its population lead is real but not yet decisive, if it can afford it", () => {

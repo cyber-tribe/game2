@@ -838,6 +838,33 @@ export const FUNGUS_GROWTH_INTERVAL = 1.5;
  */
 export const TORNADO_LIFETIME = 14;
 
+/**
+ * Seconds the ground goes on shaking along a fissure after 地震 is cast.
+ *
+ * 原作「地震が続いている間は修復が出来ない」. game2's quake used to be over
+ * the instant it was cast, so the crack could be filled back in on the very
+ * next tap — which made 地震 a mana tax rather than a weapon: the defender
+ * paid a spade-tap and lost nothing. Holding the ground for a while is what
+ * gives the miracle its window, and it is the reason the crevice kills:
+ * whoever is on the wrong side of it has to walk around.
+ *
+ * Comparable to TORNADO_LIFETIME's order of magnitude but shorter — the
+ * original lists 地震 among the miracles whose 持続時間 grows with its
+ * school's level (docs/original-miracles.md), so this is the low end of a
+ * range, not a fixed truth about the original.
+ */
+export const EARTHQUAKE_SHAKE_DURATION = 8;
+
+/**
+ * How far from the fissure itself the ground counts as still shaking, in
+ * vertices. The fissure is a line one vertex wide (see applyEarthquake), so
+ * with no margin at all a player could stand a spade one vertex away and
+ * push land into the crack sideways, which is the very repair the original
+ * denies. Two vertices is the same DEFAULT_EARTHQUAKE_RADIUS the rest of
+ * the game already uses as "roughly how much ground a quake disturbs".
+ */
+export const EARTHQUAKE_SHAKE_RADIUS = 2;
+
 /** Tiles per second a 竜巻 drifts. Slower than a walker (DEFAULT_WALKER_SPEED), so people can outrun it if they notice it. */
 export const TORNADO_SPEED = 1;
 
