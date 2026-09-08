@@ -858,6 +858,18 @@ export const FIRE_PILLAR_RADIUS = 1.2;
 export const FIRE_PILLAR_WANDER = 1.1;
 
 /**
+ * How strongly a 火柱 leans uphill — 「移動方向はランダムだが、段差があると
+ * **高い方へ動きやすい傾向**がある」 (systems/firePillar.ts).
+ *
+ * A lean, not a rule: the wander still decides where it actually goes, and
+ * on flat ground this contributes nothing at all. What it changes is where
+ * a pillar cast on a hillside tends to end up — climbing toward the high
+ * ground a settlement was built on rather than rolling off into the sea,
+ * which is what makes the miracle worth aiming below a town.
+ */
+export const FIRE_PILLAR_UPHILL_BIAS = 0.5;
+
+/**
  * Mana cost of a 火柱 — above fire rain.
  *
  * Fire rain is a bigger circle *once*; this is a smaller circle that keeps

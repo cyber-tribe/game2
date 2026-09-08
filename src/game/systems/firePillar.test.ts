@@ -153,3 +153,89 @@ describe("createFirePillarSystem", () => {
     expect(isScorched(heightmap, 11, 10)).toBe(false);
   });
 });
+
+/**
+ * 「移動方向はランダムだが、段差があると高い方へ動きやすい傾向がある」
+ * 「Ｌ＋Ｂ(3×3土地下げ)等で水中に落とすと消火できる」.
+ */
+describe("火柱と地形", () => {
+  /** A slope climbing toward +x: the higher ground is to the east. */
+  function slopeHeightmap(size: number): Heightmap {
+    const heightmap = createHeightmap(size, size, "grass");
+    for (let y = 0; y <= size; y++) {
+      for (let x = 0; x <= size; x++) heightmap.vertices[y][x] = 3 + Math.floor(x / 2);
+    }
+    return heightmap;
+  }
+
+  it("leans uphill even when it was heading downhill", () => {
+    const heightmap = slopeHeightmap(24);
+    const world = new World();
+    // Aimed west, i.e. straight down the slope.
+    const pillar = createFirePillar(world, 12, 12, -1, 0);
+    const system = createFirePillarSystem({ heightmap, rng: () => 0.5 });
+
+    for (let i = 0; i < 20; i++) system(world, 0.2);
+
+    // Still alive and no further west than it started: the slope pulled it
+    // back. Without the lean a due-west pillar with a neutral wander walks
+    // straight off in that direction.
+    expect(world.isAlive(pillar)).toBe(true);
+    expect(world.get(pillar, Position)!.x).toBeGreaterThan(12 - 20 * 0.2 * 0.9);
+  });
+
+  it("does not lean at all on level ground", () => {
+    const heightmap = createHeightmap(24, 24, "grass");
+    for (const row of heightmap.vertices) row.fill(5);
+    const world = new World();
+    const pillar = createFirePillar(world, 12, 12, 1, 0);
+    const system = createFirePillarSystem({ heightmap, rng: () => 0.5 });
+
+    system(world, 1);
+
+    // Straight along its own heading, undeflected.
+    expect(world.get(pillar, Position)!.y).toBeCloseTo(12);
+  });
+
+  /**
+   * The player's own move, not a trap laid ahead of it: 「Ｌ＋Ｂ(3×3土地
+   * 下げ)等で水中に落とすと消火できる」 drops the ground the pillar is
+   * standing on. Digging a channel in front instead tends not to work,
+   * because the lean above walks it *away* from low ground — which is the
+   * same fact seen from the other side.
+   */
+  it("goes out when the ground under it is dropped into the sea", () => {
+    const heightmap = createHeightmap(24, 24, "grass");
+    for (const row of heightmap.vertices) row.fill(5);
+    const world = new World();
+    const pillar = createFirePillar(world, 12, 12, 1, 0);
+    const system = createFirePillarSystem({ heightmap, rng: () => 0.5 });
+
+    system(world, 0.2);
+    expect(world.isAlive(pillar)).toBe(true);
+
+    // The 3x3 the player would lower, centred on where it now stands.
+    const at = world.get(pillar, Position)!;
+    for (let dy = -1; dy <= 2; dy++) {
+      for (let dx = -1; dx <= 2; dx++) {
+        heightmap.vertices[Math.round(at.y) + dy][Math.round(at.x) + dx] = heightmap.waterLevel;
+      }
+    }
+    system(world, 0.2);
+
+    expect(world.isAlive(pillar)).toBe(false);
+  });
+
+  it("keeps burning over dry ground", () => {
+    const heightmap = createHeightmap(24, 24, "grass");
+    for (const row of heightmap.vertices) row.fill(5);
+    const world = new World();
+    const pillar = createFirePillar(world, 12, 12, 1, 0);
+    const system = createFirePillarSystem({ heightmap, rng: () => 0.5 });
+
+    for (let i = 0; i < 10; i++) system(world, 0.2);
+
+    expect(world.isAlive(pillar)).toBe(true);
+  });
+});
+
