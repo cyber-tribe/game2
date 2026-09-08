@@ -37,6 +37,7 @@ const ALL_KINDS: IconKind[] = [
   "inspect",
   "settle",
   "gather",
+  "merge",
   "goToShrine",
   "fight",
   "sprog",

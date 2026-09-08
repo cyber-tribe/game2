@@ -255,6 +255,20 @@ export const EARTHQUAKE_MANA_COST = 20;
 /** Two same-faction walkers within this many tiles merge under "gather". */
 export const GATHER_RANGE = 1.5;
 
+/**
+ * How far a walker under 合体 will go looking for someone to merge with —
+ * 「**近くにいる**信者達と合体し、その力を増していく」
+ * (systems/mergeTargeting.ts).
+ *
+ * A neighbourhood, not the map. Unbounded, 合体 would be strictly better
+ * than 集合 — every walker on the board would converge into one titan with
+ * no flag to plant and no pause in building — and the order the original
+ * actually describes is a local one, which is why it has a "nobody nearby"
+ * case at all. Slightly wider than DEFAULT_WANDER_RADIUS so that walkers
+ * which would have wandered within sight of each other close instead.
+ */
+export const MERGE_SEEK_RADIUS = 8;
+
 /** How often (in seconds) the enemy AI re-evaluates its behaviorMode. */
 export const ENEMY_AI_DECISION_INTERVAL = 5;
 

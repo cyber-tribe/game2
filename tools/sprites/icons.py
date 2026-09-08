@@ -726,6 +726,29 @@ ICONS.update({
         "................",
         "................",
     ],
+    # Merge: the same converging arrows as 集結, but closing on a *person*
+    # rather than on a post. That is exactly the difference between the two
+    # orders — 集合 sends everyone to a place, 合体 sends them into each
+    # other — so the two icons deliberately share a shape and differ only in
+    # what sits between the arrows.
+    "merge": [
+        "................",
+        "................",
+        "................",
+        "......ooo.......",
+        ".....okkko......",
+        "o....okkko....o.",
+        "oo....ooo....oo.",
+        "obo..offfo..obo.",
+        "obbooffffffoobbo",
+        "obo.offfffo.obo.",
+        "oo...offfo...oo.",
+        "o....oo.oo....o.",
+        ".....od.do......",
+        ".....oo.oo......",
+        "................",
+        "................",
+    ],
     # Fight: crossed blades. The old icon was a thin bent line that read as
     # nothing; two crossed swords are unmistakable even at 16px.
     "fight": [
@@ -916,6 +939,7 @@ ICONS.update({
 ICON_KINDS = (
     "settle",
     "gather",
+    "merge",
     "goToShrine",
     "fight",
     "sprog",

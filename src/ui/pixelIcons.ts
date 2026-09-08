@@ -43,6 +43,7 @@ export type IconKind =
   | "inspect"
   | "settle"
   | "gather"
+  | "merge"
   | "goToShrine"
   | "fight"
   | "sprog"

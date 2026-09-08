@@ -59,6 +59,32 @@ describe("createSettleSystem", () => {
     expect(world.query(House)).toHaveLength(0);
   });
 
+  /**
+   * 合体 is not 集合. 「近くに他の信者がいない場合は定住に同じ」 — a walker
+   * that has run out of people to merge with keeps building, which is the
+   * whole reason to give this order instead of 集結: the economy never
+   * stops. mergeTargetingSystem holds back the ones that still have a
+   * partner in range by giving them a MoveTarget, so anyone who reaches
+   * this system under 合体 is by definition alone.
+   */
+  it("still builds under 合体, unlike 集結シンボルへ", () => {
+    const world = new World();
+    createFaction(world, "player", { x: 0, y: 0 });
+    for (const entity of world.query(FactionState)) {
+      const state = world.get(entity, FactionState)!;
+      world.add(entity, FactionState, { ...state, behaviorMode: "merge" });
+    }
+    const walker = world.createEntity();
+    world.add(walker, Position, { x: 3, y: 4 });
+    world.add(walker, Owner, { faction: "player" });
+    world.add(walker, Walker, { strength: 1, state: "seeking", speed: 1 });
+
+    createSettleSystem()(world, 0);
+
+    expect(world.isAlive(walker)).toBe(false);
+    expect(world.query(House)).toHaveLength(1);
+  });
+
   it("still lets another faction settle while one is mustering", () => {
     const world = new World();
     createFaction(world, "player", { x: 0, y: 0 });

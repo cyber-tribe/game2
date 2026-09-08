@@ -27,6 +27,7 @@ import { createEnemyTerraformSystem } from "./systems/enemyTerraform";
 import { fightTargetingSystem } from "./systems/fightTargeting";
 import { gatherSystem } from "./systems/gather";
 import { gatherTargetingSystem } from "./systems/gatherTargeting";
+import { mergeTargetingSystem } from "./systems/mergeTargeting";
 import { goToShrineSystem } from "./systems/goToShrine";
 import { createHouseGrowthSystem } from "./systems/houseGrowth";
 import { createHouseUpgradeSystem } from "./systems/houseUpgrade";
@@ -314,6 +315,7 @@ export class Simulation {
       .add(fightTargetingSystem)
       .add(goToShrineSystem)
       .add(gatherTargetingSystem)
+      .add(mergeTargetingSystem)
       .add(heroAdvanceTargetingSystem)
       .add(guardianTargetingSystem)
       .add(createHelenSystem({ onImpact: (event) => this.recordImpactEffect(event) }))

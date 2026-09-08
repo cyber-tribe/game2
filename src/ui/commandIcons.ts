@@ -6,6 +6,7 @@ import { createIconCanvas, type IconKind } from "./pixelIcons";
 const BEHAVIOR_ICON: Record<BehaviorMode, IconKind> = {
   settle: "settle",
   gather: "gather",
+  merge: "merge",
   goToShrine: "goToShrine",
   fight: "fight",
 };

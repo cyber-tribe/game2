@@ -137,13 +137,21 @@ export interface House {
 }
 
 /**
- * The four influence modes from docs/game-system.md, all enforced by
+ * The influence modes from docs/game-system.md, all enforced by
  * dedicated systems: "settle" (the wander/settle systems' implicit
  * default), "gather" (gatherTargetingSystem + gatherSystem — also the only
- * mode leaderSystem promotes a leader under), "fight" (fightTargetingSystem),
+ * mode leaderSystem promotes a leader under), "merge"
+ * (mergeTargetingSystem + gatherSystem), "fight" (fightTargetingSystem),
  * and "goToShrine" (goToShrineSystem).
+ *
+ * The original names four 神の啓示 — 集合・合体・戦闘・定住 — and "merge" is
+ * 合体: 「近くにいる信者達と合体し、その力を増していく。近くに他の信者が
+ * いない場合は定住に同じ」. It is deliberately *not* a variant of 集合: no
+ * shrine, no leader, no hero, and building never stops. "goToShrine" is
+ * game2's split of 集合 into "march to the flag" and "rally on whoever gets
+ * there first", which is why there are five here rather than four.
  */
-export type BehaviorMode = "settle" | "gather" | "goToShrine" | "fight";
+export type BehaviorMode = "settle" | "gather" | "merge" | "goToShrine" | "fight";
 
 /**
  * One FactionState entity per side. Mana is the only resource spent on
