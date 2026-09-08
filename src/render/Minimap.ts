@@ -64,6 +64,34 @@ const TERRAIN_HEIGHT_BANDS = 4;
  * Drawn once at construction, deterministically: it is a fixture of the
  * screen, not something that should look different on each run.
  */
+/**
+ * How far shard `i` trails into the void. Shared by drawIsland and
+ * minimapHeight so the widget's drawn extent and its reported extent
+ * cannot drift apart — a caller laying something out underneath the
+ * minimap is placing it under these, not under the map square.
+ */
+function shardLength(i: number): number {
+  const t = (i + 0.5) / ISLAND_SHARD_COUNT;
+  return ISLAND_SHARD_LENGTH * (0.4 + 0.6 * Math.sin(t * Math.PI)) * (i % 3 === 0 ? 0.65 : 1);
+}
+
+/**
+ * How far the whole widget reaches below its own origin, in px.
+ *
+ * Bigger than `size`, and that is the point: the map is set into a lump of
+ * rock that tapers away below it and sheds shards into the void, so laying
+ * anything out under the minimap by its `size` alone puts that thing inside
+ * the island. See main.ts's layout(), which is where that had actually
+ * happened — the HUD's terrain line was drawn at the same corner and
+ * disappeared behind the rock.
+ */
+export function minimapHeight(size: number): number {
+  const shardTop = size + ISLAND_RIM + ISLAND_DEPTH * 1.7 - 1;
+  let longest = 0;
+  for (let i = 0; i < ISLAND_SHARD_COUNT; i++) longest = Math.max(longest, shardLength(i));
+  return shardTop + longest;
+}
+
 function drawIsland(size: number): Graphics {
   const g = new Graphics();
   const rim = ISLAND_RIM;
@@ -95,7 +123,7 @@ function drawIsland(size: number): Graphics {
     const span = right - taper * 1.6 - (left + taper * 1.6);
     const x = left + taper * 1.6 + t * span;
     const half = span / ISLAND_SHARD_COUNT / 2;
-    const length = ISLAND_SHARD_LENGTH * (0.4 + 0.6 * Math.sin(t * Math.PI)) * (i % 3 === 0 ? 0.65 : 1);
+    const length = shardLength(i);
     g.poly([x - half, shardTop, x + half, shardTop, x, shardTop + length]).fill(
       i % 2 === 0 ? GAME_PALETTE.stoneShadow : GAME_PALETTE.soilDark,
     );

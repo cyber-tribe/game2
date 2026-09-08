@@ -76,7 +76,7 @@ import { Hud } from "./render/Hud";
 import { MIRACLE_SCHOOLS } from "./game/miracleSchools";
 import { IsoRenderer, visibleTileBounds, type TileBounds } from "./render/IsoRenderer";
 import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
-import { Minimap } from "./render/Minimap";
+import { Minimap, minimapHeight } from "./render/Minimap";
 import { PopulationGauge } from "./render/PopulationGauge";
 import { GAME_PALETTE } from "./render/palette";
 import { mountCommandIcons } from "./ui/commandIcons";
@@ -141,6 +141,9 @@ const TUTORIAL_HINT_TIMEOUT_MS = 15000;
 const SHAKE_DURATION = 0.3;
 /** Screen size (px) of the top-right overview map — see render/Minimap.ts. */
 const MINIMAP_SIZE = 72;
+
+/** Breathing room between the world map's lowest shard and the HUD text below it. */
+const HUD_GAP_BELOW_MINIMAP = 8;
 /**
  * Width of the population colonnade hanging opposite the overview map — see
  * render/PopulationGauge.ts. Wider than the minimap because it is read at a
@@ -434,9 +437,14 @@ async function bootstrap(world: WorldDefinition) {
       hasCenteredOnce = true;
     }
     hud.setMaxWidth(app.screen.width);
-    hud.setTopInset(safeAreaTop);
     // Top left, opposite the population gauge — the original's own arrangement.
     minimap.view.position.set(10, 10 + safeAreaTop);
+    // Clear of the world map rather than behind it. These two lines and the
+    // minimap were both anchored to the same corner, so 「地形: 草原」 and
+    // any 地形操作 restriction have been hidden under the rock since the map
+    // moved here (plan/0130). Measured from minimapHeight rather than
+    // MINIMAP_SIZE because the island is taller than the map it holds.
+    hud.setTopOffset(safeAreaTop + minimapHeight(MINIMAP_SIZE) + HUD_GAP_BELOW_MINIMAP);
     populationGauge.view.position.set(app.screen.width - POPULATION_GAUGE_WIDTH - 10, 10 + safeAreaTop);
     if (tutorialHint) tutorialHint.style.bottom = `${toolbarHeight + 12}px`;
   };
