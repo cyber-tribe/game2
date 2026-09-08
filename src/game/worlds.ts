@@ -282,7 +282,12 @@ export const GODS: readonly GodDefinition[] = [
   { id: "kronos", name: "時神クロノス", school: "earth", personality: "defensive", terrain: "rock", terrainEditRule: "raiseOnly", unlocks: ["megalith", "hercules"], bottomlessSwamp: false, territoryEditable: false },
   { id: "dionysos", name: "酒神ディオニュソス", school: "plant", personality: "aggressive", terrain: "desert", terrainEditRule: "lowerOnly", unlocks: ["adonis"], bottomlessSwamp: true, territoryEditable: false },
   { id: "zephyros", name: "西風神ゼピュロス", school: "air", personality: "defensive", terrain: "snow", terrainEditRule: "raiseOnly", unlocks: ["hurricane"], bottomlessSwamp: false, territoryEditable: false },
-  { id: "hades", name: "冥王ハデス", school: "fire", personality: "aggressive", terrain: "rock", terrainEditRule: "lowerOnly", unlocks: ["armageddon"], bottomlessSwamp: true, territoryEditable: false },
+  // 「土地上下不可ステージ」, kept for the last god of all. The article
+  // describes what such a stage becomes — 「よって神業で敵の住める土地を
+  // ゼロにすることになる」 — and by here the player holds every miracle
+  // the campaign ever unlocks, 最終決戦 included, which is exactly the
+  // hand that stage needs.
+  { id: "hades", name: "冥王ハデス", school: "fire", personality: "aggressive", terrain: "rock", terrainEditRule: "neither", unlocks: ["armageddon"], bottomlessSwamp: true, territoryEditable: false },
 ];
 
 /** How many stages each god gets — 「各3ステージが用意されている」. */
@@ -297,7 +302,8 @@ const STAGE_SUFFIXES = ["一", "二", "三"] as const;
  * vary and grow harder as the list goes on: terrain gets harsher (TERRAIN_
  * GROWTH_MULTIPLIER: grass 1 > snow 0.75 > desert 0.6 > rock 0.4),
  * terraforming gets restricted to one direction (raiseOnly/lowerOnly,
- * harder than "both"), the enemy AI gets faster/more aggressive, and more
+ * harder than "both") and finally to none at all (the last god's
+ * 土地上下不可), the enemy AI gets faster/more aggressive, and more
  * miracles unlock — never any axis relaxing at once. allowedMiracles is
  * cumulative (each world keeps everything the previous one had) so a
  * returning player is never surprised by something that used to work no

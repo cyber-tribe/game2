@@ -198,3 +198,29 @@ describe("unlockedCountForPassword", () => {
     expect(unlockedCountForPassword("not-a-real-password")).toBeUndefined();
   });
 });
+
+/**
+ * 原作の3種の制限面 —— 「土地上げ不可ステージ」「土地下げ不可ステージ」
+ * 「土地上下不可ステージ」. game2 had the first two and no third; the
+ * campaign should be able to deal all three.
+ */
+describe("terrainEditRule across the campaign", () => {
+  it("uses every one of the original's restricted stage kinds", () => {
+    const rules = new Set(WORLDS.map((world) => world.terrainEditRule));
+
+    expect(rules).toEqual(new Set(["both", "raiseOnly", "lowerOnly", "neither"]));
+  });
+
+  it("saves 土地上下不可 for the very end, where every miracle is unlocked", () => {
+    const noTerraform = WORLDS.filter((world) => world.terrainEditRule === "neither");
+    const lastStage = WORLDS[WORLDS.length - 1];
+
+    // 「よって神業で敵の住める土地をゼロにすることになる」: with the spade
+    // gone, miracles are the only remaining verb, so such a stage must not
+    // arrive before the player has them.
+    expect(noTerraform.length).toBeGreaterThan(0);
+    for (const world of noTerraform) {
+      expect(world.allowedMiracles).toEqual(lastStage.allowedMiracles);
+    }
+  });
+});

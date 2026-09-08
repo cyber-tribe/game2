@@ -803,10 +803,17 @@ describe("isTerrainEditAllowed", () => {
     expect(isTerrainEditAllowed("lowerOnly", -1)).toBe(true);
     expect(isTerrainEditAllowed("lowerOnly", 1)).toBe(false);
   });
+
+  // 「土地上下不可ステージ」 — the original's third restricted kind.
+  it("allows nothing at all under 'neither'", () => {
+    expect(isTerrainEditAllowed("neither", 1)).toBe(false);
+    expect(isTerrainEditAllowed("neither", -1)).toBe(false);
+    expect(isTerrainEditAllowed("neither", 0)).toBe(false);
+  });
 });
 
 describe("pickTerrainEditRule", () => {
-  const weights: Record<TerrainEditRule, number> = { both: 2, raiseOnly: 1, lowerOnly: 1 };
+  const weights: Record<TerrainEditRule, number> = { both: 2, raiseOnly: 1, lowerOnly: 1, neither: 0 };
 
   it("picks the rule whose weighted slice the roll lands in", () => {
     // Slices in Object.entries order: both=[0,2), raiseOnly=[2,3), lowerOnly=[3,4).
@@ -816,8 +823,13 @@ describe("pickTerrainEditRule", () => {
     expect(pickTerrainEditRule(weights, () => 0.99)).toBe("lowerOnly");
   });
 
+  it("can deal 土地上下不可 when it carries weight", () => {
+    const always: Record<TerrainEditRule, number> = { both: 0, raiseOnly: 0, lowerOnly: 0, neither: 1 };
+    expect(pickTerrainEditRule(always, () => 0.5)).toBe("neither");
+  });
+
   it("never picks a rule with zero weight", () => {
-    const onlyBoth: Record<TerrainEditRule, number> = { both: 1, raiseOnly: 0, lowerOnly: 0 };
+    const onlyBoth: Record<TerrainEditRule, number> = { both: 1, raiseOnly: 0, lowerOnly: 0, neither: 0 };
     for (let roll = 0; roll < 1; roll += 0.1) {
       expect(pickTerrainEditRule(onlyBoth, () => roll)).toBe("both");
     }
