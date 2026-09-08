@@ -4,10 +4,15 @@ import { FactionState, Owner, Position, Walker, type FactionId } from "../compon
 import { distance } from "./geometry";
 
 /**
- * Under either mustering order, a faction's own seeking walkers within
- * GATHER_RANGE of each other merge into one, combining strength — per
- * docs/game-system.md, "ウォーカー同士が合流して1体の強いウォーカーに
- * なる". Factions under 定住 or 戦闘 are untouched.
+ * Wherever two of a faction's own seeking walkers come within GATHER_RANGE
+ * of each other under an order that calls for it, they merge into one,
+ * combining strength — per docs/game-system.md, "ウォーカー同士が合流して
+ * 1体の強いウォーカーになる". Factions under 定住 or 戦闘 are untouched.
+ *
+ * 合体 is the order this exists for — 「近くにいる信者達と合体し、その力を
+ * 増していく」 — and mergeTargeting.ts is what walks its people into range.
+ * The two mustering orders share the pass rather than having one of their
+ * own, because the merging they need is the same merging.
  *
  * 集結シンボルへ merges too, not just 集結. The original describes the two
  * as one order and says the merging is the *reason* to give it:
@@ -18,7 +23,7 @@ import { distance } from "./geometry";
  * would do nothing at all.
  */
 export const gatherSystem: System = (world) => {
-  const gatheringFactions = factionsInGatherMode(world);
+  const gatheringFactions = factionsInMergingMode(world);
   if (gatheringFactions.size === 0) return;
 
   const walkers = world.query(Position, Walker, Owner);
@@ -39,11 +44,13 @@ export const gatherSystem: System = (world) => {
   }
 };
 
-function factionsInGatherMode(world: World): Set<FactionId> {
+function factionsInMergingMode(world: World): Set<FactionId> {
   const factions = new Set<FactionId>();
   for (const entity of world.query(FactionState)) {
     const state = world.get(entity, FactionState)!;
-    if (state.behaviorMode === "gather" || state.behaviorMode === "goToShrine") factions.add(state.id);
+    if (state.behaviorMode === "gather" || state.behaviorMode === "goToShrine" || state.behaviorMode === "merge") {
+      factions.add(state.id);
+    }
   }
   return factions;
 }

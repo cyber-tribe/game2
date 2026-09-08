@@ -865,3 +865,48 @@ describe("Simulation — the opening", () => {
     }
   });
 });
+
+/**
+ * 合体 is the one order whose correctness lives in the *scheduler*, not in
+ * a single system: mergeTargetingSystem has to run before
+ * createWanderTargetSystem, or every walker is handed a random destination
+ * first and never once walks toward a neighbour. A unit test on the system
+ * cannot see that, so it is checked here, through the real tick order.
+ */
+describe("Simulation under 合体", () => {
+  it("walks a faction's people into each other, growing one of them", () => {
+    const heightmap = flatHeightmap(32, 32, 5);
+    const sim = new Simulation({ worldWidth: 32, worldHeight: 32, initialWalkersPerFaction: 4, heightmap });
+    sim.setBehaviorMode("player", "merge");
+
+    // Peak rather than final: merging is not the end state. A walker with
+    // nobody left in range goes on to settle (「近くに他の信者がいない場合は
+    // 定住に同じ」), so by the last tick the strong one is a house.
+    let peakStrength = 0;
+    for (let tick = 0; tick < 200; tick++) {
+      sim.update(0.1);
+      for (const entity of sim.world.query(Walker, Owner)) {
+        if (sim.world.get(entity, Owner)!.faction !== "player") continue;
+        peakStrength = Math.max(peakStrength, sim.world.get(entity, Walker)!.strength);
+      }
+    }
+
+    expect(peakStrength).toBeGreaterThan(1);
+  });
+
+  it("leaves them at strength 1 under 定住, so the growth above is the order and not the clock", () => {
+    const heightmap = flatHeightmap(32, 32, 5);
+    const sim = new Simulation({ worldWidth: 32, worldHeight: 32, initialWalkersPerFaction: 4, heightmap });
+
+    let peakStrength = 0;
+    for (let tick = 0; tick < 200; tick++) {
+      sim.update(0.1);
+      for (const entity of sim.world.query(Walker, Owner)) {
+        if (sim.world.get(entity, Owner)!.faction !== "player") continue;
+        peakStrength = Math.max(peakStrength, sim.world.get(entity, Walker)!.strength);
+      }
+    }
+
+    expect(peakStrength).toBe(1);
+  });
+});

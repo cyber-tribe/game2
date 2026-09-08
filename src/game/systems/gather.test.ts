@@ -47,6 +47,19 @@ describe("gatherSystem", () => {
     expect(world.get(a, Walker)!.strength).toBe(5);
   });
 
+  it("merges under 合体 — the order this pass exists for", () => {
+    const world = new World();
+    createFaction(world, "player", { x: 0, y: 0 }, "merge");
+    const a = createWalker(world, "player", 0, 0, 3);
+    const b = createWalker(world, "player", 0.5, 0, 2);
+
+    gatherSystem(world, 0);
+
+    expect(world.isAlive(a)).toBe(true);
+    expect(world.isAlive(b)).toBe(false);
+    expect(world.get(a, Walker)!.strength).toBe(5);
+  });
+
   it("does nothing when the faction is settling or fighting", () => {
     const world = new World();
     createFaction(world, "player", { x: 0, y: 0 }, "settle");
