@@ -384,6 +384,24 @@
         flex: none;
         font-size: 15px;
         font-weight: bold;
+        margin-bottom: 4px;
+      }
+
+      /*
+        Who the player is — 「プレイヤーは『ゼウスと人間の女性の間に生まれた
+        青年』という設定」. The world select is the campaign's front door and
+        the only screen that ever shows the whole roster of gods, so it is
+        where the premise belongs. Quieter than the title: it is read once.
+      */
+      #world-select-premise {
+        flex: none;
+        font-size: 12px;
+        line-height: 1.7;
+        /* Full ink, like the title. The panel field is mid-stone, so both
+           the dim greys that work on the dark map and --ink-faded come out
+           around 2:1 against it — legible in a mockup, not on a phone. Size
+           and weight already keep this under the title it sits below. */
+        color: var(--ink);
         margin-bottom: 10px;
       }
 
@@ -588,6 +606,9 @@
 
     <div id="world-select">
       <div id="world-select-title">ワールドを選択</div>
+      <div id="world-select-premise">
+        あなたはゼウスと人間の女性の間に生まれた青年。16人の神が、それぞれ3つの世界で待ち受ける。
+      </div>
       <div id="world-select-list"></div>
       <div id="world-select-password-row">
         <input type="text" id="world-select-password" placeholder="パスワード" autocomplete="off" />
