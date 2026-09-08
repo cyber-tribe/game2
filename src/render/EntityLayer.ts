@@ -2,6 +2,7 @@ import { Container, Graphics, Sprite } from "pixi.js";
 import { Drowning, FirePillar, Infected, Storm, FactionState, HolyWater, House, MoveTarget, Owner, Position, Swamp, Tornado, Walker, Whirlpool, isHeroState, type FactionId, type HeroKind } from "../game/components";
 import type { Entity, World } from "../ecs";
 import { FARMLAND_RADIUS, IMPACT_EFFECT_DURATION } from "../game/constants";
+import { isShieldedAtMagnet } from "../game/protection";
 import { distance, type Point } from "../game/systems/geometry";
 import type { ImpactEffectSnapshot, ImpactEffectType } from "../game/systems/effects";
 import { GAME_PALETTE } from "./palette";
@@ -73,6 +74,45 @@ const FACTION_COLOR: Record<FactionId, number> = {
 const WALKER_PIXEL_SIZE = 1;
 /** A leader renders larger, on top of the plume baked into its own frames. */
 const LEADER_PIXEL_SIZE = 1.4;
+
+/**
+ * The 青い炎 a leader waiting at its own magnet stands in — see
+ * EntityLayer.drawBlueFlame and game/protection.ts.
+ *
+ * Blue rather than the fire palette's orange because the original names the
+ * colour, and because it has to read as protection rather than as the
+ * settlement being on fire — the two would otherwise be the same shape.
+ */
+const BLUE_FLAME_COLOR = 0x2f6fd0;
+const BLUE_FLAME_CORE_COLOR = 0x9fd8ff;
+const BLUE_FLAME_TONGUES = 3;
+const BLUE_FLAME_WIDTH = 10;
+const BLUE_FLAME_HEIGHT = 18;
+/** Radians per second the flame breathes at — slow enough to read as a flame, not a blink. */
+const BLUE_FLAME_FLICKER_RATE = 6;
+const BLUE_FLAME_ALPHA = 0.75;
+
+/**
+ * The shape of the 青い炎, as tongues to fill — pure, like swampVisual and
+ * impactEffectVisual below, so the thing worth checking (there is a flame,
+ * it has a bright middle, it breathes rather than blinks) can be checked
+ * without a GL context or a sprite atlas.
+ *
+ * Deliberately tongues rather than a ring or a glow: a circle around a unit
+ * reads as a selection marker, which is a UI idea, and this is something
+ * happening in the world. The middle one is tallest and takes the bright
+ * core colour, so the flame has a direction and a heart at any size.
+ */
+export function blueFlameTongues(elapsedTime: number): { spread: number; height: number; core: boolean }[] {
+  const breath = 0.85 + 0.15 * Math.sin(elapsedTime * BLUE_FLAME_FLICKER_RATE);
+  const middle = (BLUE_FLAME_TONGUES - 1) / 2;
+
+  return Array.from({ length: BLUE_FLAME_TONGUES }, (_, i) => ({
+    spread: (i / (BLUE_FLAME_TONGUES - 1) - 0.5) * BLUE_FLAME_WIDTH,
+    height: BLUE_FLAME_HEIGHT * breath * (i === middle ? 1 : 0.7),
+    core: i === middle,
+  }));
+}
 /**
  * Swamp used to be a translucent purple overlay (a hazard-radius marker,
  * not real ground) — per plan/0087, it's now drawn as an actual dark
@@ -376,6 +416,16 @@ export class EntityLayer {
     await Promise.all([loadWalkerSprites(), loadHouseSprites()]);
   }
 
+  /** Paints blueFlameTongues at a walker's ground point, under the sprite so the figure stays readable inside it. */
+  private drawBlueFlame(sx: number, sy: number): void {
+    for (const tongue of blueFlameTongues(this.elapsedTime)) {
+      const half = BLUE_FLAME_WIDTH / 5;
+      this.graphics
+        .poly([sx + tongue.spread - half, sy, sx + tongue.spread + half, sy, sx + tongue.spread, sy - tongue.height])
+        .fill({ color: tongue.core ? BLUE_FLAME_CORE_COLOR : BLUE_FLAME_COLOR, alpha: BLUE_FLAME_ALPHA });
+    }
+  }
+
   update(world: World, deltaSeconds = 0, impactEffects: readonly ImpactEffectSnapshot[] = []): void {
     this.elapsedTime += deltaSeconds;
     const g = this.graphics;
@@ -621,6 +671,13 @@ export class EntityLayer {
         walkerFrameKey(owner.faction, walkerPose(isLeader, heroKind), action, facing, frame),
       );
       if (!texture) continue;
+
+      // 「リーダーがマグネットに到達すると、その場に停止して青い炎に包まれ
+      // ます(この間は無敵状態になります)」 — see game/protection.ts. An
+      // invulnerability the player cannot see is one they cannot decide
+      // about, and the decision is the whole point: holding 集合 keeps the
+      // leader safe while everyone walking toward it dies.
+      if (isLeader && isShieldedAtMagnet(world, entity)) this.drawBlueFlame(sx, sy);
 
       const sprite = this.pooled(this.walkerPool, this.walkerLayer, drawnWalkers++);
       sprite.texture = texture;

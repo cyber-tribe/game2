@@ -1,5 +1,5 @@
 import type { World } from "../ecs";
-import { resistsSchool } from "./miracleSchools";
+import { resistsMiracle } from "./protection";
 import { House, Position, Walker } from "./components";
 import type { OnImpactEffect } from "./systems/effects";
 
@@ -34,7 +34,7 @@ export function burnFire(
     // a hero is worth casting *before* an enemy answers your forest with a
     // torch. Houses have no such exemption: the hero survives, what they
     // were defending does not. 「同じカテゴリーの攻撃神技は効果がない」 — see miracleSchools.ts's resistsSchool.
-    if (resistsSchool(world.get(entity, Walker)!.state, "fire")) continue;
+    if (resistsMiracle(world, entity, "fire")) continue;
 
     const pos = world.get(entity, Position)!;
     if (!isScorched(pos)) continue;

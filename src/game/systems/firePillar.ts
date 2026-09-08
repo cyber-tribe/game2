@@ -6,7 +6,7 @@ import {
   FIRE_PILLAR_SPEED,
   FIRE_PILLAR_WANDER,
 } from "../constants";
-import { resistsSchool } from "../miracleSchools";
+import { resistsMiracle } from "../protection";
 import type { OnImpactEffect } from "./effects";
 import { distance } from "./geometry";
 
@@ -77,7 +77,7 @@ export function createFirePillarSystem(config: Partial<FirePillarConfig> = {}): 
 
       for (const walkerEntity of world.query(Walker, Position)) {
         // 火柱「※アキレス除く」 — 「同じカテゴリーの攻撃神技は効果がない」 — see miracleSchools.ts's resistsSchool.
-        if (resistsSchool(world.get(walkerEntity, Walker)!.state, "fire")) continue;
+        if (resistsMiracle(world, walkerEntity, "fire")) continue;
         const walkerPos = world.get(walkerEntity, Position)!;
         if (distance(next, walkerPos) > FIRE_PILLAR_RADIUS) continue;
         world.destroyEntity(walkerEntity);
