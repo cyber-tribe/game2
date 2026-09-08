@@ -20,6 +20,7 @@ import {
   applyFungus,
   applyRoad,
   applyWall,
+  isLevelVertex,
   applyMegalith,
   DEFAULT_MEGALITH_RADIUS,
   isBoulder,
@@ -1613,3 +1614,79 @@ describe("spreadFungus", () => {
     expect(FUNGUS_WITHER_CHANCE).toBeGreaterThan(0);
   });
 });
+
+/** 道と城壁：「なお、敵陣や斜面には設置できない」——その斜面の側。 */
+describe("isLevelVertex", () => {
+  it("is true on ground whose neighbours all stand at the same height", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    expect(isLevelVertex(heightmap, 10, 10)).toBe(true);
+  });
+
+  it("is false beside a step of even one", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    heightmap.vertices[10][11] = 6;
+
+    expect(isLevelVertex(heightmap, 10, 10)).toBe(false);
+  });
+
+  /**
+   * A 城壁 lifts the ground it stands on, so counting that rise as terrain
+   * would make a wall's first segment refuse its second — and the original
+   * describes walls as something you chain: 「通常は手動で延ばして連続した
+   * 城壁を設置する」.
+   */
+  it("does not read a walled neighbour's own parapet as a slope", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyWall(heightmap, 11, 10, 0);
+
+    expect(heightmap.vertices[10][11]).toBeGreaterThan(5);
+    expect(isLevelVertex(heightmap, 10, 10)).toBe(true);
+  });
+});
+
+describe("道と城壁を斜面に置けないこと", () => {
+  it("refuses to pave a slope", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    heightmap.vertices[10][11] = 7;
+
+    expect(applyRoad(heightmap, 10, 10, 0)).toEqual([]);
+  });
+
+  it("refuses to wall a slope", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    heightmap.vertices[10][11] = 7;
+
+    expect(applyWall(heightmap, 10, 10, 0)).toEqual([]);
+  });
+
+  it("still lets a wall be chained into a line across level ground", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    for (let y = 8; y <= 12; y++) expect(applyWall(heightmap, 10, y, 0)).toHaveLength(1);
+  });
+});
+
+/** 「城壁にかかる土地上下ができなくなる」. */
+describe("raiseVertex under a 城壁", () => {
+  it("cannot lift or lower the ground a wall stands on", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyWall(heightmap, 10, 10, 0);
+    const walled = heightmap.vertices[10][10];
+
+    raiseVertex(heightmap, 10, 10, 1);
+    raiseVertex(heightmap, 10, 10, -1);
+
+    expect(heightmap.vertices[10][10]).toBe(walled);
+  });
+
+  it("leaves the ground beside it editable", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyWall(heightmap, 10, 10, 0);
+
+    raiseVertex(heightmap, 12, 10, 1);
+
+    expect(heightmap.vertices[10][12]).toBe(6);
+  });
+});
+
