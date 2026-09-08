@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
-import { Detour, MoveTarget, Position, Walker } from "../components";
+import { Detour, FactionState, MoveTarget, Position, Walker } from "../components";
 import { ROAD_SPEED_MULTIPLIER } from "../constants";
 import { applyRoad, applyWall, createHeightmap, type Heightmap } from "../../world/heightmap";
 import { createMovementSystem, movementSystem } from "./movement";
@@ -165,7 +165,10 @@ describe("createMovementSystem against a 城壁", () => {
     expect(world.has(walker, Detour)).toBe(false);
   });
 
-  /** 「英雄以外は越えられない」 — the exception is the whole second half of #12. */
+  /**
+   * 「敵リーダー・ヒーロー以外の信者を遮る効果を持つ」 — the exceptions are
+   * the whole second half of #12, and there are two of them.
+   */
   it("lets a hero walk straight over it", () => {
     const heightmap = flatHeightmap(20, 5);
     wallLine(heightmap, 10, 8, 12);
@@ -179,6 +182,55 @@ describe("createMovementSystem against a 城壁", () => {
     const pos = world.get(hero, Position)!;
     expect(pos.x).toBeCloseTo(11);
     expect(pos.y).toBeCloseTo(10);
+  });
+
+  /**
+   * The other named exception. It also keeps a wall from being able to end
+   * a faction's ability to raise a hero at all: a hero is made from the
+   * leader, and everyone musters toward the leader, so penning one in
+   * would be worth far more than a 城壁 costs.
+   */
+  it("lets a faction's leader walk straight over it", () => {
+    const heightmap = flatHeightmap(20, 5);
+    wallLine(heightmap, 10, 8, 12);
+    const world = new World();
+    const leader = createWalkerAt(world, 5, 10, 2);
+    world.add(leader, MoveTarget, { x: 15, y: 10 });
+    const faction = world.createEntity();
+    world.add(faction, FactionState, {
+      id: "player",
+      mana: 0,
+      behaviorMode: "gather",
+      shrinePosition: { x: 15, y: 10 },
+      leaderId: leader,
+    });
+
+    run(world, heightmap, 12);
+
+    const pos = world.get(leader, Position)!;
+    expect(pos.x).toBeCloseTo(11);
+    expect(pos.y).toBeCloseTo(10);
+  });
+
+  it("still stops an ordinary walker of a faction that has a leader elsewhere", () => {
+    const heightmap = flatHeightmap(20, 5);
+    wallLine(heightmap, 10, 8, 12);
+    const world = new World();
+    const leader = createWalkerAt(world, 0, 0, 2);
+    const walker = createWalkerAt(world, 5, 10, 2);
+    world.add(walker, MoveTarget, { x: 15, y: 10 });
+    const faction = world.createEntity();
+    world.add(faction, FactionState, {
+      id: "player",
+      mana: 0,
+      behaviorMode: "gather",
+      shrinePosition: { x: 15, y: 10 },
+      leaderId: leader,
+    });
+
+    run(world, heightmap, 12);
+
+    expect(world.get(walker, Position)!.x).toBeLessThan(10);
   });
 
   /**
