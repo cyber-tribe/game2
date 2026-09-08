@@ -5,6 +5,8 @@ import { HELEN_CHARM_CAPACITY, HELEN_CHARM_RADIUS } from "../constants";
 import { createHouseCaptureSystem, createWalkerCombatSystem } from "./combat";
 import { charmedBy, createHelenSystem } from "./helen";
 import { createSettleSystem } from "./settle";
+import { createSwamp } from "../swamp";
+import { createSwampSystem } from "./swamp";
 
 function spawnWalker(world: World, faction: FactionId, x: number, y: number, state: WalkerState = "seeking") {
   const entity = world.createEntity();
@@ -121,15 +123,84 @@ describe("トロイのヘレン — 敵と戦わない", () => {
     expect(world.get(soldier, Walker)!.strength).toBe(1);
   });
 
-  it("dies to anyone who actually reaches her", () => {
+  /**
+   * 「戦闘することが出来ず、**神業でしか潰せない**」. She used to die to
+   * anyone who reached her, on the reading that 「敵と戦わない」 meant
+   * "cannot win a fight" rather than "cannot be in one" — which made her a
+   * problem the enemy answers by walking one spare follower at her.
+   * Untouchable by hand, she is a problem the enemy *god* has to spend mana
+   * on, which is the pressure the miracle exists to apply.
+   */
+  it("cannot be killed by a walker, however many reach her", () => {
     const world = new World();
     const helen = spawnWalker(world, "player", 5, 5, "helen");
     world.add(helen, Walker, { strength: 99, state: "helen", speed: 1 });
     spawnWalker(world, "enemy", 5, 5);
+    spawnWalker(world, "enemy", 5, 5);
 
     createWalkerCombatSystem()(world, 0.1);
+    createWalkerCombatSystem()(world, 0.1);
+
+    expect(world.isAlive(helen)).toBe(true);
+  });
+
+  /** A miracle still ends her — that is what 神業でしか潰せない leaves open. */
+  it("still dies to a miracle", () => {
+    const world = new World();
+    const helen = spawnWalker(world, "player", 5, 5, "helen");
+    const swamp = createSwamp(world, 5, 5, 1, 3);
+
+    createSwampSystem()(world, 0.1);
 
     expect(world.isAlive(helen)).toBe(false);
+    expect(world.isAlive(swamp)).toBe(true);
+  });
+
+  /**
+   * 「敵信者を魅了して**建物を更地にさせ**、信者が死ぬまで外を連れ回し続ける」
+   * — the other half of 「敵の人口・建築基盤を崩す」. Without it she only
+   * ever cost a faction its people and never touched its 建築基盤.
+   */
+  it("has the people she holds pull down their own side's houses", () => {
+    const world = new World();
+    spawnWalker(world, "player", 5, 5, "helen");
+    spawnWalker(world, "enemy", 5.5, 5);
+    const house = world.createEntity();
+    world.add(house, Position, { x: 5.5, y: 5 });
+    world.add(house, Owner, { faction: "enemy" });
+    world.add(house, House, { level: "hut", population: 3 });
+
+    createHelenSystem()(world, 0.1);
+
+    expect(world.isAlive(house)).toBe(false);
+  });
+
+  it("does not have them pull down the houses of the side that charmed them", () => {
+    const world = new World();
+    spawnWalker(world, "player", 5, 5, "helen");
+    spawnWalker(world, "enemy", 5.5, 5);
+    const ownHouse = world.createEntity();
+    world.add(ownHouse, Position, { x: 5.5, y: 5 });
+    world.add(ownHouse, Owner, { faction: "player" });
+    world.add(ownHouse, House, { level: "hut", population: 3 });
+
+    createHelenSystem()(world, 0.1);
+
+    expect(world.isAlive(ownHouse)).toBe(true);
+  });
+
+  it("leaves a house they are nowhere near standing", () => {
+    const world = new World();
+    spawnWalker(world, "player", 5, 5, "helen");
+    spawnWalker(world, "enemy", 5.5, 5);
+    const distant = world.createEntity();
+    world.add(distant, Position, { x: 25, y: 25 });
+    world.add(distant, Owner, { faction: "enemy" });
+    world.add(distant, House, { level: "hut", population: 3 });
+
+    createHelenSystem()(world, 0.1);
+
+    expect(world.isAlive(distant)).toBe(true);
   });
 
   /**

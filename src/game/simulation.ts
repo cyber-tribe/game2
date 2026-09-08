@@ -316,7 +316,7 @@ export class Simulation {
       .add(gatherTargetingSystem)
       .add(heroAdvanceTargetingSystem)
       .add(guardianTargetingSystem)
-      .add(createHelenSystem())
+      .add(createHelenSystem({ onImpact: (event) => this.recordImpactEffect(event) }))
       .add(heroCooldownSystem)
       .add(createHeroLossSystem({ onHeroLost: (faction) => this.recordEvent(faction, "heroLost") }))
       .add(createWanderTargetSystem({ heightmap: config.heightmap }))

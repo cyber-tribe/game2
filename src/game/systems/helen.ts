@@ -1,12 +1,13 @@
 import type { Entity, System, World } from "../../ecs";
-import { Charmed, MoveTarget, Owner, Position, Walker } from "../components";
-import { HELEN_CHARM_CAPACITY, HELEN_CHARM_RADIUS, HELEN_FOLLOW_DISTANCE } from "../constants";
+import { Charmed, House, MoveTarget, Owner, Position, Walker } from "../components";
+import { HELEN_CHARM_CAPACITY, HELEN_CHARM_RADIUS, HELEN_FOLLOW_DISTANCE, HELEN_RAZE_RADIUS } from "../constants";
+import type { OnImpactEffect } from "./effects";
 import { distance, type Point } from "./geometry";
 
 /**
  * Everything トロイのヘレン does (docs/original-miracles.md #28):
- * 「敵と戦わない。敵信者を魅了・拘束して建物から引き離し連れ回す。ヘレンが
- * 死ぬと拘束は解ける。敵の人口・建築基盤を崩す」.
+ * 「敵信者を魅了して建物を更地にさせ、信者が死ぬまで外を連れ回し続ける」
+ * 「戦闘することが出来ず、神業でしか潰せない」. ヘレンが死ぬと拘束は解ける。
  *
  * Three jobs, in the order they have to happen:
  *
@@ -19,11 +20,25 @@ import { distance, type Point } from "./geometry";
  * 3. **Drag** everyone she holds along behind her, and walk her toward the
  *    nearest enemy walker she has not taken yet.
  *
- * She never targets houses, unlike every other attacking hero: she has no
- * way to hurt one, and the point of her is the people who would otherwise
- * be living in them.
+ * She never targets houses herself, unlike every other attacking hero —
+ * but the people she has taken do. 「敵信者を魅了して**建物を更地にさせ**、
+ * 信者が死ぬまで外を連れ回し続ける」: a charmed walker pulls down its own
+ * side's houses as she leads it past them, which is the other half of
+ * 「敵の人口・建築基盤を崩す」. Without it she only ever cost a faction its
+ * people, and its 建築基盤 was never touched at all.
+ *
+ * She takes people where they stand — normally at home — and then walks
+ * them out, so the razing happens on the way out rather than as a radius
+ * she sweeps a town with. See HELEN_RAZE_RADIUS.
  */
-export function createHelenSystem(): System {
+export interface HelenConfig {
+  /** Called once per house the charmed pull down — see systems/effects.ts. */
+  onImpact: OnImpactEffect;
+}
+
+export function createHelenSystem(config: Partial<HelenConfig> = {}): System {
+  const onImpact = config.onImpact ?? (() => {});
+
   return (world) => {
     releaseAbandoned(world);
 
@@ -42,6 +57,23 @@ export function createHelenSystem(): System {
 
         world.add(entity, Charmed, { by: helen });
         held.push(entity);
+      }
+
+      // What the held pull down on their way out. Their *own* side's
+      // houses: they are still that faction's people, which is what makes
+      // this hurt — the enemy watches its own followers level its own town.
+      for (const entity of held) {
+        if (!world.isAlive(entity)) continue;
+        const heldPos = world.get(entity, Position)!;
+        const heldFaction = world.get(entity, Owner)!.faction;
+
+        for (const house of world.query(House, Position, Owner)) {
+          if (world.get(house, Owner)!.faction !== heldFaction) continue;
+          if (distance(heldPos, world.get(house, Position)!) > HELEN_RAZE_RADIUS) continue;
+
+          onImpact({ position: world.get(house, Position)!, type: "blown" });
+          world.destroyEntity(house);
+        }
       }
 
       // The held trail her rather than standing where they were taken —
