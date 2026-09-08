@@ -61,18 +61,26 @@ describe("ENEMY_SIGNATURE_MIRACLE", () => {
   });
 
   /**
-   * A god can only cast what its world unlocks — the same allowedMiracles
-   * gate the player plays under. A world whose god's signature is locked
-   * would advertise a school in the world select and then never show it.
+   * A god can only cast what its stage deals — the same allowedMiracles
+   * gate the player plays under.
+   *
+   * This used to require the signature on *every* world, back when game2
+   * dealt miracles cumulatively and chose the gods to fit. The original's
+   * table does not cooperate: six of its forty-eight stages allow nothing
+   * from their own god's school, and the earliest allow almost nothing at
+   * all — 「土地上下とマグネットのみ。しかも反応が極めて遅い」. The god is
+   * still a 火 god; it simply has no fire to throw that day, and
+   * enemyMiracles.ts falls back. What is worth holding is that the
+   * situation is the exception rather than the rule.
    */
-  it("is unlocked in every world that advertises its school", () => {
-    for (const world of WORLDS) {
-      const signature = ENEMY_SIGNATURE_MIRACLE[world.enemySchool];
-      expect({ world: world.id, canCast: world.allowedMiracles.includes(signature) }).toEqual({
-        world: world.id,
-        canCast: true,
-      });
-    }
+  it("lets every school's god actually cast its signature on some stage", () => {
+    const castableSchools = new Set(
+      WORLDS.filter((world) => world.allowedMiracles.includes(ENEMY_SIGNATURE_MIRACLE[world.enemySchool])).map(
+        (world) => world.enemySchool,
+      ),
+    );
+
+    expect(castableSchools).toEqual(new Set(MIRACLE_SCHOOLS.map(({ id }) => id)));
   });
 
   it("gives the campaign all six schools rather than repeating a couple", () => {

@@ -1657,7 +1657,10 @@ function showWorldSelect(): void {
 
         const name = document.createElement("span");
         name.className = "world-select-name";
-        name.textContent = world.name;
+        // 「アルゴス(プロメテウス)」 — the original pairs the place with the
+        // god waiting in it, and the god is the opponent the player is
+        // actually about to face.
+        name.textContent = `${world.name}（${world.god}）`;
 
         const detail = document.createElement("span");
         detail.className = "world-select-detail";
@@ -1673,6 +1676,9 @@ function showWorldSelect(): void {
         // match (see game/miracleSchools.ts), so there is no "default"
         // worth leaving unsaid.
         const schoolLabel = `・敵の系統: ${MIRACLE_SCHOOLS.find(({ id }) => id === world.enemySchool)!.label}`;
+        // The original's two acts: ground-level Greece, then the halls of
+        // the gods. Worth naming because it is where the campaign turns.
+        const chapterLabel = `${world.chapter}・`;
         // WORLDS is itself ordered by difficulty (see its own doc comment),
         // so the world's own position in the list doubles as a simple
         // difficulty indicator — no separate derived score needed. Map
@@ -1680,7 +1686,7 @@ function showWorldSelect(): void {
         // fixed 64x64 (see plan/0062-original-scale-map.md).
         detail.textContent = locked
           ? "パスワードが必要です"
-          : `${TERRAIN_LABELS[world.terrain]}${ruleLabel}${personalityLabel}${schoolLabel}・難易度${index + 1}/${WORLDS.length}`;
+          : `${chapterLabel}${TERRAIN_LABELS[world.terrain]}${ruleLabel}${personalityLabel}${schoolLabel}・難易度${index + 1}/${WORLDS.length}`;
 
         button.append(name, detail);
         if (!locked) {

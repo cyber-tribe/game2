@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ENEMY_SIGNATURE_MIRACLE, MIRACLE_SCHOOLS } from "./miracleSchools";
+import { MIRACLE_SCHOOLS } from "./miracleSchools";
 import { ALL_MIRACLES, GODS, STAGES_PER_GOD, WORLDS, nextWorldId, unlockedCountForPassword, type EnemyPersonality } from "./worlds";
 
 const KNOWN_PERSONALITIES: readonly EnemyPersonality[] = ["balanced", "aggressive", "defensive"];
@@ -20,7 +20,13 @@ describe("WORLDS", () => {
     expect(WORLDS).toHaveLength(48);
   });
 
-  it("keeps a god's three stages as the same opponent, differing only in difficulty", () => {
+  /**
+   * The opponent is the same across a god's three stages; the *stage* is
+   * not. game2 used to hand one toolset per god and keep it for all three;
+   * the original re-deals every time, and often differs within a god
+   * (アルゴス goes 5 → 7 → 9 miracles, アテナイ 17 → 9 → 12).
+   */
+  it("keeps a god's three stages the same opponent, and lets the stage itself differ", () => {
     for (let i = 0; i < GODS.length; i++) {
       const stages = WORLDS.slice(i * STAGES_PER_GOD, (i + 1) * STAGES_PER_GOD);
       expect(stages).toHaveLength(STAGES_PER_GOD);
@@ -28,52 +34,64 @@ describe("WORLDS", () => {
         expect(stage.enemySchool).toBe(stages[0].enemySchool);
         expect(stage.enemyPersonality).toBe(stages[0].enemyPersonality);
         expect(stage.terrain).toBe(stages[0].terrain);
-        expect(stage.terrainEditRule).toBe(stages[0].terrainEditRule);
-        // One toolset per god, so all three matches are played with what
-        // the player gained when this god appeared.
-        expect(stage.allowedMiracles).toEqual(stages[0].allowedMiracles);
+      }
+    }
+  });
+
+  it("deals a different hand within at least one god's three stages", () => {
+    const differs = GODS.some((_, i) => {
+      const [first, second, third] = WORLDS.slice(i * STAGES_PER_GOD, (i + 1) * STAGES_PER_GOD);
+      return (
+        first.allowedMiracles.length !== second.allowedMiracles.length ||
+        second.allowedMiracles.length !== third.allowedMiracles.length
+      );
+    });
+
+    expect(differs).toBe(true);
+  });
+
+  /**
+   * `enemySchool` is the god's own mythological domain — what the world
+   * select calls it — and deliberately *not* an invariant about what that
+   * stage allows. Six of the forty-eight allow nothing from their god's
+   * school at all, so tying the two together would mean rewriting the
+   * original's table. enemyMiracles.ts already falls back when its
+   * signature is not dealt.
+   */
+  it("gives every god one of the six schools, the same across its three stages", () => {
+    for (let i = 0; i < GODS.length; i++) {
+      const stages = WORLDS.slice(i * STAGES_PER_GOD, (i + 1) * STAGES_PER_GOD);
+      for (const stage of stages) {
+        expect(MIRACLE_SCHOOLS.map(({ id }) => id)).toContain(stage.enemySchool);
+        expect(stage.enemySchool).toBe(stages[0].enemySchool);
       }
     }
   });
 
   /**
-   * A god falls back on 地震 when its school's signature isn't unlocked
-   * (see enemyMiracles.ts), so a world select describing a 火 god the
-   * player then never sees cast fire would simply be a lie.
+   * The hand is dealt per stage, not accumulated — 「面ごとに配り直す」. So
+   * the invariant is not "unlocked exactly once" (the old cumulative model)
+   * but "every miracle is dealt somewhere", which is what makes all 29 of
+   * them reachable across a playthrough.
    */
-  it("has every god's own school signature already unlocked when it appears", () => {
-    for (const world of WORLDS) {
-      expect(world.allowedMiracles).toContain(ENEMY_SIGNATURE_MIRACLE[world.enemySchool]);
-    }
-  });
+  it("deals every miracle on some stage", () => {
+    const dealt = new Set(WORLDS.flatMap((world) => world.allowedMiracles));
 
-  it("covers all six schools across the roster", () => {
-    const schools = new Set(WORLDS.map((world) => world.enemySchool));
-    expect(schools.size).toBe(MIRACLE_SCHOOLS.length);
+    expect(dealt).toEqual(new Set(ALL_MIRACLES));
   });
 
   /**
-   * 「面ごとに底なしかどうか設定される」 — a stage property, and deliberately
-   * not a difficulty axis: a 底なし沼 is stronger for *whoever casts it*,
-   * and the enemy god casts 沼 too (it is 植物's signature). So it is only
-   * checked to actually vary, never to escalate.
+   * And it genuinely shrinks as well as grows, which is the whole reason
+   * the table is transcribed rather than generated: No.4 takes ペルセウス,
+   * 沼, 火柱 and 雷 away at once, No.29 drops fourteen.
    */
-  it("uses 底なし沼 on some stages and the draining kind on others", () => {
-    expect(WORLDS.some((world) => world.bottomlessSwamp)).toBe(true);
-    expect(WORLDS.some((world) => !world.bottomlessSwamp)).toBe(true);
-  });
+  it("takes miracles away again, not only adds them", () => {
+    const shrinks = WORLDS.some((world, i) => {
+      if (i === 0) return false;
+      return WORLDS[i - 1].allowedMiracles.some((miracle) => !world.allowedMiracles.includes(miracle));
+    });
 
-  it("only sets 底なし沼 on worlds that have 沼 unlocked at all", () => {
-    for (const world of WORLDS) {
-      if (!world.bottomlessSwamp) continue;
-      expect(world.allowedMiracles).toContain("swamp");
-    }
-  });
-
-  it("unlocks each miracle exactly once across the campaign", () => {
-    const unlocks = GODS.flatMap((god) => god.unlocks);
-    expect(new Set(unlocks).size).toBe(unlocks.length);
-    expect(new Set(unlocks)).toEqual(new Set(ALL_MIRACLES));
+    expect(shrinks).toBe(true);
   });
 
   it("gives every world a unique id", () => {
@@ -102,26 +120,33 @@ describe("WORLDS", () => {
     }
   });
 
-  it("never drops a miracle a previous world already unlocked (allowedMiracles only grows)", () => {
-    for (let i = 1; i < WORLDS.length; i++) {
-      for (const miracle of WORLDS[i - 1].allowedMiracles) {
-        expect(WORLDS[i].allowedMiracles).toContain(miracle);
-      }
-    }
+  /**
+   * Superseded: the original's hand shrinks as well as grows (see "takes
+   * miracles away again" above). What is still worth holding is that the
+   * *size* moves — a table that dealt the same count every stage would
+   * mean the transcription had flattened something.
+   */
+  it("varies how much it deals from stage to stage", () => {
+    const counts = WORLDS.map((world) => world.allowedMiracles.length);
+    expect(new Set(counts).size).toBeGreaterThan(4);
   });
-
   it("unlocks strictly more miracles at some point across the list, not the same set throughout", () => {
     const counts = WORLDS.map((world) => world.allowedMiracles.length);
     expect(Math.max(...counts)).toBeGreaterThan(Math.min(...counts));
   });
 
-  it("unlocks every miracle by the final world", () => {
-    const lastWorld = WORLDS[WORLDS.length - 1];
-    for (const miracle of ALL_MIRACLES) {
-      expect(lastWorld.allowedMiracles).toContain(miracle);
-    }
-  });
+  /**
+   * Not "the last stage has everything" — the original's last stage is
+   * missing 集結地移動, among others. What matters is that no miracle is
+   * unreachable, which "deals every miracle on some stage" above covers.
+   * Here: the last stage is a real hand, not an empty or total one.
+   */
+  it("ends on a hand that is neither empty nor everything", () => {
+    const last = WORLDS[WORLDS.length - 1].allowedMiracles;
 
+    expect(last.length).toBeGreaterThan(0);
+    expect(last.length).toBeLessThan(ALL_MIRACLES.length);
+  });
   it("never lists a miracle outside the known set", () => {
     for (const world of WORLDS) {
       for (const miracle of world.allowedMiracles) {
@@ -143,12 +168,20 @@ describe("WORLDS", () => {
     expect(WORLDS.some((world) => world.enemyPersonality !== "balanced")).toBe(true);
   });
 
-  it("never relaxes enemyTerritoryEditable back to true once a world has set it false", () => {
-    for (let i = 1; i < WORLDS.length; i++) {
-      if (!WORLDS[i - 1].enemyTerritoryEditable) expect(WORLDS[i].enemyTerritoryEditable).toBe(false);
-    }
-  });
+  /**
+   * Not monotonic. game2 used to ratchet this one way; the original turns
+   * 敵陣での↑↓ off and on again across the campaign (月神の宮 goes
+   * ○ → × → ○), because it is a property of the map rather than a rung on
+   * a difficulty ladder. What is worth asserting is that it is used at all,
+   * in both directions.
+   */
+  it("turns 敵陣での土地上下 off on some stages and back on later", () => {
+    const flags = WORLDS.map((world) => world.enemyTerritoryEditable);
 
+    expect(flags).toContain(true);
+    expect(flags).toContain(false);
+    expect(flags.some((editable, i) => i > 0 && editable && !flags[i - 1])).toBe(true);
+  });
   it("restricts enemyTerritoryEditable somewhere in the list, not every world staying editable", () => {
     expect(WORLDS.some((world) => !world.enemyTerritoryEditable)).toBe(true);
   });
@@ -211,16 +244,17 @@ describe("terrainEditRule across the campaign", () => {
     expect(rules).toEqual(new Set(["both", "raiseOnly", "lowerOnly", "neither"]));
   });
 
-  it("saves 土地上下不可 for the very end, where every miracle is unlocked", () => {
+  /**
+   * 土地上下不可 is where the source says 「よって神業で敵の住める土地を
+   * ゼロにすることになる」, so such a stage has to deal miracles that can
+   * actually take land away — 渦巻き, 津波 or 火山.
+   */
+  it("gives every 土地上下不可 stage a way to take land away", () => {
     const noTerraform = WORLDS.filter((world) => world.terrainEditRule === "neither");
-    const lastStage = WORLDS[WORLDS.length - 1];
 
-    // 「よって神業で敵の住める土地をゼロにすることになる」: with the spade
-    // gone, miracles are the only remaining verb, so such a stage must not
-    // arrive before the player has them.
     expect(noTerraform.length).toBeGreaterThan(0);
     for (const world of noTerraform) {
-      expect(world.allowedMiracles).toEqual(lastStage.allowedMiracles);
+      expect(world.allowedMiracles.some((m) => m === "whirlpool" || m === "tsunami" || m === "volcano")).toBe(true);
     }
   });
 });
