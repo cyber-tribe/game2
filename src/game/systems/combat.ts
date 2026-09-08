@@ -1,6 +1,7 @@
 import type { Entity, System, World } from "../../ecs";
 import { ADONIS_MIN_SPLIT_STRENGTH, ADONIS_SPLIT_GAP, COMBAT_RANGE, HERO_ACTION_COOLDOWN, HOUSE_LEVELS } from "../constants";
 import { Charmed, HeroCooldown, House, Owner, Position, Walker, isAdvancingHeroState, type FactionId } from "../components";
+import { isShieldedAtMagnet } from "../protection";
 import type { OnImpactEffect } from "./effects";
 import { distance, type Point } from "./geometry";
 
@@ -42,6 +43,10 @@ export function createWalkerCombatSystem(config: Partial<WalkerCombatConfig> = {
         // and out of the fight entirely. They are still the enemy's people
         // (they are not converted), they are simply not fighting for them.
         if (world.has(a, Charmed) || world.has(b, Charmed)) continue;
+        // 「リーダーがマグネットに到達すると…青い炎に包まれます(この間は
+        // 無敵状態になります)」 — a leader waiting at its own flag under
+        // 集合 cannot be fought either. See protection.ts.
+        if (isShieldedAtMagnet(world, a) || isShieldedAtMagnet(world, b)) continue;
 
         resolveWalkerFight(world, a, b, onImpact);
         if (!world.isAlive(a)) break;

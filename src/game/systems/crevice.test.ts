@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
 import { applyEarthquake, createHeightmap, type Heightmap } from "../../world/heightmap";
-import { Owner, Position, Walker } from "../components";
+import { FactionState, Owner, Position, Walker } from "../components";
+import { createFaction } from "../faction";
 import { createCreviceSystem } from "./crevice";
 
 function flatHeightmap(size: number, elevation: number): Heightmap {
@@ -128,3 +129,42 @@ describe("createCreviceSystem — ヘラクレス", () => {
     expect(world.query(Walker)).toHaveLength(0);
   });
 });
+
+/**
+ * The source's own worked example of the blue flame, cast as an
+ * earthquake: 「マグネットに重なっている間(青い炎に包まれた状態)は無敵だが、
+ * 集まってくるウォーカーが次々に地割れに落ちていくため、集合を解除すること
+ * が多い。その瞬間にリーダーも地割れに落ちる」.
+ */
+describe("creviceSystem and the leader waiting at the magnet", () => {
+  const stage = (mode: "gather" | "fight") => {
+    const heightmap = flatHeightmap(20, 5);
+    // Same fissure the tests above use, with the magnet planted on it.
+    applyEarthquake(heightmap, 5, 10, 1, 0, 6, () => 0.5);
+    const world = new World();
+    const faction = createFaction(world, "player", { x: 8, y: 10 }, mode);
+    const leader = world.createEntity();
+    world.add(leader, Position, { x: 8, y: 10 });
+    world.add(leader, Owner, { faction: "player" });
+    world.add(leader, Walker, { strength: 1, state: "seeking", speed: 1 });
+    world.add(faction, FactionState, { ...world.get(faction, FactionState)!, leaderId: leader });
+    return { world, leader, heightmap };
+  };
+
+  it("cannot swallow it while the order stands", () => {
+    const { world, leader, heightmap } = stage("gather");
+
+    createCreviceSystem({ heightmap })(world, 0.1);
+
+    expect(world.isAlive(leader)).toBe(true);
+  });
+
+  it("swallows it the moment the order is lifted", () => {
+    const { world, leader, heightmap } = stage("fight");
+
+    createCreviceSystem({ heightmap })(world, 0.1);
+
+    expect(world.isAlive(leader)).toBe(false);
+  });
+});
+
