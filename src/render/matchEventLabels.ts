@@ -27,6 +27,7 @@ const MATCH_EVENT_TEMPLATE: Record<MatchEventType, string> = {
   heroLost: "{subject}が英雄を失った",
   armageddon: "{subject}が最終決戦を発動した",
   tsunami: "{subject}が津波を起こした",
+  whirlpool: "{subject}が渦巻きを呼んだ",
   forest: "{subject}が森を生やした",
   flower: "{subject}が荒れた土地を癒した",
   fireRain: "{subject}が火の雨を降らせた",

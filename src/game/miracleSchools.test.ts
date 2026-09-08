@@ -11,8 +11,14 @@ import { ALL_MIRACLES, WORLDS } from "./worlds";
 /**
  * The six schools as docs/original-miracles.md counts them, minus what
  * game2 has no MiracleId for: 土地上下 (the always-available terrain
- * edits) in 人, and 渦巻き in 水, which is only ever born from a 竜巻 that
- * wanders into water.
+ * edits) in 人.
+ *
+ * 水 used to be 4 here as well, because 渦巻き could only be born from a
+ * 竜巻 that wandered into water. The original lists it in 全奇跡 under 水
+ * with a description of its own, so it is castable there and now is here
+ * too — 水 is the original's 5 again, and only 人 (whose fifth is the
+ * always-available 土地上下, plus game2's own 守護者化) and 火 (which the
+ * original itself gives only 4) differ from the article's table.
  */
 const ORIGINAL_SIZES: Record<MiracleSchool, number> = {
   human: 5, // 集結地移動, ペルセウス, 病原菌, 最終決戦 + game2's own 守護者化
@@ -20,7 +26,7 @@ const ORIGINAL_SIZES: Record<MiracleSchool, number> = {
   earth: 5,
   air: 5,
   fire: 4,
-  water: 4,
+  water: 5, // 岩礁, 渦巻き, 聖水の泉, トロイのヘレン, 津波
 };
 
 describe("MIRACLE_SCHOOL", () => {

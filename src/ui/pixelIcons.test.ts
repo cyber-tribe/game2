@@ -33,6 +33,7 @@ const ALL_KINDS: IconKind[] = [
   "megalith",
   "fungus",
   "tsunami",
+  "whirlpool",
   "armageddon",
   "inspect",
   "settle",

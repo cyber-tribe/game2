@@ -38,6 +38,7 @@ export type MiracleId =
   | "fireRain"
   | "volcano"
   | "tsunami"
+  | "whirlpool"
   | "armageddon";
 
 /** Every discretionary miracle — see MiracleId. */
@@ -69,6 +70,7 @@ export const ALL_MIRACLES: readonly MiracleId[] = [
   "fireRain",
   "volcano",
   "tsunami",
+  "whirlpool",
   "armageddon",
 ];
 
@@ -267,7 +269,7 @@ export const GODS: readonly GodDefinition[] = [
   { id: "aiolos", name: "風神アイオロス", school: "air", personality: "balanced", terrain: "snow", terrainEditRule: "both", unlocks: ["lightning", "shrine"], bottomlessSwamp: false, territoryEditable: true },
   { id: "hera", name: "女王神ヘラ", school: "human", personality: "balanced", terrain: "desert", terrainEditRule: "both", unlocks: ["plague", "perseus"], bottomlessSwamp: false, territoryEditable: true },
   { id: "hephaistos", name: "鍛冶神ヘパイストス", school: "fire", personality: "aggressive", terrain: "rock", terrainEditRule: "both", unlocks: ["fireRain", "firePillar"], bottomlessSwamp: false, territoryEditable: true },
-  { id: "poseidon", name: "海神ポセイドン", school: "water", personality: "defensive", terrain: "grass", terrainEditRule: "raiseOnly", unlocks: ["holyWater", "reef"], bottomlessSwamp: false, territoryEditable: true },
+  { id: "poseidon", name: "海神ポセイドン", school: "water", personality: "defensive", terrain: "grass", terrainEditRule: "raiseOnly", unlocks: ["holyWater", "reef", "whirlpool"], bottomlessSwamp: false, territoryEditable: true },
   // The second six revisit the schools with a different temperament each,
   // and hand the player the terrain-shaping miracles.
   { id: "atlas", name: "巨神アトラス", school: "earth", personality: "aggressive", terrain: "desert", terrainEditRule: "both", unlocks: ["road", "wall"], bottomlessSwamp: false, territoryEditable: true },

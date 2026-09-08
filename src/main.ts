@@ -27,6 +27,7 @@ import {
   SWAMP_RADIUS,
   HOLY_WATER_MANA_COST,
   TORNADO_MANA_COST,
+  WHIRLPOOL_MANA_COST,
   FIRE_PILLAR_MANA_COST,
   LIGHTNING_MANA_COST,
   STORM_MANA_COST,
@@ -64,7 +65,7 @@ import { createFirePillar } from "./game/firePillar";
 import { strikeLightning } from "./game/lightning";
 import { seedPlague } from "./game/plague";
 import { createStorm } from "./game/storm";
-import { createTornado } from "./game/tornado";
+import { createTornado, createWhirlpool } from "./game/tornado";
 import { collapseSwampsNear, createSwamp } from "./game/swamp";
 import { burnFire } from "./game/fire";
 import { eruptVolcano } from "./game/volcano";
@@ -1143,6 +1144,27 @@ async function bootstrap(world: WorldDefinition) {
       return;
     }
 
+    if (toolMode === "whirlpool") {
+      // 「渦巻き：海面上をランダムに動き回り、既にある土地を削り取る」 — it
+      // lives on water and nowhere else, so the same up-front check 岩礁
+      // uses: charging for a cast that does nothing reads as the game being
+      // broken.
+      if (sampleElevation(heightmap, vertex.x, vertex.y) > heightmap.waterLevel) {
+        showEntityInfo("渦巻きは海にしか作れません", "warning");
+        return;
+      }
+      if (!trySpendPlayerMana(WHIRLPOOL_MANA_COST)) return;
+      // Headed away from the caster's own shrine, like the 竜巻 that can
+      // also produce one: the only thing a whirlpool does is take land
+      // away, and a tap carries no second axis to aim it with.
+      const from = simulation.getShrinePosition("player") ?? vertex;
+      createWhirlpool(simulation.world, vertex.x, vertex.y, vertex.x - from.x, vertex.y - from.y);
+      simulation.recordEvent("player", "whirlpool");
+      vibrate(30);
+      playMiracleSound("whirlpool");
+      return;
+    }
+
     if (toolMode === "tsunami") {
       // Aimed, unlike the global sea-level rise this replaced: the tap is
       // the wave's origin, and high ground or a reef between it and a
@@ -1480,6 +1502,7 @@ async function bootstrap(world: WorldDefinition) {
     swamp: SWAMP_MANA_COST,
     holyWater: HOLY_WATER_MANA_COST,
     tornado: TORNADO_MANA_COST,
+    whirlpool: WHIRLPOOL_MANA_COST,
     firePillar: FIRE_PILLAR_MANA_COST,
     lightning: LIGHTNING_MANA_COST,
     storm: STORM_MANA_COST,

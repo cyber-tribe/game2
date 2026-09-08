@@ -34,6 +34,7 @@ export type IconKind =
   | "flower"
   | "fireRain"
   | "tsunami"
+  | "whirlpool"
   | "reef"
   | "road"
   | "wall"

@@ -28,6 +28,7 @@ export type ToolMode =
   | "flower"
   | "fireRain"
   | "tsunami"
+  | "whirlpool"
   | "reef"
   | "road"
   | "wall"

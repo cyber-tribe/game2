@@ -225,6 +225,7 @@ export type MatchEventType =
   | "heroLost"
   | "armageddon"
   | "tsunami"
+  | "whirlpool"
   | "reef"
   | "road"
   | "wall"
