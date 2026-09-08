@@ -89,6 +89,36 @@ const SWAMP_FILL = {
   textureSpace: "global" as const,
 };
 /**
+ * A 底なし沼 (Swamp.bottomless — see WorldDefinition.bottomlessSwamp, set
+ * per stage per 「面ごとに底なしかどうか設定される」) is drawn as the same bog
+ * gone black: near-lightless mud, and a wide hole in each tile instead of
+ * the ordinary swamp's two small ones.
+ *
+ * The two kinds behave completely differently — an ordinary swamp swallows
+ * a few walkers and dries up, a bottomless one takes the ground away for
+ * the rest of the match — and until now they looked identical. That made
+ * the only question a player actually asks of a swamp ("can I still send
+ * anyone past this?") unanswerable by looking, on a hazard whose whole job
+ * is to be looked at and walked around.
+ *
+ * Darker rather than a different hue: it is the same mud, and the reading
+ * is depth, not a different substance. The hole is what carries it — the
+ * one thing a bottomless pit visibly has.
+ */
+const BOTTOMLESS_SWAMP_MUD_COLOR = 0x1a0f1c;
+const BOTTOMLESS_SWAMP_SPECKLE_COLOR = 0x0d060e;
+const BOTTOMLESS_SWAMP_FILL = {
+  texture: createDitherTexture(
+    SWAMP_DITHER_SIZE,
+    BOTTOMLESS_SWAMP_MUD_COLOR,
+    BOTTOMLESS_SWAMP_SPECKLE_COLOR,
+    SWAMP_SPECKLE_DENSITY,
+  ),
+  textureSpace: "global" as const,
+};
+/** Radius of the void a 底なし沼 shows in each of its tiles, in screen pixels. */
+const BOTTOMLESS_SWAMP_HOLE_RADIUS = 5;
+/**
  * 聖水の泉 (see the HolyWater component). Bright, still water — the visual
  * opposite of the swamp's mud, because the two are the opposite miracle:
  * one deletes whoever walks in, the other takes them. Ringed in its owner's
@@ -255,6 +285,26 @@ const IMPACT_EFFECT_COLOR: Record<ImpactEffectType, number> = {
   blown: 0xe8f0f2,
 };
 
+/**
+ * How a swamp's ground is drawn, by kind — see BOTTOMLESS_SWAMP_FILL for
+ * why the two must not look alike. `holes` is how many voids the tile
+ * shows and how wide: a 底なし沼 gets one wide one in the middle, an
+ * ordinary swamp two small scattered ones (see swampTileHash).
+ *
+ * Pulled out as a pure function so the distinction is unit-testable
+ * without a Graphics/canvas context, same as impactEffectVisual below.
+ */
+export function swampVisual(bottomless: boolean): {
+  fill: typeof SWAMP_FILL;
+  holeCount: number;
+  holeRadius: number;
+  centered: boolean;
+} {
+  return bottomless
+    ? { fill: BOTTOMLESS_SWAMP_FILL, holeCount: 1, holeRadius: BOTTOMLESS_SWAMP_HOLE_RADIUS, centered: true }
+    : { fill: SWAMP_FILL, holeCount: 2, holeRadius: 2, centered: false };
+}
+
 /** Screen-px radius an ImpactEffect's ring has expanded to by the time it fully fades out. */
 const IMPACT_EFFECT_MAX_RADIUS = 16;
 
@@ -394,7 +444,8 @@ export class EntityLayer {
         const p1 = this.iso.project(tile.x + 1, tile.y);
         const p2 = this.iso.project(tile.x + 1, tile.y + 1);
         const p3 = this.iso.project(tile.x, tile.y + 1);
-        g.poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy]).fill(SWAMP_FILL);
+        const visual = swampVisual(swamp.bottomless);
+        g.poly([p0.sx, p0.sy, p1.sx, p1.sy, p2.sx, p2.sy, p3.sx, p3.sy]).fill(visual.fill);
 
         // A couple of deterministic dark "holes" per tile (see
         // swampTileHash) — fixed pixel marks, not a randomly reshuffling
@@ -405,11 +456,15 @@ export class EntityLayer {
           sx: p0.sx + (p1.sx - p0.sx) * u + (p3.sx - p0.sx) * v + (p2.sx - p1.sx - (p3.sx - p0.sx)) * u * v,
           sy: p0.sy + (p1.sy - p0.sy) * u + (p3.sy - p0.sy) * v + (p2.sy - p1.sy - (p3.sy - p0.sy)) * u * v,
         });
-        for (let hole = 0; hole < 2; hole++) {
-          const u = swampTileHash(tile.x, tile.y, hole * 2 + 1);
-          const v = swampTileHash(tile.x, tile.y, hole * 2 + 2);
+        // A 底なし沼 gets one wide void in the middle of the tile rather
+        // than two small marks off to the side: 底なし is a property of the
+        // whole tile, and a scatter of pits reads as texture where a single
+        // opening reads as depth. See swampVisual.
+        for (let hole = 0; hole < visual.holeCount; hole++) {
+          const u = visual.centered ? 0.5 : swampTileHash(tile.x, tile.y, hole * 2 + 1);
+          const v = visual.centered ? 0.5 : swampTileHash(tile.x, tile.y, hole * 2 + 2);
           const { sx, sy } = at(u, v);
-          g.circle(sx, sy, 2).fill(SWAMP_HOLE_COLOR);
+          g.circle(sx, sy, visual.holeRadius).fill(SWAMP_HOLE_COLOR);
         }
 
         // A slow, per-tile-phased bubble — visible for roughly half of
