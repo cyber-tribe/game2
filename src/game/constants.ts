@@ -460,6 +460,18 @@ export const HELEN_CHARM_CAPACITY = 4;
 /** How closely a charmed walker trails トロイのヘレン, in tiles. */
 export const HELEN_FOLLOW_DISTANCE = 1;
 
+/**
+ * How close a walker トロイのヘレン has charmed must come to one of its own
+ * side's houses to pull it down — 「敵信者を魅了して**建物を更地にさせ**、
+ * 信者が死ぬまで外を連れ回し続ける」.
+ *
+ * Small: they have to actually reach the building, not merely be led past
+ * the settlement. Helen takes people where they stand, which is normally at
+ * home, and then walks them out — so the razing happens on the way out,
+ * once, rather than being a radius she sweeps a town with.
+ */
+export const HELEN_RAZE_RADIUS = 1.2;
+
 export const GUARDIAN_MANA_COST = 25;
 
 /**
