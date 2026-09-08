@@ -621,13 +621,14 @@
           <div class="status-bar-track"><div id="mana-bar-fill" style="width: 0%"></div></div>
           <span class="status-value" id="mana-value">0</span>
         </div>
-        <div class="status-item">
-          <canvas class="status-icon" id="population-status-icon"></canvas>
-          <div class="status-bar-track">
-            <div id="population-bar-player" style="width: 50%"></div>
-            <div id="population-bar-enemy" style="width: 50%"></div>
-          </div>
-        </div>
+        <!--
+          The population comparison moved out of this row and onto the map
+          itself, as the colonnade hanging opposite the overview map — see
+          src/render/PopulationGauge.ts. Keeping a bar here as well would
+          have said the same thing twice, and the row's remaining job (mana)
+          is the one number that is genuinely a quantity rather than a
+          standing.
+        -->
       </div>
       <div id="toolbar">
         <div class="command-row">

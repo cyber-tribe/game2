@@ -77,6 +77,7 @@ import { MIRACLE_SCHOOLS } from "./game/miracleSchools";
 import { IsoRenderer, visibleTileBounds, type TileBounds } from "./render/IsoRenderer";
 import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
 import { Minimap } from "./render/Minimap";
+import { PopulationGauge } from "./render/PopulationGauge";
 import { GAME_PALETTE } from "./render/palette";
 import { mountCommandIcons } from "./ui/commandIcons";
 import { loadCommandIcons } from "./ui/pixelIcons";
@@ -140,6 +141,12 @@ const TUTORIAL_HINT_TIMEOUT_MS = 15000;
 const SHAKE_DURATION = 0.3;
 /** Screen size (px) of the top-right overview map — see render/Minimap.ts. */
 const MINIMAP_SIZE = 72;
+/**
+ * Width of the population colonnade hanging opposite the overview map — see
+ * render/PopulationGauge.ts. Wider than the minimap because it is read at a
+ * glance rather than studied, and its whole content is a left/right split.
+ */
+const POPULATION_GAUGE_WIDTH = 96;
 
 /**
  * The device's top safe-area inset (notch/status bar), read from the CSS
@@ -237,6 +244,12 @@ async function bootstrap(world: WorldDefinition) {
 
   const minimap = new Minimap(heightmap, MINIMAP_SIZE);
   app.stage.addChild(minimap.view);
+
+  // The two things the original hangs in the black space either side of the
+  // world: its overview map at top left (on Minimap's own slab) and the
+  // population standing at top right, as a colonnade rather than a bar.
+  const populationGauge = new PopulationGauge(POPULATION_GAUGE_WIDTH);
+  app.stage.addChild(populationGauge.view);
 
   mountCommandIcons();
   const statusPanel = new StatusPanel(MAX_MANA);
@@ -422,7 +435,9 @@ async function bootstrap(world: WorldDefinition) {
     }
     hud.setMaxWidth(app.screen.width);
     hud.setTopInset(safeAreaTop);
-    minimap.view.position.set(app.screen.width - MINIMAP_SIZE - 10, 10 + safeAreaTop);
+    // Top left, opposite the population gauge — the original's own arrangement.
+    minimap.view.position.set(10, 10 + safeAreaTop);
+    populationGauge.view.position.set(app.screen.width - POPULATION_GAUGE_WIDTH - 10, 10 + safeAreaTop);
     if (tutorialHint) tutorialHint.style.bottom = `${toolbarHeight + 12}px`;
   };
   layout();
@@ -1519,7 +1534,12 @@ async function bootstrap(world: WorldDefinition) {
     entityLayer.update(simulation.world, deltaSeconds, simulation.getImpactEffects());
     const outcome = simulation.getOutcome();
     hud.update();
-    statusPanel.update(simulation.summarize());
+    const summaries = simulation.summarize();
+    statusPanel.update(summaries);
+    const playerPopulation = summaries.find((f) => f.id === "player")?.population ?? 0;
+    const enemyPopulation = summaries.find((f) => f.id === "enemy")?.population ?? 0;
+    const totalPopulation = playerPopulation + enemyPopulation;
+    populationGauge.update(totalPopulation > 0 ? playerPopulation / totalPopulation : 0.5);
     updateToolbarAffordability();
     if (outcome.over && !matchRecordShown) {
       matchRecordShown = true;
