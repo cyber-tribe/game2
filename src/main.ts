@@ -124,6 +124,17 @@ const LONG_PRESS_DURATION_MS = 350;
  */
 const MEGALITH_HOLD_INTERVAL_MS = 500;
 /**
+ * How often a held 雷 drops the next volley — 「雷はボタンを押し続けている
+ * 間は落ち続ける」.
+ *
+ * Slower than 地下巨石's hold even though the two cost almost the same
+ * (20 vs 24), because a volley is five bolts that kill outright while a
+ * stone only raises ground: at 500ms a held 雷 would wipe a settlement
+ * before the finger registered it had been held at all. 800ms leaves the
+ * player a beat to see what the first volley did and lift off.
+ */
+const LIGHTNING_HOLD_INTERVAL_MS = 800;
+/**
  * How much one mouse-wheel "notch" (deltaY around ±100) zooms the map on
  * PC — see plan/0039-pc-support.md. Chosen so a single notch feels close
  * to one pinch-zoom step; exponential so repeated notches compound evenly
@@ -830,6 +841,32 @@ async function bootstrap(world: WorldDefinition) {
     return true;
   };
 
+  /**
+   * The other miracle a held press repeats: 雷. 「雷はボタンを押し続けて
+   * いる間は落ち続ける」 — see the hold handling in the pointer handlers
+   * below, and game/lightning.ts.
+   *
+   * Unlike 地下巨石's hold this does not need somewhere new to aim: one
+   * cast already scatters its bolts around the aim point (LIGHTNING_SCATTER),
+   * so holding on one spot walks a storm over the same neighbourhood rather
+   * than striking the identical vertex over and over.
+   *
+   * Returns whether a volley actually fell, so a hold stops itself the
+   * moment the mana runs out.
+   */
+  const castLightningAt = (vertex: { x: number; y: number }): boolean => {
+    if (!trySpendPlayerMana(LIGHTNING_MANA_COST)) return false;
+    strikeLightning(simulation.world, heightmap, vertex, Math.random, (event) =>
+      simulation.recordImpactEffect(event),
+    );
+    renderer.redraw(visibleBounds());
+    simulation.recordEvent("player", "lightning");
+    triggerShake(6);
+    vibrate([15, 40, 15]);
+    playMiracleSound("lightning");
+    return true;
+  };
+
   // Dispatches to whichever of the two above the current toolMode needs —
   // shared by the plain single-tap path (applyTool, below) and by ブラシ
   // continuous painting (see the pointer handlers further down).
@@ -958,15 +995,7 @@ async function bootstrap(world: WorldDefinition) {
     }
 
     if (toolMode === "lightning") {
-      if (!trySpendPlayerMana(LIGHTNING_MANA_COST)) return;
-      strikeLightning(simulation.world, heightmap, vertex, Math.random, (event) =>
-        simulation.recordImpactEffect(event),
-      );
-      renderer.redraw(visibleBounds());
-      simulation.recordEvent("player", "lightning");
-      triggerShake(6);
-      vibrate([15, 40, 15]);
-      playMiracleSound("lightning");
+      castLightningAt(vertex);
       return;
     }
 
@@ -1263,16 +1292,16 @@ async function bootstrap(world: WorldDefinition) {
   let longPressTimer: ReturnType<typeof setTimeout> | undefined;
   let painting = false;
   /**
-   * The one miracle a held press repeats: 地下巨石. 「発生ボタンを押し続けると、
-   * 一帯により多くの巨石を発生させる」 — see castMegalithAt and
-   * megalithScatterCandidates. Every other miracle stays a single
-   * deliberate cast, which is why this is its own flag rather than another
-   * toolMode in the brush's list: the brush edits whatever the pointer
-   * moves over, while this stays put and scatters around where it was
-   * first pressed.
+   * The two miracles a held press repeats: 地下巨石 (「発生ボタンを押し
+   * 続けると、一帯により多くの巨石を発生させる」) and 雷 (「雷はボタンを
+   * 押し続けている間は落ち続ける」) — see castMegalithAt and
+   * castLightningAt. Every other miracle stays a single deliberate cast,
+   * which is why this is its own flag rather than more toolModes in the
+   * brush's list: the brush edits whatever the pointer moves over, while
+   * these stay put and repeat around where the press first landed.
    */
-  let megalithHoldTimer: ReturnType<typeof setInterval> | undefined;
-  let megalithHolding = false;
+  let holdCastTimer: ReturnType<typeof setInterval> | undefined;
+  let holdCasting = false;
   // A vertex for raise/lower, a tile for flatten — see pickTerrainEditPoint.
   let lastPaintedPoint: { x: number; y: number } | undefined;
 
@@ -1282,15 +1311,15 @@ async function bootstrap(world: WorldDefinition) {
     longPressTimer = undefined;
   };
 
-  const stopMegalithHold = () => {
-    if (megalithHoldTimer !== undefined) clearInterval(megalithHoldTimer);
-    megalithHoldTimer = undefined;
-    megalithHolding = false;
+  const stopHoldCast = () => {
+    if (holdCastTimer !== undefined) clearInterval(holdCastTimer);
+    holdCastTimer = undefined;
+    holdCasting = false;
   };
 
   const stopPainting = () => {
     clearLongPressTimer();
-    stopMegalithHold();
+    stopHoldCast();
     painting = false;
     lastPaintedPoint = undefined;
     flattenTargetElevation = undefined;
@@ -1390,7 +1419,13 @@ async function bootstrap(world: WorldDefinition) {
       viewStartPos = { x: renderer.view.position.x, y: renderer.view.position.y };
       flattenTargetElevation = undefined; // fresh gesture — see its own doc comment
 
-      if (toolMode === "raise" || toolMode === "lower" || toolMode === "flatten" || toolMode === "megalith") {
+      if (
+        toolMode === "raise" ||
+        toolMode === "lower" ||
+        toolMode === "flatten" ||
+        toolMode === "megalith" ||
+        toolMode === "lightning"
+      ) {
         clearLongPressTimer();
         longPressTimer = setTimeout(() => {
           longPressTimer = undefined;
@@ -1400,24 +1435,43 @@ async function bootstrap(world: WorldDefinition) {
           if (toolMode === "megalith") {
             const center = renderer.pickVertex(local.x, local.y);
             if (!center) return;
-            megalithHolding = true;
+            holdCasting = true;
             vibrate(10); // brief confirmation that the hold just engaged
             // The first stone lands here, exactly where a plain tap would
             // have put it — holding adds to that cast rather than
             // replacing it.
             if (!castMegalithAt(center, true)) {
-              stopMegalithHold();
+              stopHoldCast();
               return;
             }
-            megalithHoldTimer = setInterval(() => {
+            holdCastTimer = setInterval(() => {
               const candidates = megalithScatterCandidates(heightmap, center.x, center.y);
               if (candidates.length === 0) {
-                stopMegalithHold();
+                stopHoldCast();
                 return;
               }
               const next = candidates[Math.floor(Math.random() * candidates.length)];
-              if (!castMegalithAt(next, false)) stopMegalithHold();
+              if (!castMegalithAt(next, false)) stopHoldCast();
             }, MEGALITH_HOLD_INTERVAL_MS);
+            return;
+          }
+
+          if (toolMode === "lightning") {
+            const center = renderer.pickVertex(local.x, local.y);
+            if (!center) return;
+            holdCasting = true;
+            vibrate(10);
+            // Same shape as 地下巨石's hold: the first volley is the one a
+            // plain tap would have thrown, and holding adds to it. Every
+            // repeat aims at the same point — the bolts' own scatter is
+            // what spreads them (see castLightningAt).
+            if (!castLightningAt(center)) {
+              stopHoldCast();
+              return;
+            }
+            holdCastTimer = setInterval(() => {
+              if (!castLightningAt(center)) stopHoldCast();
+            }, LIGHTNING_HOLD_INTERVAL_MS);
             return;
           }
 
@@ -1455,13 +1509,13 @@ async function bootstrap(world: WorldDefinition) {
 
     if (!pointerActive) return;
 
-    // A held 地下巨石 scatters around where it was pressed, so the pointer
+    // A held 地下巨石 or 雷 stays where it was pressed, so the pointer
     // drifting is not a brush stroke — it just ends the hold, the same way
     // moving before the hold engaged turns the gesture into a pan.
-    if (megalithHolding) {
+    if (holdCasting) {
       const dx = event.global.x - dragStart.x;
       const dy = event.global.y - dragStart.y;
-      if (Math.hypot(dx, dy) > DRAG_THRESHOLD) stopMegalithHold();
+      if (Math.hypot(dx, dy) > DRAG_THRESHOLD) stopHoldCast();
       return;
     }
 
@@ -1495,7 +1549,7 @@ async function bootstrap(world: WorldDefinition) {
     activePointers.delete(event.pointerId);
     if (activePointers.size < 2) rotating = false;
 
-    if (pointerActive && !isDragging && !painting && !megalithHolding && !gestureHadTwoFingers) applyTool(event);
+    if (pointerActive && !isDragging && !painting && !holdCasting && !gestureHadTwoFingers) applyTool(event);
 
     stopPainting();
     pointerActive = false;
