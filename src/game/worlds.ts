@@ -120,6 +120,10 @@ export type EnemyPersonality = "balanced" | "aggressive" | "defensive";
 export interface WorldDefinition {
   id: string;
   name: string;
+  /** The god waiting here — 「アルゴス(プロメテウス)」. See STAGES. */
+  god: string;
+  /** 地上編 (No.1-30) or 天上編 (No.31-48) — the original's own two acts. */
+  chapter: "地上編" | "天上編";
   worldWidth: number;
   worldHeight: number;
   terrain: TerrainType;
@@ -242,55 +246,131 @@ export interface WorldDefinition {
  *   on, but never monotonically per-god: a god's realm is a place, and the
  *   difficulty curve proper is the AI ramp, not the scenery.
  */
-interface GodDefinition {
+/**
+ * One stage of the campaign, exactly as the original lays it out — see
+ * `docs/original-maps.md`, which holds the whole 48-row table this is
+ * transcribed from (place, god, chapter, the ten ○× settings, and the
+ * 6x5 grid of miracles each stage allows).
+ *
+ * **The hand is dealt per stage, not accumulated.** game2 used to invent
+ * sixteen gods and hand out miracles cumulatively — a god's first stage
+ * unlocked something and its three matches were played with one toolset
+ * that never shrank. The original does nothing of the sort: No.4 takes
+ * ペルセウス, 沼, 火柱 and 雷 away all at once, No.29 drops fourteen of the
+ * previous stage's, and a god's three stages routinely differ from each
+ * other. Reading the table straight is the only way to get that.
+ *
+ * Three of the ten per-stage settings map onto fields game2 already had:
+ * 土地の↑/↓ become terrainEditRule, 敵陣での↑↓ becomes
+ * enemyTerritoryEditable, and 底なし沼 becomes bottomlessSwamp. The other
+ * seven (どこでも↑↓ / 海上に土地↑↓ / 溺れた人間の救出 / 敵の位置表示 /
+ * スプログ / 災害箇所表示) have no field yet — see docs/original-miracles.md.
+ *
+ * `terrain` and `enemyPersonality` are **game2's own**: the original's map
+ * data records neither, so they are assigned here to give the sixteen
+ * realms some variety, ground-level places (地上編) reading greener than
+ * the gods' halls (天上編).
+ *
+ * `enemySchool` is the god's own mythological domain, and is flavour rather
+ * than an invariant: it is what the world select calls the god, while what
+ * the god can actually *cast* is whatever that stage allows. Six of the
+ * forty-eight stages allow nothing from their own god's school at all, so
+ * tying the two together would mean rewriting the original's table. See
+ * enemyMiracles.ts, which already falls back when its signature is not on
+ * the stage's list — and falls back to nothing at all on the earliest
+ * stages, which is exactly what the source says of them:
+ * 「土地上下とマグネットのみ。しかも反応が極めて遅い」.
+ */
+interface StageDefinition {
   id: string;
-  name: string;
-  school: MiracleSchool;
-  personality: EnemyPersonality;
+  /** The Greek place, or the hall of the god — 「アルゴス」「冥王の宮」. */
+  place: string;
+  god: string;
+  chapter: "地上編" | "天上編";
+  /** 1, 2 or 3 — every god gets three, per 「各3ステージが用意されている」. */
+  stage: number;
   terrain: TerrainType;
   terrainEditRule: TerrainEditRule;
-  /** Miracles this god's first stage adds to the cumulative pool. */
-  unlocks: readonly MiracleId[];
-  /**
-   * Whether the player may still reshape land inside this god's territory.
-   * Once false it stays false for every god after — see WorldDefinition's
-   * enemyTerritoryEditable.
-   */
-  territoryEditable: boolean;
-  /** Whether this god's stages use 底なし沼 — see WorldDefinition.bottomlessSwamp. */
+  enemyPersonality: EnemyPersonality;
+  enemySchool: MiracleSchool;
+  enemyTerritoryEditable: boolean;
   bottomlessSwamp: boolean;
+  allowedMiracles: readonly MiracleId[];
 }
 
-export const GODS: readonly GodDefinition[] = [
-  // The first six are one per school, in the order docs/original-miracles.md
-  // lists them, each introducing its own signature miracle.
-  { id: "gaia", name: "大地神ガイア", school: "earth", personality: "balanced", terrain: "grass", terrainEditRule: "both", unlocks: ["earthquake"], bottomlessSwamp: false, territoryEditable: true },
-  { id: "demeter", name: "豊穣神デメテル", school: "plant", personality: "balanced", terrain: "grass", terrainEditRule: "both", unlocks: ["swamp", "forest"], bottomlessSwamp: false, territoryEditable: true },
-  { id: "aiolos", name: "風神アイオロス", school: "air", personality: "balanced", terrain: "snow", terrainEditRule: "both", unlocks: ["lightning", "shrine"], bottomlessSwamp: false, territoryEditable: true },
-  { id: "hera", name: "女王神ヘラ", school: "human", personality: "balanced", terrain: "desert", terrainEditRule: "both", unlocks: ["plague", "perseus"], bottomlessSwamp: false, territoryEditable: true },
-  { id: "hephaistos", name: "鍛冶神ヘパイストス", school: "fire", personality: "aggressive", terrain: "rock", terrainEditRule: "both", unlocks: ["fireRain", "firePillar"], bottomlessSwamp: false, territoryEditable: true },
-  { id: "poseidon", name: "海神ポセイドン", school: "water", personality: "defensive", terrain: "grass", terrainEditRule: "raiseOnly", unlocks: ["holyWater", "reef", "whirlpool"], bottomlessSwamp: false, territoryEditable: true },
-  // The second six revisit the schools with a different temperament each,
-  // and hand the player the terrain-shaping miracles.
-  { id: "atlas", name: "巨神アトラス", school: "earth", personality: "aggressive", terrain: "desert", terrainEditRule: "both", unlocks: ["road", "wall"], bottomlessSwamp: false, territoryEditable: true },
-  { id: "persephone", name: "冥后ペルセポネ", school: "plant", personality: "defensive", terrain: "snow", terrainEditRule: "lowerOnly", unlocks: ["fungus", "flower"], bottomlessSwamp: true, territoryEditable: true },
-  { id: "boreas", name: "北風神ボレアス", school: "air", personality: "aggressive", terrain: "grass", terrainEditRule: "both", unlocks: ["tornado", "storm"], bottomlessSwamp: false, territoryEditable: true },
-  { id: "athena", name: "戦神アテナ", school: "human", personality: "defensive", terrain: "desert", terrainEditRule: "raiseOnly", unlocks: ["guardian", "helen"], bottomlessSwamp: false, territoryEditable: true },
-  { id: "prometheus", name: "先知神プロメテウス", school: "fire", personality: "aggressive", terrain: "rock", terrainEditRule: "lowerOnly", unlocks: ["volcano", "achilles"], bottomlessSwamp: false, territoryEditable: true },
-  { id: "thetis", name: "海精テティス", school: "water", personality: "balanced", terrain: "snow", terrainEditRule: "both", unlocks: ["tsunami", "odysseus"], bottomlessSwamp: false, territoryEditable: true },
-  // The last four close out the roster of heroes and the two miracles that
-  // end matches outright, and their realms are off-limits to the player's
-  // own spade.
-  { id: "kronos", name: "時神クロノス", school: "earth", personality: "defensive", terrain: "rock", terrainEditRule: "raiseOnly", unlocks: ["megalith", "hercules"], bottomlessSwamp: false, territoryEditable: false },
-  { id: "dionysos", name: "酒神ディオニュソス", school: "plant", personality: "aggressive", terrain: "desert", terrainEditRule: "lowerOnly", unlocks: ["adonis"], bottomlessSwamp: true, territoryEditable: false },
-  { id: "zephyros", name: "西風神ゼピュロス", school: "air", personality: "defensive", terrain: "snow", terrainEditRule: "raiseOnly", unlocks: ["hurricane"], bottomlessSwamp: false, territoryEditable: false },
-  // 「土地上下不可ステージ」, kept for the last god of all. The article
-  // describes what such a stage becomes — 「よって神業で敵の住める土地を
-  // ゼロにすることになる」 — and by here the player holds every miracle
-  // the campaign ever unlocks, 最終決戦 included, which is exactly the
-  // hand that stage needs.
-  { id: "hades", name: "冥王ハデス", school: "fire", personality: "aggressive", terrain: "rock", terrainEditRule: "neither", unlocks: ["armageddon"], bottomlessSwamp: true, territoryEditable: false },
+/**
+ * The original's own 48, in order. Transcribed from the table in
+ * `docs/original-maps.md` rather than typed by hand.
+ *
+ * 守護者化 rides with ペルセウス wherever it appears: it is game2's own
+ * hero (the original has no defensive one), so it has no row of its own in
+ * the source, and the baseline hero it is defined against is the natural
+ * place to hang it.
+ */
+const STAGES: readonly StageDefinition[] = [
+  { id: "argos-1", place: "アルゴス", god: "プロメテウス", chapter: "地上編", stage: 1, terrain: "grass", terrainEditRule: "both", enemyPersonality: "balanced", enemySchool: "fire", enemyTerritoryEditable: true, bottomlessSwamp: true, allowedMiracles: ["shrine", "firePillar", "perseus", "guardian", "armageddon"] },
+  { id: "argos-2", place: "アルゴス", god: "プロメテウス", chapter: "地上編", stage: 2, terrain: "grass", terrainEditRule: "both", enemyPersonality: "balanced", enemySchool: "fire", enemyTerritoryEditable: true, bottomlessSwamp: true, allowedMiracles: ["shrine", "swamp", "firePillar", "lightning", "perseus", "guardian", "armageddon"] },
+  { id: "argos-3", place: "アルゴス", god: "プロメテウス", chapter: "地上編", stage: 3, terrain: "grass", terrainEditRule: "both", enemyPersonality: "balanced", enemySchool: "fire", enemyTerritoryEditable: true, bottomlessSwamp: true, allowedMiracles: ["shrine", "earthquake", "swamp", "firePillar", "lightning", "perseus", "guardian", "fireRain", "armageddon"] },
+  { id: "sparta-1", place: "スパルタ", god: "ヘルメス", chapter: "地上編", stage: 1, terrain: "grass", terrainEditRule: "both", enemyPersonality: "aggressive", enemySchool: "air", enemyTerritoryEditable: true, bottomlessSwamp: true, allowedMiracles: ["shrine", "earthquake", "holyWater", "tornado", "odysseus", "fireRain", "armageddon"] },
+  { id: "sparta-2", place: "スパルタ", god: "ヘルメス", chapter: "地上編", stage: 2, terrain: "grass", terrainEditRule: "both", enemyPersonality: "aggressive", enemySchool: "air", enemyTerritoryEditable: true, bottomlessSwamp: true, allowedMiracles: ["shrine", "swamp", "holyWater", "tornado", "odysseus", "fireRain", "armageddon"] },
+  { id: "sparta-3", place: "スパルタ", god: "ヘルメス", chapter: "地上編", stage: 3, terrain: "grass", terrainEditRule: "both", enemyPersonality: "aggressive", enemySchool: "air", enemyTerritoryEditable: true, bottomlessSwamp: true, allowedMiracles: ["shrine", "lightning", "storm", "odysseus", "armageddon"] },
+  { id: "crete-1", place: "クレタ", god: "ステュクス", chapter: "地上編", stage: 1, terrain: "grass", terrainEditRule: "both", enemyPersonality: "balanced", enemySchool: "water", enemyTerritoryEditable: true, bottomlessSwamp: false, allowedMiracles: ["shrine", "swamp", "firePillar", "adonis", "forest", "fireRain", "whirlpool", "armageddon"] },
+  { id: "crete-2", place: "クレタ", god: "ステュクス", chapter: "地上編", stage: 2, terrain: "grass", terrainEditRule: "both", enemyPersonality: "balanced", enemySchool: "water", enemyTerritoryEditable: true, bottomlessSwamp: false, allowedMiracles: ["shrine", "earthquake", "swamp", "firePillar", "road", "wall", "adonis", "forest", "armageddon"] },
+  { id: "crete-3", place: "クレタ", god: "ステュクス", chapter: "地上編", stage: 3, terrain: "grass", terrainEditRule: "both", enemyPersonality: "balanced", enemySchool: "water", enemyTerritoryEditable: true, bottomlessSwamp: false, allowedMiracles: ["shrine", "earthquake", "swamp", "firePillar", "road", "wall", "fungus", "adonis", "forest", "flower", "armageddon"] },
+  { id: "cyprus-1", place: "キプロス", god: "アフロディーテ", chapter: "地上編", stage: 1, terrain: "desert", terrainEditRule: "both", enemyPersonality: "defensive", enemySchool: "human", enemyTerritoryEditable: true, bottomlessSwamp: true, allowedMiracles: ["shrine", "earthquake", "firePillar", "road", "wall", "megalith", "fungus", "hercules", "forest", "flower", "armageddon"] },
+  { id: "cyprus-2", place: "キプロス", god: "アフロディーテ", chapter: "地上編", stage: 2, terrain: "desert", terrainEditRule: "both", enemyPersonality: "defensive", enemySchool: "human", enemyTerritoryEditable: true, bottomlessSwamp: true, allowedMiracles: ["shrine", "earthquake", "firePillar", "reef", "road", "wall", "megalith", "fungus", "hercules", "forest", "flower", "whirlpool", "armageddon"] },
+  { id: "cyprus-3", place: "キプロス", god: "アフロディーテ", chapter: "地上編", stage: 3, terrain: "desert", terrainEditRule: "both", enemyPersonality: "defensive", enemySchool: "human", enemyTerritoryEditable: true, bottomlessSwamp: true, allowedMiracles: ["shrine", "holyWater", "firePillar", "lightning", "hercules", "whirlpool", "armageddon"] },
+  { id: "delos-1", place: "デロス", god: "アレス", chapter: "地上編", stage: 1, terrain: "grass", terrainEditRule: "both", enemyPersonality: "aggressive", enemySchool: "human", enemyTerritoryEditable: true, bottomlessSwamp: true, allowedMiracles: ["shrine", "reef", "helen", "tsunami"] },
+  { id: "delos-2", place: "デロス", god: "アレス", chapter: "地上編", stage: 2, terrain: "grass", terrainEditRule: "both", enemyPersonality: "aggressive", enemySchool: "human", enemyTerritoryEditable: true, bottomlessSwamp: true, allowedMiracles: ["shrine", "earthquake", "swamp", "tornado", "firePillar", "reef", "road", "wall", "megalith", "fungus", "helen", "forest", "flower", "fireRain", "tsunami", "whirlpool"] },
+  { id: "delos-3", place: "デロス", god: "アレス", chapter: "地上編", stage: 3, terrain: "grass", terrainEditRule: "both", enemyPersonality: "aggressive", enemySchool: "human", enemyTerritoryEditable: true, bottomlessSwamp: true, allowedMiracles: ["shrine", "earthquake", "swamp", "holyWater", "lightning", "storm", "plague", "hurricane", "road", "wall", "megalith", "fungus", "helen", "forest", "flower", "fireRain", "whirlpool"] },
+  { id: "athens-1", place: "アテナイ", god: "アテナ", chapter: "地上編", stage: 1, terrain: "grass", terrainEditRule: "both", enemyPersonality: "balanced", enemySchool: "human", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "earthquake", "swamp", "holyWater", "tornado", "firePillar", "plague", "reef", "road", "wall", "megalith", "fungus", "achilles", "flower", "volcano", "whirlpool", "armageddon"] },
+  { id: "athens-2", place: "アテナイ", god: "アテナ", chapter: "地上編", stage: 2, terrain: "grass", terrainEditRule: "raiseOnly", enemyPersonality: "balanced", enemySchool: "human", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "swamp", "tornado", "firePillar", "megalith", "fungus", "forest", "flower", "whirlpool"] },
+  { id: "athens-3", place: "アテナイ", god: "アテナ", chapter: "地上編", stage: 3, terrain: "grass", terrainEditRule: "both", enemyPersonality: "balanced", enemySchool: "human", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "swamp", "holyWater", "lightning", "storm", "wall", "achilles", "forest", "flower", "volcano", "tsunami", "armageddon"] },
+  { id: "mycenae-1", place: "ミュケナイ", god: "ディオニュソス", chapter: "地上編", stage: 1, terrain: "desert", terrainEditRule: "both", enemyPersonality: "aggressive", enemySchool: "plant", enemyTerritoryEditable: true, bottomlessSwamp: true, allowedMiracles: ["shrine", "holyWater", "road", "wall", "adonis", "flower", "armageddon"] },
+  { id: "mycenae-2", place: "ミュケナイ", god: "ディオニュソス", chapter: "地上編", stage: 2, terrain: "desert", terrainEditRule: "both", enemyPersonality: "aggressive", enemySchool: "plant", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "earthquake", "swamp", "tornado", "firePillar", "reef", "adonis", "fireRain", "volcano", "tsunami", "whirlpool", "armageddon"] },
+  { id: "mycenae-3", place: "ミュケナイ", god: "ディオニュソス", chapter: "地上編", stage: 3, terrain: "desert", terrainEditRule: "both", enemyPersonality: "aggressive", enemySchool: "plant", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "earthquake", "plague", "hurricane", "megalith", "adonis", "flower", "volcano", "tsunami", "armageddon"] },
+  { id: "larissa-1", place: "ラリッサ", god: "ヘパイストス", chapter: "地上編", stage: 1, terrain: "rock", terrainEditRule: "raiseOnly", enemyPersonality: "aggressive", enemySchool: "fire", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "holyWater", "firePillar", "reef", "achilles", "forest", "flower", "fireRain", "whirlpool"] },
+  { id: "larissa-2", place: "ラリッサ", god: "ヘパイストス", chapter: "地上編", stage: 2, terrain: "rock", terrainEditRule: "neither", enemyPersonality: "aggressive", enemySchool: "fire", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "tornado", "firePillar", "megalith", "fungus", "forest", "flower", "whirlpool"] },
+  { id: "larissa-3", place: "ラリッサ", god: "ヘパイストス", chapter: "地上編", stage: 3, terrain: "rock", terrainEditRule: "both", enemyPersonality: "aggressive", enemySchool: "fire", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "hurricane", "reef", "megalith", "fungus", "armageddon"] },
+  { id: "thrace-1", place: "トラキア", god: "デメテル", chapter: "地上編", stage: 1, terrain: "snow", terrainEditRule: "lowerOnly", enemyPersonality: "balanced", enemySchool: "plant", enemyTerritoryEditable: true, bottomlessSwamp: true, allowedMiracles: ["earthquake", "swamp", "holyWater", "lightning", "storm", "plague", "megalith", "adonis", "forest", "flower", "volcano", "whirlpool", "armageddon"] },
+  { id: "thrace-2", place: "トラキア", god: "デメテル", chapter: "地上編", stage: 2, terrain: "snow", terrainEditRule: "both", enemyPersonality: "balanced", enemySchool: "plant", enemyTerritoryEditable: true, bottomlessSwamp: true, allowedMiracles: ["shrine", "earthquake", "firePillar", "road", "wall", "adonis", "forest", "flower"] },
+  { id: "thrace-3", place: "トラキア", god: "デメテル", chapter: "地上編", stage: 3, terrain: "snow", terrainEditRule: "raiseOnly", enemyPersonality: "balanced", enemySchool: "plant", enemyTerritoryEditable: true, bottomlessSwamp: true, allowedMiracles: ["shrine", "reef", "adonis", "tsunami"] },
+  { id: "olympus-1", place: "オリュンポス山", god: "ガイア", chapter: "地上編", stage: 1, terrain: "rock", terrainEditRule: "both", enemyPersonality: "defensive", enemySchool: "earth", enemyTerritoryEditable: true, bottomlessSwamp: true, allowedMiracles: ["shrine", "earthquake", "tornado", "firePillar", "plague", "hurricane", "reef", "road", "wall", "hercules", "forest", "flower", "fireRain", "volcano", "tsunami", "whirlpool", "armageddon"] },
+  { id: "olympus-2", place: "オリュンポス山", god: "ガイア", chapter: "地上編", stage: 2, terrain: "rock", terrainEditRule: "both", enemyPersonality: "defensive", enemySchool: "earth", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "hurricane", "hercules", "tsunami", "armageddon"] },
+  { id: "olympus-3", place: "オリュンポス山", god: "ガイア", chapter: "地上編", stage: 3, terrain: "rock", terrainEditRule: "both", enemyPersonality: "defensive", enemySchool: "earth", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "lightning", "wall", "hercules", "flower", "armageddon"] },
+  { id: "artemis-1", place: "月神の宮", god: "アルテミス", chapter: "天上編", stage: 1, terrain: "snow", terrainEditRule: "both", enemyPersonality: "defensive", enemySchool: "plant", enemyTerritoryEditable: true, bottomlessSwamp: true, allowedMiracles: ["shrine", "plague", "perseus", "guardian", "armageddon"] },
+  { id: "artemis-2", place: "月神の宮", god: "アルテミス", chapter: "天上編", stage: 2, terrain: "snow", terrainEditRule: "both", enemyPersonality: "defensive", enemySchool: "plant", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "swamp"] },
+  { id: "artemis-3", place: "月神の宮", god: "アルテミス", chapter: "天上編", stage: 3, terrain: "snow", terrainEditRule: "both", enemyPersonality: "defensive", enemySchool: "plant", enemyTerritoryEditable: true, bottomlessSwamp: true, allowedMiracles: ["shrine", "earthquake", "swamp", "tornado", "firePillar", "reef", "perseus", "guardian", "flower", "fireRain", "volcano", "tsunami", "whirlpool", "armageddon"] },
+  { id: "apollo-1", place: "太陽神の宮", god: "アポロン", chapter: "天上編", stage: 1, terrain: "desert", terrainEditRule: "both", enemyPersonality: "aggressive", enemySchool: "fire", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "holyWater", "plague", "flower", "armageddon"] },
+  { id: "apollo-2", place: "太陽神の宮", god: "アポロン", chapter: "天上編", stage: 2, terrain: "desert", terrainEditRule: "both", enemyPersonality: "aggressive", enemySchool: "fire", enemyTerritoryEditable: false, bottomlessSwamp: false, allowedMiracles: ["shrine", "earthquake", "swamp", "holyWater", "firePillar", "lightning", "storm", "plague", "hurricane", "reef", "road", "wall", "fungus", "achilles", "forest", "flower", "fireRain", "volcano", "tsunami", "whirlpool", "armageddon"] },
+  { id: "apollo-3", place: "太陽神の宮", god: "アポロン", chapter: "天上編", stage: 3, terrain: "desert", terrainEditRule: "both", enemyPersonality: "aggressive", enemySchool: "fire", enemyTerritoryEditable: true, bottomlessSwamp: false, allowedMiracles: ["shrine", "earthquake", "swamp", "tornado", "firePillar", "reef", "achilles", "fireRain", "volcano", "tsunami", "whirlpool", "armageddon"] },
+  { id: "hera-1", place: "天界王妃の宮", god: "ヘラ", chapter: "天上編", stage: 1, terrain: "grass", terrainEditRule: "both", enemyPersonality: "balanced", enemySchool: "human", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "holyWater", "lightning", "plague", "odysseus"] },
+  { id: "hera-2", place: "天界王妃の宮", god: "ヘラ", chapter: "天上編", stage: 2, terrain: "grass", terrainEditRule: "both", enemyPersonality: "balanced", enemySchool: "human", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "firePillar", "storm", "megalith", "fungus", "odysseus", "forest", "flower", "whirlpool", "armageddon"] },
+  { id: "hera-3", place: "天界王妃の宮", god: "ヘラ", chapter: "天上編", stage: 3, terrain: "grass", terrainEditRule: "both", enemyPersonality: "balanced", enemySchool: "human", enemyTerritoryEditable: true, bottomlessSwamp: true, allowedMiracles: ["shrine", "swamp", "fungus", "odysseus", "forest", "flower"] },
+  { id: "poseidon-1", place: "海王の宮", god: "ポセイドン", chapter: "天上編", stage: 1, terrain: "snow", terrainEditRule: "both", enemyPersonality: "defensive", enemySchool: "water", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "earthquake", "swamp", "holyWater", "firePillar", "lightning", "storm", "plague", "hurricane", "reef", "road", "wall", "megalith", "fungus", "helen", "forest", "flower", "fireRain", "volcano", "tsunami", "whirlpool"] },
+  { id: "poseidon-2", place: "海王の宮", god: "ポセイドン", chapter: "天上編", stage: 2, terrain: "snow", terrainEditRule: "both", enemyPersonality: "defensive", enemySchool: "water", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "earthquake", "swamp", "holyWater", "tornado", "firePillar", "plague", "hurricane", "reef", "road", "wall", "megalith", "fungus", "helen", "forest", "flower", "fireRain", "volcano", "tsunami", "whirlpool"] },
+  { id: "poseidon-3", place: "海王の宮", god: "ポセイドン", chapter: "天上編", stage: 3, terrain: "snow", terrainEditRule: "both", enemyPersonality: "defensive", enemySchool: "water", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "earthquake", "swamp", "firePillar", "lightning", "storm", "hurricane", "reef", "road", "wall", "megalith", "fungus", "helen", "forest", "flower", "fireRain", "volcano"] },
+  { id: "hades-1", place: "冥王の宮", god: "ハデス", chapter: "天上編", stage: 1, terrain: "rock", terrainEditRule: "both", enemyPersonality: "aggressive", enemySchool: "earth", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "earthquake", "perseus", "guardian", "volcano"] },
+  { id: "hades-2", place: "冥王の宮", god: "ハデス", chapter: "天上編", stage: 2, terrain: "rock", terrainEditRule: "both", enemyPersonality: "aggressive", enemySchool: "earth", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "swamp", "fungus", "achilles", "forest", "flower"] },
+  { id: "hades-3", place: "冥王の宮", god: "ハデス", chapter: "天上編", stage: 3, terrain: "rock", terrainEditRule: "both", enemyPersonality: "aggressive", enemySchool: "earth", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "firePillar", "lightning", "road", "hercules", "forest"] },
+  { id: "zeus-1", place: "オリュンポス神殿", god: "ゼウス", chapter: "天上編", stage: 1, terrain: "rock", terrainEditRule: "both", enemyPersonality: "balanced", enemySchool: "air", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "earthquake", "swamp", "firePillar", "lightning", "storm", "reef", "adonis", "fireRain", "volcano", "tsunami", "whirlpool", "armageddon"] },
+  { id: "zeus-2", place: "オリュンポス神殿", god: "ゼウス", chapter: "天上編", stage: 2, terrain: "rock", terrainEditRule: "both", enemyPersonality: "balanced", enemySchool: "air", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["shrine", "lightning", "storm", "hurricane", "odysseus"] },
+  { id: "zeus-3", place: "オリュンポス神殿", god: "ゼウス", chapter: "天上編", stage: 3, terrain: "rock", terrainEditRule: "both", enemyPersonality: "balanced", enemySchool: "air", enemyTerritoryEditable: false, bottomlessSwamp: true, allowedMiracles: ["earthquake", "holyWater", "lightning", "storm", "hurricane", "reef", "wall", "fungus", "hercules", "forest", "flower", "fireRain", "volcano"] },
 ];
+
+/**
+ * The sixteen gods, derived from the stage table rather than declared
+ * beside it — the campaign is the list of stages, and a "god" is just the
+ * three consecutive stages that share one.
+ */
+export const GODS: readonly { id: string; place: string; god: string; chapter: string; school: MiracleSchool }[] =
+  STAGES.filter((stage) => stage.stage === 1).map(({ place, god, chapter, enemySchool }) => ({
+    id: place,
+    place,
+    god,
+    chapter,
+    school: enemySchool,
+  }));
 
 /** How many stages each god gets — 「各3ステージが用意されている」. */
 export const STAGES_PER_GOD = 3;
@@ -298,71 +378,44 @@ export const STAGES_PER_GOD = 3;
 /** Stage numbering as it appears in a world's name. */
 const STAGE_SUFFIXES = ["一", "二", "三"] as const;
 
-/**
- * Every world is a fixed 64x64 (see WorldDefinition's doc comment) — only
- * terrain, terrainEditRule, enemy AI speed/aggression, and allowedMiracles
- * vary and grow harder as the list goes on: terrain gets harsher (TERRAIN_
- * GROWTH_MULTIPLIER: grass 1 > snow 0.75 > desert 0.6 > rock 0.4),
- * terraforming gets restricted to one direction (raiseOnly/lowerOnly,
- * harder than "both") and finally to none at all (the last god's
- * 土地上下不可), the enemy AI gets faster/more aggressive, and more
- * miracles unlock — never any axis relaxing at once. allowedMiracles is
- * cumulative (each world keeps everything the previous one had) so a
- * returning player is never surprised by something that used to work no
- * longer working; by the final world every miracle is unlocked.
- */
+/** Every world is a fixed 64x64 — see WorldDefinition's doc comment and plan/0062. */
 const WORLD_SIZE = 64;
 
 /**
- * The AI ramp, as a function of position in the whole 48-stage campaign
- * rather than of which god it belongs to. Difficulty is one continuous
- * curve across the campaign; the gods are the characters drawn on top of
- * it, which is why school and personality live in GODS and these two
- * numbers do not.
+ * The AI ramp, as a function of position in the whole 48-stage campaign.
  *
- * 6 down to 2 in even steps, floored so it never rises again — the
- * "never relaxing" rule worlds.test.ts enforces.
+ * This is game2's own, and it is now the *only* axis that rises
+ * monotonically. The original's stages do not get steadily harder in what
+ * they allow — the hand shrinks and grows all the way through — so the
+ * curve that makes the campaign a campaign has to be the opponent rather
+ * than the toolset. 6 down to 2 in even steps, floored so it never rises
+ * again.
  */
 function difficultyStep(stageIndex: number, total: number): number {
   return Math.max(2, 6 - Math.floor((stageIndex * 5) / total));
 }
 
 function buildWorlds(): WorldDefinition[] {
-  const worlds: WorldDefinition[] = [];
-  const total = GODS.length * STAGES_PER_GOD;
-  const unlocked: MiracleId[] = [];
-
-  GODS.forEach((god, godIndex) => {
-    // Unlocked at the god's first stage and kept for the rest of the
-    // campaign, so a god's three matches are played with one toolset and
-    // the player has all three to learn what it just gained.
-    unlocked.push(...god.unlocks);
-    const allowedMiracles: readonly MiracleId[] = [...unlocked];
-
-    for (let stage = 0; stage < STAGES_PER_GOD; stage++) {
-      const stageIndex = godIndex * STAGES_PER_GOD + stage;
-      worlds.push({
-        id: `${god.id}-${stage + 1}`,
-        name: `${god.name}・${STAGE_SUFFIXES[stage]}`,
-        worldWidth: WORLD_SIZE,
-        worldHeight: WORLD_SIZE,
-        terrain: god.terrain,
-        terrainEditRule: god.terrainEditRule,
-        enemyDecisionInterval: difficultyStep(stageIndex, total),
-        enemyAggressionThreshold: difficultyStep(stageIndex, total),
-        allowedMiracles,
-        enemyPersonality: god.personality,
-        enemySchool: god.school,
-        enemyTerritoryEditable: god.territoryEditable,
-        // Tied to the terrain's own lava theming, not to difficulty — see
-        // WorldDefinition.instantDrowning.
-        instantDrowning: god.terrain === "rock",
-        bottomlessSwamp: god.bottomlessSwamp,
-      });
-    }
-  });
-
-  return worlds;
+  return STAGES.map((stage, index) => ({
+    id: stage.id,
+    name: `${stage.place}・${STAGE_SUFFIXES[stage.stage - 1]}`,
+    god: stage.god,
+    chapter: stage.chapter,
+    worldWidth: WORLD_SIZE,
+    worldHeight: WORLD_SIZE,
+    terrain: stage.terrain,
+    terrainEditRule: stage.terrainEditRule,
+    enemyDecisionInterval: difficultyStep(index, STAGES.length),
+    enemyAggressionThreshold: difficultyStep(index, STAGES.length),
+    allowedMiracles: stage.allowedMiracles,
+    enemyPersonality: stage.enemyPersonality,
+    enemySchool: stage.enemySchool,
+    enemyTerritoryEditable: stage.enemyTerritoryEditable,
+    bottomlessSwamp: stage.bottomlessSwamp,
+    // Kept as it was: every 溶岩地帯 stage drowns instantly — see the field's
+    // own doc comment. Terrain is game2's choice here, so this rides on it.
+    instantDrowning: stage.terrain === "rock",
+  }));
 }
 
 export const WORLDS: WorldDefinition[] = buildWorlds();
