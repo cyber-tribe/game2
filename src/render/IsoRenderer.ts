@@ -1,5 +1,5 @@
 import { Container, Graphics, Texture } from "pixi.js";
-import { MAX_ELEVATION, sampleElevation, VOLCANO_ROCK_HARDNESS, type Heightmap } from "../world/heightmap";
+import { MAX_ELEVATION, REEF_HARDNESS, sampleElevation, VOLCANO_ROCK_HARDNESS, type Heightmap } from "../world/heightmap";
 import { GAME_PALETTE } from "./palette";
 import { createDitherTexture, createPatternTexture } from "./patternTexture";
 
@@ -434,19 +434,33 @@ export function waterFrameIndex(elapsedTime: number): number {
 
 /**
  * How brightly a volcano tile's lava should glow right now: a base level
- * from how much rockHardness is left (0 once it's fully cooled back to
- * ordinary ground), gently pulsing over time like real embers rather than
- * sitting at a flat brightness. Pulled out as a pure function so both the
- * hardness falloff and the pulse are unit-testable without a Graphics/
- * canvas context.
+ * from how much rockHardness is left above `coldHardness`, gently pulsing
+ * over time like real embers rather than sitting at a flat brightness.
+ * Pulled out as a pure function so both the hardness falloff and the pulse
+ * are unit-testable without a Graphics/canvas context.
+ *
+ * `coldHardness` is the hardness at which stone is simply stone. It
+ * defaults to REEF_HARDNESS because that is exactly what a 岩礁 is: rock
+ * standing in the sea, made — per the original — by 「海底火山を噴火させ」,
+ * but standing there cold. Reefs set rockHardness like a volcano flow
+ * does, so without a floor they glowed like one: a player's own breakwater
+ * came out of the water looking like molten lava, indistinguishable at a
+ * glance from an enemy volcano. The dark volcanic stone is right for a
+ * reef; the fire is not.
+ *
+ * A volcano cooling to that same hardness stops glowing too, which is the
+ * same statement read the other way: rock glows only while it is hotter
+ * than a reef.
  */
 export function volcanoGlowIntensity(
   hardness: number,
   maxHardness: number,
   elapsedTime: number,
   phaseSeed: number,
+  coldHardness: number = REEF_HARDNESS,
 ): number {
-  const base = maxHardness > 0 ? Math.max(0, Math.min(1, hardness / maxHardness)) : 0;
+  const range = maxHardness - coldHardness;
+  const base = range > 0 ? Math.max(0, Math.min(1, (hardness - coldHardness) / range)) : 0;
   const pulse = 1 - LAVA_PULSE_DEPTH + LAVA_PULSE_DEPTH * Math.sin(elapsedTime * LAVA_PULSE_SPEED + phaseSeed * Math.PI * 2);
   return base * pulse;
 }

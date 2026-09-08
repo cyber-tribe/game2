@@ -1,6 +1,6 @@
 import { Graphics, Texture } from "pixi.js";
 import { describe, expect, it, vi } from "vitest";
-import { VOLCANO_ROCK_HARDNESS, type Heightmap } from "../world/heightmap";
+import { REEF_HARDNESS, VOLCANO_ROCK_HARDNESS, type Heightmap } from "../world/heightmap";
 import {
   IsoRenderer,
   TERRAIN_COLOR,
@@ -486,6 +486,24 @@ describe("volcanoGlowIntensity", () => {
 
     expect(averageOver(VOLCANO_ROCK_HARDNESS)).toBeGreaterThan(averageOver(VOLCANO_ROCK_HARDNESS / 2));
     expect(averageOver(VOLCANO_ROCK_HARDNESS / 2)).toBeGreaterThan(averageOver(0));
+  });
+
+  /**
+   * A 岩礁 sets rockHardness exactly as a volcano flow does, so without a
+   * floor it glowed like one — a player's own breakwater came out of the
+   * sea looking like molten lava. The dark volcanic stone is right for a
+   * reef (the original makes one by 「海底火山を噴火させ」); the fire is not.
+   */
+  it("does not glow at all at reef hardness — a breakwater is not lava", () => {
+    for (let t = 0; t < 3; t += 0.3) {
+      expect(volcanoGlowIntensity(REEF_HARDNESS, VOLCANO_ROCK_HARDNESS, t, 0.5)).toBe(0);
+    }
+  });
+
+  /** The same statement read the other way: rock glows only while it is hotter than a reef. */
+  it("stops glowing once a volcano has cooled to reef hardness", () => {
+    expect(volcanoGlowIntensity(REEF_HARDNESS - 1, VOLCANO_ROCK_HARDNESS, 0.4, 0.2)).toBe(0);
+    expect(volcanoGlowIntensity(REEF_HARDNESS + 1, VOLCANO_ROCK_HARDNESS, 0.4, 0.2)).toBeGreaterThan(0);
   });
 
   it("pulses over time rather than sitting at a flat brightness", () => {
