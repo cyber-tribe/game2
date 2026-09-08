@@ -26,6 +26,13 @@ export class Hud {
         fill: 0xffffff,
         fontSize: 12,
         fontFamily: "monospace",
+        // White text sits directly on the world, whose four terrains run
+        // from 溶岩地帯's near-black to 雪原's near-white. An ink outline is
+        // what makes one colour work on all of them; without it these lines
+        // vanish on snow exactly as they used to vanish behind the world
+        // map. Same rule the toolbar icons follow (tools/sprites/icons.py:
+        // "Every icon has an ink outline").
+        stroke: { color: 0x000000, width: 3, join: "round" },
         wordWrap: true,
         wordWrapWidth: 320,
         breakWords: true,
@@ -40,13 +47,15 @@ export class Hud {
   }
 
   /**
-   * Pushes the HUD down by the device's top safe-area inset (notch/status
-   * bar), so an installed standalone PWA — which draws edge-to-edge under
+   * Pushes the HUD down by however much of the top-left corner is already
+   * spoken for: the device's top safe-area inset (notch/status bar), so an
+   * installed standalone PWA — which draws edge-to-edge under
    * `viewport-fit=cover` — doesn't render the terrain label under the
-   * status bar. A plain browser tab has no inset to speak of (its own
-   * chrome already occupies that space), so this is a no-op there.
+   * status bar, plus whatever the caller has put in that corner. See
+   * main.ts's layout(): the world map hangs there, and these lines used to
+   * be drawn underneath it, invisible.
    */
-  setTopInset(px: number): void {
+  setTopOffset(px: number): void {
     this.view.position.set(10, 10 + px);
   }
 
