@@ -1,3 +1,4 @@
+import { isHeroState, type HeroKind, type WalkerState } from "./components";
 import type { MiracleId } from "./worlds";
 
 /**
@@ -103,6 +104,46 @@ export function miraclesOfSchool(school: MiracleSchool): MiracleId[] {
  * - 水 聖水の泉: takes their people rather than killing them — the enemy
  *   god's own spring, so whoever falls in comes out fighting for it
  */
+/**
+ * Which school each hero belongs to — the same six the miracles are filed
+ * under, one hero each, which is the original's own pattern (see the note
+ * above MIRACLE_SCHOOL).
+ *
+ * game2's own 守護者 is filed with ペルセウス in 人, beside the baseline
+ * hero it is defined against, exactly as 守護者化 is among the miracles.
+ */
+export const HERO_SCHOOL: Record<HeroKind, MiracleSchool> = {
+  perseus: "human",
+  adonis: "plant",
+  hercules: "earth",
+  odysseus: "air",
+  achilles: "fire",
+  helen: "water",
+  guardian: "human",
+};
+
+/**
+ * Whether a walker shrugs off an attack miracle of `school` — 「ただし、
+ * **同じカテゴリーの攻撃神技は効果がない**」.
+ *
+ * One rule, not six exceptions. The walkthrough source lists these
+ * one-by-one as it describes each miracle — 沼「※アドニス除く」, 地割れ
+ * 「※ヘラクレス除く」, 雷と竜巻「※オディッセウス除く」, 火柱と火の雨
+ * 「※アキレス除く」, 聖水の泉「※トロイのヘレン除く」 — and every single
+ * one of them is the hero of that miracle's own school. game2 had two of
+ * them hard-coded as named special cases (crevice.ts checked for
+ * "hercules", fire.ts for "achilles") and the rest missing; this is the
+ * rule those two were instances of.
+ *
+ * Ordinary walkers resist nothing. Note the rule is about *attack* miracles
+ * killing a hero, not about drowning: nothing in the source says a water
+ * hero cannot drown, so systems that put a walker under the sea (flood,
+ * tsunami, whirlpool erosion) do not consult this.
+ */
+export function resistsSchool(state: WalkerState, school: MiracleSchool): boolean {
+  return isHeroState(state) && HERO_SCHOOL[state] === school;
+}
+
 export const ENEMY_SIGNATURE_MIRACLE: Record<MiracleSchool, MiracleId> = {
   human: "plague",
   plant: "swamp",

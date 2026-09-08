@@ -1,4 +1,5 @@
 import type { System } from "../../ecs";
+import { resistsSchool } from "../miracleSchools";
 import { isInWaterPool, type Heightmap } from "../../world/heightmap";
 import { House, Position, Tornado, Walker } from "../components";
 import {
@@ -120,6 +121,8 @@ export function createTornadoSystem(config: Partial<TornadoConfig> = {}): System
       }
 
       for (const walkerEntity of world.query(Walker, Position)) {
+        // 竜巻「※オディッセウス除く」 — see miracleSchools.ts's resistsSchool.
+        if (resistsSchool(world.get(walkerEntity, Walker)!.state, "air")) continue;
         const walkerPos = world.get(walkerEntity, Position)!;
         if (distance(next, walkerPos) > TORNADO_RADIUS) continue;
 

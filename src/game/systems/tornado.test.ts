@@ -210,3 +210,22 @@ describe("createTornadoSystem", () => {
     expect(world.query(Whirlpool)).toHaveLength(0);
   });
 });
+
+/** 竜巻「※オディッセウス除く」 — 気 の神技なので、気 の英雄は巻き込まれない。 */
+describe("tornadoSystem and the air school's own hero", () => {
+  it("passes straight through オディッセウス", () => {
+    const heightmap = flatHeightmap(20, 5);
+    const world = new World();
+    const odysseus = world.createEntity();
+    world.add(odysseus, Position, { x: 10, y: 10 });
+    world.add(odysseus, Owner, { faction: "enemy" });
+    world.add(odysseus, Walker, { strength: 1, state: "odysseus", speed: 1 });
+    createTornado(world, 10, 10, 1, 0);
+
+    createTornadoSystem({ heightmap })(world, 1);
+
+    expect(world.isAlive(odysseus)).toBe(true);
+    expect(world.get(odysseus, Walker)!.strength).toBe(1);
+  });
+});
+

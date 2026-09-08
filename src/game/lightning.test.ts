@@ -73,6 +73,16 @@ describe("strikeLightning", () => {
    * through fire rain, which is the kind of "this one is for that one" the
    * original is built out of.
    */
+  /** 雷「※オディッセウス除く」 — 気 の神技なので、気 の英雄には効かない。 */
+  it("cannot touch オディッセウス", () => {
+    const world = new World();
+    const odysseus = spawnWalker(world, 10, 10, "odysseus");
+
+    strikeLightning(world, undefined, { x: 10, y: 10 }, dead_on);
+
+    expect(world.isAlive(odysseus)).toBe(true);
+  });
+
   it("kills アキレス, who walks through fire unharmed", () => {
     const world = new World();
     const achilles = spawnWalker(world, 10, 10, "achilles");

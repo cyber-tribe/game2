@@ -1,4 +1,5 @@
 import type { World } from "../ecs";
+import { resistsSchool } from "./miracleSchools";
 import { scorchGround, type Heightmap } from "../world/heightmap";
 import { House, Position, Walker } from "./components";
 import { LIGHTNING_BOLTS, LIGHTNING_BOLT_RADIUS, LIGHTNING_SCATTER } from "./constants";
@@ -47,6 +48,8 @@ export function strikeLightning(
     if (heightmap) scorchGround(heightmap, at.x, at.y, LIGHTNING_BOLT_RADIUS);
 
     for (const entity of world.query(Walker, Position)) {
+      // 雷「※オディッセウス除く」 — see miracleSchools.ts's resistsSchool.
+      if (resistsSchool(world.get(entity, Walker)!.state, "air")) continue;
       const pos = world.get(entity, Position)!;
       if (distance(at, pos) > LIGHTNING_BOLT_RADIUS) continue;
       world.destroyEntity(entity);
