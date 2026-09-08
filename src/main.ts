@@ -998,6 +998,8 @@ async function bootstrap(world: WorldDefinition) {
         return;
       }
       if (!trySpendPlayerMana(REEF_MANA_COST)) return;
+      // One cast lays a whole breakwater — a line parallel to the coast,
+      // per the original's 「線分状に発生させる」. See applyReef.
       applyReef(heightmap, vertex.x, vertex.y);
       renderer.redraw(visibleBounds());
       simulation.recordEvent("player", "reef");
