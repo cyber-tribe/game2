@@ -620,7 +620,7 @@
       },
       "trimmed": false
     },
-    "icon_road": {
+    "icon_rescue": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -640,7 +640,7 @@
       },
       "trimmed": false
     },
-    "icon_settle": {
+    "icon_road": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -660,7 +660,7 @@
       },
       "trimmed": false
     },
-    "icon_shrine": {
+    "icon_settle": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -680,7 +680,7 @@
       },
       "trimmed": false
     },
-    "icon_sprog": {
+    "icon_shrine": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -700,7 +700,7 @@
       },
       "trimmed": false
     },
-    "icon_storm": {
+    "icon_sprog": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -720,7 +720,7 @@
       },
       "trimmed": false
     },
-    "icon_swamp": {
+    "icon_storm": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -740,7 +740,7 @@
       },
       "trimmed": false
     },
-    "icon_tornado": {
+    "icon_swamp": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -760,7 +760,7 @@
       },
       "trimmed": false
     },
-    "icon_tsunami": {
+    "icon_tornado": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -780,7 +780,7 @@
       },
       "trimmed": false
     },
-    "icon_volcano": {
+    "icon_tsunami": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -800,7 +800,7 @@
       },
       "trimmed": false
     },
-    "icon_wall": {
+    "icon_volcano": {
       "frame": {
         "h": 16,
         "w": 16,
@@ -820,11 +820,31 @@
       },
       "trimmed": false
     },
-    "icon_whirlpool": {
+    "icon_wall": {
       "frame": {
         "h": 16,
         "w": 16,
         "x": 144,
+        "y": 32
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 16,
+        "w": 16
+      },
+      "spriteSourceSize": {
+        "h": 16,
+        "w": 16,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "icon_whirlpool": {
+      "frame": {
+        "h": 16,
+        "w": 16,
+        "x": 160,
         "y": 32
       },
       "rotated": false,
