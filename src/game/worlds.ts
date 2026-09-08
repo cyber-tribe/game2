@@ -107,9 +107,12 @@ export type EnemyPersonality = "balanced" | "aggressive" | "defensive";
  * rather than a whole map shrunk to fit one screen and so, per-world,
  * differently sized.
  *
- * World-count progression (500 worlds) is still out of scope — see
- * plan/0059-world-select.md. A password/continue system (see nextWorldId/
- * unlockedCountForPassword below) was added on top in
+ * The campaign is the original's own 全48面 — 16 gods of 3 stages each,
+ * generated from GODS below. (plan/0059-world-select.md once deferred
+ * "500 worlds" as out of scope; that figure came from the generic
+ * god-game research and belongs to the first POPULOUS, not to the SFC
+ * POPULOUS 2 this project reproduces.) A password/continue system (see
+ * nextWorldId/unlockedCountForPassword below) was added on top in
  * plan/0060-campaign-password.md.
  */
 export interface WorldDefinition {
@@ -200,6 +203,79 @@ export interface WorldDefinition {
 }
 
 /**
+ * The sixteen gods of the campaign — 「敵として16人の神が登場し、各3ステージが
+ * 用意されている」. Their 3 stages each are what make up the original's
+ * 全48面, and WORLDS below is generated from this table.
+ *
+ * A god, not a stage, is the unit the player experiences as an opponent:
+ * the same character across three matches, with one school it draws its
+ * miracles from (see miracleSchools.ts's ENEMY_SIGNATURE_MIRACLE) and one
+ * temperament. So everything that says *who you are fighting* lives here —
+ * school, personality, the terrain of its realm — while everything that
+ * says *how hard* lives in the per-stage ramp in buildWorlds.
+ *
+ * Ordering rules, all checked by worlds.test.ts:
+ *
+ * - A god's school signature must already be unlocked by the time that god
+ *   appears, or it would fall back on 地震 and the world select would be
+ *   describing a school the player never actually sees. The first six gods
+ *   are therefore one per school, each unlocking its own signature.
+ * - `unlocks` across the whole table covers every MiracleId exactly once,
+ *   so the last stage has all of them.
+ * - Terrain gets harsher and terraforming gets restricted as the list goes
+ *   on, but never monotonically per-god: a god's realm is a place, and the
+ *   difficulty curve proper is the AI ramp, not the scenery.
+ */
+interface GodDefinition {
+  id: string;
+  name: string;
+  school: MiracleSchool;
+  personality: EnemyPersonality;
+  terrain: TerrainType;
+  terrainEditRule: TerrainEditRule;
+  /** Miracles this god's first stage adds to the cumulative pool. */
+  unlocks: readonly MiracleId[];
+  /**
+   * Whether the player may still reshape land inside this god's territory.
+   * Once false it stays false for every god after — see WorldDefinition's
+   * enemyTerritoryEditable.
+   */
+  territoryEditable: boolean;
+}
+
+export const GODS: readonly GodDefinition[] = [
+  // The first six are one per school, in the order docs/original-miracles.md
+  // lists them, each introducing its own signature miracle.
+  { id: "gaia", name: "大地神ガイア", school: "earth", personality: "balanced", terrain: "grass", terrainEditRule: "both", unlocks: ["earthquake"], territoryEditable: true },
+  { id: "demeter", name: "豊穣神デメテル", school: "plant", personality: "balanced", terrain: "grass", terrainEditRule: "both", unlocks: ["swamp", "forest"], territoryEditable: true },
+  { id: "aiolos", name: "風神アイオロス", school: "air", personality: "balanced", terrain: "snow", terrainEditRule: "both", unlocks: ["lightning", "shrine"], territoryEditable: true },
+  { id: "hera", name: "女王神ヘラ", school: "human", personality: "balanced", terrain: "desert", terrainEditRule: "both", unlocks: ["plague", "perseus"], territoryEditable: true },
+  { id: "hephaistos", name: "鍛冶神ヘパイストス", school: "fire", personality: "aggressive", terrain: "rock", terrainEditRule: "both", unlocks: ["fireRain", "firePillar"], territoryEditable: true },
+  { id: "poseidon", name: "海神ポセイドン", school: "water", personality: "defensive", terrain: "grass", terrainEditRule: "raiseOnly", unlocks: ["holyWater", "reef"], territoryEditable: true },
+  // The second six revisit the schools with a different temperament each,
+  // and hand the player the terrain-shaping miracles.
+  { id: "atlas", name: "巨神アトラス", school: "earth", personality: "aggressive", terrain: "desert", terrainEditRule: "both", unlocks: ["road", "wall"], territoryEditable: true },
+  { id: "persephone", name: "冥后ペルセポネ", school: "plant", personality: "defensive", terrain: "snow", terrainEditRule: "lowerOnly", unlocks: ["fungus", "flower"], territoryEditable: true },
+  { id: "boreas", name: "北風神ボレアス", school: "air", personality: "aggressive", terrain: "grass", terrainEditRule: "both", unlocks: ["tornado", "storm"], territoryEditable: true },
+  { id: "athena", name: "戦神アテナ", school: "human", personality: "defensive", terrain: "desert", terrainEditRule: "raiseOnly", unlocks: ["guardian", "helen"], territoryEditable: true },
+  { id: "prometheus", name: "先知神プロメテウス", school: "fire", personality: "aggressive", terrain: "rock", terrainEditRule: "lowerOnly", unlocks: ["volcano", "achilles"], territoryEditable: true },
+  { id: "thetis", name: "海精テティス", school: "water", personality: "balanced", terrain: "snow", terrainEditRule: "both", unlocks: ["tsunami", "odysseus"], territoryEditable: true },
+  // The last four close out the roster of heroes and the two miracles that
+  // end matches outright, and their realms are off-limits to the player's
+  // own spade.
+  { id: "kronos", name: "時神クロノス", school: "earth", personality: "defensive", terrain: "rock", terrainEditRule: "raiseOnly", unlocks: ["megalith", "hercules"], territoryEditable: false },
+  { id: "dionysos", name: "酒神ディオニュソス", school: "plant", personality: "aggressive", terrain: "desert", terrainEditRule: "lowerOnly", unlocks: ["adonis"], territoryEditable: false },
+  { id: "zephyros", name: "西風神ゼピュロス", school: "air", personality: "defensive", terrain: "snow", terrainEditRule: "raiseOnly", unlocks: ["hurricane"], territoryEditable: false },
+  { id: "hades", name: "冥王ハデス", school: "fire", personality: "aggressive", terrain: "rock", terrainEditRule: "lowerOnly", unlocks: ["armageddon"], territoryEditable: false },
+];
+
+/** How many stages each god gets — 「各3ステージが用意されている」. */
+export const STAGES_PER_GOD = 3;
+
+/** Stage numbering as it appears in a world's name. */
+const STAGE_SUFFIXES = ["一", "二", "三"] as const;
+
+/**
  * Every world is a fixed 64x64 (see WorldDefinition's doc comment) — only
  * terrain, terrainEditRule, enemy AI speed/aggression, and allowedMiracles
  * vary and grow harder as the list goes on: terrain gets harsher (TERRAIN_
@@ -213,17 +289,58 @@ export interface WorldDefinition {
  */
 const WORLD_SIZE = 64;
 
-export const WORLDS: WorldDefinition[] = [
-  { id: "quiet-plain", name: "静かな草原", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "grass", terrainEditRule: "both", enemyDecisionInterval: 6, enemyAggressionThreshold: 6, allowedMiracles: ["earthquake"], enemyPersonality: "balanced", enemySchool: "earth", enemyTerritoryEditable: true, instantDrowning: false },
-  { id: "dry-highland", name: "乾いた高地", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "desert", terrainEditRule: "both", enemyDecisionInterval: 5, enemyAggressionThreshold: 5, allowedMiracles: ["earthquake", "swamp"], enemyPersonality: "balanced", enemySchool: "plant", enemyTerritoryEditable: true, instantDrowning: false },
-  { id: "frozen-border", name: "凍てつく国境", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "snow", terrainEditRule: "raiseOnly", enemyDecisionInterval: 5, enemyAggressionThreshold: 4, allowedMiracles: ["earthquake", "swamp", "shrine", "lightning"], enemyPersonality: "balanced", enemySchool: "air", enemyTerritoryEditable: true, instantDrowning: false },
-  // First world with hero miracles — an aggressive god shows off knight rushing. Rock/溶岩地帯 terrain: its own water is "海がマグマ" themed — instant drowning.
-  { id: "ashen-waste", name: "灰の荒野", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 4, enemyAggressionThreshold: 3, allowedMiracles: ["earthquake", "swamp", "shrine", "lightning", "perseus", "guardian", "fireRain"], enemyPersonality: "aggressive", enemySchool: "fire", enemyTerritoryEditable: true, instantDrowning: true },
-  // A turtling god that leans on guardian/volcano and needs a much bigger lead to commit — teaches the player to break a defense, not just outrace one.
-  { id: "rising-frontier", name: "隆起する辺境", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "desert", terrainEditRule: "raiseOnly", enemyDecisionInterval: 3, enemyAggressionThreshold: 3, allowedMiracles: ["earthquake", "swamp", "shrine", "lightning", "perseus", "hercules", "guardian", "fireRain", "volcano", "plague"], enemyPersonality: "defensive", enemySchool: "human", enemyTerritoryEditable: true, instantDrowning: false },
-  // The final boss goes back to all-in aggression, decisively finishing the match the moment it's ahead — and, for the first time, its own territory is off-limits to direct terraforming: cornering it takes combat/miracles, not just digging its houses into the sea by hand. Rock terrain again — same lava-sea theming as ashen-waste.
-  { id: "final-frontline", name: "最終戦線", worldWidth: WORLD_SIZE, worldHeight: WORLD_SIZE, terrain: "rock", terrainEditRule: "lowerOnly", enemyDecisionInterval: 2, enemyAggressionThreshold: 2, allowedMiracles: ALL_MIRACLES, enemyPersonality: "aggressive", enemySchool: "water", enemyTerritoryEditable: false, instantDrowning: true },
-];
+/**
+ * The AI ramp, as a function of position in the whole 48-stage campaign
+ * rather than of which god it belongs to. Difficulty is one continuous
+ * curve across the campaign; the gods are the characters drawn on top of
+ * it, which is why school and personality live in GODS and these two
+ * numbers do not.
+ *
+ * 6 down to 2 in even steps, floored so it never rises again — the
+ * "never relaxing" rule worlds.test.ts enforces.
+ */
+function difficultyStep(stageIndex: number, total: number): number {
+  return Math.max(2, 6 - Math.floor((stageIndex * 5) / total));
+}
+
+function buildWorlds(): WorldDefinition[] {
+  const worlds: WorldDefinition[] = [];
+  const total = GODS.length * STAGES_PER_GOD;
+  const unlocked: MiracleId[] = [];
+
+  GODS.forEach((god, godIndex) => {
+    // Unlocked at the god's first stage and kept for the rest of the
+    // campaign, so a god's three matches are played with one toolset and
+    // the player has all three to learn what it just gained.
+    unlocked.push(...god.unlocks);
+    const allowedMiracles: readonly MiracleId[] = [...unlocked];
+
+    for (let stage = 0; stage < STAGES_PER_GOD; stage++) {
+      const stageIndex = godIndex * STAGES_PER_GOD + stage;
+      worlds.push({
+        id: `${god.id}-${stage + 1}`,
+        name: `${god.name}・${STAGE_SUFFIXES[stage]}`,
+        worldWidth: WORLD_SIZE,
+        worldHeight: WORLD_SIZE,
+        terrain: god.terrain,
+        terrainEditRule: god.terrainEditRule,
+        enemyDecisionInterval: difficultyStep(stageIndex, total),
+        enemyAggressionThreshold: difficultyStep(stageIndex, total),
+        allowedMiracles,
+        enemyPersonality: god.personality,
+        enemySchool: god.school,
+        enemyTerritoryEditable: god.territoryEditable,
+        // Tied to the terrain's own lava theming, not to difficulty — see
+        // WorldDefinition.instantDrowning.
+        instantDrowning: god.terrain === "rock",
+      });
+    }
+  });
+
+  return worlds;
+}
+
+export const WORLDS: WorldDefinition[] = buildWorlds();
 
 /**
  * The "password" (per docs/game-system.md 10節's "クリアするとパスワード
