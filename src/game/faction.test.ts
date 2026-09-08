@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../ecs";
-import { FactionState } from "./components";
+import { FactionState, Walker } from "./components";
 import { createFaction, findFactionEntity, moveShrine, trySpendMana } from "./faction";
 
 describe("createFaction / findFactionEntity", () => {
@@ -70,15 +70,42 @@ describe("moveShrine", () => {
   it("replaces the faction's shrinePosition and leaves everything else alone", () => {
     const world = new World();
     const player = createFaction(world, "player", { x: 0, y: 0 }, "goToShrine");
+    const leader = world.createEntity();
+    world.add(leader, Walker, { strength: 1, state: "seeking", speed: 1 });
+    world.add(player, FactionState, { ...world.get(player, FactionState)!, leaderId: leader });
 
-    moveShrine(world, "player", { x: 7, y: 3 });
-
+    expect(moveShrine(world, "player", { x: 7, y: 3 })).toBe(true);
     expect(world.get(player, FactionState)).toEqual({
       id: "player",
       mana: 0,
       behaviorMode: "goToShrine",
       shrinePosition: { x: 7, y: 3 },
+      leaderId: leader,
     });
+  });
+
+  /**
+   * 「ただし、リーダーがいない状態ではこのコマンドは使用できない(リーダーが
+   * いない場合は、まず啓示コマンドの「集合」でリーダーを作る必要がある)」 —
+   * the magnet is the leader's, so without one there is nothing to move.
+   */
+  it("refuses to move without a leader, and leaves the flag where it was", () => {
+    const world = new World();
+    const player = createFaction(world, "player", { x: 2, y: 2 }, "goToShrine");
+
+    expect(moveShrine(world, "player", { x: 7, y: 3 })).toBe(false);
+    expect(world.get(player, FactionState)!.shrinePosition).toEqual({ x: 2, y: 2 });
+  });
+
+  it("refuses once the leader it was pointing at is gone", () => {
+    const world = new World();
+    const player = createFaction(world, "player", { x: 2, y: 2 }, "goToShrine");
+    const leader = world.createEntity();
+    world.add(leader, Walker, { strength: 1, state: "seeking", speed: 1 });
+    world.add(player, FactionState, { ...world.get(player, FactionState)!, leaderId: leader });
+    world.destroyEntity(leader);
+
+    expect(moveShrine(world, "player", { x: 7, y: 3 })).toBe(false);
   });
 
   it("does nothing when the faction doesn't exist", () => {

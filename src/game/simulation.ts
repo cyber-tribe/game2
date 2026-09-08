@@ -14,7 +14,7 @@ import {
   type WalkerState,
 } from "./components";
 import { DEFAULT_WALKER_SPEED, FARMLAND_RADIUS, HOUSE_LEVELS, IMPACT_EFFECT_DURATION, INITIAL_WALKER_SPREAD, TILES_PER_HOUSE_CAP } from "./constants";
-import { createFaction, findFactionEntity, moveShrine } from "./faction";
+import { createFaction, findFactionEntity, hasLiveLeader, moveShrine } from "./faction";
 import { promoteHero } from "./hero";
 import { totalPopulation } from "./population";
 import { sprogHouse } from "./populationRelease";
@@ -524,9 +524,14 @@ export class Simulation {
     return false;
   }
 
-  /** The "集結シンボル移動" miracle — relocates where "goToShrine" mode leads the army. */
-  moveShrine(faction: FactionId, position: { x: number; y: number }): void {
-    moveShrine(this.world, faction, position);
+  /**
+   * The "集結シンボル移動" miracle — relocates where "goToShrine" mode leads
+   * the army. Returns whether it moved: 「リーダーがいない状態ではこの
+   * コマンドは使用できない」, so a faction without one is refused (see
+   * faction.ts's moveShrine) and the caller should not charge for it.
+   */
+  moveShrine(faction: FactionId, position: { x: number; y: number }): boolean {
+    return moveShrine(this.world, faction, position);
   }
 
   /**
@@ -535,6 +540,12 @@ export class Simulation {
    * map is otherwise far bigger than any one screen (see
    * plan/0062-original-scale-map.md).
    */
+  /** Whether a faction currently has a leader — 集結地移動 needs one (see moveShrine). */
+  hasLeader(faction: FactionId): boolean {
+    const entity = findFactionEntity(this.world, faction);
+    return entity !== undefined && hasLiveLeader(this.world, this.world.get(entity, FactionState)!);
+  }
+
   getShrinePosition(faction: FactionId): Position | undefined {
     const entity = findFactionEntity(this.world, faction);
     return entity === undefined ? undefined : this.world.get(entity, FactionState)!.shrinePosition;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../ecs";
 import { FactionState, Owner, Position, Walker } from "./components";
-import { createFaction } from "./faction";
+import { createFaction, moveShrine } from "./faction";
 import { promoteHero } from "./hero";
 
 function spawnWalker(world: World, faction: "player" | "enemy") {
@@ -42,17 +42,19 @@ describe("promoteHero", () => {
   });
 
   it("doubles ヘラクレス's strength and speeds オディッセウス up", () => {
-    const world = new World();
-    const faction = createFaction(world, "player", { x: 0, y: 0 });
-    const leader = spawnWalker(world, "player");
-    world.add(leader, Walker, { strength: 4, state: "seeking", speed: 1.5 });
-    world.add(faction, FactionState, { ...world.get(faction, FactionState)!, leaderId: leader });
+    const promote = (kind: "hercules" | "odysseus") => {
+      const world = new World();
+      const faction = createFaction(world, "player", { x: 0, y: 0 });
+      const leader = spawnWalker(world, "player");
+      world.add(leader, Walker, { strength: 4, state: "seeking", speed: 1.5 });
+      world.add(faction, FactionState, { ...world.get(faction, FactionState)!, leaderId: leader });
 
-    promoteHero(world, "player", "hercules");
-    expect(world.get(leader, Walker)).toMatchObject({ strength: 8, speed: 1.5 });
+      promoteHero(world, "player", kind);
+      return world.get(leader, Walker)!;
+    };
 
-    promoteHero(world, "player", "odysseus");
-    expect(world.get(leader, Walker)).toMatchObject({ strength: 4, speed: 2.7 });
+    expect(promote("hercules")).toMatchObject({ strength: 8, speed: 1.5 });
+    expect(promote("odysseus")).toMatchObject({ strength: 4, speed: 2.7 });
   });
 
   /**
@@ -173,3 +175,52 @@ describe("promoteHero — 守護者", () => {
     expect(() => promoteHero(world, "player", "guardian")).not.toThrow();
   });
 });
+
+/**
+ * 「影響で、味方リーダーがいなくなる。マグネットはリーダーのいた場所に移動
+ * する」 — repeated verbatim under all six of the original's heroes.
+ */
+describe("promoteHero and the magnet", () => {
+  const promoted = (x: number, y: number) => {
+    const world = new World();
+    const faction = createFaction(world, "player", { x: 0, y: 0 });
+    const leader = spawnWalker(world, "player");
+    world.add(leader, Position, { x, y });
+    world.add(faction, FactionState, { ...world.get(faction, FactionState)!, leaderId: leader });
+
+    promoteHero(world, "player", "perseus");
+    return { world, faction, leader };
+  };
+
+  it("leaves the faction without a leader", () => {
+    const { world, faction } = promoted(6, 4);
+
+    expect(world.get(faction, FactionState)!.leaderId).toBeUndefined();
+  });
+
+  it("drops the magnet where the leader was standing", () => {
+    const { world, faction } = promoted(6, 4);
+
+    expect(world.get(faction, FactionState)!.shrinePosition).toEqual({ x: 6, y: 4 });
+  });
+
+  /**
+   * The loop the original is built around: with no leader the faction
+   * cannot move its magnet, so it has to 集合 and appoint another — who
+   * walks to the spot the hero left.
+   */
+  it("makes 集結地移動 unavailable until another leader is appointed", () => {
+    const { world } = promoted(6, 4);
+
+    expect(moveShrine(world, "player", { x: 20, y: 20 })).toBe(false);
+  });
+
+  it("cannot re-specialize a hero, because it is no longer the leader", () => {
+    const { world, leader } = promoted(6, 4);
+
+    promoteHero(world, "player", "hercules");
+
+    expect(world.get(leader, Walker)!.state).toBe("perseus");
+  });
+});
+
