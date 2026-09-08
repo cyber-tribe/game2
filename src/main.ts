@@ -80,7 +80,7 @@ import { mountCommandIcons } from "./ui/commandIcons";
 import { loadCommandIcons } from "./ui/pixelIcons";
 import { StatusPanel } from "./ui/statusPanel";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
-import { AUTO_FLATTEN_SIZE, DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyFlower, applyForest, applyFungus, DEFAULT_FLOWER_RADIUS, applyReef, applyRoad, applyWall, applyMegalith, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, planAutoFlatten, raiseVertex } from "./world/heightmap";
+import { AUTO_FLATTEN_SIZE, DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyFlower, applyForest, applyFungus, DEFAULT_FLOWER_RADIUS, applyReef, applyRoad, applyWall, applyMegalith, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, megalithScatterCandidates, planAutoFlatten, raiseVertex } from "./world/heightmap";
 
 /**
  * The camera's fixed base scale — see layout()'s doc comment for why this
@@ -107,6 +107,17 @@ const DRAG_THRESHOLD = 10;
  * holding still doesn't feel like waiting.
  */
 const LONG_PRESS_DURATION_MS = 350;
+/**
+ * How often a held 地下巨石 raises the next stone — 「発生ボタンを押し続けると、
+ * 一帯により多くの巨石を発生させる」.
+ *
+ * Far slower than the terraforming brush, which is bounded by the pointer
+ * actually moving onto a new tile. This one repeats while the finger sits
+ * still, and each repeat spends MEGALITH_MANA_COST, so the interval is
+ * what keeps "hold to scatter a field of stones" from being "hold to empty
+ * the mana bar before you notice".
+ */
+const MEGALITH_HOLD_INTERVAL_MS = 500;
 /**
  * How much one mouse-wheel "notch" (deltaY around ±100) zooms the map on
  * PC — see plan/0039-pc-support.md. Chosen so a single notch feels close
@@ -721,6 +732,36 @@ async function bootstrap(world: WorldDefinition) {
     vibrate(15);
   };
 
+  /**
+   * One 地下巨石 cast. Split out of applyTool because the original's own
+   * description makes this repeatable: 「発生ボタンを押し続けると、一帯に
+   * より多くの巨石を発生させる」 — see the hold handling in the pointer
+   * events below, which calls this once per repeat.
+   *
+   * `announce` is off for the repeats: a held press that wanders onto
+   * water should quietly place nothing there, not fill the info panel with
+   * one warning per interval tick.
+   *
+   * Returns whether a stone actually went up, so a hold can stop itself
+   * once the mana runs out or the whole area is already stone.
+   */
+  const castMegalithAt = (vertex: { x: number; y: number }, announce: boolean): boolean => {
+    if (!canAffordPlayerMana(MEGALITH_MANA_COST)) return false;
+    const raised = applyMegalith(heightmap, vertex.x, vertex.y);
+    if (raised.length === 0) {
+      if (announce) showEntityInfo("ここには巨石を起こせません", "warning");
+      return false;
+    }
+    trySpendPlayerMana(MEGALITH_MANA_COST);
+    raiseMegalith(simulation.world, raised);
+    renderer.redraw(visibleBounds());
+    simulation.recordEvent("player", "megalith");
+    triggerShake(6);
+    vibrate([30, 20, 40]);
+    playMiracleSound("megalith");
+    return true;
+  };
+
   // Dispatches to whichever of the two above the current toolMode needs —
   // shared by the plain single-tap path (applyTool, below) and by ブラシ
   // continuous painting (see the pointer handlers further down).
@@ -982,19 +1023,7 @@ async function bootstrap(world: WorldDefinition) {
     if (toolMode === "megalith") {
       // Pay only once the stone is actually up, same as the wall — and a
       // cast on water or a crevice raises nothing (see applyMegalith).
-      if (!canAffordPlayerMana(MEGALITH_MANA_COST)) return;
-      const raised = applyMegalith(heightmap, vertex.x, vertex.y);
-      if (raised.length === 0) {
-        showEntityInfo("ここには巨石を起こせません", "warning");
-        return;
-      }
-      trySpendPlayerMana(MEGALITH_MANA_COST);
-      raiseMegalith(simulation.world, raised);
-      renderer.redraw(visibleBounds());
-      simulation.recordEvent("player", "megalith");
-      triggerShake(6);
-      vibrate([30, 20, 40]);
-      playMiracleSound("megalith");
+      if (!castMegalithAt(vertex, true)) return;
       return;
     }
 
@@ -1117,6 +1146,17 @@ async function bootstrap(world: WorldDefinition) {
   // often expensive miracle cast that a drag should never be able to repeat.
   let longPressTimer: ReturnType<typeof setTimeout> | undefined;
   let painting = false;
+  /**
+   * The one miracle a held press repeats: 地下巨石. 「発生ボタンを押し続けると、
+   * 一帯により多くの巨石を発生させる」 — see castMegalithAt and
+   * megalithScatterCandidates. Every other miracle stays a single
+   * deliberate cast, which is why this is its own flag rather than another
+   * toolMode in the brush's list: the brush edits whatever the pointer
+   * moves over, while this stays put and scatters around where it was
+   * first pressed.
+   */
+  let megalithHoldTimer: ReturnType<typeof setInterval> | undefined;
+  let megalithHolding = false;
   // A vertex for raise/lower, a tile for flatten — see pickTerrainEditPoint.
   let lastPaintedPoint: { x: number; y: number } | undefined;
 
@@ -1126,8 +1166,15 @@ async function bootstrap(world: WorldDefinition) {
     longPressTimer = undefined;
   };
 
+  const stopMegalithHold = () => {
+    if (megalithHoldTimer !== undefined) clearInterval(megalithHoldTimer);
+    megalithHoldTimer = undefined;
+    megalithHolding = false;
+  };
+
   const stopPainting = () => {
     clearLongPressTimer();
+    stopMegalithHold();
     painting = false;
     lastPaintedPoint = undefined;
     flattenTargetElevation = undefined;
@@ -1227,14 +1274,39 @@ async function bootstrap(world: WorldDefinition) {
       viewStartPos = { x: renderer.view.position.x, y: renderer.view.position.y };
       flattenTargetElevation = undefined; // fresh gesture — see its own doc comment
 
-      if (toolMode === "raise" || toolMode === "lower" || toolMode === "flatten") {
+      if (toolMode === "raise" || toolMode === "lower" || toolMode === "flatten" || toolMode === "megalith") {
         clearLongPressTimer();
         longPressTimer = setTimeout(() => {
           longPressTimer = undefined;
           if (!pointerActive || isDragging || activePointers.size !== 1) return;
+          const local = renderer.view.toLocal(event.global);
+
+          if (toolMode === "megalith") {
+            const center = renderer.pickVertex(local.x, local.y);
+            if (!center) return;
+            megalithHolding = true;
+            vibrate(10); // brief confirmation that the hold just engaged
+            // The first stone lands here, exactly where a plain tap would
+            // have put it — holding adds to that cast rather than
+            // replacing it.
+            if (!castMegalithAt(center, true)) {
+              stopMegalithHold();
+              return;
+            }
+            megalithHoldTimer = setInterval(() => {
+              const candidates = megalithScatterCandidates(heightmap, center.x, center.y);
+              if (candidates.length === 0) {
+                stopMegalithHold();
+                return;
+              }
+              const next = candidates[Math.floor(Math.random() * candidates.length)];
+              if (!castMegalithAt(next, false)) stopMegalithHold();
+            }, MEGALITH_HOLD_INTERVAL_MS);
+            return;
+          }
+
           painting = true;
           vibrate(10); // brief confirmation that painting just engaged
-          const local = renderer.view.toLocal(event.global);
           const point = pickTerrainEditPoint(local.x, local.y);
           if (point) {
             applyTerrainEditAt(point);
@@ -1267,6 +1339,16 @@ async function bootstrap(world: WorldDefinition) {
 
     if (!pointerActive) return;
 
+    // A held 地下巨石 scatters around where it was pressed, so the pointer
+    // drifting is not a brush stroke — it just ends the hold, the same way
+    // moving before the hold engaged turns the gesture into a pan.
+    if (megalithHolding) {
+      const dx = event.global.x - dragStart.x;
+      const dy = event.global.y - dragStart.y;
+      if (Math.hypot(dx, dy) > DRAG_THRESHOLD) stopMegalithHold();
+      return;
+    }
+
     if (painting) {
       const local = renderer.view.toLocal(event.global);
       const point = pickTerrainEditPoint(local.x, local.y);
@@ -1297,7 +1379,7 @@ async function bootstrap(world: WorldDefinition) {
     activePointers.delete(event.pointerId);
     if (activePointers.size < 2) rotating = false;
 
-    if (pointerActive && !isDragging && !painting && !gestureHadTwoFingers) applyTool(event);
+    if (pointerActive && !isDragging && !painting && !megalithHolding && !gestureHadTwoFingers) applyTool(event);
 
     stopPainting();
     pointerActive = false;

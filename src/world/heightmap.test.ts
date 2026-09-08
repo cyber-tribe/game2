@@ -11,6 +11,8 @@ import {
   applyReef,
   AUTO_FLATTEN_SIZE,
   planAutoFlatten,
+  megalithScatterCandidates,
+  MEGALITH_SCATTER_RADIUS,
   applyTsunami,
   applyFireRain,
   applyFlower,
@@ -19,6 +21,7 @@ import {
   applyRoad,
   applyWall,
   applyMegalith,
+  DEFAULT_MEGALITH_RADIUS,
   isBoulder,
   MEGALITH_HEIGHT,
   isWall,
@@ -932,6 +935,69 @@ describe("applyTsunami", () => {
     applyTsunami(heightmap, 20, 20, 12, 6);
 
     expect(heightmap.vertices[20][26]).toBe(heightmap.waterLevel);
+  });
+});
+
+describe("megalithScatterCandidates", () => {
+  /**
+   * 「発生ボタンを押し続けると、一帯により多くの巨石を発生させる」 — a held
+   * cast needs somewhere to put the next stone, and the area it may use is
+   * wider than one stone's own footprint. Otherwise holding would be
+   * indistinguishable from tapping the same spot.
+   */
+  it("offers vertices across the whole scatter area, wider than one stone", () => {
+    const heightmap = flatHeightmap(40, 40, 4);
+
+    const candidates = megalithScatterCandidates(heightmap, 20, 20);
+
+    expect(candidates.length).toBeGreaterThan(0);
+    expect(candidates.every((v) => Math.hypot(v.x - 20, v.y - 20) <= MEGALITH_SCATTER_RADIUS)).toBe(true);
+    expect(candidates.some((v) => Math.hypot(v.x - 20, v.y - 20) > DEFAULT_MEGALITH_RADIUS)).toBe(true);
+  });
+
+  it("skips vertices that already carry a stone", () => {
+    const heightmap = flatHeightmap(40, 40, 4);
+    applyMegalith(heightmap, 20, 20);
+
+    const candidates = megalithScatterCandidates(heightmap, 20, 20);
+
+    expect(candidates.some((v) => heightmap.boulder[v.y][v.x])).toBe(false);
+    expect(candidates).not.toContainEqual({ x: 20, y: 20 });
+  });
+
+  it("skips water and torn ground, where applyMegalith would raise nothing", () => {
+    const heightmap = flatHeightmap(40, 40, 4);
+    heightmap.vertices[20][21] = MIN_ELEVATION;
+    heightmap.crevice[20][19] = true;
+
+    const candidates = megalithScatterCandidates(heightmap, 20, 20);
+
+    expect(candidates).not.toContainEqual({ x: 21, y: 20 });
+    expect(candidates).not.toContainEqual({ x: 19, y: 20 });
+  });
+
+  /**
+   * An empty list is how a held cast knows to stop, rather than spending
+   * MEGALITH_MANA_COST per interval on casts that raise nothing.
+   */
+  it("comes back empty once the whole area is stone", () => {
+    const heightmap = flatHeightmap(40, 40, 4);
+    for (let y = 20 - MEGALITH_SCATTER_RADIUS; y <= 20 + MEGALITH_SCATTER_RADIUS; y++) {
+      for (let x = 20 - MEGALITH_SCATTER_RADIUS; x <= 20 + MEGALITH_SCATTER_RADIUS; x++) {
+        heightmap.boulder[y][x] = true;
+      }
+    }
+
+    expect(megalithScatterCandidates(heightmap, 20, 20)).toEqual([]);
+  });
+
+  it("stays inside the map at a corner", () => {
+    const heightmap = flatHeightmap(40, 40, 4);
+
+    const candidates = megalithScatterCandidates(heightmap, 0, 0);
+
+    expect(candidates.length).toBeGreaterThan(0);
+    expect(candidates.every((v) => v.x >= 0 && v.y >= 0)).toBe(true);
   });
 });
 

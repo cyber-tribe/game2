@@ -1619,6 +1619,53 @@ export const DEFAULT_MEGALITH_RADIUS = 3;
  */
 export const MEGALITH_HEIGHT = 8;
 
+/**
+ * How wide an area a held 地下巨石 cast scatters over — 「発生ボタンを
+ * 押し続けると、**一帯に**より多くの巨石を発生させる」.
+ *
+ * Wider than DEFAULT_MEGALITH_RADIUS so a hold spreads across ground the
+ * first stone did not reach; that spreading is the whole difference
+ * between holding the button and tapping it repeatedly on one spot.
+ */
+export const MEGALITH_SCATTER_RADIUS = 6;
+
+/**
+ * Vertices within `radius` of (cx, cy) where a 地下巨石 could still be
+ * raised — the same per-vertex conditions applyMegalith itself applies.
+ *
+ * Held casts pick their next centre from this list (see main.ts), which is
+ * what makes a hold spread stone over 「一帯」 rather than stack it on the
+ * one vertex under the finger. An empty list means the area is used up, so
+ * the hold can stop itself instead of charging mana for casts that raise
+ * nothing.
+ */
+export function megalithScatterCandidates(
+  heightmap: Heightmap,
+  cx: number,
+  cy: number,
+  radius: number = MEGALITH_SCATTER_RADIUS,
+): { x: number; y: number }[] {
+  const centerX = Math.round(cx);
+  const centerY = Math.round(cy);
+  const candidates: { x: number; y: number }[] = [];
+
+  for (let dy = -radius; dy <= radius; dy++) {
+    const vy = centerY + dy;
+    if (vy < 0 || vy > heightmap.height) continue;
+    for (let dx = -radius; dx <= radius; dx++) {
+      const vx = centerX + dx;
+      if (vx < 0 || vx > heightmap.width) continue;
+      if (Math.hypot(dx, dy) > radius) continue;
+      if (heightmap.boulder[vy][vx]) continue;
+      if (heightmap.crevice[vy][vx]) continue;
+      if (heightmap.vertices[vy][vx] <= heightmap.waterLevel) continue;
+      candidates.push({ x: vx, y: vy });
+    }
+  }
+
+  return candidates;
+}
+
 /** Whether the vertex nearest (x, y) is covered by a 地下巨石 — see Heightmap.boulder. */
 export function isBoulder(heightmap: Heightmap, x: number, y: number): boolean {
   const vx = Math.round(x);
