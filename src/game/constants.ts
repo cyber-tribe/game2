@@ -80,6 +80,11 @@ export const TERRAIN_EDIT_RULE_WEIGHTS: Record<TerrainEditRule, number> = {
   both: 2,
   raiseOnly: 1,
   lowerOnly: 1,
+  // Rarest by a distance. The original has 土地上下不可 stages and the
+  // article files them under 問題点 — 「トリッキーを超えて苦痛でしかない」 —
+  // so a custom match should be able to deal one, and should almost never
+  // deal one to a player who did not ask for it.
+  neither: 0.25,
 };
 
 /** Japanese display name for each terrain-edit rule, shown in the HUD so a restriction is never a silent mystery. */
@@ -87,6 +92,7 @@ export const TERRAIN_EDIT_RULE_LABELS: Record<TerrainEditRule, string> = {
   both: "隆起・沈降とも可",
   raiseOnly: "隆起のみ可",
   lowerOnly: "沈降のみ可",
+  neither: "土地上下不可",
 };
 
 /**

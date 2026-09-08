@@ -180,12 +180,23 @@ export function createHeightmap(
  * enemyTerraform.ts's AI are gated through equally ("敵の神はプレイヤーと
  * 同じルールで介入する").
  */
-export type TerrainEditRule = "both" | "raiseOnly" | "lowerOnly";
+export type TerrainEditRule = "both" | "raiseOnly" | "lowerOnly" | "neither";
 
-/** Whether raiseVertex(..., delta) is permitted under `rule` — see TerrainEditRule. */
+/**
+ * Whether raiseVertex(..., delta) is permitted under `rule` — see
+ * TerrainEditRule.
+ *
+ * The original has all three restricted kinds: 「土地上げ不可ステージ」,
+ * 「土地下げ不可ステージ」 and 「土地上下不可ステージ」. The last one takes
+ * the game's basic verb away entirely, and the article says plainly what
+ * is left when it does: 「よって神業で敵の住める土地をゼロにすることに
+ * なる」. You still build on the flat ground you were given, and everything
+ * else has to be a miracle.
+ */
 export function isTerrainEditAllowed(rule: TerrainEditRule, delta: number): boolean {
   if (rule === "raiseOnly") return delta > 0;
   if (rule === "lowerOnly") return delta < 0;
+  if (rule === "neither") return false;
   return true;
 }
 

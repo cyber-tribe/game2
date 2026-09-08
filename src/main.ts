@@ -563,8 +563,11 @@ async function bootstrap(world: WorldDefinition) {
 
   // Defaults to whichever direction terrainEditRule actually allows —
   // defaulting to the disabled "raise" under lowerOnly would otherwise
-  // leave the player's very first tap doing nothing.
-  let toolMode: ToolMode = terrainEditRule === "lowerOnly" ? "lower" : "raise";
+  // leave the player's very first tap doing nothing. Under 土地上下不可
+  // there is no allowed direction at all, so it falls back to 照会, the
+  // panel's own neutral "nothing is armed" tool (see ui/toolbar.ts, which
+  // already disarms to 照会 when the player changes school).
+  let toolMode: ToolMode = terrainEditRule === "neither" ? "inspect" : terrainEditRule === "lowerOnly" ? "lower" : "raise";
 
   // Finds the walker/house closest to a tapped point in renderer.view's
   // local space, for the "照会" tool — mirrors IsoRenderer.pickVertex's
@@ -1426,8 +1429,18 @@ async function bootstrap(world: WorldDefinition) {
   // Reflects terrainEditRule in the toolbar itself: a player should never
   // be able to select the forbidden direction in the first place, rather
   // than tapping it and having nothing happen.
-  if (terrainEditRule !== "both") {
-    const forbidden: ToolMode = terrainEditRule === "raiseOnly" ? "lower" : "raise";
+  // Under 土地上下不可 that is every terrain tool there is: 平坦化 and
+  // 自動整地 are made of the same vertex edits (flattenTile), so leaving
+  // them enabled would offer two buttons that spend a tap and do nothing.
+  const forbiddenTools: ToolMode[] =
+    terrainEditRule === "neither"
+      ? ["raise", "lower", "flatten", "autoFlatten"]
+      : terrainEditRule === "raiseOnly"
+        ? ["lower"]
+        : terrainEditRule === "lowerOnly"
+          ? ["raise"]
+          : [];
+  for (const forbidden of forbiddenTools) {
     document.querySelector<HTMLButtonElement>(`#toolbar [data-tool="${forbidden}"]`)?.setAttribute("disabled", "true");
   }
   // Same idea for allowedMiracles: a player should never be able to select
@@ -1441,7 +1454,7 @@ async function bootstrap(world: WorldDefinition) {
   // default set above — index.html hardcodes "raise" as pressed, which is
   // wrong whenever terrainEditRule forced the default to "lower" instead.
   document
-    .querySelectorAll<HTMLButtonElement>('#toolbar [data-tool="raise"], #toolbar [data-tool="lower"]')
+    .querySelectorAll<HTMLButtonElement>('#toolbar [data-tool="raise"], #toolbar [data-tool="lower"], #toolbar [data-tool="inspect"]')
     .forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.tool === toolMode)));
 
   // Every tool that spends the player's mana, and how much — used below to
