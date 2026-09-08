@@ -81,6 +81,7 @@ import { Minimap, minimapHeight } from "./render/Minimap";
 import { PopulationGauge } from "./render/PopulationGauge";
 import { GAME_PALETTE } from "./render/palette";
 import { mountCommandIcons } from "./ui/commandIcons";
+import { mountPanelFrame } from "./ui/panelFrame";
 import { loadCommandIcons } from "./ui/pixelIcons";
 import { StatusPanel } from "./ui/statusPanel";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
@@ -256,6 +257,7 @@ async function bootstrap(world: WorldDefinition) {
   app.stage.addChild(populationGauge.view);
 
   mountCommandIcons();
+  mountPanelFrame();
   const statusPanel = new StatusPanel(MAX_MANA);
 
   // The command panel's single message line (see index.html's

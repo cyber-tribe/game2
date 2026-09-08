@@ -78,6 +78,17 @@
        * enough (small icons, no per-button subtitle text) to fit a phone
        * screen without needing to scroll.
        */
+      /*
+       * A carved slab, not a bar of flat colour. The original's commands sit
+       * on stone: a grainy face, a 雷文 (Greek key) band running along the
+       * edge that faces the world, and a bevel deep enough to read as
+       * thickness. See src/ui/panelFrame.ts, which draws both patterns from
+       * GAME_PALETTE so a palette pass carries the panel with it.
+       *
+       * The band is padded for rather than overlaid: the icon grid starts
+       * below it, so nothing the player needs to read ever sits on top of
+       * the pattern.
+       */
       #command-panel {
         position: fixed;
         left: 0;
@@ -86,11 +97,30 @@
         display: flex;
         flex-direction: column;
         gap: 5px;
-        padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
-        background: var(--stone-mid);
+        padding: calc(6px + var(--meander-size, 8px)) 6px calc(6px + env(safe-area-inset-bottom));
+        background-color: var(--stone-mid);
+        background-image: var(--stone-grain-image);
+        background-size: var(--stone-grain-size, 7px) var(--stone-grain-size, 7px);
+        image-rendering: pixelated;
         border-top: 3px solid var(--bronze-dark);
-        box-shadow: inset 0 2px 0 var(--stone-light);
+        box-shadow:
+          inset 0 2px 0 var(--stone-light),
+          inset 0 -2px 0 var(--stone-shadow);
         box-sizing: border-box;
+      }
+
+      #command-panel::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 2px;
+        height: var(--meander-size, 8px);
+        background-image: var(--meander-image);
+        background-repeat: repeat-x;
+        background-size: var(--meander-size, 8px) var(--meander-size, 8px);
+        image-rendering: pixelated;
+        border-bottom: 1px solid var(--stone-shadow);
       }
 
       /*
