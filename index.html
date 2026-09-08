@@ -393,6 +393,21 @@
         the only screen that ever shows the whole roster of gods, so it is
         where the premise belongs. Quieter than the title: it is read once.
       */
+      /* 奇跡のレベル — the six schools the password carries in. Sits
+         between the premise and the world list because it describes the god
+         choosing, not the world chosen. Hidden entirely at level 1 in every
+         school: a row of ones on a fresh start is noise. */
+      #world-select-levels {
+        flex: none;
+        font-size: 11px;
+        line-height: 1.7;
+        color: var(--ink);
+        letter-spacing: 0.04em;
+      }
+      #world-select-levels:empty {
+        display: none;
+      }
+
       #world-select-premise {
         flex: none;
         font-size: 12px;
@@ -609,6 +624,7 @@
       <div id="world-select-premise">
         あなたはゼウスと人間の女性の間に生まれた青年。16人の神が、それぞれ3つの世界で待ち受ける。
       </div>
+      <div id="world-select-levels"></div>
       <div id="world-select-list"></div>
       <div id="world-select-password-row">
         <input type="text" id="world-select-password" placeholder="パスワード" autocomplete="off" />

@@ -168,3 +168,45 @@ describe("strikeLightning held on one spot", () => {
     expect(afterMany).toBeLessThan(afterOne);
   });
 });
+
+/**
+ * The 気 level is what moves the scatter — 「レベルが上がると一撃必殺の
+ * 破壊力がある」. See game/miracleLevels.ts.
+ */
+describe("strikeLightning's scatter parameter", () => {
+  it("defaults to LIGHTNING_SCATTER, which is level 1", () => {
+    const world = new World();
+    let seed = 7;
+    const rng = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+
+    for (const bolt of strikeLightning(world, undefined, { x: 20, y: 20 }, rng)) {
+      expect(Math.hypot(bolt.x - 20, bolt.y - 20)).toBeLessThanOrEqual(LIGHTNING_SCATTER + 0.001);
+    }
+  });
+
+  it("lands every bolt inside a tighter scatter when given one", () => {
+    const world = new World();
+    let seed = 7;
+    const rng = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+
+    for (const bolt of strikeLightning(world, undefined, { x: 20, y: 20 }, rng, () => {}, 0.75)) {
+      expect(Math.hypot(bolt.x - 20, bolt.y - 20)).toBeLessThanOrEqual(0.75 + 0.001);
+    }
+  });
+
+  it("kills what a wide scatter misses", () => {
+    const wide = new World();
+    const tight = new World();
+    const seeded = () => {
+      let seed = 4242;
+      return () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+    };
+    for (const world of [wide, tight]) spawnWalker(world, 20, 20);
+
+    strikeLightning(wide, undefined, { x: 20, y: 20 }, seeded(), () => {}, 8);
+    strikeLightning(tight, undefined, { x: 20, y: 20 }, seeded(), () => {}, 0.5);
+
+    expect(wide.query(Walker)).toHaveLength(1); // the bolts went everywhere but here
+    expect(tight.query(Walker)).toHaveLength(0);
+  });
+});

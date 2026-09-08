@@ -323,6 +323,37 @@ export const MAX_STAGE_SCORE = 5000;
 export const MAX_STAGE_MARKS = 10;
 
 /**
+ * How high a school's level can go — 原作「各カテゴリーのレベルを上げて
+ * いくことができる」.
+ *
+ * The original's own numbers are far larger (it speaks of 雷 becoming
+ * usable 「レベルが上がる（50〜100程度）」), and are not transplanted for
+ * the same reason its 5万点 is not: they are steps on the original's own
+ * scale, over a campaign whose scoring is not game2's. Five is what 48
+ * stages of game2 can actually walk up.
+ */
+export const MAX_MIRACLE_LEVEL = 5;
+
+/** Experience points per level. One stage's 稲妻マーク is at most MAX_STAGE_MARKS, so this is a couple of good stages per level in a school. */
+export const MIRACLE_LEVEL_STEP = 20;
+
+/**
+ * How much longer 地震・竜巻・嵐・火柱 last per level — 「効果の持続時間が
+ * それぞれのレベルで伸びる」. At MAX_MIRACLE_LEVEL this doubles them, which
+ * is a real difference without turning one cast into the whole match.
+ */
+export const MIRACLE_LEVEL_DURATION_STEP = 0.25;
+
+/**
+ * What 雷's scatter shrinks to at MAX_MIRACLE_LEVEL — 「一撃必殺の破壊力」.
+ *
+ * Not zero. Even at its best the original's 雷 is a scatter of bolts around
+ * a point rather than a sniper's shot, and a scatter of zero would stack
+ * every bolt on one vertex, which is a different miracle.
+ */
+export const MIRACLE_LEVEL_MIN_SCATTER = 0.75;
+
+/**
  * Placeholder land-scarcity proxy: roughly how many map tiles a faction
  * needs per house it's allowed to build, used to derive
  * HouseGrowthConfig.maxHousesPerFaction from world size until real

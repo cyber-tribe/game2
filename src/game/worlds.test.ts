@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { MIRACLE_SCHOOLS } from "./miracleSchools";
-import { ALL_MIRACLES, GODS, STAGES_PER_GOD, WORLDS, nextWorldId, unlockedCountForPassword, type EnemyPersonality } from "./worlds";
+import {
+  ALL_MIRACLES,
+  GODS,
+  STAGES_PER_GOD,
+  WORLDS,
+  buildPassword,
+  nextWorldId,
+  passwordExperienceCode,
+  passwordWorldId,
+  unlockedCountForPassword,
+  type EnemyPersonality,
+} from "./worlds";
 
 const KNOWN_PERSONALITIES: readonly EnemyPersonality[] = ["balanced", "aggressive", "defensive"];
 
@@ -229,6 +240,40 @@ describe("unlockedCountForPassword", () => {
 
   it("returns undefined for an unrecognized password", () => {
     expect(unlockedCountForPassword("not-a-real-password")).toBeUndefined();
+  });
+
+  /**
+   * The password grew a second half to carry 奇跡のレベル (see
+   * game/miracleLevels.ts). Every password game2 has handed out so far is a
+   * bare world id, and a player who wrote one down must not find it
+   * rejected because the format changed.
+   */
+  it("still accepts a bare world id, the only kind that existed before", () => {
+    expect(unlockedCountForPassword(WORLDS[2].id)).toBe(3);
+  });
+
+  it("accepts one carrying experience, and unlocks the same world", () => {
+    const password = buildPassword(WORLDS[2].id, "0a0b0c0d0e0f");
+
+    expect(unlockedCountForPassword(password)).toBe(3);
+  });
+});
+
+describe("the password's two halves", () => {
+  it("splits one that carries experience", () => {
+    const password = buildPassword("crete-2", "0a0b0c0d0e0f");
+
+    expect(passwordWorldId(password)).toBe("crete-2");
+    expect(passwordExperienceCode(password)).toBe("0a0b0c0d0e0f");
+  });
+
+  it("reads a bare id as a world with no experience at all", () => {
+    expect(passwordWorldId("crete-2")).toBe("crete-2");
+    expect(passwordExperienceCode("crete-2")).toBe("");
+  });
+
+  it("builds a bare id when there is nothing to carry", () => {
+    expect(buildPassword("crete-2", "")).toBe("crete-2");
   });
 });
 
