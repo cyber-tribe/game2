@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { facingFor, impactEffectVisual, swampAffectedTiles, walkCycle } from "./EntityLayer";
+import { facingFor, impactEffectVisual, swampAffectedTiles, swampVisual, walkCycle } from "./EntityLayer";
 
 describe("facingFor", () => {
   it("picks the iso-screen diagonal matching each tile-axis direction", () => {
@@ -127,5 +127,32 @@ describe("impactEffectVisual", () => {
     );
 
     expect(colors.size).toBe(4);
+  });
+});
+
+describe("swampVisual", () => {
+  /**
+   * 「面ごとに底なしかどうか設定される」 — the two kinds behave completely
+   * differently (one dries up after a few walkers, one takes the ground for
+   * the rest of the match) and used to be drawn identically, which made the
+   * only question a player asks of a swamp unanswerable by looking.
+   */
+  it("draws a 底なし沼 differently from an ordinary one", () => {
+    const bottomless = swampVisual(true);
+    const ordinary = swampVisual(false);
+
+    expect(bottomless.fill).not.toBe(ordinary.fill);
+  });
+
+  it("gives a 底なし沼 one wide void where an ordinary swamp gets small scattered ones", () => {
+    const bottomless = swampVisual(true);
+    const ordinary = swampVisual(false);
+
+    expect(bottomless.holeCount).toBe(1);
+    expect(bottomless.centered).toBe(true);
+    expect(bottomless.holeRadius).toBeGreaterThan(ordinary.holeRadius);
+
+    expect(ordinary.holeCount).toBeGreaterThan(1);
+    expect(ordinary.centered).toBe(false);
   });
 });
