@@ -232,6 +232,12 @@ export function pickTerrainEditRule(
 export function raiseVertex(heightmap: Heightmap, x: number, y: number, delta: number): void {
   const row = heightmap.vertices[y];
   if (!row || row[x] === undefined) return;
+  // 「城壁にかかる土地上下ができなくなる」. A wall pins the ground it stands
+  // on: the barrier is the point of the miracle, and land you could simply
+  // lower out from under it would not be one. It is also the only way to
+  // spend a cheap 城壁 to deny an opponent's terraforming, which is what
+  // makes it worth casting at all (the original calls it hard to use).
+  if (heightmap.wall[y][x]) return;
   row[x] = Math.min(MAX_ELEVATION, Math.max(MIN_ELEVATION, row[x] + delta));
 
   const hardnessRow = heightmap.rockHardness[y];
@@ -1351,6 +1357,13 @@ export function applyRoad(
       // isBuildable already rejects fungus, water, rock and crevices —
       // exactly the ground a road cannot be laid on.
       if (!isBuildable(heightmap, vx, vy)) continue;
+      // 「なお、敵陣や斜面には設置できない」 — the slope half. Paving and
+      // walling are both laid *flat*: a road up a hillside and a wall on a
+      // gradient are things the original simply will not build. The enemy-
+      // territory half needs the world rather than the map, so it is
+      // checked where the cast is (main.ts), the same way the per-world
+      // terrain-edit territory rule is.
+      if (!isLevelVertex(heightmap, vx, vy)) continue;
 
       heightmap.road[vy][vx] = true;
       paved.push({ x: vx, y: vy });
@@ -1358,6 +1371,44 @@ export function applyRoad(
   }
 
   return paved;
+}
+
+/**
+ * Whether the ground at a vertex is level — it and every in-bounds
+ * orthogonal neighbour stand at the same height.
+ *
+ * What 道 and 城壁 are laid on: 「なお、敵陣や斜面には設置できない」. A
+ * gradient of even one step counts as a slope, which is strict, and
+ * deliberately so — this is the same standard the player already meets to
+ * build, so "flat enough for a house" and "flat enough for a road" are one
+ * idea rather than two thresholds to remember.
+ *
+ * **A walled neighbour is not a slope.** A 城壁 lifts the ground it stands
+ * on (see applyWall's WALL_ELEVATION_RISE), so measuring that rise as
+ * terrain would make a wall's own first segment disqualify its second — and
+ * the original describes walls exactly as something you chain: 「通常は手動
+ * で延ばして連続した城壁を設置する」. The parapet is the structure, not the
+ * hillside, so it is not what "slope" means here. The same reading lets a
+ * road run up to a wall and stop rather than being refused beside it.
+ */
+export function isLevelVertex(heightmap: Heightmap, x: number, y: number): boolean {
+  const here = heightmap.vertices[y]?.[x];
+  if (here === undefined) return false;
+
+  for (const [dx, dy] of [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ] as const) {
+    const nx = x + dx;
+    const ny = y + dy;
+    const neighbor = heightmap.vertices[ny]?.[nx];
+    if (neighbor === undefined) continue;
+    if (heightmap.wall[ny][nx]) continue;
+    if (neighbor !== here) return false;
+  }
+  return true;
 }
 
 /** How far from its cast point a fungus outbreak starts, in vertices. */
@@ -1593,6 +1644,10 @@ export function applyWall(
       if (heightmap.crevice[vy][vx]) continue;
       if (heightmap.fungus[vy][vx]) continue;
       if (heightmap.vertices[vy][vx] <= heightmap.waterLevel) continue;
+      // 「道と同じく、敵陣や斜面には設置できない」 — see applyRoad, and
+      // isLevelVertex on why a wall's own parapet does not count as the
+      // slope that would stop the next segment of it.
+      if (!isLevelVertex(heightmap, vx, vy)) continue;
 
       heightmap.wall[vy][vx] = true;
       heightmap.forest[vy][vx] = false;

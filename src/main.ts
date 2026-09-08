@@ -1032,6 +1032,15 @@ async function bootstrap(world: WorldDefinition) {
       // paving is refused outright on 毒カビ (see applyRoad) — the
       // interaction is that you lay a road *ahead* of an outbreak.
       if (!canAffordPlayerMana(ROAD_MANA_COST)) return;
+      // 「なお、敵陣や斜面には設置できない」. The slope half lives in
+      // applyRoad (isLevelVertex); territory needs the world, so it is
+      // asked here — the same split the per-world terrain-edit rule uses.
+      // Unlike that one this is not a per-world setting: 道 and 城壁 are
+      // never laid on enemy ground in any stage.
+      if (simulation.isEnemyTerritory("player", vertex)) {
+        showEntityInfo("敵陣には道を敷けません", "warning");
+        return;
+      }
       if (applyRoad(heightmap, vertex.x, vertex.y).length === 0) {
         showEntityInfo("ここには道を敷けません", "warning");
         return;
@@ -1049,6 +1058,11 @@ async function bootstrap(world: WorldDefinition) {
       // and refuse the cast outright where a wall cannot stand (water, a
       // crevice, 毒カビ, or ground already walled — see applyWall).
       if (!canAffordPlayerMana(WALL_MANA_COST)) return;
+      // 「道と同じく、敵陣や斜面には設置できない」 — see the road above.
+      if (simulation.isEnemyTerritory("player", vertex)) {
+        showEntityInfo("敵陣には城壁を築けません", "warning");
+        return;
+      }
       if (applyWall(heightmap, vertex.x, vertex.y).length === 0) {
         showEntityInfo("ここには城壁を築けません", "warning");
         return;
