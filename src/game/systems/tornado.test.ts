@@ -94,23 +94,60 @@ describe("createTornadoSystem", () => {
 
   /**
    * The interaction both miracles exist for (docs/original-miracles.md
-   * #17): 「水地形へ入ると渦巻きへ変化する」. Without it the tornado is a
-   * slow fire rain and the 渦巻き never exists at all, since nothing else
-   * creates one.
+   * #17). Without it the tornado is a slow fire rain and the 渦巻き never
+   * exists at all, since nothing else creates one.
    */
-  it("becomes a 渦巻き when it reaches open water", () => {
+  it("throws off a 渦巻き once it reaches open water", () => {
     const heightmap = withSea(flatHeightmap(40, 5), 20);
     const world = new World();
     createTornado(world, 18, 10, 1, 0);
 
     const system = createTornadoSystem({ heightmap, rng: straight });
-    // Checked by component rather than by the entity handle: World recycles
-    // ids the instant one is freed, so the whirlpool can be handed the
-    // tornado's own id and a stale handle would still report alive.
-    for (let tick = 0; tick < 20 && world.query(Tornado).length > 0; tick++) system(world, 0.5);
+    for (let tick = 0; tick < 8 && world.query(Whirlpool).length === 0; tick++) system(world, 0.5);
+
+    expect(world.query(Whirlpool)).toHaveLength(1);
+  });
+
+  /**
+   * 「海上では渦巻きを**大量発生**させるため、敵陣の海岸付近に大量に仕掛けると
+   * 土地を広げにくくなるので効果的」 — the tactic the original names, and it
+   * needs one cast to be worth more than one whirlpool. game2 used to
+   * destroy the tornado on the first one, so 「大量」 could only ever mean
+   * "cast 竜巻 many times".
+   */
+  it("keeps crossing the sea and sheds several, rather than being spent on the first", () => {
+    const heightmap = withSea(flatHeightmap(60, 5), 5);
+    const world = new World();
+    createTornado(world, 10, 10, 1, 0);
+
+    const system = createTornadoSystem({ heightmap, rng: straight });
+    for (let tick = 0; tick < TORNADO_LIFETIME * 2; tick++) system(world, 0.5);
+
+    expect(world.query(Whirlpool).length).toBeGreaterThan(1);
+  });
+
+  it("does not shed one every tick — they come at TORNADO_WHIRLPOOL_INTERVAL", () => {
+    const heightmap = withSea(flatHeightmap(60, 5), 5);
+    const world = new World();
+    createTornado(world, 10, 10, 1, 0);
+
+    const system = createTornadoSystem({ heightmap, rng: straight });
+    for (let tick = 0; tick < 4; tick++) system(world, 0.5);
+
+    // Two seconds at sea is under one interval past the first, immediate one.
+    expect(world.query(Whirlpool)).toHaveLength(1);
+  });
+
+  /** A tornado still dies of old age; the sea does not extend its life. */
+  it("expires at the end of its 一定時間 even over water", () => {
+    const heightmap = withSea(flatHeightmap(60, 5), 5);
+    const world = new World();
+    createTornado(world, 10, 10, 1, 0);
+
+    const system = createTornadoSystem({ heightmap, rng: straight });
+    for (let tick = 0; tick < TORNADO_LIFETIME + 1; tick++) system(world, 1);
 
     expect(world.query(Tornado)).toHaveLength(0);
-    expect(world.query(Whirlpool)).toHaveLength(1);
   });
 
   it("stays a 竜巻 over dry land for its whole life", () => {

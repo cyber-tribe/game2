@@ -225,6 +225,12 @@ export interface Tornado {
   remaining: number;
   headingX: number;
   headingY: number;
+  /**
+   * Seconds since this tornado last threw off a 渦巻き while crossing open
+   * water — 「海上では渦巻きを**大量発生**させる」. Only advances at sea;
+   * over land it sits where it was. See systems/tornado.ts.
+   */
+  sinceWhirlpool: number;
 }
 
 /**

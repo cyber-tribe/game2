@@ -823,6 +823,19 @@ export const FIRE_PILLAR_WANDER = 1.1;
 export const FIRE_PILLAR_MANA_COST = 32;
 
 /** Mana cost of a 竜巻 — "中" tier. Cheaper than fire rain: it is slower, avoidable, and where it goes is not entirely up to the caster. */
+/**
+ * Seconds between the 渦巻き a tornado throws off while it is over open
+ * water — 「海上では渦巻きを大量発生させるため、敵陣の海岸付近に大量に
+ * 仕掛けると土地を広げにくくなるので効果的」.
+ *
+ * Sized against TORNADO_LIFETIME (14s) so a tornado that spends its whole
+ * life at sea leaves a handful of whirlpools rather than one or a swarm.
+ * Each of those then splits up to WHIRLPOOL_MAX_SPLITS times on its own, so
+ * the 「大量」 is mostly what the whirlpools do afterwards; this is what
+ * gives them something to start from.
+ */
+export const TORNADO_WHIRLPOOL_INTERVAL = 3.5;
+
 export const TORNADO_MANA_COST = 22;
 
 /** How long a 渦巻き lives once a 竜巻 reaches water, in seconds. */

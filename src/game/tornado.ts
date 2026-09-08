@@ -2,6 +2,7 @@ import type { Entity, World } from "../ecs";
 import { Position, Tornado, Whirlpool } from "./components";
 import {
   TORNADO_LIFETIME,
+  TORNADO_WHIRLPOOL_INTERVAL,
   WHIRLPOOL_LIFETIME,
   WHIRLPOOL_MAX_SPLITS,
   WHIRLPOOL_SPLIT_INTERVAL,
@@ -33,6 +34,9 @@ export function createTornado(
     // is as arbitrary as anything else, same as applyEarthquake's choice.
     headingX: magnitude === 0 ? 1 : headingX / magnitude,
     headingY: magnitude === 0 ? 0 : headingY / magnitude,
+    // Ready to spawn the moment it reaches water, so a tornado cast
+    // straight out to sea does not waste its first interval doing nothing.
+    sinceWhirlpool: TORNADO_WHIRLPOOL_INTERVAL,
   });
   return entity;
 }
