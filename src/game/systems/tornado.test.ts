@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
 import { MIN_ELEVATION, createHeightmap, type Heightmap } from "../../world/heightmap";
-import { Owner, Position, Tornado, Walker, Whirlpool } from "../components";
+import { House, Owner, Position, Tornado, Walker, Whirlpool } from "../components";
 import { TORNADO_DAMAGE_PER_SECOND, TORNADO_LIFETIME } from "../constants";
 import { createTornado } from "../tornado";
 import { createTornadoSystem } from "./tornado";
@@ -90,6 +90,44 @@ describe("createTornadoSystem", () => {
     createTornadoSystem({ heightmap, rng: straight })(world, 1);
 
     expect(world.get(walker, Walker)!.strength).toBe(5);
+  });
+
+  /**
+   * 「一定時間、ランダムに動き回って**建物を吹き飛ばし**、信者を巻き込む」 —
+   * buildings come first in the original's own sentence. This used to skip
+   * houses outright on the reading that the tornado's damage was "entirely
+   * in terms of people", which made a wandering hazard that cannot touch a
+   * settlement: an anti-army weapon only, when the original's tornado is
+   * the one miracle you send into a town.
+   */
+  it("throws down a house it passes over", () => {
+    const heightmap = flatHeightmap(40, 5);
+    const world = new World();
+    const house = world.createEntity();
+    world.add(house, Position, { x: 12, y: 10 });
+    world.add(house, Owner, { faction: "enemy" });
+    world.add(house, House, { level: "hut", population: 4 });
+    createTornado(world, 10, 10, 1, 0);
+
+    const system = createTornadoSystem({ heightmap, rng: straight });
+    for (let tick = 0; tick < 8 && world.isAlive(house); tick++) system(world, 0.5);
+
+    expect(world.isAlive(house)).toBe(false);
+  });
+
+  it("leaves a house well outside its radius standing", () => {
+    const heightmap = flatHeightmap(40, 20);
+    const world = new World();
+    const house = world.createEntity();
+    world.add(house, Position, { x: 12, y: 18 });
+    world.add(house, Owner, { faction: "enemy" });
+    world.add(house, House, { level: "hut", population: 4 });
+    createTornado(world, 10, 2, 1, 0);
+
+    const system = createTornadoSystem({ heightmap, rng: straight });
+    for (let tick = 0; tick < 8; tick++) system(world, 0.5);
+
+    expect(world.isAlive(house)).toBe(true);
   });
 
   /**
