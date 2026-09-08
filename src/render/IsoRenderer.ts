@@ -285,6 +285,23 @@ const ROCK_SPECKLE_DENSITY = 0.4;
 const VOLCANO_ROCK_COLOR = 0x1a120f;
 const LAVA_CORE_COLOR = 0xfff4c2;
 const LAVA_GLOW_COLOR = 0xff5a12;
+/**
+ * The bands the map's cut side is painted in, from the rim downward — see
+ * drawEdgeWall. `depth` is how far below that point's own surface the band
+ * ends, in elevation units; the last band runs to sea level whatever is
+ * left.
+ *
+ * Three, in the order the original's own floating slab shows them: a light
+ * band right under the rim, browner ground below it, and near-black rock at
+ * the bottom. Taken from GAME_PALETTE's soil family rather than new
+ * literals — this is the same earth farmland is tinted with, seen edge-on.
+ */
+export const EDGE_STRATA: readonly { depth: number; color: number }[] = [
+  { depth: 0.9, color: GAME_PALETTE.soilLight },
+  { depth: 2.4, color: GAME_PALETTE.soilMid },
+  { depth: Infinity, color: GAME_PALETTE.stoneShadow },
+];
+
 /** Radians/second the lava glow's pulse advances — see volcanoGlowIntensity. */
 const LAVA_PULSE_SPEED = 3;
 /** How much the pulse swings the glow up/down around its hardness-driven base level. */
@@ -994,17 +1011,47 @@ export class IsoRenderer {
    * same x (or y) coordinate by definition, so the wall is always exactly
    * vertical and planar regardless of edgeA/edgeB's own heights — its
    * normal never actually depends on them.
+   *
+   * The wall is painted as EDGE_STRATA — soil over subsoil over bedrock —
+   * not as the surface's own color extruded downward. The original's world
+   * is a slab floating in black space and its cut side plainly shows earth:
+   * a light band hugging the rim, then browner ground, then near-black rock
+   * at the bottom, whatever is growing on top. Extruding the surface color
+   * gave a green field a green underside, i.e. a world made of grass all the
+   * way down, and lost the one thing that reads as "this is a piece of land
+   * lifted out of the ground".
+   *
+   * Bands are measured *down from each end's own top*, so they follow the
+   * rim's contour the way real strata under a cut bank do, rather than
+   * sitting at fixed world heights and slicing across a slope.
    */
-  private drawEdgeWall(graphics: Graphics, edgeA: Vec3, edgeB: Vec3, baseColor: number, outwardNormal: Vec3): void {
+  private drawEdgeWall(graphics: Graphics, edgeA: Vec3, edgeB: Vec3, _baseColor: number, outwardNormal: Vec3): void {
     if (Math.max(edgeA.z, edgeB.z) < FLAT_EPSILON) return; // already at/below sea level — nothing to drop down to
 
-    const topA = this.toScreen(edgeA.x, edgeA.y, edgeA.z);
-    const topB = this.toScreen(edgeB.x, edgeB.y, edgeB.z);
-    const bottomB = this.toScreen(edgeB.x, edgeB.y, 0);
-    const bottomA = this.toScreen(edgeA.x, edgeA.y, 0);
-    const color = shadeColor(baseColor, faceBrightness(outwardNormal));
+    const brightness = faceBrightness(outwardNormal);
+    let above = 0;
 
-    graphics.poly([topA.sx, topA.sy, topB.sx, topB.sy, bottomB.sx, bottomB.sy, bottomA.sx, bottomA.sy]).fill(color);
+    for (const band of EDGE_STRATA) {
+      // Each end's own top and bottom for this band, clamped at sea level:
+      // a shallow corner runs out of depth before a tall one does, and the
+      // band simply pinches shut there.
+      const topZA = Math.max(0, edgeA.z - above);
+      const topZB = Math.max(0, edgeB.z - above);
+      const bottomZA = Math.max(0, edgeA.z - band.depth);
+      const bottomZB = Math.max(0, edgeB.z - band.depth);
+      above = band.depth;
+
+      if (topZA - bottomZA < FLAT_EPSILON && topZB - bottomZB < FLAT_EPSILON) continue;
+
+      const topA = this.toScreen(edgeA.x, edgeA.y, topZA);
+      const topB = this.toScreen(edgeB.x, edgeB.y, topZB);
+      const bottomB = this.toScreen(edgeB.x, edgeB.y, bottomZB);
+      const bottomA = this.toScreen(edgeA.x, edgeA.y, bottomZA);
+
+      graphics
+        .poly([topA.sx, topA.sy, topB.sx, topB.sy, bottomB.sx, bottomB.sy, bottomA.sx, bottomA.sy])
+        .fill(shadeColor(band.color, brightness));
+    }
   }
 
   /**
