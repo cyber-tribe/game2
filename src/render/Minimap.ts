@@ -38,6 +38,14 @@ const HOUSE_DOT_SIZE = 3;
 const WALKER_DOT_RADIUS = 1;
 
 /**
+ * The ring drawn where the enemy's last miracles landed — 「災害箇所表示」,
+ * see ui/disasterMarkers.ts. A ring rather than a dot so it can never be
+ * mistaken for one of the faction dots it is drawn over.
+ */
+const DISASTER_MARK_RADIUS = 4;
+const DISASTER_MARK_COLOR = 0xffcc44;
+
+/**
  * How coarse the terrain-height readout is, independent of the actual
  * heightmap size (a 64x64 map's every vertex would be sub-pixel at this
  * minimap's own on-screen size anyway) — see terrainColorAt. Also caps the
@@ -241,14 +249,31 @@ export class Minimap {
     }
   }
 
-  /** `visibleBounds` is the camera's current tile-space view (see main.ts's strictVisibleBounds) — drawn as an outline over the terrain grid. */
-  update(world: World, visibleBounds?: { minX: number; maxX: number; minY: number; maxY: number }): void {
+  /**
+   * `visibleBounds` is the camera's current tile-space view (see main.ts's
+   * strictVisibleBounds) — drawn as an outline over the terrain grid.
+   *
+   * `options` carries the two per-stage information settings the original
+   * deals (docs/original-maps.md's ○× table): `showEnemies` false leaves
+   * the opponent off the map entirely — 「敵の位置表示」× — and
+   * `disasters` is the list of places its miracles just landed, which a
+   * stage without 「災害箇所表示」 simply never passes. Both default to the
+   * generous reading, so a caller that knows nothing about stage settings
+   * (tests, tools) gets the full map.
+   */
+  update(
+    world: World,
+    visibleBounds?: { minX: number; maxX: number; minY: number; maxY: number },
+    options: { showEnemies?: boolean; disasters?: readonly { x: number; y: number }[] } = {},
+  ): void {
+    const showEnemies = options.showEnemies ?? true;
     const g = this.entities;
     g.clear();
 
     for (const entity of world.query(Position, House, Owner)) {
       const pos = world.get(entity, Position)!;
       const owner = world.get(entity, Owner)!;
+      if (!showEnemies && owner.faction !== "player") continue;
       const { x, y } = this.toMinimapPoint(pos);
       g.rect(x - HOUSE_DOT_SIZE / 2, y - HOUSE_DOT_SIZE / 2, HOUSE_DOT_SIZE, HOUSE_DOT_SIZE).fill(
         FACTION_COLOR[owner.faction],
@@ -258,8 +283,16 @@ export class Minimap {
     for (const entity of world.query(Position, Walker, Owner)) {
       const pos = world.get(entity, Position)!;
       const owner = world.get(entity, Owner)!;
+      if (!showEnemies && owner.faction !== "player") continue;
       const { x, y } = this.toMinimapPoint(pos);
       g.circle(x, y, WALKER_DOT_RADIUS).fill(FACTION_COLOR[owner.faction]);
+    }
+
+    // Drawn last, so a strike lands on top of whatever it hit rather than
+    // under it.
+    for (const mark of options.disasters ?? []) {
+      const { x, y } = this.toMinimapPoint(mark);
+      g.circle(x, y, DISASTER_MARK_RADIUS).stroke({ width: 1, color: DISASTER_MARK_COLOR, alpha: 0.9 });
     }
 
     const vg = this.viewportIndicator;

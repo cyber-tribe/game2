@@ -445,6 +445,16 @@ export class Simulation {
     this.matchEvents.push({ time: this.elapsedTime, faction, type });
   }
 
+  /**
+   * How long the match has run, in seconds — the same clock the event log
+   * is stamped against. main.ts ages its 災害箇所 marks by it (see
+   * ui/disasterMarkers.ts) rather than by wall time, so the marks stop
+   * moving whenever the match itself does.
+   */
+  get matchTime(): number {
+    return this.elapsedTime;
+  }
+
   /** The match's full event log so far, oldest first — see MatchEvent. */
   getMatchEvents(): readonly MatchEvent[] {
     return this.matchEvents;

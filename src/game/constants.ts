@@ -276,6 +276,16 @@ export const RESCUE_SHORE_SEARCH = 8;
 export const IMPACT_EFFECT_DURATION = 0.5;
 
 /**
+ * Seconds an enemy miracle stays marked on the world map — 「災害箇所表示」,
+ * see ui/disasterMarkers.ts.
+ *
+ * Long enough to pan across a 64x64 map and see what happened, short enough
+ * that the marks read as "go there now" rather than accumulating into a
+ * history of the whole match.
+ */
+export const DISASTER_MARKER_DURATION = 12;
+
+/**
  * Placeholder land-scarcity proxy: roughly how many map tiles a faction
  * needs per house it's allowed to build, used to derive
  * HouseGrowthConfig.maxHousesPerFaction from world size until real

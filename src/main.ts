@@ -83,6 +83,7 @@ import { Minimap, minimapHeight } from "./render/Minimap";
 import { PopulationGauge } from "./render/PopulationGauge";
 import { GAME_PALETTE } from "./render/palette";
 import { mountCommandIcons } from "./ui/commandIcons";
+import { DisasterMarkers } from "./ui/disasterMarkers";
 import { loadCommandIcons } from "./ui/pixelIcons";
 import { StatusPanel } from "./ui/statusPanel";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
@@ -318,8 +319,20 @@ async function bootstrap(world: WorldDefinition) {
     guardian: 3,
   };
 
+  /**
+   * 「災害箇所表示」 — where the enemy's miracles just landed, for the world
+   * map to point at. Recorded on every stage and only *shown* where the
+   * stage allows it (see disasterMarkersVisible): the toast and the shake
+   * tell you something happened either way; what the setting grants is
+   * knowing where.
+   */
+  const disasterMarkers = new DisasterMarkers();
+
   const onEnemyAction = (event: EnemyMiracleEvent) => {
     showEnemyEventToast(describeMatchEvent(event.type, "enemy"));
+    // ペルセウス/守護者化/最終決戦 have no place to point at — they are
+    // done to the whole board, not to a spot on it.
+    if ("position" in event) disasterMarkers.record(event.position, simulation.matchTime);
     triggerShake(ENEMY_SHAKE_MAGNITUDE[event.type]);
     playMiracleSound(event.type);
   };
@@ -1744,7 +1757,12 @@ async function bootstrap(world: WorldDefinition) {
       showMatchRecord(outcome, simulation.getMatchEvents());
     }
     minimap.redrawTerrain();
-    minimap.update(simulation.world, strictVisibleBounds());
+    minimap.update(simulation.world, strictVisibleBounds(), {
+      // 「敵の位置表示」/「災害箇所表示」 — the two per-stage settings that
+      // take away information rather than an operation.
+      showEnemies: world.enemyPositionsVisible,
+      disasters: world.disasterMarkersVisible ? disasterMarkers.active(simulation.matchTime) : [],
+    });
 
     if (shakeTimeRemaining > 0) {
       shakeTimeRemaining = Math.max(0, shakeTimeRemaining - deltaSeconds);
