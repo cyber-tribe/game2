@@ -819,6 +819,26 @@
         "y": 0
       },
       "trimmed": false
+    },
+    "icon_whirlpool": {
+      "frame": {
+        "h": 16,
+        "w": 16,
+        "x": 144,
+        "y": 32
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 16,
+        "w": 16
+      },
+      "spriteSourceSize": {
+        "h": 16,
+        "w": 16,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
     }
   },
   "meta": {

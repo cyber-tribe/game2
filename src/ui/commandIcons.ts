@@ -40,6 +40,7 @@ const TOOL_ICON: Record<ToolMode, IconKind> = {
   flower: "flower",
   fireRain: "fireRain",
   tsunami: "tsunami",
+  whirlpool: "whirlpool",
   reef: "reef",
   road: "road",
   wall: "wall",

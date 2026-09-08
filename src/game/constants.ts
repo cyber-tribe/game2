@@ -890,6 +890,18 @@ export const TORNADO_WHIRLPOOL_INTERVAL = 3.5;
 
 export const TORNADO_MANA_COST = 22;
 
+/**
+ * Mana cost of casting a 渦巻き directly — 「渦巻き：海面上をランダムに
+ * 動き回り、既にある土地を削り取る。一定時間で分裂し被害が広がる」.
+ *
+ * Cheaper than the 竜巻 that can throw off several of them, dearer than a
+ * 岩礁: one whirlpool, placed where you want it, is a smaller thing than a
+ * tornado's whole run at sea, but it is the only miracle in the game that
+ * takes land away permanently and it arrives already next to the coast you
+ * aimed it at. A tornado has to survive its way out to water first.
+ */
+export const WHIRLPOOL_MANA_COST = 18;
+
 /** How long a 渦巻き lives once a 竜巻 reaches water, in seconds. */
 export const WHIRLPOOL_LIFETIME = 16;
 

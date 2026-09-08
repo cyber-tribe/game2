@@ -450,6 +450,28 @@ ICONS: dict[str, list[str]] = {
         "................",
         "................",
     ],
+    # 渦巻き seen from above: a dark funnel with water turning around it, and
+    # one arm sweeping out to the right so it reads as rotating rather than
+    # as a ring. Deliberately nothing like 津波's row of waves — the two are
+    # the water miracles most often aimed at the same coastline.
+    "whirlpool": [
+        "................",
+        "................",
+        ".....oooooo.....",
+        "...oowwwwwwooo..",
+        "..owwwooooowwwo.",
+        ".owwwoWWWWowwwww",
+        ".owwoWWoooWWwwwo",
+        "owwwoWoooooWwwo.",
+        "owwwoWoooooWwo..",
+        ".owwoWWoooWWwo..",
+        ".owwwoWWWWowwo..",
+        "..owwwooooowwo..",
+        "...oowwwwwwoo...",
+        ".....oooooo.....",
+        "................",
+        "................",
+    ],
     "armageddon": [
         "................",
         "....oooooo......",
@@ -975,6 +997,7 @@ ICON_KINDS = (
     "megalith",
     "fungus",
     "tsunami",
+    "whirlpool",
     "armageddon",
     "mana",
     "population",

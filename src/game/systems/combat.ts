@@ -132,9 +132,11 @@ export function createHouseCaptureSystem(config: Partial<HouseCaptureConfig> = {
       const walkerPos = world.get(walkerEntity, Position)!;
       const walkerOwner = world.get(walkerEntity, Owner)!;
       const walker = world.get(walkerEntity, Walker)!;
-      // トロイのヘレン 「敵と戦わない」 — she has no way to hurt a house
-      // and must not be consumed capturing one; and anyone she is holding
-      // is 拘束, not free to storm a building on the way past.
+      // トロイのヘレン 「戦闘することが出来ず」 — she has no way to hurt a
+      // house and must not be consumed capturing one; and anyone she is
+      // holding is 拘束, not free to storm a building on the way past
+      // (what the charmed *do* pull down is their own side's houses, and
+      // systems/helen.ts is where that happens).
       if (walker.state === "helen" || world.has(walkerEntity, Charmed)) continue;
 
       for (const houseEntity of world.query(Position, House, Owner)) {

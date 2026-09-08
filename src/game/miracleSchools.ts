@@ -66,9 +66,9 @@ export const MIRACLE_SCHOOL: Record<MiracleId, MiracleSchool> = {
   fireRain: "fire",
   achilles: "fire",
   volcano: "fire",
-  // 水 — 渦巻き has no MiracleId of its own: it is only ever born from a
-  // 竜巻 that wanders into water (see systems/whirlpool.ts).
+  // 水
   reef: "water",
+  whirlpool: "water",
   holyWater: "water",
   helen: "water",
   tsunami: "water",

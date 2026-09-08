@@ -12,10 +12,10 @@ import {
 
 /**
  * The six schools as docs/original-miracles.md counts them, minus what
- * game2 keeps out of the panel's schools: 土地上下 and マグネット移動 (人)
- * are the terrain edits and 集結地移動 — the first two are always visible,
- * the third is filed under 人 — and 渦巻き (水) has no button because it
- * is only ever born from a 竜巻 that wanders into water.
+ * game2 keeps out of the panel's schools: 土地上下 (人) are the terrain
+ * edits, always visible rather than filed under a school. 渦巻き now has a
+ * button of its own like every other miracle in the original's list, so 水
+ * is back to five.
  */
 const ORIGINAL_SIZES: Record<MiracleCategory, number> = {
   human: 5, // 集結地移動, ペルセウス, 病原菌, 最終決戦 + game2's 守護者化
@@ -23,7 +23,7 @@ const ORIGINAL_SIZES: Record<MiracleCategory, number> = {
   earth: 5,
   air: 5,
   fire: 4,
-  water: 4, // 渦巻き has no button of its own
+  water: 5, // 岩礁, 渦巻き, 聖水の泉, トロイのヘレン, 津波
 };
 
 describe("MIRACLE_CATEGORY", () => {
