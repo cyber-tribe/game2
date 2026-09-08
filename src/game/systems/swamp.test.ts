@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
 import { Owner, Position, Swamp, Walker, type WalkerState } from "../components";
+import { SWAMP_CAPACITY, SWAMP_RADIUS } from "../constants";
 import { createSwamp } from "../swamp";
 import type { ImpactEffectEvent } from "./effects";
 import { createSwampSystem } from "./swamp";
@@ -151,7 +152,9 @@ describe("swampSystem and the plant school's own hero", () => {
     const world = new World();
     const hercules = createWalker(world, 5, 5, "hercules");
     const achilles = createWalker(world, 5, 5, "achilles");
-    createSwamp(world, 5, 5);
+    // Bottomless, so the first one in does not fill it — this is about who
+    // sinks, not about how many a fillable swamp takes (SWAMP_CAPACITY).
+    createSwamp(world, 5, 5, SWAMP_RADIUS, SWAMP_CAPACITY, true);
 
     createSwampSystem()(world, 0.1);
 
@@ -159,3 +162,36 @@ describe("swampSystem and the plant school's own hero", () => {
     expect(world.isAlive(achilles)).toBe(false);
   });
 });
+
+/**
+ * 「インフォメーションの『底無し沼』が○の場合は修復されるまで有効だが、
+ * ×の場合は1人が落ちると埋まって普通の地面に戻る」.
+ */
+describe("底なしでない沼は1人で埋まる", () => {
+  it("dries up after taking one walker", () => {
+    const world = new World();
+    const first = createWalker(world, 5, 5);
+    const second = createWalker(world, 5, 5);
+    createSwamp(world, 5, 5);
+
+    createSwampSystem()(world, 0.1);
+
+    expect(world.isAlive(first) && world.isAlive(second)).toBe(false); // one of them went in
+    expect(world.isAlive(first) || world.isAlive(second)).toBe(true); // the other walked over ground
+    expect(world.query(Swamp)).toHaveLength(0);
+  });
+
+  it("still takes everyone when the stage's swamps are bottomless", () => {
+    const world = new World();
+    const first = createWalker(world, 5, 5);
+    const second = createWalker(world, 5, 5);
+    createSwamp(world, 5, 5, SWAMP_RADIUS, SWAMP_CAPACITY, true);
+
+    createSwampSystem()(world, 0.1);
+
+    expect(world.isAlive(first)).toBe(false);
+    expect(world.isAlive(second)).toBe(false);
+    expect(world.query(Swamp)).toHaveLength(1);
+  });
+});
+

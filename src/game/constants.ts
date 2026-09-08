@@ -350,8 +350,22 @@ export const SWAMP_MANA_COST = 15;
 /** Radius (in tiles) a conjured swamp drowns walkers within. */
 export const SWAMP_RADIUS = 1.2;
 
-/** How many walkers a swamp swallows before it dries up and disappears. */
-export const SWAMP_CAPACITY = 5;
+/**
+ * How many walkers a swamp swallows before it dries up and disappears —
+ * only on stages where 底なし沼 is off (see game/worlds.ts).
+ *
+ * One. 「インフォメーションの『底無し沼』が○の場合は修復されるまで有効だが、
+ * ×の場合は**1人が落ちると埋まって普通の地面に戻る**」. game2 had five,
+ * which made the two kinds of swamp differ only in degree; at one they are
+ * different miracles. A fillable swamp is a single trap — worth spending on
+ * a leader walking toward you, worthless sprayed across a settlement — and
+ * the original's own advice on facing one follows from that: 「底無し沼×の
+ * 場合はある程度埋めたら完全に埋めるよりも他の作業に移った方が良い」.
+ *
+ * The stage list makes this the rarer case anyway: of the original's 48
+ * maps only five turn 底なし沼 off (docs/original-maps.md).
+ */
+export const SWAMP_CAPACITY = 1;
 
 /** How far from its cast point a 聖水の泉 converts walkers — see holyWater.ts. */
 export const HOLY_WATER_RADIUS = 1.5;
