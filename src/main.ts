@@ -846,6 +846,13 @@ async function bootstrap(world: WorldDefinition) {
     if (!vertex) return;
 
     if (toolMode === "shrine") {
+      // Checked before spending, like 岩礁's "only at sea": 「リーダーが
+      // いない状態ではこのコマンドは使用できない」, and charging for a cast
+      // that does nothing reads as the game being broken.
+      if (!simulation.hasLeader("player")) {
+        showEntityInfo("リーダーが居ないと集結地は動かせません（まず集結を）", "warning");
+        return;
+      }
       if (!trySpendPlayerMana(SHRINE_MOVE_MANA_COST)) return;
       simulation.moveShrine("player", vertex);
       simulation.recordEvent("player", "shrineMove");

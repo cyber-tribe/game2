@@ -95,19 +95,6 @@ export interface Walker {
   state: WalkerState;
   /** Tiles per second. */
   speed: number;
-  /**
-   * What this walker's strength and speed were before any hero miracle
-   * multiplied them (see hero.ts's promoteHero and HERO_TRAITS). Absent on
-   * a walker that has never been promoted.
-   *
-   * Kept so re-specializing from one hero to another re-derives both
-   * numbers from the same base instead of compounding: without it, a
-   * leader cycled ヘラクレス → オディッセウス → ヘラクレス would come out
-   * four times as strong as one that was simply cast ヘラクレス once, and
-   * the cheapest path to the strongest hero would be to buy every other
-   * hero first.
-   */
-  heroBase?: { strength: number; speed: number };
 }
 
 /** Where a Position-having entity is currently walking to. Removed on arrival. */
