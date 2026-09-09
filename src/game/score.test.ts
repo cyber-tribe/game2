@@ -3,29 +3,42 @@ import { MAX_STAGE_MARKS, MAX_STAGE_SCORE, SCORE_PER_SECOND, SCORE_VALUE } from 
 import { scoreValue, stageRating } from "./score";
 
 /**
- * 原作「経験点の稼ぎ方（効果の高い順）：**地下巨石・岩礁を使う**／敵リーダー
- * を倒す／ウォーカー同士の直接戦闘に勝つ／時間が経つ」. The order is the
- * design; the magnitudes are game2's own.
+ * 資料がスコアについて書いているのは**2つだけ**である。
+ *
+ * - 地下巨石「この神技には『なぜか経験点が非常に高い』という特徴があるため、
+ *   もっぱら点数稼ぎに使われる」
+ * - 岩礁「地下巨石ほどではないがそれなりに経験点が入るので点数稼ぎに」
+ *
+ * かつてここには4つの源（地下巨石・岩礁／敵リーダー撃破／直接戦闘の勝利／
+ * 時間経過）とその順位があり、`docs/original-miracles.md` の
+ * 「経験点の稼ぎ方（効果の高い順）」という一行を根拠にしていた。
+ * **その一行は資料に存在しない**（`plan/0167`）。
  */
 describe("scoreValue", () => {
-  it("ranks the four sources the way the source ranks them", () => {
-    expect(scoreValue("stonework")).toBeGreaterThan(scoreValue("enemyLeader"));
-    expect(scoreValue("enemyLeader")).toBeGreaterThan(scoreValue("fightWon"));
-    expect(scoreValue("fightWon")).toBeGreaterThan(scoreValue("time"));
+  it("pays for the two the guide names, and ranks them the way it ranks them", () => {
+    // 「なぜか経験点が非常に高い」 vs 「地下巨石ほどではないが、それなりに」
+    expect(scoreValue("megalith")).toBeGreaterThan(scoreValue("reef"));
+    expect(scoreValue("reef")).toBeGreaterThan(0);
+  });
+
+  it("keeps the trickle far below either of them", () => {
+    // 時間は game2 のもので資料の言葉ではない。資料が名指しした2つを
+    // 上回ってはいけない——それでは「地下巨石で点を稼ぐ」が嘘になる。
+    expect(scoreValue("time") * 60).toBeLessThan(scoreValue("reef"));
   });
 
   it("reads time as a per-second rate and the rest as per occurrence", () => {
     expect(scoreValue("time")).toBe(SCORE_PER_SECOND);
-    expect(scoreValue("stonework")).toBe(SCORE_VALUE.stonework);
+    expect(scoreValue("megalith")).toBe(SCORE_VALUE.megalith);
+    expect(scoreValue("reef")).toBe(SCORE_VALUE.reef);
   });
 
   /**
-   * 「低コストでスコア効率が高い」 is said of 岩礁 in particular: a player
-   * chasing marks builds rather than fights, and the numbers have to make
-   * that true rather than merely say it.
+   * 「もっぱら点数稼ぎに使われる」——マークを埋めたいなら建てることになる、
+   * というのが原作の設計である。
    */
-  it("makes one 地下巨石 worth more than a long skirmish", () => {
-    expect(scoreValue("stonework")).toBeGreaterThan(scoreValue("fightWon") * 10);
+  it("makes 地下巨石 the way to fill the bar", () => {
+    expect(MAX_STAGE_SCORE / scoreValue("megalith")).toBeLessThan(30);
   });
 });
 

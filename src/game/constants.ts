@@ -286,27 +286,45 @@ export const IMPACT_EFFECT_DURATION = 0.5;
 export const DISASTER_MARKER_DURATION = 12;
 
 /**
- * What each of the original's four score sources is worth — 「経験点の
- * 稼ぎ方（効果の高い順）：地下巨石・岩礁を使う／敵リーダーを倒す／
- * ウォーカー同士の直接戦闘に勝つ／時間が経つ」 (see game/score.ts).
+ * What the original actually says a score is made of.
  *
- * The *order* is the original's and is what these numbers exist to
- * preserve: one 地下巨石 or 岩礁 outweighs a leader, a leader outweighs a
- * won fight, and a won fight outweighs a good many seconds of simply being
- * alive. The magnitudes are game2's own, calibrated against a real match
- * rather than borrowed from the original's five-figure scale — see
- * stageRating on why that scale is deliberately not transplanted.
+ * Two things, and only two:
+ *
+ * - 地下巨石「この神技には**「なぜか経験点が非常に高い」**という特徴が
+ *   あるため、もっぱら点数稼ぎに使われる」
+ * - 岩礁「**地下巨石ほどではない**がそれなりに経験点が入るので点数稼ぎに」
+ *
+ * This used to be four sources — 地下巨石・岩礁 / 敵リーダーを倒す /
+ * 直接戦闘に勝つ / 時間が経つ — quoted from a "経験点の稼ぎ方（効果の高い
+ * 順）" line in docs/original-miracles.md. **That line is not in the
+ * source.** Searching the guide's twenty-two pages: 「効果の高い順」 0 hits,
+ * 「稼ぎ方」 0 hits, and the two combat entries appear only as tactics,
+ * never as scoring. It was written into game2's own notes and then built
+ * on (see plan/0167).
+ *
+ * The two that survive are not equal either: the guide puts 地下巨石 well
+ * above 岩礁, and they used to share one value.
  */
 export const SCORE_VALUE = {
-  /** 地下巨石 and 岩礁 — 「低コストでスコア効率が高い」. */
-  stonework: 300,
-  /** Killing the opposing リーダー. */
-  enemyLeader: 120,
-  /** Winning one walker-on-walker fight. */
-  fightWon: 20,
+  /** 地下巨石 — 「なぜか経験点が非常に高い」, and the reason to cast it at all. */
+  megalith: 300,
+  /** 岩礁 — 「地下巨石ほどではないがそれなりに」. Worth casting for points, worth less. */
+  reef: 120,
 } as const;
 
-/** Score for simply staying in the match, per second. The weakest source, as the original ranks it. */
+/**
+ * Score for simply staying in the match, per second.
+ *
+ * **game2's own, not the original's.** The guide never names a third
+ * source, but it does say a stage without 地下巨石 has a problem —
+ * 「ただし地下巨石は無いので、他の方法でスコアを確保したいところです」
+ * (No.34-36) — so something else must exist; it just never says what. A
+ * slow trickle is the smallest thing that keeps such a stage scoreable
+ * without inventing a mechanic the source is silent about.
+ *
+ * Deliberately tiny against the two real sources: ten minutes of it is
+ * worth two 地下巨石.
+ */
 export const SCORE_PER_SECOND = 1;
 
 /**
