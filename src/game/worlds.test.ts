@@ -258,3 +258,29 @@ describe("terrainEditRule across the campaign", () => {
     }
   });
 });
+
+/**
+ * The two per-stage settings that gate operations rather than miracles —
+ * see docs/original-maps.md's ○× table.
+ */
+describe("面ごとに落とされる操作", () => {
+  it("opens terraforming on exactly the five stages the source names", () => {
+    const open = WORLDS.map((world, i) => (world.openTerraforming ? i + 1 : 0)).filter(Boolean);
+
+    expect(open).toEqual([1, 2, 3, 4, 19]);
+  });
+
+  it("takes スプログ away on ゼウス's three stages and nowhere else", () => {
+    const denied = WORLDS.map((world, i) => (world.sprogAllowed ? 0 : i + 1)).filter(Boolean);
+
+    expect(denied).toEqual([46, 47, 48]);
+    for (const stage of denied) expect(WORLDS[stage - 1].god).toBe("ゼウス");
+  });
+
+  it("keeps 底なし沼 off on exactly the five stages the source names", () => {
+    const fillable = WORLDS.map((world, i) => (world.bottomlessSwamp ? 0 : i + 1)).filter(Boolean);
+
+    expect(fillable).toEqual([7, 8, 9, 35, 36]);
+  });
+});
+
