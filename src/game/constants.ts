@@ -932,12 +932,20 @@ export const ENEMY_VIEWPORT_ACROSS_TILES = 15;
 export const ENEMY_VIEWPORT_ALONG_TILES = 56.25;
 
 /**
- * Mana cost of one 毒カビ outbreak. Cheap on purpose, and the price is a
- * design statement: the original's "複数設置すると大繁殖" only means
- * anything if casting several in one place is a real option, so this is
- * priced per seed rather than per acre of eventual rot.
+ * Mana cost of one 毒カビ outbreak.
+ *
+ * The original prices this *against* the player, and says so plainly:
+ * 「**マナ消費が比較的多い**、複数まとめて設置する必要がある、すぐ消えて
+ * しまう、と短所ばかりが目立つ」. Expensive **and** needing several casts
+ * to do anything is the whole complaint — so pricing it cheap "because you
+ * have to cast several" (which is what this used to say) inverted the one
+ * thing the source is explicit about.
+ *
+ * Above 沼 and 地震, below 地下巨石: the guide's own cheapest-first list
+ * for clearing an island is 「渦巻き → 毒カビ → 地下巨石」 (No.24), and
+ * this is the middle of it.
  */
-export const FUNGUS_MANA_COST = 14;
+export const FUNGUS_MANA_COST = 20;
 
 /**
  * Seconds between growth steps of every 毒カビ patch — see
@@ -1093,13 +1101,21 @@ export const TORNADO_MANA_COST = 22;
  * Mana cost of casting a 渦巻き directly — 「渦巻き：海面上をランダムに
  * 動き回り、既にある土地を削り取る。一定時間で分裂し被害が広がる」.
  *
- * Cheaper than the 竜巻 that can throw off several of them, dearer than a
- * 岩礁: one whirlpool, placed where you want it, is a smaller thing than a
- * tornado's whole run at sea, but it is the only miracle in the game that
- * takes land away permanently and it arrives already next to the coast you
- * aimed it at. A tornado has to survive its way out to water first.
+ * The one miracle the original calls cheap in so many words:
+ * 「この神技のメリットとしては**消費マナがかなり少ない**点と必要以上に
+ * 被害が拡大しないことがある」, contrasted there with sending a 竜巻 out to
+ * sea instead. The guide's cheapest-first list for clearing an island
+ * starts with it (No.24: 渦巻き → 毒カビ → 地下巨石).
+ *
+ * Cheap, but not as cheap as 「かなり少ない」 alone would argue for, and
+ * the reason is the other half of that sentence. The original's whirlpool
+ * is cheap *because* 「必要以上に被害が拡大しない」 — game2's splits
+ * (WHIRLPOOL_MAX_SPLITS), so its damage does spread. Pricing it at 8 would
+ * be taking the discount the original gives for a restraint game2 has not
+ * implemented. 12 keeps it below 沼 and first in the guide's list without
+ * that.
  */
-export const WHIRLPOOL_MANA_COST = 18;
+export const WHIRLPOOL_MANA_COST = 12;
 
 /** How long a 渦巻き lives once a 竜巻 reaches water, in seconds. */
 export const WHIRLPOOL_LIFETIME = 16;
@@ -1223,13 +1239,19 @@ export const LIGHTNING_SCATTER = 3;
 export const LIGHTNING_BOLT_RADIUS = 1;
 
 /**
- * Mana cost of a 雷 — below fire rain.
+ * Mana cost of a 雷.
  *
- * It covers a comparable area but cannot be aimed within it: half a
- * scattered strike lands on ground nobody cared about. The discount is for
- * the uncertainty, not for weakness.
+ * The original files it with 沼 as the cheap option to open with:
+ * 「比較的**マナ消費の少ない雷や沼**で……敵の勢力拡大を妨害することで、
+ * 早い段階で主導権を取れる」 (No.34-36). So it sits beside SWAMP_MANA_COST
+ * rather than in the middle of the table.
+ *
+ * It covers an area comparable to fire rain's but cannot be aimed within
+ * it: half a scattered strike lands on ground nobody cared about. The
+ * discount is for the uncertainty, not for weakness — and at low levels the
+ * uncertainty is most of the miracle (see miracleLevels.ts).
  */
-export const LIGHTNING_MANA_COST = 20;
+export const LIGHTNING_MANA_COST = 16;
 
 /** How long a 嵐's cloud sits over its ground, in seconds. */
 export const STORM_LIFETIME = 12;
