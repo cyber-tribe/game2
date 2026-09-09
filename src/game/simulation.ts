@@ -46,6 +46,7 @@ import { createHolyWaterSystem } from "./systems/holyWater";
 import { createFirePillarSystem } from "./systems/firePillar";
 import { createPlagueSystem } from "./systems/plague";
 import { createStormSystem } from "./systems/storm";
+import { createLavaFlowSystem } from "./systems/lavaFlow";
 import { createQuakeSystem } from "./systems/quake";
 import { createTornadoSystem } from "./systems/tornado";
 import { createWhirlpoolSystem } from "./systems/whirlpool";
@@ -390,6 +391,17 @@ export class Simulation {
       // system because the two are the same miracle's two aftermaths: the
       // crack that kills, and the ground that cannot be repaired yet.
       .add(createQuakeSystem())
+      // 「水を埋め立てるとさらに外側へ流れ出す」 — a volcano's flow waits on
+      // the shoreline that stopped it, and this is what notices when that
+      // shoreline is filled in. See game/lavaFlow.ts.
+      .add(
+        createLavaFlowSystem({
+          heightmap: config.heightmap,
+          onFlow: () => {
+            this.terrainChanged = true;
+          },
+        }),
+      )
       .add(
         createFungusSystem({
           heightmap: config.heightmap,

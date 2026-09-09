@@ -372,6 +372,24 @@ export interface Quake {
   path: readonly { x: number; y: number }[];
 }
 
+/**
+ * A lava flow still waiting against the water that stopped it — 原作
+ * 「溶岩は水地形で止まる。**水を埋め立てるとさらに外側へ流れ出す**」.
+ *
+ * Not a hazard that ticks: nothing happens to it while the shoreline holds.
+ * It is a promise the map keeps — fill that water in and the lava you
+ * thought was finished comes through. See game/lavaFlow.ts and
+ * systems/lavaFlow.ts.
+ */
+export interface LavaFlow {
+  /** The water vertices it stopped against, and where it resumes from. */
+  blocked: readonly { x: number; y: number }[];
+  /** Lava it never got to spend. */
+  remaining: number;
+  /** The rock hardness this flow lays down, so a resumed flow matches the eruption that started it. */
+  hardness: number;
+}
+
 export const Position = defineComponent<Position>("Position");
 export const Owner = defineComponent<Owner>("Owner");
 export const Walker = defineComponent<Walker>("Walker");
@@ -390,3 +408,4 @@ export const HeroCooldown = defineComponent<HeroCooldown>("HeroCooldown");
 export const Drowning = defineComponent<Drowning>("Drowning");
 export const Detour = defineComponent<Detour>("Detour");
 export const Quake = defineComponent<Quake>("Quake");
+export const LavaFlow = defineComponent<LavaFlow>("LavaFlow");
