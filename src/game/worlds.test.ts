@@ -277,6 +277,18 @@ describe("面ごとに落とされる操作", () => {
     for (const stage of denied) expect(WORLDS[stage - 1].god).toBe("ゼウス");
   });
 
+  /**
+   * 「溺れた人間の救出」 — × on all fifteen of the first stages and then
+   * largely ○ from No.16 on, with two later exceptions. The shape matters:
+   * the operation arrives mid-campaign rather than being there from the
+   * start, and can still be taken away again afterwards.
+   */
+  it("withholds 救出 on exactly the seventeen stages the source names", () => {
+    const denied = WORLDS.map((world, i) => (world.rescueAllowed ? 0 : i + 1)).filter(Boolean);
+
+    expect(denied).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 26, 39]);
+  });
+
   it("keeps 底なし沼 off on exactly the five stages the source names", () => {
     const fillable = WORLDS.map((world, i) => (world.bottomlessSwamp ? 0 : i + 1)).filter(Boolean);
 

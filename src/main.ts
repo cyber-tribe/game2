@@ -64,6 +64,7 @@ import { applyHurricane } from "./game/hurricane";
 import { createFirePillar } from "./game/firePillar";
 import { strikeLightning } from "./game/lightning";
 import { seedPlague } from "./game/plague";
+import { rescueDrowning } from "./game/rescue";
 import { createQuake, isGroundShaking } from "./game/quake";
 import { createStorm } from "./game/storm";
 import { createTornado, createWhirlpool } from "./game/tornado";
@@ -812,6 +813,27 @@ async function bootstrap(world: WorldDefinition) {
   };
 
   /**
+   * The original's 「溺れた人間の救出」 — one of the ten per-stage settings,
+   * and the only one of them that hands the player an operation rather
+   * than taking one away. See game/rescue.ts.
+   *
+   * Free, like スプログ: the ○× table lists operations, not miracles, and
+   * a rescue that cost mana would be unavailable exactly when it matters.
+   */
+  const applyRescueAt = (vertex: { x: number; y: number }): void => {
+    if (!world.rescueAllowed) {
+      showEntityInfo("この面では溺れた人を救出できません", "warning");
+      return;
+    }
+    if (rescueDrowning(simulation.world, heightmap, "player", vertex) === undefined) {
+      showEntityInfo("このあたりに溺れている自分の民は居ません", "warning");
+      return;
+    }
+    vibrate(15);
+    showEntityInfo("溺れていた民を岸へ引き上げました");
+  };
+
+  /**
    * One 地下巨石 cast. Split out of applyTool because the original's own
    * description makes this repeatable: 「発生ボタンを押し続けると、一帯に
    * より多くの巨石を発生させる」 — see the hold handling in the pointer
@@ -917,6 +939,11 @@ async function bootstrap(world: WorldDefinition) {
 
     const vertex = renderer.pickVertex(local.x, local.y);
     if (!vertex) return;
+
+    if (toolMode === "rescue") {
+      applyRescueAt(vertex);
+      return;
+    }
 
     if (toolMode === "shrine") {
       // Checked before spending, like 岩礁's "only at sea": 「リーダーが
@@ -1599,6 +1626,11 @@ async function bootstrap(world: WorldDefinition) {
   }
   // スプログ is not a miracle (it costs no mana) but it is one of the ten
   // per-stage settings, so it goes dark the same way — see sprogAllowed.
+  // 「溺れた人間の救出」 is the same kind of per-stage setting, and goes
+  // dark the same way — see rescueAllowed.
+  if (!world.rescueAllowed) {
+    document.querySelector<HTMLButtonElement>('#toolbar [data-tool="rescue"]')?.setAttribute("disabled", "true");
+  }
   if (!world.sprogAllowed) {
     document.querySelector<HTMLButtonElement>('#toolbar [data-tool="sprog"]')?.setAttribute("disabled", "true");
   }

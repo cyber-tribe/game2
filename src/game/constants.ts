@@ -248,6 +248,26 @@ export const COMBAT_RANGE = 0.5;
 export const DROWNING_BREATH_SECONDS = 4;
 
 /**
+ * How far from the tap 救出 looks for one of your own drowning followers,
+ * in tiles — 「溺れた人間の救出」, see game/rescue.ts.
+ *
+ * Generous, because the thing being aimed at is thrashing in water rather
+ * than standing still, and a rescue that misses costs the walker its life
+ * while the player taps again.
+ */
+export const RESCUE_RADIUS = 6;
+
+/**
+ * How far 救出 will search for a shore to put the rescued walker on, in
+ * vertices.
+ *
+ * Beyond this the walker is genuinely adrift and the rescue fails: hauling
+ * someone across half the map would be a teleport, and a free teleport is
+ * a far bigger operation than the one the original's ○× is granting.
+ */
+export const RESCUE_SHORE_SEARCH = 8;
+
+/**
  * Seconds an ImpactEffect (see systems/effects.ts) stays on screen before
  * effectAgingSystem destroys it — a kill/capture/drowning's visible
  * lifetime is brief on purpose: it's a punctuation mark on the moment it

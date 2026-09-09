@@ -48,6 +48,7 @@ export type IconKind =
   | "goToShrine"
   | "fight"
   | "sprog"
+  | "rescue"
   | "mana"
   | "population";
 

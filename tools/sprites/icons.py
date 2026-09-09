@@ -833,6 +833,28 @@ ICONS.update({
         "..oooooo........",
         "................",
     ],
+    # 救出: a life ring. The one per-stage ○× that grants an operation
+    # rather than taking one away, so it wants a silhouette that reads as
+    # help rather than as a hazard — and a ring is legible at 16px in a way
+    # a swimmer is not.
+    "rescue": [
+        "................",
+        ".....oooooo.....",
+        "...oorrrSSSoo...",
+        "..oorrrrSSSSoo..",
+        "..orrrooooSSSo..",
+        ".orrro....oSSSo.",
+        ".orro......oSSo.",
+        ".orro......oSSo.",
+        ".oSSo......orro.",
+        ".oSSo......orro.",
+        ".oSSSo....orrro.",
+        "..oSSSoooorrro..",
+        "..ooSSSSrrrroo..",
+        "...ooSSSrrroo...",
+        ".....oooooo.....",
+        "................",
+    ],
     # Status-row icons: mana as a charged orb, population as a pair.
     "mana": [
         "................",
@@ -965,6 +987,7 @@ ICON_KINDS = (
     "goToShrine",
     "fight",
     "sprog",
+    "rescue",
     "inspect",
     "raise",
     "lower",
