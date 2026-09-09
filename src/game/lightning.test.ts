@@ -109,3 +109,62 @@ describe("strikeLightning", () => {
     expect(world.query(Walker)).toHaveLength(0);
   });
 });
+
+/**
+ * 原作「雷はボタンを押し続けている間は落ち続ける」. main.ts repeats the
+ * cast on a held press, aiming every volley at the same point — which is
+ * only sound because the miracle scatters its own bolts. These check the
+ * property that decision rests on.
+ */
+describe("strikeLightning held on one spot", () => {
+  const seeded = () => {
+    let seed = 12345;
+    return () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+  };
+
+  it("lands a different volley each time, without being re-aimed", () => {
+    const world = new World();
+    const rng = seeded();
+
+    const first = strikeLightning(world, undefined, { x: 20, y: 20 }, rng);
+    const second = strikeLightning(world, undefined, { x: 20, y: 20 }, rng);
+
+    const key = (bolts: { x: number; y: number }[]) => bolts.map((b) => `${b.x.toFixed(3)},${b.y.toFixed(3)}`).join("|");
+    expect(key(second)).not.toBe(key(first));
+  });
+
+  it("keeps every repeat inside the same scatter, so a hold never creeps off the target", () => {
+    const world = new World();
+    const rng = seeded();
+
+    for (let volley = 0; volley < 8; volley++) {
+      for (const bolt of strikeLightning(world, undefined, { x: 20, y: 20 }, rng)) {
+        expect(Math.hypot(bolt.x - 20, bolt.y - 20)).toBeLessThanOrEqual(LIGHTNING_SCATTER + 0.001);
+      }
+    }
+  });
+
+  /**
+   * Held over a village, repeated volleys clear it — the reason the
+   * original bothers to say the button can be held at all.
+   */
+  it("clears a crowd that one volley only thins", () => {
+    const world = new World();
+    const rng = seeded();
+    // Spread around the scatter's own edge, so one volley cannot cover
+    // them all — a crowd packed onto the aim point would die to a single
+    // cast and prove nothing about holding.
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      spawnWalker(world, 20 + Math.cos(angle) * 2.8, 20 + Math.sin(angle) * 2.8);
+    }
+
+    strikeLightning(world, undefined, { x: 20, y: 20 }, rng);
+    const afterOne = [...world.query(Walker)].length;
+    for (let volley = 0; volley < 10; volley++) strikeLightning(world, undefined, { x: 20, y: 20 }, rng);
+    const afterMany = [...world.query(Walker)].length;
+
+    expect(afterOne).toBeGreaterThan(0); // one volley is not enough
+    expect(afterMany).toBeLessThan(afterOne);
+  });
+});
