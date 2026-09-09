@@ -334,8 +334,21 @@ export const MAX_STAGE_MARKS = 10;
  */
 export const MAX_MIRACLE_LEVEL = 5;
 
-/** Experience points per level. One stage's 稲妻マーク is at most MAX_STAGE_MARKS, so this is a couple of good stages per level in a school. */
-export const MIRACLE_LEVEL_STEP = 20;
+/**
+ * Experience points per level.
+ *
+ * A stage yields its 稲妻マーク count as points — at most MAX_STAGE_MARKS —
+ * and the player puts them where they like (see miracleLevels.ts's
+ * allocate). Ten per level means a school reaches MAX_MIRACLE_LEVEL on
+ * four perfect stages' worth of points, which over forty-eight stages
+ * leaves room to raise several schools while still making 「重点配分」 a
+ * real choice rather than a formality.
+ *
+ * Was 20, back when a stage sprayed its marks into every school the player
+ * had cast from: the same points now arrive once instead of several times
+ * over, so the rate had to come with them.
+ */
+export const MIRACLE_LEVEL_STEP = 10;
 
 /**
  * How much longer 地震・竜巻・嵐・火柱 last per level — 「効果の持続時間が

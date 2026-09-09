@@ -14,7 +14,9 @@ import {
   FOREST_MANA_COST,
   ROAD_MANA_COST,
   WALL_MANA_COST,
+  MAX_MIRACLE_LEVEL,
   MEGALITH_MANA_COST,
+  MIRACLE_LEVEL_STEP,
   FUNGUS_MANA_COST,
   TSUNAMI_MANA_COST,
   GUARDIAN_MANA_COST,
@@ -90,9 +92,9 @@ import {
 import { EntityLayer } from "./render/EntityLayer";
 import { describeInspectableEntity } from "./render/entityInfoLabel";
 import { Hud } from "./render/Hud";
-import { MIRACLE_SCHOOLS, MIRACLE_SCHOOL, type MiracleSchool } from "./game/miracleSchools";
+import { MIRACLE_SCHOOLS, type MiracleSchool } from "./game/miracleSchools";
 import {
-  awardStage,
+  allocate,
   decodeExperience,
   durationScaleAt,
   encodeExperience,
@@ -416,22 +418,72 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
     // on #world-select next time, the same manual "code on paper" flow the
     // doc's own "パスワード" wording implies.
     if (outcome.winner === "player") {
-      // 「各マップごとにスコアに応じて経験点が入り」 — the stage's marks are
-      // awarded to the schools the player actually cast from on it, and the
-      // result rides out in the password (see game/miracleLevels.ts).
-      const earned = awardStage(
-        experience,
-        events
-          .filter((event) => event.faction === "player" && event.type in MIRACLE_SCHOOL)
-          .map((event) => event.type as MiracleId),
-        simulation.getStageRating("player"),
-      );
+      /**
+       * 原作の経験点は**プレイヤーが配分する**——「経験点を地と気レベルに
+       * 重点配分して下さい」「経験点の使い道に迷ったら水レベルを上げると、
+       * 次の太陽神の宮で役に立ちます」。次が何の神かを見て振り分けること
+       * 自体が遊びなので、面をクリアした画面でその場で配る。
+       *
+       * 配れるのは稲妻マークの数だけ——「経験点10点を取ってクリアできる
+       * でしょう」と「稲妻マーク10個」が上限で一致する。
+       */
+      let earned = experience;
+      let unspent = simulation.getStageRating("player");
       const nextId = nextWorldId(world.id);
-      const password = nextId ? buildPassword(nextId, encodeExperience(earned)) : undefined;
+
       const passwordLine = document.createElement("div");
       passwordLine.id = "match-record-password";
-      passwordLine.textContent = password ? `次のワールドのパスワード: ${password}` : "全ワールドを制覇しました！";
-      matchRecordList.appendChild(passwordLine);
+
+      const allocation = document.createElement("div");
+      allocation.id = "match-record-allocation";
+
+      const renderAllocation = () => {
+        const password = nextId ? buildPassword(nextId, encodeExperience(earned)) : undefined;
+        passwordLine.textContent = password
+          ? `次のワールドのパスワード: ${password}`
+          : "全ワールドを制覇しました！";
+
+        allocation.replaceChildren();
+        if (unspent === 0 && simulation.getStageRating("player") === 0) return;
+
+        const heading = document.createElement("div");
+        heading.className = "allocation-heading";
+        heading.textContent = `経験点 ${unspent} 点 —— 上げたい系統に振り分けてください`;
+        allocation.appendChild(heading);
+
+        for (const { id, label } of MIRACLE_SCHOOLS) {
+          const row = document.createElement("div");
+          row.className = "allocation-row";
+
+          const name = document.createElement("span");
+          name.className = "allocation-name";
+          name.textContent = `${label} Lv${levelOf(earned, id)}`;
+
+          const detail = document.createElement("span");
+          detail.className = "allocation-detail";
+          // 次の1段までの残りを出す。どこへ入れるか決める材料はこれである。
+          const toNext = MIRACLE_LEVEL_STEP - (earned[id] % MIRACLE_LEVEL_STEP);
+          detail.textContent = levelOf(earned, id) >= MAX_MIRACLE_LEVEL ? "最大" : `次まで ${toNext}`;
+
+          const add = document.createElement("button");
+          add.type = "button";
+          add.className = "allocation-button";
+          add.textContent = "＋";
+          add.disabled = unspent === 0;
+          add.addEventListener("click", () => {
+            if (unspent === 0) return;
+            earned = allocate(earned, id);
+            unspent--;
+            renderAllocation();
+          });
+
+          row.append(name, detail, add);
+          allocation.appendChild(row);
+        }
+      };
+
+      renderAllocation();
+      matchRecordList.append(allocation, passwordLine);
     }
 
     matchRecordPanel.classList.remove("hidden");
