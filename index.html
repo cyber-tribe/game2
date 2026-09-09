@@ -579,6 +579,60 @@
       }
 
       /*
+       * 経験点の配分（原作「経験点を地と気レベルに重点配分して下さい」）。
+       * 面をクリアした画面でその場で振り分けるので、戦いの記録の**先頭**に
+       * 置く——次のワールドのパスワードは配分の結果を含むため、決めてから
+       * 書き写すことになる。
+       */
+      #match-record-allocation {
+        margin: 10px 0;
+        padding: 8px 10px;
+        background: var(--stone-dark);
+        border: 1px solid var(--ink);
+      }
+
+      .allocation-heading {
+        font-size: 12px;
+        font-weight: bold;
+        margin-bottom: 6px;
+      }
+
+      .allocation-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 2px 0;
+      }
+
+      .allocation-name {
+        flex: 0 0 84px;
+        font-size: 13px;
+      }
+
+      .allocation-detail {
+        flex: 1 1 auto;
+        font-size: 11px;
+        color: var(--ink-faded);
+      }
+
+      .allocation-button {
+        flex: none;
+        /* 44px is the smallest target a thumb hits reliably — the same
+           reason the toolbar's own buttons are sized the way they are. */
+        min-width: 44px;
+        min-height: 32px;
+        font-size: 15px;
+        font-family: inherit;
+        color: var(--ink);
+        background: var(--stone-light);
+        border: 1px solid var(--ink);
+      }
+
+      .allocation-button:disabled {
+        opacity: 0.4;
+      }
+
+      /*
        * Kept pinned below the (scrollable) event list rather than inside
        * it, so it's always visible without scrolling down — see
        * plan/archived/0038-play-again.md. This button is deliberately left in place
