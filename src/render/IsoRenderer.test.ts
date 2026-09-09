@@ -4,14 +4,16 @@ import { REEF_HARDNESS, VOLCANO_ROCK_HARDNESS, type Heightmap } from "../world/h
 import {
   EDGE_STRATA,
   IsoRenderer,
-  TERRAIN_COLOR,
   TILE_HEIGHT,
   TILE_WIDTH,
+  faceBrightnessOf,
   isWithinTileBounds,
+  turfFillFor,
   visibleTileBounds,
   volcanoGlowIntensity,
   waterFrameIndex,
   type TileBounds,
+  type Vec3,
 } from "./IsoRenderer";
 function blankLayer(width: number, height: number): boolean[][] {
   return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
@@ -124,23 +126,23 @@ describe("IsoRenderer.isAnimating", () => {
 });
 
 describe("IsoRenderer.redraw with bounds", () => {
-  it("draws far fewer triangles when given a small, edge-free bounds than the whole map", () => {
+  it("draws far fewer squares when given a small, edge-free bounds than the whole map", () => {
     const heightmap = flatHeightmap(40, 40, 5);
     const renderer = new IsoRenderer(heightmap);
     const polySpy = vi.spyOn(Graphics.prototype, "poly");
 
     polySpy.mockClear();
-    renderer.redraw(); // whole map: 40*40 tiles * 2 triangles each, plus a
-    // perimeter of vertical walls along the map's own outer edge (see
-    // drawEdgeWall) — an interior height difference never draws one.
+    renderer.redraw(); // whole map: one square per tile (see fillTerrainQuad),
+    // plus a perimeter of vertical walls along the map's own outer edge
+    // (see drawEdgeWall) — an interior height difference never draws one.
     const fullMapCalls = polySpy.mock.calls.length;
 
     polySpy.mockClear();
     renderer.redraw({ minX: 10, maxX: 14, minY: 10, maxY: 14 }); // 5*5 interior tiles, no map edges crossed
     const boundedCalls = polySpy.mock.calls.length;
 
-    expect(fullMapCalls).toBeGreaterThan(40 * 40 * 2);
-    expect(boundedCalls).toBe(5 * 5 * 2);
+    expect(fullMapCalls).toBeGreaterThan(40 * 40);
+    expect(boundedCalls).toBe(5 * 5);
     expect(boundedCalls).toBeLessThan(fullMapCalls);
     polySpy.mockRestore();
   });
@@ -232,22 +234,32 @@ describe("IsoRenderer.redraw (sloped mesh)", () => {
     }
   });
 
-  it("draws more fills once a raised patch turns neighboring underwater tiles into dry land", () => {
+  it("turns neighboring underwater tiles into dry land once a patch is raised", () => {
+    // Water and land are both one square per tile now (see fillTerrainQuad),
+    // so the fill *count* no longer moves — what changes is what those
+    // squares are filled with. An all-water map is one repeated wave frame;
+    // dry land brings in its terrain's own dither and the plain shaded
+    // colors of slopes.
+    const fillsFor = (heightmap: Heightmap) =>
+      drawInstructions(new IsoRenderer(heightmap)).filter((i) => i.action === "fill");
+
     const heightmap = flatHeightmap(5, 5, 0); // every tile starts as water (elevation 0 == waterLevel 0)
-    const flatFillCount = drawInstructions(new IsoRenderer(heightmap)).filter((i) => i.action === "fill").length;
+    const beforeFills = fillsFor(heightmap);
+    expect(beforeFills).toHaveLength(5 * 5);
+    expect(new Set(beforeFills.map((f) => f.data.style!.texture)).size).toBe(1);
 
     // Raising every corner of the interior tile (2,2) also partially lifts
     // its neighbors' averaged heights (corners are shared), pushing some of
-    // them from water (1 flat quad) into dry land (2 shaded triangles) —
-    // with no vertical wall anywhere, since none of this touches the map's
-    // own outer edge.
+    // them from water into dry land — with no vertical wall anywhere, since
+    // none of this touches the map's own outer edge.
     heightmap.vertices[2][2] = 4;
     heightmap.vertices[2][3] = 4;
     heightmap.vertices[3][2] = 4;
     heightmap.vertices[3][3] = 4;
-    const raisedFillCount = drawInstructions(new IsoRenderer(heightmap)).filter((i) => i.action === "fill").length;
 
-    expect(raisedFillCount).toBeGreaterThan(flatFillCount);
+    const afterFills = fillsFor(heightmap);
+    expect(afterFills).toHaveLength(5 * 5); // still exactly one square per tile
+    expect(new Set(afterFills.map((f) => f.data.style!.texture)).size).toBeGreaterThan(1);
   });
 
   /**
@@ -292,8 +304,7 @@ describe("IsoRenderer.redraw (sloped mesh)", () => {
     // a plain color — not what this test is about — so walls are singled
     // out by their plain Texture.WHITE fill (see the dithering tests below)
     // rather than by position, since redraw() interleaves each tile's own
-    // walls right after its 2 top triangles instead of drawing all walls
-    // last. Only tile (1,1) has no map-edge wall; every other tile borders
+    // walls right after its top square instead of drawing all walls last. Only tile (1,1) has no map-edge wall; every other tile borders
     // the map's true edge on at least one side, shading toward one of two
     // tones depending on which way it faces (see drawEdgeWall's fixed
     // outward normal per direction) — exactly 2 distinct wall colors.
@@ -326,10 +337,10 @@ describe("IsoRenderer.redraw (sloped mesh)", () => {
     heightmap.terrain = "desert";
     const renderer = new IsoRenderer(heightmap);
     const fills = drawInstructions(renderer).filter((i) => i.action === "fill");
-    // 2 flat top triangles + 4 edge walls, each in EDGE_STRATA bands.
-    expect(fills).toHaveLength(2 + 4 * EDGE_STRATA.length);
+    // 1 flat top square + 4 edge walls, each in EDGE_STRATA bands.
+    expect(fills).toHaveLength(1 + 4 * EDGE_STRATA.length);
 
-    // redraw() fills a tile's own 2 triangles first, then always draws its
+    // redraw() fills a tile's own square first, then always draws its
     // 4 edge walls in north/east/south/west order (see its own body) — a
     // stable enough contract for this single-tile scene to just read the
     // walls off by position instead of hunting for each one by its screen
@@ -337,12 +348,10 @@ describe("IsoRenderer.redraw (sloped mesh)", () => {
     // since toScreen can map distinct (x, y, elevation) triples onto the
     // same screen point).
     const colors = fills.map((f) => f.data.style!.color);
-    const [topA, topB] = colors;
     // The topmost band of each wall, in north/east/south/west order.
     const bandsPerWall = EDGE_STRATA.length;
-    const [north, east, south, west] = [0, 1, 2, 3].map((i) => colors[2 + i * bandsPerWall]);
+    const [north, east, south, west] = [0, 1, 2, 3].map((i) => colors[1 + i * bandsPerWall]);
 
-    expect(topA).toBe(topB); // flat, so both triangles are the same unshaded desert color
     expect(north).toBe(east);
     expect(south).toBe(west);
     expect(north).not.toBe(south);
@@ -354,95 +363,87 @@ describe("IsoRenderer.redraw (sloped mesh)", () => {
     expect(nb).toBeGreaterThan(sb);
   });
 
-  it("shades an interior slope more the steeper it is, with no minimum threshold and never a vertical wall", () => {
-    const DESERT = TERRAIN_COLOR.desert;
-    const [dr, dg, db] = channels(DESERT);
+  it("draws an interior slope as one square, never a vertical wall", () => {
+    const heightmap = flatHeightmap(6, 6, 5); // big enough that tile (2,2) sits nowhere near the map's own edge
+    heightmap.vertices[2][2] += 4;
+    const renderer = new IsoRenderer(heightmap);
+    renderer.redraw({ minX: 2, maxX: 2, minY: 2, maxY: 2 }); // isolates tile (2,2)'s own draws
 
-    const maxShadeDistance = (cornerDelta: number): number => {
-      const heightmap = flatHeightmap(6, 6, 5); // big enough that tile (2,2) sits nowhere near the map's own edge
-      heightmap.terrain = "desert";
-      heightmap.vertices[2][2] += cornerDelta; // tilts both triangles that share this one corner
-      const renderer = new IsoRenderer(heightmap);
-      renderer.redraw({ minX: 2, maxX: 2, minY: 2, maxY: 2 }); // isolates tile (2,2)'s own draws
-      const fills = drawInstructions(renderer).filter((i) => i.action === "fill");
-      expect(fills).toHaveLength(2); // exactly its own 2 triangles — an interior height difference never draws a wall
-
-      return Math.max(
-        ...fills.map((f) => {
-          const [r, g, b] = channels(f.data.style!.color);
-          return Math.abs(dr - r) + Math.abs(dg - g) + Math.abs(db - b);
-        }),
-      );
-    };
-
-    // Within FLAT_EPSILON, the tile dithers (see TERRAIN_FILL) instead of
-    // filling with a plain shaded color at all — not a meaningful "shade
-    // distance" to compare against DESERT, so this only checks that
-    // shading itself starts immediately past that threshold, with no dead
-    // zone before it kicks in.
-    const justPastFlat = maxShadeDistance(0.03);
-    const gentle = maxShadeDistance(0.5);
-    const steep = maxShadeDistance(4);
-    expect(justPastFlat).toBeGreaterThan(0);
-    expect(gentle).toBeGreaterThan(justPastFlat);
-    expect(steep).toBeGreaterThan(gentle);
+    expect(drawInstructions(renderer).filter((i) => i.action === "fill")).toHaveLength(1);
   });
 
-  it("shades an interior slope differently depending on which way it faces, not just how steep it is", () => {
-    const shadeFor = (cornerDelta: number): number => {
-      const heightmap = flatHeightmap(6, 6, 5);
-      heightmap.terrain = "desert";
-      heightmap.vertices[2][2] += cornerDelta;
+  it("gives a slope the turf of its own shade, and a flat tile the unshaded one", () => {
+    const tileCorners = (heightmap: Heightmap, x: number, y: number): Vec3[] => [
+      { x, y, z: heightmap.vertices[y][x] },
+      { x: x + 1, y, z: heightmap.vertices[y][x + 1] },
+      { x: x + 1, y: y + 1, z: heightmap.vertices[y + 1][x + 1] },
+      { x, y: y + 1, z: heightmap.vertices[y + 1][x] },
+    ];
+    const turfOf = (heightmap: Heightmap): Texture => {
       const renderer = new IsoRenderer(heightmap);
       renderer.redraw({ minX: 2, maxX: 2, minY: 2, maxY: 2 });
       const [fill] = drawInstructions(renderer).filter((i) => i.action === "fill");
-      return fill.data.style!.color;
+      return fill.data.style!.texture!;
     };
 
-    // Tilting the same corner up vs. down changes which way the triangle's
-    // face points, not just how far it points away from flat — these
-    // should not land on the same shade.
-    expect(shadeFor(3)).not.toBe(shadeFor(-3));
+    const flat = flatHeightmap(6, 6, 5);
+    flat.terrain = "desert";
+    expect(turfOf(flat)).toBe(turfFillFor("desert", 1).texture);
+
+    const sloped = flatHeightmap(6, 6, 5);
+    sloped.terrain = "desert";
+    sloped.vertices[2][2] += 4;
+    expect(turfOf(sloped)).toBe(turfFillFor("desert", faceBrightnessOf(tileCorners(sloped, 2, 2))).texture);
+    expect(turfOf(sloped)).not.toBe(turfFillFor("desert", 1).texture);
   });
 
-  it("dithers a flat grass triangle with the speckled texture instead of a flat color", () => {
+  it("dithers a flat grass square with the speckled texture instead of a flat color", () => {
     const heightmap = flatHeightmap(3, 3, 0); // flatHeightmap defaults to grass terrain
     heightmap.waterLevel = -1; // land despite elevation 0 — see isBuildable's own use of waterLevel
     const renderer = new IsoRenderer(heightmap);
     const instructions = drawInstructions(renderer);
     const tops = instructions.filter((i) => i.action === "fill");
 
-    expect(tops).toHaveLength(3 * 3 * 2); // every land tile is 2 flat, dithered triangles, not 1 quad
+    expect(tops).toHaveLength(3 * 3); // one dithered square per land tile
     for (const top of tops) {
-      // A plain color fill (a map-edge wall, or a sloped/non-grass
-      // triangle) still carries Pixi's own default 1x1 white texture — a
-      // real texture fill (GRASS_FILL) is the only kind that replaces it.
+      // A plain color fill (a map-edge wall, or a sloped/non-grass tile)
+      // still carries Pixi's own default 1x1 white texture — a real
+      // texture fill (GRASS_FILL) is the only kind that replaces it.
       expect(top.data.style!.texture).not.toBe(Texture.WHITE);
     }
   });
 
-  it.each(["desert", "snow", "rock"] as const)("dithers a flat %s triangle too, not just grass", (terrain) => {
+  it.each(["desert", "snow", "rock"] as const)("dithers a flat %s square too, not just grass", (terrain) => {
     const heightmap = flatHeightmap(3, 3, 0); // elevation 0 draws no walls (see drawEdgeWall's own FLAT_EPSILON check)
     heightmap.terrain = terrain;
     heightmap.waterLevel = -1; // land despite elevation 0
     const renderer = new IsoRenderer(heightmap);
     const tops = drawInstructions(renderer).filter((i) => i.action === "fill");
 
-    expect(tops).toHaveLength(3 * 3 * 2);
+    expect(tops).toHaveLength(3 * 3);
     for (const top of tops) {
       expect(top.data.style!.texture).not.toBe(Texture.WHITE);
     }
   });
 
-  it("shades a sloped grass triangle as a plain tinted color instead of dithering it", () => {
-    const heightmap = flatHeightmap(6, 6, 5); // grass by default; big enough for an edge-free interior tile
-    heightmap.vertices[2][2] += 3; // tilts tile (2,2)'s corner
+  /**
+   * The reference art has no flat colour anywhere on its land — only turf
+   * catching more or less light. Ordinary ground used to lose its texture
+   * the moment it stopped being level, which on rolling terrain meant most
+   * of the map was plain colour.
+   */
+  it("textures every ordinary ground square, however steep — plain colour is left to walls and rock", () => {
+    const heightmap = flatHeightmap(6, 6, 5); // grass by default; big enough for edge-free interior tiles
+    heightmap.vertices[2][2] += 3;
+    heightmap.vertices[3][3] += 2;
+    heightmap.vertices[2][3] -= 1;
     const renderer = new IsoRenderer(heightmap);
-    renderer.redraw({ minX: 2, maxX: 2, minY: 2, maxY: 2 });
+    renderer.redraw({ minX: 1, maxX: 4, minY: 1, maxY: 4 }); // interior only: no map-edge walls
     const fills = drawInstructions(renderer).filter((i) => i.action === "fill");
-    expect(fills).toHaveLength(2);
+
+    expect(fills).toHaveLength(4 * 4);
     for (const fill of fills) {
-      expect(fill.data.style!.texture).toBe(Texture.WHITE);
+      expect(fill.data.style!.texture).not.toBe(Texture.WHITE);
     }
   });
 
@@ -455,9 +456,76 @@ describe("IsoRenderer.redraw (sloped mesh)", () => {
     const instructions = drawInstructions(renderer);
     // Every one of the 4 tiles borders the map edge on at least 2 sides
     // and none of them differ from each other, so all their walls come
-    // from those map-edge sides: 4 tiles * 2 triangles + edge walls.
+    // from those map-edge sides: 4 tile squares + edge walls.
     const fills = instructions.filter((i) => i.action === "fill");
-    expect(fills.length).toBeGreaterThan(2 * 2 * 2);
+    expect(fills.length).toBeGreaterThan(2 * 2);
+  });
+});
+
+/**
+ * The shading rules themselves, away from the renderer. A square has one
+ * normal (see polygonNormal), so these are the questions its brightness can
+ * actually answer — and the ones fillTerrainQuad's turf shade is picked by.
+ */
+describe("faceBrightnessOf", () => {
+  const tile = (h00: number, h10: number, h11: number, h01: number): Vec3[] => [
+    { x: 0, y: 0, z: h00 },
+    { x: 1, y: 0, z: h10 },
+    { x: 1, y: 1, z: h11 },
+    { x: 0, y: 1, z: h01 },
+  ];
+
+  it("leaves level ground exactly unshaded", () => {
+    expect(faceBrightnessOf(tile(5, 5, 5, 5))).toBeCloseTo(1);
+  });
+
+  it("shades further from flat the steeper the tile gets", () => {
+    const gentle = Math.abs(1 - faceBrightnessOf(tile(5.5, 5, 5, 5)));
+    const middling = Math.abs(1 - faceBrightnessOf(tile(7, 5, 5, 5)));
+    const steep = Math.abs(1 - faceBrightnessOf(tile(9, 5, 5, 5)));
+
+    expect(gentle).toBeGreaterThan(0);
+    expect(middling).toBeGreaterThan(gentle);
+    expect(steep).toBeGreaterThan(middling);
+  });
+
+  /**
+   * No dead zone: a tilt far below one 8-bit colour step is still a tilt,
+   * so the only threshold anywhere in this path is fillTerrainQuad's own
+   * FLAT_EPSILON.
+   */
+  it("shades a hair past flat, however invisible that shade is", () => {
+    expect(faceBrightnessOf(tile(5.03, 5, 5, 5))).not.toBe(1);
+  });
+
+  /**
+   * LIGHT_DIRECTION comes from -y/+x, so dropping a tile's north edge turns
+   * it toward the light and raising it turns it away. Half a unit each way:
+   * the normal that catches the light most directly is only about 27° off
+   * vertical, and tilting past that darkens again — Lambert's rule, not
+   * something to test around.
+   */
+  it("lightens a face turned toward the light and darkens one turned away", () => {
+    expect(faceBrightnessOf(tile(4.5, 4.5, 5, 5))).toBeGreaterThan(1);
+    expect(faceBrightnessOf(tile(5.5, 5.5, 5, 5))).toBeLessThan(1);
+  });
+});
+
+describe("turfFillFor", () => {
+  it("hands back the same texture for the same shade, so tiles batch instead of each building their own", () => {
+    expect(turfFillFor("grass", 1).texture).toBe(turfFillFor("grass", 1).texture);
+  });
+
+  it("quantizes, so two shades closer than one step share a texture", () => {
+    expect(turfFillFor("grass", 0.8).texture).toBe(turfFillFor("grass", 0.801).texture);
+    expect(turfFillFor("grass", 0.8).texture).not.toBe(turfFillFor("grass", 0.9).texture);
+  });
+
+  it("gives each kind of ground its own weave", () => {
+    const kinds = ["grass", "desert", "snow", "rock", "forest", "road", "fungus", "scorched"] as const;
+    const textures = new Set(kinds.map((kind) => turfFillFor(kind, 1).texture));
+
+    expect(textures.size).toBe(kinds.length);
   });
 });
 
