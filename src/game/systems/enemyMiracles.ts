@@ -2,6 +2,8 @@ import type { System, World } from "../../ecs";
 import {
   applyEarthquake,
   applyFireRain,
+  applyFungus,
+  applyTsunami,
   applyVolcano,
   DEFAULT_EARTHQUAKE_RADIUS,
   DEFAULT_VOLCANO_RADIUS,
@@ -9,32 +11,43 @@ import {
 } from "../../world/heightmap";
 import { triggerArmageddon } from "../armageddon";
 import { burnFire } from "../fire";
+import { createFirePillar } from "../firePillar";
+import { drownFlood } from "../flood";
 import { createHolyWater } from "../holyWater";
+import { applyHurricane } from "../hurricane";
 import { strikeLightning } from "../lightning";
-import { ENEMY_SIGNATURE_MIRACLE, type MiracleSchool } from "../miracleSchools";
+import { ENEMY_SIGNATURE_MIRACLE, MIRACLE_SCHOOL, type MiracleSchool } from "../miracleSchools";
 import { seedPlague } from "../plague";
+import { createStorm } from "../storm";
+import { createTornado, createWhirlpool } from "../tornado";
 import { createLavaFlow } from "../lavaFlow";
 import { createQuake } from "../quake";
 import { collapseSwampsNear, createSwamp } from "../swamp";
-import { FactionState, House, Owner, Position, Walker, type FactionId } from "../components";
+import { FactionState, House, Owner, Position, Walker, type FactionId, type HeroKind } from "../components";
 import {
   ARMAGEDDON_MANA_COST,
+  FIRE_PILLAR_MANA_COST,
   FIRE_RAIN_MANA_COST,
+  FUNGUS_MANA_COST,
+  HURRICANE_MANA_COST,
   HOLY_WATER_MANA_COST,
   LIGHTNING_MANA_COST,
   PLAGUE_MANA_COST,
   SWAMP_CAPACITY,
   SWAMP_MANA_COST,
+  STORM_MANA_COST,
   SWAMP_RADIUS,
   ARMAGEDDON_POPULATION_RATIO,
   EARTHQUAKE_MANA_COST,
   ENEMY_PERSONALITY_TUNING,
   ENEMY_VIEWPORT_ACROSS_TILES,
   ENEMY_VIEWPORT_ALONG_TILES,
-  GUARDIAN_MANA_COST,
-  PERSEUS_MANA_COST,
+  HERO_MANA_COST,
   MIN_ARMAGEDDON_TIME,
+  TORNADO_MANA_COST,
+  TSUNAMI_MANA_COST,
   VOLCANO_MANA_COST,
+  WHIRLPOOL_MANA_COST,
   VOLCANO_POPULATION_RATIO,
 } from "../constants";
 import { findFactionEntity, trySpendMana } from "../faction";
@@ -61,7 +74,25 @@ export type EnemyMiracleEvent =
   | { type: "lightning"; position: Point }
   | { type: "fireRain"; position: Point }
   | { type: "holyWater"; position: Point }
+  // The rest of what a god can aim. Added when it turned out the enemy
+  // only knew ten of the twenty-nine miracles, so three stages dealt it a
+  // hand it could not cast a single card from — see ENEMY_ATTACK_MIRACLES.
+  | { type: "firePillar"; position: Point }
+  | { type: "tornado"; position: Point }
+  | { type: "hurricane"; position: Point }
+  | { type: "storm"; position: Point }
+  | { type: "fungus"; position: Point }
+  | { type: "whirlpool"; position: Point }
+  | { type: "tsunami"; position: Point }
+  // Every hero a god can turn its leader into. Was ペルセウス and 守護者化
+  // only, until the guide turned out to name one per stage — see
+  // WorldDefinition's enemyHero.
   | { type: "perseus" }
+  | { type: "hercules" }
+  | { type: "odysseus" }
+  | { type: "achilles" }
+  | { type: "adonis" }
+  | { type: "helen" }
   | { type: "guardian" }
   | { type: "armageddon" };
 
@@ -87,6 +118,15 @@ export interface EnemyMiracleConfig {
    * miracle unlocked, matching today's unrestricted behavior.
    */
   allowedMiracles: readonly MiracleId[];
+  /**
+   * What this god itself throws — the guide's own per-stage 「敵の神技」
+   * (see worlds.ts's WorldDefinition.enemyMiracles). Defaults to
+   * allowedMiracles, which is what this system used to read and is still
+   * the right answer for a caller that has no separate list.
+   */
+  enemyMiracles: readonly MiracleId[];
+  /** Which hero this god promotes its leader into — see WorldDefinition.enemyHero. */
+  enemyHero: HeroKind;
   /**
    * The enemy god's play style (see worlds.ts's EnemyPersonality and
    * constants.ts's ENEMY_PERSONALITY_TUNING) — biases the escalation
@@ -186,6 +226,8 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
   const minArmageddonTime = config.minArmageddonTime ?? MIN_ARMAGEDDON_TIME;
   const rng = config.rng ?? Math.random;
   const allowedMiracles = config.allowedMiracles ?? ALL_MIRACLES;
+  const enemyMiracles = config.enemyMiracles ?? allowedMiracles;
+  const enemyHero = config.enemyHero;
   const tuning = ENEMY_PERSONALITY_TUNING[config.personality ?? "balanced"];
   const viewport = config.viewport ?? { across: ENEMY_VIEWPORT_ACROSS_TILES, along: ENEMY_VIEWPORT_ALONG_TILES };
   const school = config.school ?? "earth";
@@ -205,6 +247,12 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
     if (factionEntity === undefined) return;
     const state = world.get(factionEntity, FactionState)!;
     if (state.finalBattle) return;
+
+    // 「土地上下とマグネットのみ」 — a god the guide describes as casting
+    // nothing casts nothing, heroes and 最終決戦 included. Only No.1 is
+    // written that way, and it is the whole of why the first stage is
+    // gentle: not a small hand, a god that does not reach for one.
+    if (enemyMiracles.length === 0) return;
 
     const myPopulation = totalPopulation(world, factionId);
     const theirPopulation = totalPopulation(world, opponentId);
@@ -233,18 +281,31 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
       // crevices or forests — a genuinely different AI, and a difficulty
       // change, which belongs in its own measured change rather than
       // riding along with the heroes existing at all.
-      const preferredHeroKind = theirPopulation > 0 && populationRatio < 1 + tuning.heroPreferenceBias ? "guardian" : "perseus";
-      const heroCost = preferredHeroKind === "guardian" ? GUARDIAN_MANA_COST : PERSEUS_MANA_COST;
+      // Losing → dig in behind a 守護者 (game2's own hero, which the guide
+      // never names because the original has none). Otherwise the hero the
+      // guide names for this stage — 「ヒーローはアドニス」「特にペルセウス
+      // を多用」 — falling back on ペルセウス where it names none. Picking a
+      // specialist used to be refused here on the grounds that doing it
+      // well means reading the map; it does not, because the original does
+      // not choose either. It is per-stage data (see enemyHero).
+      const losing = theirPopulation > 0 && populationRatio < 1 + tuning.heroPreferenceBias;
+      const preferredHeroKind = losing ? "guardian" : (enemyHero ?? "perseus");
+      const heroCost = HERO_MANA_COST[preferredHeroKind];
       const leader = world.get(state.leaderId, Walker);
+      // A hero the guide names for *this god* is the god's own and needs no
+      // permission from the player's hand. ペルセウス and 守護者化 as
+      // fallbacks are game2's own guesses at what a god would do, and stay
+      // gated by the stage the way they always were.
+      const heroAvailable = (!losing && enemyHero !== undefined) || allowedMiracles.includes(preferredHeroKind);
 
-      if (allowedMiracles.includes(preferredHeroKind) && leader && leader.state !== preferredHeroKind && trySpendMana(world, factionId, heroCost)) {
+      if (heroAvailable && leader && leader.state !== preferredHeroKind && trySpendMana(world, factionId, heroCost)) {
         promoteHero(world, factionId, preferredHeroKind);
         onAction({ type: preferredHeroKind });
         return;
       }
     }
 
-    if (allowedMiracles.includes("volcano") && populationRatio >= VOLCANO_POPULATION_RATIO * tuning.volcanoRatioMultiplier) {
+    if (enemyMiracles.includes("volcano") && populationRatio >= VOLCANO_POPULATION_RATIO * tuning.volcanoRatioMultiplier) {
       const target = densestReachableCluster(world, factionId, opponentId, DEFAULT_VOLCANO_RADIUS, viewport, rng);
       if (target && trySpendMana(world, factionId, VOLCANO_MANA_COST)) {
         const eruption = applyVolcano(heightmap, target.x, target.y, undefined, undefined, undefined, undefined, rng);
@@ -257,30 +318,22 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
       }
     }
 
-    // The god's own school — see miracleSchools.ts's
-    // ENEMY_SIGNATURE_MIRACLE. 地震 is 地's own signature, so an earth god
-    // simply falls through to the branch below.
-    const signature = ENEMY_SIGNATURE_MIRACLE[school];
-    if (signature !== "earthquake" && allowedMiracles.includes(signature)) {
-      const signatureTarget = densestReachableCluster(world, factionId, opponentId, DEFAULT_EARTHQUAKE_RADIUS, viewport, rng);
-      if (signatureTarget && castSignature(world, heightmap, factionId, signature, signatureTarget, rng, onImpact, bottomlessSwamp)) {
-        onAction({ type: signature as EnemyMiracleEvent["type"], position: signatureTarget });
-      }
-      // Saves up for its own miracle rather than spending the difference
-      // on 地震: a 水 god that casts two earthquakes for every spring is
-      // not a 水 god, it is an earth god with a hobby. A pass it cannot
-      // afford is a pass it does nothing on — which is also what makes
-      // the pricier schools cast in bursts instead of on a metronome.
-      return;
-    }
+    // What this god actually throws — its own repertoire, not the player's
+    // hand (see WorldDefinition's enemyMiracles). Its own school first, and
+    // within that the dearest it was given, which is the same habit as
+    // "saves up for its own miracle rather than spending the difference on
+    // 地震".
+    const choice = chooseAttack(enemyMiracles, school);
+    if (!choice) return;
 
-    if (!allowedMiracles.includes("earthquake")) return;
     const target = densestReachableCluster(world, factionId, opponentId, DEFAULT_EARTHQUAKE_RADIUS, viewport, rng);
-    if (target && trySpendMana(world, factionId, EARTHQUAKE_MANA_COST)) {
+    if (!target) return;
+
+    if (choice === "earthquake") {
+      if (!trySpendMana(world, factionId, EARTHQUAKE_MANA_COST)) return;
       // Same aiming rule the player gets (see main.ts): away from its own
       // shrine, through the target.
-      const shrineEntity = findFactionEntity(world, factionId);
-      const from = shrineEntity === undefined ? target : world.get(shrineEntity, FactionState)!.shrinePosition;
+      const from = shrinePositionOf(world, factionId) ?? target;
       const fissure = applyEarthquake(heightmap, target.x, target.y, target.x - from.x, target.y - from.y, undefined, rng);
       // The god's quake denies the player's spade exactly as the player's
       // own does — 「地震が続いている間は修復が出来ない」 — and this is the
@@ -289,12 +342,73 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
       createQuake(world, fissure);
       collapseSwampsNear(world, target.x, target.y, DEFAULT_EARTHQUAKE_RADIUS);
       onAction({ type: "earthquake", position: target });
+      return;
+    }
+
+    if (castAttack(world, heightmap, factionId, choice, target, rng, onImpact, bottomlessSwamp)) {
+      onAction({ type: choice as EnemyMiracleEvent["type"], position: target });
     }
   };
 }
 
 /**
- * Casts one school's signature miracle at `target`, spending the mana for
+ * Every attack miracle a god knows how to aim, dearest first.
+ *
+ * Reached for only when the stage dealt neither the god's own signature nor
+ * 地震 — see the branch that calls spareAttack. Ordered by price because
+ * the god's established habit is to save for its biggest weapon rather than
+ * spend the difference on a cheap one ("what makes the pricier schools cast
+ * in bursts instead of on a metronome"), and the prices are already
+ * calibrated against each other; a separate hand-written ranking would be a
+ * second opinion about the same thing.
+ *
+ * 病原菌 and 沼 are here as well as being signatures: a god of another
+ * school that was dealt one still knows how to throw it.
+ */
+const ENEMY_ATTACK_MIRACLES: readonly { id: MiracleId; cost: number }[] = [
+  { id: "tsunami", cost: TSUNAMI_MANA_COST },
+  { id: "storm", cost: STORM_MANA_COST },
+  { id: "firePillar", cost: FIRE_PILLAR_MANA_COST },
+  { id: "hurricane", cost: HURRICANE_MANA_COST },
+  { id: "plague", cost: PLAGUE_MANA_COST },
+  { id: "fireRain", cost: FIRE_RAIN_MANA_COST },
+  { id: "holyWater", cost: HOLY_WATER_MANA_COST },
+  { id: "tornado", cost: TORNADO_MANA_COST },
+  { id: "fungus", cost: FUNGUS_MANA_COST },
+  { id: "lightning", cost: LIGHTNING_MANA_COST },
+  { id: "swamp", cost: SWAMP_MANA_COST },
+  { id: "whirlpool", cost: WHIRLPOOL_MANA_COST },
+  { id: "earthquake", cost: EARTHQUAKE_MANA_COST },
+];
+
+/**
+ * The best of this god's own miracles that it can aim — its own school
+ * first, the rest of its repertoire second.
+ *
+ * Its own school first because that is what the god *is*: the world select
+ * names its school, and a 火 god that reaches past its own 火柱 for someone
+ * else's 沼 is a lie the player can see.
+ */
+function chooseAttack(enemyMiracles: readonly MiracleId[], school: MiracleSchool): MiracleId | undefined {
+  // The signature first when the god holds it: that is the guide's own
+  // one-word characterisation of the school (「沼。ひたすら沼」), and it is
+  // not always the dearest thing in it.
+  const signature = ENEMY_SIGNATURE_MIRACLE[school];
+  if (enemyMiracles.includes(signature)) return signature;
+
+  const held = ENEMY_ATTACK_MIRACLES.filter(({ id }) => enemyMiracles.includes(id));
+  const ownSchool = held.filter(({ id }) => MIRACLE_SCHOOL[id] === school);
+  return (ownSchool[0] ?? held[0])?.id;
+}
+
+/** The caster's own shrine, which is where every aimed miracle is thrown from. */
+function shrinePositionOf(world: World, factionId: FactionId): Point | undefined {
+  const factionEntity = findFactionEntity(world, factionId);
+  return factionEntity === undefined ? undefined : world.get(factionEntity, FactionState)!.shrinePosition;
+}
+
+/**
+ * Casts one attack miracle at `target`, spending the mana for
  * it. Returns false without spending anything when the faction can't
  * afford it, or — for 病原菌, which needs someone to infect — when the
  * cast would do nothing at all; the caller then falls through to a
@@ -304,17 +418,21 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
  * god shares, so it stays in the system's own last branch rather than
  * being reachable from two places.
  */
-function castSignature(
+function castAttack(
   world: World,
   heightmap: Heightmap,
   factionId: FactionId,
-  signature: MiracleId,
+  miracle: MiracleId,
   target: Point,
   rng: () => number,
   onImpact: OnImpactEffect,
   bottomlessSwamp: boolean,
 ): boolean {
-  switch (signature) {
+  // Everything with a heading is aimed the way the player aims it (see
+  // main.ts): from the caster's own shrine, through the target — so a god
+  // never sends a tornado back over its own villages.
+  const from = shrinePositionOf(world, factionId) ?? target;
+  switch (miracle) {
     case "plague":
       // Checked before charging, like the player's own cast: a plague on
       // empty ground is a cast that does nothing.
@@ -338,6 +456,38 @@ function castSignature(
       // opponent's people rather than killing them (see systems/holyWater.ts).
       if (!trySpendMana(world, factionId, HOLY_WATER_MANA_COST)) return false;
       createHolyWater(world, factionId, target.x, target.y);
+      return true;
+    case "firePillar":
+      if (!trySpendMana(world, factionId, FIRE_PILLAR_MANA_COST)) return false;
+      createFirePillar(world, target.x, target.y, target.x - from.x, target.y - from.y);
+      return true;
+    case "tornado":
+      if (!trySpendMana(world, factionId, TORNADO_MANA_COST)) return false;
+      createTornado(world, target.x, target.y, target.x - from.x, target.y - from.y);
+      return true;
+    case "hurricane":
+      if (!trySpendMana(world, factionId, HURRICANE_MANA_COST)) return false;
+      applyHurricane(world, target, target.x - from.x, target.y - from.y, onImpact);
+      return true;
+    case "storm":
+      if (!trySpendMana(world, factionId, STORM_MANA_COST)) return false;
+      createStorm(world, target.x, target.y);
+      return true;
+    case "fungus":
+      // Checked before charging, like 病原菌 above: nothing takes root on
+      // water, rock, a crevice or a road, and a cast on such ground would
+      // be paid for and do nothing.
+      if (totalMana(world, factionId) < FUNGUS_MANA_COST) return false;
+      if (applyFungus(heightmap, target.x, target.y).length === 0) return false;
+      return trySpendMana(world, factionId, FUNGUS_MANA_COST);
+    case "whirlpool":
+      if (!trySpendMana(world, factionId, WHIRLPOOL_MANA_COST)) return false;
+      createWhirlpool(world, target.x, target.y, target.x - from.x, target.y - from.y);
+      return true;
+    case "tsunami":
+      if (!trySpendMana(world, factionId, TSUNAMI_MANA_COST)) return false;
+      applyTsunami(heightmap, target.x, target.y);
+      drownFlood(world, heightmap, onImpact);
       return true;
     default:
       return false;
