@@ -3,7 +3,7 @@
 ## 背景
 
 「POPULOUS 2 グラフィックス原作再現 改修指示」（32項目）のうち、PR1
-（`plan/0084`）・PR2（`plan/0085`）に続きユーザー自身が指示した順序で
+（`plan/archived/0084`）・PR2（`plan/archived/0085`）に続きユーザー自身が指示した順序で
 **PR3: Directional followers** に着手した。
 
 これまでのWalkerは常に正面向きの単色ドット絵パターン1種類で、進行

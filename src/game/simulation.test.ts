@@ -408,7 +408,7 @@ describe("Simulation", () => {
 
     // Not "armageddon": enemyMiracles.ts won't trigger 最終決戦 before
     // MIN_ARMAGEDDON_TIME has elapsed, however lopsided the population
-    // ratio already is — see plan/0045-armageddon-timing.md. With the
+    // ratio already is — see plan/archived/0045-armageddon-timing.md. With the
     // ratio this decisive (20 vs 1) but the match only 0.1s old, the AI
     // falls through to the next-priciest thing it can afford instead.
     expect(sim.getMatchEvents()).toEqual([{ time: 0.1, faction: "enemy", type: "volcano" }]);
@@ -697,7 +697,7 @@ describe("Simulation", () => {
     const sim = new Simulation({ worldWidth: 20, worldHeight: 20, initialWalkersPerFaction: 1 });
     // Assigning leaderId directly (rather than via a "gather" pass) sidesteps
     // gatherTargetingSystem's own "nobody else left to gather" fallback (see
-    // plan/0069-gather-settle-fallback.md) — a lone walker with no one else
+    // plan/archived/0069-gather-settle-fallback.md) — a lone walker with no one else
     // to gather would otherwise fall through to a random wander target in
     // that same transitional tick, which this test isn't about.
     const [playerState] = sim.world.query(FactionState).filter((e) => sim.world.get(e, FactionState)!.id === "player");
@@ -776,7 +776,7 @@ describe("Simulation", () => {
 
     // Houses that had spread far from the center before armageddon convert
     // into walkers that need time to march back in, at FINAL_BATTLE_WALKER_
-    // SPEED (see plan/0046-final-battle-pacing.md) — a 20x20 map's diagonal
+    // SPEED (see plan/archived/0046-final-battle-pacing.md) — a 20x20 map's diagonal
     // at that speed can take close to 60s to cross alone, so this budget is
     // generous on top of that.
     for (let i = 0; i < 1200; i++) sim.update(0.1);
@@ -842,7 +842,7 @@ describe("Simulation — the opening", () => {
    * a faction still occupied a single point at 40 seconds — three walkers,
    * then three houses, all at identical coordinates. One area miracle of
    * any size therefore erased a whole faction, which let an opening cast
-   * end a match outright (plan/0107).
+   * end a match outright (plan/archived/0107).
    */
   it("does not start a faction's walkers all on the same spot", () => {
     const sim = new Simulation({ worldWidth: 32, worldHeight: 32, initialWalkersPerFaction: 3 });

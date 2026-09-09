@@ -169,7 +169,7 @@ export interface EnemyMiracleConfig {
  * createEnemyAiSystem.
  *
  * The 最終決戦 branch additionally waits until minArmageddonTime has
- * elapsed — see plan/0045-armageddon-timing.md. Without it, a match's
+ * elapsed — see plan/archived/0045-armageddon-timing.md. Without it, a match's
  * early, noisy population swings (a house's in-progress population
  * resets to 0 every time it overflows into a walker, so totalPopulation
  * below jitters well before either side has a real economy) could clear

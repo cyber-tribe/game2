@@ -77,7 +77,7 @@ export const ALL_MIRACLES: readonly MiracleId[] = [
 /**
  * A qualitatively different way the enemy god plays, on top of (not instead
  * of) the purely numeric difficulty knobs below — see
- * plan/0072-enemy-personality.md. "aggressive"/"defensive" bias
+ * plan/archived/0072-enemy-personality.md. "aggressive"/"defensive" bias
  * systems/enemyMiracles.ts's escalation thresholds and hero-kind choice
  * (see ENEMY_PERSONALITY_TUNING in constants.ts); "balanced" reproduces
  * today's original thresholds exactly, so it's a safe default for tests
@@ -92,9 +92,9 @@ export type EnemyPersonality = "balanced" | "aggressive" | "defensive";
  * 敵AIの攻撃性／賢さ・使用可能な奇跡の制限などが異なり、徐々に難しく
  * なる". This first step covers the axes that were already plumbed
  * per-match before this file existed (terrain type, terrainEditRule — see
- * plan/0052-terrain-edit-rule.md), plus the enemy AI's "攻撃性"
+ * plan/archived/0052-terrain-edit-rule.md), plus the enemy AI's "攻撃性"
  * （enemyAggressionThreshold）と"介入速度"（enemyDecisionInterval）— see
- * plan/0061-per-world-ai-difficulty.md. "賢さ" (the AI's actual decision
+ * plan/archived/0061-per-world-ai-difficulty.md. "賢さ" (the AI's actual decision
  * *logic*, not just how eagerly/often it acts) is deliberately not touched
  * here — per the same doc's own "高難度では敵の介入頻度が上がるが、行動
  * パターン自体は比較的予測可能", a harder world should still play by
@@ -104,18 +104,18 @@ export type EnemyPersonality = "balanced" | "aggressive" | "defensive";
  * opponent, not a faster one.
  *
  * Map size is a fixed 64x64 for every world (see WORLDS below), not a
- * difficulty axis of its own — per plan/0062-original-scale-map.md's move
+ * difficulty axis of its own — per plan/archived/0062-original-scale-map.md's move
  * to one original-scale world every match pans across (like the original),
  * rather than a whole map shrunk to fit one screen and so, per-world,
  * differently sized.
  *
  * The campaign is the original's own 全48面 — 16 gods of 3 stages each,
- * generated from GODS below. (plan/0059-world-select.md once deferred
+ * generated from GODS below. (plan/archived/0059-world-select.md once deferred
  * "500 worlds" as out of scope; that figure came from the generic
  * god-game research and belongs to the first POPULOUS, not to the SFC
  * POPULOUS 2 this project reproduces.) A password/continue system (see
  * nextWorldId/unlockedCountForPassword below) was added on top in
- * plan/0060-campaign-password.md.
+ * plan/archived/0060-campaign-password.md.
  */
 export interface WorldDefinition {
   id: string;
@@ -440,7 +440,7 @@ export const STAGES_PER_GOD = 3;
 /** Stage numbering as it appears in a world's name. */
 const STAGE_SUFFIXES = ["一", "二", "三"] as const;
 
-/** Every world is a fixed 64x64 — see WorldDefinition's doc comment and plan/0062. */
+/** Every world is a fixed 64x64 — see WorldDefinition's doc comment and plan/archived/0062. */
 const WORLD_SIZE = 64;
 
 /**

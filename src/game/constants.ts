@@ -30,7 +30,7 @@ export const DEFAULT_WALKER_SPEED = 1.5;
 
 /**
  * Tiles per second for every walker once 最終決戦 has been triggered —
- * see armageddon.ts and plan/0046-final-battle-pacing.md. Slower than
+ * see armageddon.ts and plan/archived/0046-final-battle-pacing.md. Slower than
  * DEFAULT_WALKER_SPEED: measured with the mana/pacing fixes in plan/0043-
  * 0045 already in place, the final battle itself (armageddon → game over)
  * still only took ~22s on average, mostly spent marching to the center —
@@ -360,8 +360,8 @@ export const MIRACLE_LEVEL_MIN_SCATTER = 0.75;
  * terrain-based flat-land scarcity is implemented.
  *
  * Raised from 8 to 12 alongside the map going from 20x20 to 32x32
- * (plan/0055-map-expansion.md), then to 48 when every world became a fixed
- * 64x64 (plan/0062-original-scale-map.md) — in both cases deliberately
+ * (plan/archived/0055-map-expansion.md), then to 48 when every world became a fixed
+ * 64x64 (plan/archived/0062-original-scale-map.md) — in both cases deliberately
  * scaled right along with the tile count (so maxHousesPerFaction itself
  * stays roughly flat, ~85, across all three sizes) rather than growing
  * with it. A bigger map is meant to buy more geographic space (room for
@@ -711,7 +711,7 @@ export const GUARDIAN_DEFENSE_RADIUS = 4;
  * every tick, so a single one could burn/capture through a whole
  * undefended settlement in seconds, collapsing the "小競り合い→復興/逆転"
  * phases a match is meant to have into a single instant (see
- * plan/0044-knight-cooldown.md). Matches the scale of other AI decision
+ * plan/archived/0044-knight-cooldown.md). Matches the scale of other AI decision
  * intervals in this file (ENEMY_AI_DECISION_INTERVAL etc.) rather than
  * being a much larger, separate design.
  */
@@ -792,7 +792,7 @@ export const ARMAGEDDON_POPULATION_RATIO = 1.8;
 /**
  * Seconds since match start before the enemy AI will trigger 最終決戦,
  * however lopsided ARMAGEDDON_POPULATION_RATIO already is — see
- * enemyMiracles.ts, plan/0045-armageddon-timing.md, and plan/0053-
+ * enemyMiracles.ts, plan/archived/0045-armageddon-timing.md, and plan/0053-
  * match-length-tuning.md. A match's early population numbers are noisy (a
  * house's in-progress population resets to 0 every time it overflows into
  * a walker) and can swing past the ratio within the first minute or two
@@ -805,7 +805,7 @@ export const ARMAGEDDON_POPULATION_RATIO = 1.8;
  *
  * Raised from 180s (3 minutes) to 600s (10 minutes) once the 180s floor
  * was measured to no longer be the binding constraint — an AI-vs-AI match
- * (see plan/0053-match-length-tuning.md's measurement method) was already
+ * (see plan/archived/0053-match-length-tuning.md's measurement method) was already
  * averaging ~250s on its own by the time ARMAGEDDON_POPULATION_RATIO was
  * actually reached, well past the old floor. 600s pushes the measured
  * average to ~680s (~11-12 minutes), inside the 10-15 minute range a
@@ -826,7 +826,7 @@ export const VOLCANO_POPULATION_RATIO = 1.3;
  * How much an EnemyPersonality (see worlds.ts) biases enemyMiracles.ts's
  * escalation math, on top of (not instead of) the per-world difficulty
  * knobs above — the qualitative "character" axis docs/game-system.md's
- * 敵AI section was missing (see plan/0072-enemy-personality.md): earlier
+ * 敵AI section was missing (see plan/archived/0072-enemy-personality.md): earlier
  * worlds all played the exact same way, just faster/more trigger-happy.
  *
  * - `volcanoRatioMultiplier`/`armageddonRatioMultiplier` scale

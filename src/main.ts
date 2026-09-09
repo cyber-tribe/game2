@@ -164,7 +164,7 @@ const MEGALITH_HOLD_INTERVAL_MS = 500;
 const LIGHTNING_HOLD_INTERVAL_MS = 800;
 /**
  * How much one mouse-wheel "notch" (deltaY around ±100) zooms the map on
- * PC — see plan/0039-pc-support.md. Chosen so a single notch feels close
+ * PC — see plan/archived/0039-pc-support.md. Chosen so a single notch feels close
  * to one pinch-zoom step; exponential so repeated notches compound evenly
  * in both directions instead of the zoom-out direction stalling near 0.
  */
@@ -233,7 +233,7 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
     // out-of-bounds area is near-black (see plan/archived/0088-palette-calibration.md).
     background: GAME_PALETTE.ink,
     // Off, not on: MSAA roughly doubled full-screen frame cost in testing
-    // (see plan/0062-original-scale-map.md) once the map — and so the
+    // (see plan/archived/0062-original-scale-map.md) once the map — and so the
     // terrain mesh redrawn every frame — grew from ≤32x32 to 64x64. This
     // game's flat-shaded low-poly style barely shows the difference; a
     // lower, steadier frame rate would be far more noticeable.
@@ -379,14 +379,14 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
 
   // Simplest possible reset: reload the page for a fresh heightmap/Simulation
   // and default camera/UI state, rather than hand-rolling teardown of every
-  // stateful object main.ts builds. See plan/0038-play-again.md — this
+  // stateful object main.ts builds. See plan/archived/0038-play-again.md — this
   // button exists as playtesting infrastructure, not a polished transition.
   playAgainButton?.addEventListener("click", () => {
     window.location.reload();
   });
 
   // Shown once, the moment the match ends — a bare win/lose line tells
-  // none of the match's actual story (see plan/0032-match-event-log.md).
+  // none of the match's actual story (see plan/archived/0032-match-event-log.md).
   // Rendered as HTML rather than through Hud's PixiJS Text so a long
   // match's event list can actually scroll (see index.html's #match-record).
   const showMatchRecord = (outcome: GameOutcome, events: readonly MatchEvent[]) => {
@@ -454,7 +454,7 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
 
 
   // The map is now far bigger than any one screen (see
-  // plan/0062-original-scale-map.md) — like the original, the camera
+  // plan/archived/0062-original-scale-map.md) — like the original, the camera
   // always renders at a fixed, comfortably tap-able native scale (see
   // IsoRenderer's own TILE_WIDTH/TILE_HEIGHT doc comment) and the player
   // pans to reach the rest, rather than the whole map ever shrinking to
@@ -523,7 +523,7 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
     // Clear of the world map rather than behind it. These two lines and the
     // minimap were both anchored to the same corner, so 「地形: 草原」 and
     // any 地形操作 restriction have been hidden under the rock since the map
-    // moved here (plan/0130). Measured from minimapHeight rather than
+    // moved here (plan/archived/0130). Measured from minimapHeight rather than
     // MINIMAP_SIZE because the island is taller than the map it holds.
     hud.setTopOffset(safeAreaTop + minimapHeight(MINIMAP_SIZE) + HUD_GAP_BELOW_MINIMAP);
     populationGauge.view.position.set(app.screen.width - POPULATION_GAUGE_WIDTH - 10, 10 + safeAreaTop);
@@ -578,8 +578,8 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
   // docs/game-system.md-inspired original-game rule: the player can only
   // act with their god-given powers while at least one of their own
   // walkers/houses/shrine is somewhere within the current camera view —
-  // see plan/0063-visibility-gated-casting.md. Without this, a much
-  // bigger, freely-pannable map (plan/0062-original-scale-map.md) lets a
+  // see plan/archived/0063-visibility-gated-casting.md. Without this, a much
+  // bigger, freely-pannable map (plan/archived/0062-original-scale-map.md) lets a
   // single tap snipe anywhere on the map instantly, with no need to
   // actually travel there first.
   //
@@ -739,7 +739,7 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
 
   // Raises/lowers a single grid vertex — picked via pickVertex, not
   // pickTile. This used to edit a whole tile's 4 corners (raiseTile) at
-  // once, matching plan/0065-tile-based-terraform.md's original request to
+  // once, matching plan/archived/0065-tile-based-terraform.md's original request to
   // mirror the original game's tile-based terraforming — but every corner
   // is shared with up to 3 *other* tiles, so a single tap visibly tilted
   // every neighboring tile touching that tile's corners too, reading as
@@ -748,8 +748,8 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
   // 動きます" — confirmed by the reporter to mean exactly this, not the
   // brush painting too wide an area). raiseTile's own rationale (raiseVertex
   // alone left the old flat-averaged-per-tile renderer with jagged block
-  // boundaries — plan/0064-terraced-terrain.md) no longer applies: the
-  // renderer hasn't averaged tiles into flat blocks since plan/0073's
+  // boundaries — plan/archived/0064-terraced-terrain.md) no longer applies: the
+  // renderer hasn't averaged tiles into flat blocks since plan/archived/0073's
   // per-vertex sloped mesh, so a single vertex nudge just tilts the (at
   // most 4, half of raiseTile's up-to-8) neighboring tiles smoothly, with
   // no jagged edge to speak of. "平坦化" keeps the tile-based raiseTile
@@ -1404,7 +1404,7 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
   let dragStart = { x: 0, y: 0 };
   let viewStartPos = { x: 0, y: 0 };
 
-  // "ブラシ" continuous terraforming (see plan/0054-terraform-brush.md):
+  // "ブラシ" continuous terraforming (see plan/archived/0054-terraform-brush.md):
   // holding a single press still for LONG_PRESS_DURATION_MS — long enough
   // that it hasn't already turned into a pan — engages painting, so every
   // tile the pointer then passes over gets edited once. Leveling a wide
@@ -1496,7 +1496,7 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
 
   // PC support: a mouse has no second finger for the pinch/twist gesture
   // above, so it gets its own inputs that drive the same applyPinchTransform
-  // — see plan/0039-pc-support.md. Pan and tap-to-apply-tool already work
+  // — see plan/archived/0039-pc-support.md. Pan and tap-to-apply-tool already work
   // unmodified, since a mouse fires the same pointerdown/move/up events a
   // single touch does.
   app.canvas.addEventListener(
@@ -1811,7 +1811,7 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
     // Rebuilding the whole terrain mesh (redraw()) — recomputing every
     // tile's screen-space quad, its rock/lava state, etc. — is real CPU
     // work that scales with tile count, which now (see
-    // plan/0062-original-scale-map.md) means up to a screen's worth of a
+    // plan/archived/0062-original-scale-map.md) means up to a screen's worth of a
     // 64x64 world instead of a whole ≤32x32 one. Most frames, with the
     // camera held still and no edit in progress, that work would rebuild
     // the exact same mesh already on screen. Skipping it whenever the
@@ -1860,7 +1860,7 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
 /**
  * 征服モードの入り口（docs/game-system.md 10節）: プレイヤーがワールドを
  * 選ぶまで試合は始まらない。#play-again が window.location.reload() で
- * ページごと作り直す都合上（plan/0038-play-again.md）、この画面も
+ * ページごと作り直す都合上（plan/archived/0038-play-again.md）、この画面も
  * 毎回ここから素通しで出し直せばよく、選択状態を別途持ち回る必要はない。
  *
  * 起動直後は最初のワールドしか選べない — worlds.ts の nextWorldId /
@@ -1933,7 +1933,7 @@ function showWorldSelect(): void {
         // so the world's own position in the list doubles as a simple
         // difficulty indicator — no separate derived score needed. Map
         // size is no longer shown here since every world is the same
-        // fixed 64x64 (see plan/0062-original-scale-map.md).
+        // fixed 64x64 (see plan/archived/0062-original-scale-map.md).
         detail.textContent = locked
           ? "パスワードが必要です"
           : `${chapterLabel}${TERRAIN_LABELS[world.terrain]}${ruleLabel}${personalityLabel}${schoolLabel}・難易度${index + 1}/${WORLDS.length}`;
