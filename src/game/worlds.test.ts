@@ -110,7 +110,7 @@ describe("WORLDS", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("gives every world the same fixed 64x64 map size (see plan/0062-original-scale-map.md)", () => {
+  it("gives every world the same fixed 64x64 map size (see plan/archived/0062-original-scale-map.md)", () => {
     for (const world of WORLDS) {
       expect(world.worldWidth).toBe(64);
       expect(world.worldHeight).toBe(64);

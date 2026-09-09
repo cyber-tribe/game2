@@ -85,7 +85,7 @@ describe("createHeightmap", () => {
   });
 
   it("doesn't hand a house a castle's worth of flatness for free", () => {
-    // Regression guard for plan/0043-terrain-roughness.md: a too-smooth
+    // Regression guard for plan/archived/0043-terrain-roughness.md: a too-smooth
     // wave let rounding alone produce large naturally-flat plateaus, so a
     // freshly settled house could already qualify for the top house level
     // (and often most of the way to it) before any terraforming — the

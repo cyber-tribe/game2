@@ -40,7 +40,7 @@ import { distance, type Point } from "./geometry";
  *
  * This used to have the *charmed* pull down their own side's houses, on a
  * reading of the catalogue article's 「敵信者を魅了して建物を更地にさせ」 —
- * see plan/0133. The walkthrough source is specific where the article is
+ * see plan/archived/0133. The walkthrough source is specific where the article is
  * compressed, and it is Helen who levels the building. The difference is
  * not cosmetic: on the old reading she had to charm someone standing next
  * to a house before anything was destroyed, so a town whose people were

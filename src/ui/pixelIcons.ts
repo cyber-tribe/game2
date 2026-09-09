@@ -52,7 +52,7 @@ export type IconKind =
   | "mana"
   | "population";
 
-/** Logical icon resolution — small enough to read as a single "sprite" at 16-bit scale, per plan/0084's pixel-density notes. */
+/** Logical icon resolution — small enough to read as a single "sprite" at 16-bit scale, per plan/archived/0084's pixel-density notes. */
 export const ICON_SIZE = 16;
 
 /**

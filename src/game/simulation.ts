@@ -611,7 +611,7 @@ export class Simulation {
    * Where a faction's shrine currently is — main.ts uses this to center
    * the initial camera on the player's own starting village, since the
    * map is otherwise far bigger than any one screen (see
-   * plan/0062-original-scale-map.md).
+   * plan/archived/0062-original-scale-map.md).
    */
   /** Whether a faction currently has a leader — 集結地移動 needs one (see moveShrine). */
   hasLeader(faction: FactionId): boolean {
@@ -731,7 +731,7 @@ export class Simulation {
    * three walkers, then three houses, all at identical coordinates. A
    * single area miracle of any size therefore erased an entire faction,
    * which is what made an opening cast able to end a match outright (see
-   * plan/0107).
+   * plan/archived/0107).
    *
    * Deterministic, not random: a match's opening should not vary in a way
    * nobody can see, and the ring is the shape "everyone gathered at the

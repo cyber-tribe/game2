@@ -165,7 +165,7 @@ describe("トロイのヘレン — 敵と戦わない", () => {
    * 「敵建物に接触して竪琴を一閃すると建物が消滅し、現れたウォーカーを拘束
    * する」 — she levels the building herself, and the people who were inside
    * come out already hers. This used to have the *charmed* pull down their
-   * own side's houses instead (plan/0133), on a compressed reading of the
+   * own side's houses instead (plan/archived/0133), on a compressed reading of the
    * catalogue article.
    */
   it("levels an enemy house she reaches", () => {

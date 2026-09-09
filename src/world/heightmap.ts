@@ -120,14 +120,14 @@ export const MAX_ELEVATION = 20;
  * fresh 20x20 map, about 15% of vertices already qualified for a "castle"
  * house's flatness requirement and 95%+ for "lodge", with zero player
  * terraforming. That let a match's population/mana explode within under a
- * minute (see plan/0043-terrain-roughness.md) since the core "flatten your
+ * minute (see plan/archived/0043-terrain-roughness.md) since the core "flatten your
  * land to grow a house" loop was already done by worldgen. At these
  * frequencies a fresh map has ~0% castle-ready and single-digit %
  * manor-ready vertices — reaching those tiers again requires actually
  * terraforming.
  *
  * The amplitudes were trimmed down from the original 1.5/1.5/2 (see
- * plan/0073-grass-cliff-legibility.md) once fixing that renderer's cliff
+ * plan/archived/0073-grass-cliff-legibility.md) once fixing that renderer's cliff
  * legibility bug made this same wave's true roughness visible for the
  * first time: at the original amplitude, 18% of all adjacent vertex pairs
  * differed by 3 or more units, rendering as a wall of cliffs almost
@@ -260,7 +260,7 @@ export function raiseVertex(heightmap: Heightmap, x: number, y: number, delta: n
  * Raises/lowers an entire tile (all 4 corner vertices) by the same delta —
  * the player's basic terraforming tool now edits a whole tile face at once
  * rather than a single corner point, per the original game's tile-based
- * land-raising (see plan/0065-tile-based-terraform.md). Each corner is
+ * land-raising (see plan/archived/0065-tile-based-terraform.md). Each corner is
  * still clamped and chips rockHardness independently via raiseVertex, so a
  * tile straddling MAX_ELEVATION or partly-cooled volcano rock behaves the
  * same as 4 individual taps would.
@@ -776,7 +776,7 @@ export const VOLCANO_PUDDLES = 5;
 /**
  * Heaves the footprint within `radius` of (centerX, centerY) into a real
  * cone-with-crater shape and covers it in rock — docs/game-system.md's
- * "対象地点を高く隆起させ、岩石で覆う", refined per plan/0087's "外側：
+ * "対象地点を高く隆起させ、岩石で覆う", refined per plan/archived/0087's "外側：
  * 低い→中間：高い→火口縁：さらに高い→中央：少し低い": the ring exactly
  * `radius` vertices out (the crater rim) sits at MAX_ELEVATION, the exact
  * center dips VOLCANO_CRATER_DEPTH below that (the crater floor — still a

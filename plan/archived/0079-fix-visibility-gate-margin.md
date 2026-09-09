@@ -14,7 +14,7 @@
 
 `main.ts`の`isOwnFactionVisible`は`trySpendPlayerMana`の入口で
 「自分の勢力（拠点・民）が現在のカメラの画面内に映っているか」を
-チェックする、`plan/0063-visibility-gated-casting.md`由来の制約。
+チェックする、`plan/archived/0063-visibility-gated-casting.md`由来の制約。
 
 このチェックに渡していた`visibleBounds()`は、`IsoRenderer.redraw()`用に
 `TILE_BOUNDS_MARGIN`（`Math.ceil(MAX_ELEVATION/2)+2` = 12タイル）ぶん
