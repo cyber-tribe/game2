@@ -107,21 +107,24 @@ describe("Simulation", () => {
       const leader = sim.world.createEntity();
       sim.world.add(leader, Position, { x: 5, y: 5 });
       sim.world.add(leader, Owner, { faction: "enemy" });
-      // Strong enough to take the player's hut below (defense 3), so the
-      // enemy AI leaves the "fight" mode this test sets rather than
-      // sending the faction off to muster — see ENEMY_AI's own muster
-      // rule. A walker's strength IS its head count (population.ts's
-      // walkerFollowers), so this one is four of the eight people the
-      // ratio below is made of.
-      sim.world.add(leader, Walker, { strength: 4, state: "seeking", speed: 1 });
+      // Past the enemy AI's own muster bar, so it leaves the "fight" mode
+      // this test sets rather than sending the faction off to muster. That
+      // bar is now ENEMY_MUSTER_HOUSES (3) times the player's weakest
+      // house (a hut, defense 3), so it takes strictly more than 9.
+      //
+      // A walker's strength IS its head count (population.ts's
+      // walkerFollowers), so raising it moves the population ratio this
+      // test is about — the two house populations below are picked to put
+      // that ratio back at 0.8.
+      sim.world.add(leader, Walker, { strength: 10, state: "seeking", speed: 1 });
       const enemyHouse = sim.world.createEntity();
       sim.world.add(enemyHouse, Position, { x: 4, y: 4 });
       sim.world.add(enemyHouse, Owner, { faction: "enemy" });
-      sim.world.add(enemyHouse, House, { level: "hut", population: 4 }); // + the leader's 4 = myPopulation 8
+      sim.world.add(enemyHouse, House, { level: "hut", population: 2 }); // + the leader's 10 = myPopulation 12
       const playerHouse = sim.world.createEntity();
       sim.world.add(playerHouse, Position, { x: 15, y: 15 });
       sim.world.add(playerHouse, Owner, { faction: "player" });
-      sim.world.add(playerHouse, House, { level: "hut", population: 10 }); // ratio 8/10 = 0.8
+      sim.world.add(playerHouse, House, { level: "hut", population: 15 }); // ratio 12/15 = 0.8
       sim.world.add(enemyState, FactionState, {
         ...sim.world.get(enemyState, FactionState)!,
         mana: 999,

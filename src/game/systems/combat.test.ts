@@ -113,15 +113,44 @@ describe("houseCaptureSystem", () => {
   it("captures an enemy house when the attacking walker's strength beats its defense", () => {
     const world = new World();
     const house = createHouse(world, "enemy", 0, 0);
-    const attacker = createWalker(world, "player", 0, 0, HOUSE_LEVELS.hut.defense + 1);
+    createWalker(world, "player", 0, 0, HOUSE_LEVELS.hut.defense + 1);
 
     const captured: FactionId[] = [];
     createHouseCaptureSystem({ onCapture: (faction) => captured.push(faction) })(world, 0);
 
     expect(world.get(house, Owner)).toEqual({ faction: "player" });
     expect(world.get(house, House)).toEqual({ level: "hut", population: 0 });
-    expect(world.isAlive(attacker)).toBe(false);
     expect(captured).toEqual(["player"]);
+  });
+
+  /**
+   * The same arithmetic two walkers use when they meet — a walker is a
+   * group, not a person (docs/game-system.md 4節), so storming a house
+   * costs it what the house was worth to defend and the rest walks on.
+   */
+  it("leaves the attacker standing, weakened by what the house cost to take", () => {
+    const world = new World();
+    createHouse(world, "enemy", 0, 0);
+    const attacker = createWalker(world, "player", 0, 0, HOUSE_LEVELS.hut.defense + 5);
+
+    createHouseCaptureSystem()(world, 0);
+
+    expect(world.get(attacker, Walker)!.strength).toBe(5);
+  });
+
+  it("lets one force take a second house with what it has left", () => {
+    const world = new World();
+    const first = createHouse(world, "enemy", 0, 0);
+    const second = createHouse(world, "enemy", 20, 20);
+    const attacker = createWalker(world, "player", 0, 0, HOUSE_LEVELS.hut.defense * 2 + 1);
+    const system = createHouseCaptureSystem();
+
+    system(world, 0);
+    world.add(attacker, Position, { x: 20, y: 20 }); // marches on to the next one
+    system(world, 0);
+
+    expect(world.get(first, Owner)).toEqual({ faction: "player" });
+    expect(world.get(second, Owner)).toEqual({ faction: "player" });
   });
 
   it("repels a walker too weak to beat the house's defense, leaving the house untouched", () => {
