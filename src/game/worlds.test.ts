@@ -289,6 +289,33 @@ describe("面ごとに落とされる操作", () => {
     expect(denied).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 26, 39]);
   });
 
+  /**
+   * 「敵の位置表示」「災害箇所表示」 — the two settings that take away
+   * information rather than an operation. 「表示を奪うことが難易度の軸に
+   * なっている」.
+   */
+  it("hides the enemy on exactly the eleven stages the source names", () => {
+    const hidden = WORLDS.map((world, i) => (world.enemyPositionsVisible ? 0 : i + 1)).filter(Boolean);
+
+    expect(hidden).toEqual([16, 18, 19, 25, 26, 40, 41, 42, 43, 45, 48]);
+  });
+
+  it("hides 災害箇所 on exactly the six stages the source names", () => {
+    const hidden = WORLDS.map((world, i) => (world.disasterMarkersVisible ? 0 : i + 1)).filter(Boolean);
+
+    expect(hidden).toEqual([25, 40, 41, 42, 45, 48]);
+  });
+
+  /**
+   * Every stage that hides the strikes also hides the enemy — the two are
+   * dealt as a pair at the hard end, never the other way round.
+   */
+  it("never hides 災害箇所 on a stage that still shows the enemy", () => {
+    for (const world of WORLDS) {
+      if (!world.disasterMarkersVisible) expect(world.enemyPositionsVisible).toBe(false);
+    }
+  });
+
   it("keeps 底なし沼 off on exactly the five stages the source names", () => {
     const fillable = WORLDS.map((world, i) => (world.bottomlessSwamp ? 0 : i + 1)).filter(Boolean);
 
