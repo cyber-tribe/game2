@@ -3,6 +3,7 @@ import { World } from "../../ecs";
 import type { Heightmap } from "../../world/heightmap";
 import { MoveTarget, Position, Walker } from "../components";
 import { createWanderTargetSystem } from "./wanderTarget";
+import { WANDER_OUTWARD_BIAS } from "../constants";
 function blankLayer(width: number, height: number): boolean[][] {
   return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
 }
@@ -120,5 +121,94 @@ describe("createWanderTargetSystem", () => {
     const target = world.get(entity, MoveTarget)!;
     expect(target.x).toBe(0);
     expect(target.y).toBe(0);
+  });
+});
+
+/**
+ * 「定住：ウォーカーは適当に歩き回り、平地に建物を建てます。マップ中央より
+ * は端に向かいやすい傾向があります」 — the walk leans away from the middle
+ * of the map. These check the lean, and check that it stays a 傾向: no
+ * direction is closed off, and the step is turned rather than lengthened.
+ */
+describe("createWanderTargetSystem's outward lean", () => {
+  function seekerAt(world: World, x: number, y: number) {
+    const entity = world.createEntity();
+    world.add(entity, Position, { x, y });
+    world.add(entity, Walker, { strength: 1, state: "seeking", speed: 1 });
+    return entity;
+  }
+
+  /** Distance from the map's centre, which the lean should tend to grow. */
+  function radiusFromCentre(point: { x: number; y: number }): number {
+    return Math.hypot(point.x - 50, point.y - 50);
+  }
+
+  it("sends more walkers outward than inward from an off-centre spot", () => {
+    const heightmap = halfWaterHeightmap(100, 100, 0); // land everywhere
+    let outward = 0;
+    let inward = 0;
+
+    for (let roll = 0; roll < 400; roll++) {
+      const world = new World();
+      // North-west of the centre, well inside the map so nothing clamps.
+      const entity = seekerAt(world, 30, 30);
+      const rng = queueRng([roll / 400, 0.5]);
+      createWanderTargetSystem({ radius: 6, rng, heightmap })(world, 1);
+
+      const target = world.get(entity, MoveTarget)!;
+      if (radiusFromCentre(target) > radiusFromCentre({ x: 30, y: 30 })) outward++;
+      else inward++;
+    }
+
+    expect(outward).toBeGreaterThan(inward);
+  });
+
+  it("still lets a walker head inward — a 傾向, not a rule", () => {
+    const world = new World();
+    const entity = seekerAt(world, 30, 30);
+    const heightmap = halfWaterHeightmap(100, 100, 0);
+    // An eighth of a turn is due south-east, i.e. straight back at the centre.
+    createWanderTargetSystem({ radius: 6, rng: queueRng([0.125, 1]), heightmap })(world, 1);
+
+    const target = world.get(entity, MoveTarget)!;
+    expect(radiusFromCentre(target)).toBeLessThan(radiusFromCentre({ x: 30, y: 30 }));
+  });
+
+  it("turns the step without lengthening it", () => {
+    const world = new World();
+    const entity = seekerAt(world, 20, 80);
+    const heightmap = halfWaterHeightmap(100, 100, 0);
+    createWanderTargetSystem({ radius: 6, rng: queueRng([0.1, 0.5]), heightmap })(world, 1);
+
+    const target = world.get(entity, MoveTarget)!;
+    expect(Math.hypot(target.x - 20, target.y - 80)).toBeCloseTo(3, 10);
+  });
+
+  it("leaves a walker standing on the centre with a plain uniform roll", () => {
+    const world = new World();
+    const entity = seekerAt(world, 50, 50);
+    const heightmap = halfWaterHeightmap(100, 100, 0);
+    createWanderTargetSystem({ radius: 6, rng: queueRng([0.25, 1]), heightmap })(world, 1);
+
+    // A quarter turn is due south at full radius, unturned by any lean.
+    const target = world.get(entity, MoveTarget)!;
+    expect(target.x).toBeCloseTo(50, 10);
+    expect(target.y).toBeCloseTo(56, 10);
+  });
+
+  it("restores the old isotropic wander at outwardBias 0", () => {
+    const world = new World();
+    const entity = seekerAt(world, 30, 30);
+    const heightmap = halfWaterHeightmap(100, 100, 0);
+    createWanderTargetSystem({ radius: 6, rng: queueRng([0.25, 1]), outwardBias: 0, heightmap })(world, 1);
+
+    const target = world.get(entity, MoveTarget)!;
+    expect(target.x).toBeCloseTo(30, 10);
+    expect(target.y).toBeCloseTo(36, 10);
+  });
+
+  it("keeps the shipped bias a lean rather than a march to the edge", () => {
+    expect(WANDER_OUTWARD_BIAS).toBeGreaterThan(0);
+    expect(WANDER_OUTWARD_BIAS).toBeLessThan(1);
   });
 });

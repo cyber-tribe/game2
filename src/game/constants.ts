@@ -44,6 +44,20 @@ export const FINAL_BATTLE_WALKER_SPEED = 0.5;
 /** Radius (in tiles) a "seeking" walker without a target wanders within. */
 export const DEFAULT_WANDER_RADIUS = 6;
 
+/**
+ * How strongly a wandering walker leans away from the middle of the map.
+ *
+ * 原作の定住は「ウォーカーは適当に歩き回り、平地に建物を建てます。マップ
+ * 中央よりは端に向かいやすい傾向があります」 — a *tendency*, not a rule, so
+ * this blends the outward direction into an otherwise uniform random one
+ * rather than replacing it. At 0 the walk is the old isotropic one; at 1 it
+ * always marches straight for the nearest edge. 0.35 leaves every direction
+ * reachable (the blend of a unit vector with 0.35 of another can still point
+ * anywhere) while making the outward half of the circle noticeably more
+ * likely, which is what "傾向" asks for.
+ */
+export const WANDER_OUTWARD_BIAS = 0.35;
+
 /** Population units a house accumulates per second. */
 export const DEFAULT_POPULATION_GROWTH_RATE = 2;
 
