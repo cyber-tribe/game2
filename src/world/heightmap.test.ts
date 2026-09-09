@@ -32,6 +32,8 @@ import {
   FUNGUS_SPREAD_CHANCE,
   FUNGUS_WITHER_CHANCE,
   applyVolcano,
+  VOLCANO_PUDDLES,
+  VOLCANO_PUDDLE_RING,
   countFlatNeighbors,
   createHeightmap,
   findLeastFlatVertex,
@@ -725,7 +727,7 @@ describe("applyVolcano", () => {
   it("returns every vertex it covered, so the ECS side can bury what stood there", () => {
     const heightmap = flatHeightmap(10, 10, 3);
 
-    const covered = applyVolcano(heightmap, 5, 5, 1, 7, 0);
+    const covered = applyVolcano(heightmap, 5, 5, 1, 7, 0, 0);
 
     expect(covered).toHaveLength(9); // the 3x3 cone footprint
     expect(covered).toContainEqual({ x: 5, y: 5 });
@@ -761,7 +763,7 @@ describe("applyVolcano", () => {
   it("floods lava beyond the cone, covering far more ground than the cone itself", () => {
     const heightmap = flatHeightmap(30, 30, 3);
 
-    const covered = applyVolcano(heightmap, 15, 15, 1, 7, 20);
+    const covered = applyVolcano(heightmap, 15, 15, 1, 7, 20, 0);
 
     expect(covered.length).toBe(9 + 20);
     expect(covered.filter(({ x, y }) => Math.abs(x - 15) > 1 || Math.abs(y - 15) > 1).length).toBe(20);
@@ -793,7 +795,7 @@ describe("applyVolcano", () => {
     // A valley running east from the volcano.
     for (let x = 16; x <= 26; x++) heightmap.vertices[15][x] = 1;
 
-    applyVolcano(heightmap, 15, 15, 1, 7, 8);
+    applyVolcano(heightmap, 15, 15, 1, 7, 8, 0);
 
     expect(heightmap.rockHardness[15][22]).toBeGreaterThan(0); // down the valley
     expect(heightmap.rockHardness[22][15]).toBe(0); // across the plateau
@@ -802,9 +804,84 @@ describe("applyVolcano", () => {
   it("spends exactly its volume, no more", () => {
     const heightmap = flatHeightmap(30, 30, 3);
 
-    const covered = applyVolcano(heightmap, 15, 15, 0, 7, 5);
+    const covered = applyVolcano(heightmap, 15, 15, 0, 7, 5, 0);
 
     expect(covered.length).toBe(1 + 5);
+  });
+
+  /**
+   * 原作「火山の外周には水たまりができ、溶岩流をそこで止める」. Scattered
+   * rather than a closed moat — see VOLCANO_PUDDLES.
+   */
+  describe("its 外周の水たまり", () => {
+    it("melts VOLCANO_PUDDLES of them, out on the ring beyond the cone", () => {
+      const heightmap = flatHeightmap(40, 40, 6);
+
+      applyVolcano(heightmap, 20, 20, 1, 7, 0, VOLCANO_PUDDLES, () => 0.5);
+
+      const water: { x: number; y: number }[] = [];
+      for (let y = 0; y <= 40; y++) {
+        for (let x = 0; x <= 40; x++) {
+          if (heightmap.vertices[y][x] <= heightmap.waterLevel) water.push({ x, y });
+        }
+      }
+
+      expect(water).toHaveLength(VOLCANO_PUDDLES);
+      for (const { x, y } of water) {
+        // Out past the cone's own footprint, on its skirt.
+        expect(Math.max(Math.abs(x - 20), Math.abs(y - 20))).toBeGreaterThan(1);
+        expect(Math.hypot(x - 20, y - 20)).toBeLessThanOrEqual(1 + VOLCANO_PUDDLE_RING + 1);
+      }
+    });
+
+    it("reports them as covered, so a house that ends up in one is cleared", () => {
+      const heightmap = flatHeightmap(40, 40, 6);
+
+      const covered = applyVolcano(heightmap, 20, 20, 1, 7, 0, VOLCANO_PUDDLES, () => 0.5);
+
+      for (let y = 0; y <= 40; y++) {
+        for (let x = 0; x <= 40; x++) {
+          if (heightmap.vertices[y][x] <= heightmap.waterLevel) expect(covered).toContainEqual({ x, y });
+        }
+      }
+    });
+
+    it("stops the lava where they are, and lets it out between them", () => {
+      const heightmap = flatHeightmap(40, 40, 6);
+
+      applyVolcano(heightmap, 20, 20, 1, 7, 200, VOLCANO_PUDDLES, () => 0.5);
+
+      for (let y = 0; y <= 40; y++) {
+        for (let x = 0; x <= 40; x++) {
+          // Nothing under water is ever rock — the flow ends there.
+          if (heightmap.vertices[y][x] <= heightmap.waterLevel) expect(heightmap.rockHardness[y][x]).toBe(0);
+        }
+      }
+
+      // ...and the lava still got out: a handful of puddles is not a moat.
+      const escaped = heightmap.rockHardness.some((row, y) =>
+        row.some((hardness, x) => hardness > 0 && Math.hypot(x - 20, y - 20) > 1 + VOLCANO_PUDDLE_RING + 1),
+      );
+      expect(escaped).toBe(true);
+    });
+
+    it("melts none at all when asked for none", () => {
+      const heightmap = flatHeightmap(40, 40, 6);
+
+      applyVolcano(heightmap, 20, 20, 1, 7, 0, 0);
+
+      const anyWater = heightmap.vertices.some((row) => row.some((h) => h <= heightmap.waterLevel));
+      expect(anyWater).toBe(false);
+    });
+
+    it("leaves ground that was already sea alone rather than reporting it twice", () => {
+      const heightmap = flatHeightmap(40, 40, 6);
+      for (const row of heightmap.vertices) row.fill(MIN_ELEVATION);
+
+      const covered = applyVolcano(heightmap, 20, 20, 1, 7, 0, VOLCANO_PUDDLES, () => 0.5);
+
+      expect(covered).toHaveLength(9); // the cone only — every puddle site was water already
+    });
   });
 
   it("does not touch vertices outside the map bounds", () => {

@@ -903,6 +903,22 @@ export const TORNADO_WANDER = 0.9;
  */
 export const FIRE_PILLAR_LIFETIME = 9;
 
+/**
+ * How many 火柱 one 火山 throws out — 原作「火山からは火柱が数本発生する」.
+ * 「数本」 is a handful; three is enough to surround a settlement's edge
+ * without turning one cast into an unanswerable wipe.
+ */
+export const VOLCANO_FIRE_PILLARS = 3;
+
+/**
+ * How far from the crater those pillars are born, in tiles.
+ *
+ * Clear of the cone and of the puddles around it (VOLCANO_PUDDLE_RING), for
+ * the reason raiseFirePillars gives: a 火柱 leans uphill, so one started on
+ * the volcano's own slope walks back up it and burns nothing.
+ */
+export const VOLCANO_FIRE_PILLAR_RING = 4;
+
 /** Tiles per second a 火柱 drifts. Slower than a walker, like the 竜巻 — it can be outrun. */
 export const FIRE_PILLAR_SPEED = 0.9;
 
