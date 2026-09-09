@@ -17,13 +17,7 @@ import {
   MEGALITH_MANA_COST,
   FUNGUS_MANA_COST,
   TSUNAMI_MANA_COST,
-  GUARDIAN_MANA_COST,
-  PERSEUS_MANA_COST,
-  HERCULES_MANA_COST,
-  ODYSSEUS_MANA_COST,
-  ACHILLES_MANA_COST,
-  ADONIS_MANA_COST,
-  HELEN_MANA_COST,
+  HERO_MANA_COST,
   MAX_MANA,
   SHRINE_MOVE_MANA_COST,
   SWAMP_CAPACITY,
@@ -54,15 +48,6 @@ import type { HeroKind } from "./game/components";
  * both the toolbar's affordability dimming and applyTool's own dispatch
  * read it, so a new hero cannot be added to one and forgotten in the other.
  */
-const HERO_MANA_COST: Record<HeroKind, number> = {
-  perseus: PERSEUS_MANA_COST,
-  hercules: HERCULES_MANA_COST,
-  odysseus: ODYSSEUS_MANA_COST,
-  achilles: ACHILLES_MANA_COST,
-  adonis: ADONIS_MANA_COST,
-  helen: HELEN_MANA_COST,
-  guardian: GUARDIAN_MANA_COST,
-};
 import { createHolyWater } from "./game/holyWater";
 import { applyHurricane } from "./game/hurricane";
 import { createFirePillar } from "./game/firePillar";
@@ -343,13 +328,30 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
     earthquake: 6,
     fireRain: 4,
     lightning: 6,
+    tsunami: 5,
+    hurricane: 5,
+    tornado: 4,
+    firePillar: 4,
+    storm: 3,
     // Neither of these lands with any weight — a spring wells up and a
     // plague shows nothing at all (see game/plague.ts) — so shaking the
     // camera for them would promise damage that isn't there.
     holyWater: 0,
     plague: 0,
     swamp: 0,
+    // Nor do these on the player's own side: a whirlpool is a spiral out at
+    // sea and 毒カビ is a stain on the ground.
+    whirlpool: 0,
+    fungus: 0,
+    // The hero promotions have no player-side shake to match, so they keep
+    // their own small, hero-scale value — one each, now that the god picks
+    // from all of them (see WorldDefinition's enemyHero).
     perseus: 3,
+    hercules: 3,
+    odysseus: 3,
+    achilles: 3,
+    adonis: 3,
+    helen: 3,
     guardian: 3,
   };
 
@@ -447,6 +449,11 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
     allowedMiracles: world.allowedMiracles,
     enemyPersonality: world.enemyPersonality,
     enemySchool: world.enemySchool,
+    // The god's own repertoire, separate from the player's hand — see
+    // WorldDefinition's enemyMiracles.
+    enemyMiracles: world.enemyMiracles,
+    enemyHero: world.enemyHero,
+    enemyCastRate: world.enemyCastRate,
     instantDrowning: world.instantDrowning,
     bottomlessSwamp: world.bottomlessSwamp,
     onEnemyAction,

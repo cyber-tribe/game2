@@ -659,6 +659,23 @@ export const HELEN_CAPTIVE_DRAIN_RATE = 0.03;
 export const GUARDIAN_MANA_COST = 25;
 
 /**
+ * What each hero costs to promote to, in one table.
+ *
+ * Lived in main.ts until the enemy god started choosing among them too
+ * (see systems/enemyMiracles.ts and WorldDefinition's enemyHero) — both
+ * sides pay the same price for the same hero, so both read the same table.
+ */
+export const HERO_MANA_COST: Record<HeroKind, number> = {
+  perseus: PERSEUS_MANA_COST,
+  hercules: HERCULES_MANA_COST,
+  odysseus: ODYSSEUS_MANA_COST,
+  achilles: ACHILLES_MANA_COST,
+  adonis: ADONIS_MANA_COST,
+  helen: HELEN_MANA_COST,
+  guardian: GUARDIAN_MANA_COST,
+};
+
+/**
  * What each hero kind multiplies its leader's strength and speed by when
  * the miracle lands — see hero.ts's promoteHero.
  *

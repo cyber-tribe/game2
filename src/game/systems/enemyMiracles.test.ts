@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
 import type { Heightmap } from "../../world/heightmap";
-import { FactionState, House, Infected, Owner, Position, Swamp, Walker } from "../components";
+import { FactionState, House, Infected, Owner, Position, Swamp, Tornado, Walker, type HeroKind } from "../components";
 import {
   ARMAGEDDON_MANA_COST,
   ARMAGEDDON_POPULATION_RATIO,
@@ -13,7 +13,9 @@ import {
 } from "../constants";
 import { createFaction } from "../faction";
 import { isGroundShaking } from "../quake";
-import { createEnemyMiracleSystem } from "./enemyMiracles";
+import { createEnemyMiracleSystem, type EnemyMiracleEvent } from "./enemyMiracles";
+import type { MiracleSchool } from "../miracleSchools";
+import type { MiracleId } from "../worlds";
 function blankLayer(width: number, height: number): boolean[][] {
   return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
 }
@@ -781,5 +783,129 @@ describe("createEnemyMiracleSystem personality tuning", () => {
 
     expect(world.isAlive(target)).toBe(true); // unbiased threshold not met, no volcano
     expect(ARMAGEDDON_POPULATION_RATIO).toBeGreaterThan(VOLCANO_POPULATION_RATIO); // sanity check on the fixtures above
+  });
+});
+
+/**
+ * 敵の神は自分の持ち物から撃つ——プレイヤーの手札からではない。攻略資料は
+ * 面ごとに「敵の神技」欄を別に持っており、game2 はそれを長く見落として
+ * いた（`plan/0166`）。
+ */
+describe("createEnemyMiracleSystem casting the god's own repertoire", () => {
+  function god(options: {
+    enemyMiracles?: MiracleId[];
+    allowedMiracles?: MiracleId[];
+    school?: MiracleSchool;
+    enemyHero?: HeroKind;
+    mana?: number;
+    fight?: boolean;
+  }) {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 }, options.fight ? "fight" : undefined);
+    const leader = options.fight ? createWalker(world, "enemy") : undefined;
+    world.add(enemy, FactionState, {
+      ...world.get(enemy, FactionState)!,
+      mana: options.mana ?? 999,
+      ...(leader ? { leaderId: leader } : {}),
+    });
+    createFaction(world, "player", { x: 9, y: 9 });
+    createHouse(world, "player", 5, 5);
+    const events: EnemyMiracleEvent[] = [];
+    createEnemyMiracleSystem({
+      decisionInterval: 8,
+      heightmap: flatHeightmap(10, 10, 5),
+      worldCenter: WORLD_CENTER,
+      rng: () => 0,
+      allowedMiracles: options.allowedMiracles ?? [],
+      enemyMiracles: options.enemyMiracles ?? [],
+      school: options.school ?? "earth",
+      enemyHero: options.enemyHero,
+      onAction: (event) => events.push(event),
+    })(world, 8);
+    return { world, leader, events, cast: events.map((event) => event.type) };
+  }
+
+  /** No.1「土地上下とマグネットのみ。しかも反応が極めて遅い」 */
+  it("throws nothing at all where the guide gives the god nothing", () => {
+    const { cast } = god({ enemyMiracles: [], allowedMiracles: ["firePillar", "perseus", "armageddon"], school: "fire" });
+
+    expect(cast).toEqual([]);
+  });
+
+  /** 「のみ」なので英雄も含めて何もしない——守護者化も最終決戦も。 */
+  it("does not even promote a hero where the guide gives the god nothing", () => {
+    const { world, leader, cast } = god({
+      enemyMiracles: [],
+      allowedMiracles: ["perseus", "guardian", "armageddon"],
+      school: "fire",
+      fight: true,
+    });
+
+    expect(cast).toEqual([]);
+    expect(world.get(leader!, Walker)!.state).toBe("seeking");
+  });
+
+  /** 手札はプレイヤーのもの。神の持ち物と食い違っていてよい。 */
+  it("ignores the player's hand entirely and casts its own list", () => {
+    const { cast } = god({ enemyMiracles: ["storm"], allowedMiracles: ["swamp", "earthquake"], school: "air" });
+
+    expect(cast).toEqual(["storm"]);
+  });
+
+  /** No.7「沼。ひたすら沼」——系統の代表を持っていれば、高い物より先にそれ。 */
+  it("reaches for its school's signature before anything dearer", () => {
+    const { cast } = god({ enemyMiracles: ["swamp", "fungus"], school: "plant" });
+
+    expect(cast).toEqual(["swamp"]);
+  });
+
+  it("takes the dearest of its own school when it holds no signature", () => {
+    const { cast } = god({ enemyMiracles: ["tornado", "storm"], school: "air" });
+
+    expect(cast).toEqual(["storm"]);
+  });
+
+  it("falls back to another school's miracle when its own school holds none", () => {
+    const { cast } = god({ enemyMiracles: ["whirlpool"], school: "fire" });
+
+    expect(cast).toEqual(["whirlpool"]);
+  });
+
+  it("saves up rather than casting what it cannot afford", () => {
+    const { cast } = god({ enemyMiracles: ["tsunami"], school: "water", mana: 5 });
+
+    expect(cast).toEqual([]);
+  });
+
+  /** 向きを持つ奇跡は、プレイヤーと同じく自陣のマグネットから標的の向こうへ。 */
+  it("aims the ones with a heading away from its own shrine", () => {
+    const { world, cast } = god({ enemyMiracles: ["tornado"], school: "air" });
+
+    expect(cast).toEqual(["tornado"]);
+    const heading = world.get(world.query(Tornado)[0], Tornado)!;
+    expect(heading.headingX).toBeGreaterThan(0);
+    expect(heading.headingY).toBeGreaterThan(0);
+  });
+
+  /** 「ヒーローはアドニス」——資料が名指しした英雄は、その神のものである。 */
+  it("promotes into the hero the guide names for this god", () => {
+    // No.19「ほぼアドニスのみ。津波を持っているが、まず使わない」——英雄を
+    // 名指しされた神は、攻撃神技も何かしら持っている。
+    const { world, leader, cast } = god({ enemyMiracles: ["tsunami"], enemyHero: "adonis", school: "plant", fight: true });
+
+    expect(cast).toEqual(["adonis"]);
+    expect(world.get(leader!, Walker)!.state).toBe("adonis");
+  });
+
+  it("does not need the player's hand to hold that hero", () => {
+    const { cast } = god({ enemyMiracles: ["hurricane"], enemyHero: "hercules", allowedMiracles: [], school: "earth", fight: true });
+
+    expect(cast).toEqual(["hercules"]);
+  });
+
+  it("still falls back on ペルセウス where the guide names no hero", () => {
+    const { cast } = god({ enemyMiracles: ["earthquake"], allowedMiracles: ["perseus"], school: "earth", fight: true });
+
+    expect(cast).toEqual(["perseus"]);
   });
 });

@@ -119,6 +119,19 @@ export interface SimulationConfig {
    */
   enemySchool?: MiracleSchool;
   /**
+   * What the enemy god itself throws, and which hero it becomes — the
+   * guide's own per-stage 「敵の神技」 (see worlds.ts's
+   * WorldDefinition.enemyMiracles / enemyHero). Distinct from
+   * allowedMiracles, which is the player's hand.
+   */
+  enemyMiracles?: readonly MiracleId[];
+  enemyHero?: HeroKind;
+  /**
+   * Multiplies the god's decision interval — 「執拗に仕掛けてくる」 vs
+   * 「ほとんど仕掛けてこない」. See WorldDefinition.enemyCastRate.
+   */
+  enemyCastRate?: number;
+  /**
    * Called whenever the enemy actually casts a miracle (see
    * enemyMiracles.ts's EnemyMiracleEvent) — lets main.ts surface it
    * (screen shake, a toast) even when it happens off the player's
@@ -449,8 +462,10 @@ export class Simulation {
         createEnemyMiracleSystem({
           heightmap: config.heightmap,
           worldCenter: this.worldCenter,
-          decisionInterval: config.enemyDecisionInterval,
+          decisionInterval: (config.enemyDecisionInterval ?? 8) * (config.enemyCastRate ?? 1),
           allowedMiracles: config.allowedMiracles ?? ALL_MIRACLES,
+          enemyMiracles: config.enemyMiracles ?? config.allowedMiracles ?? ALL_MIRACLES,
+          enemyHero: config.enemyHero,
           personality: config.enemyPersonality,
           school: config.enemySchool,
           bottomlessSwamp: config.bottomlessSwamp,
