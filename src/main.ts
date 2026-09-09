@@ -78,7 +78,7 @@ import { describeInspectableEntity } from "./render/entityInfoLabel";
 import { Hud } from "./render/Hud";
 import { MIRACLE_SCHOOLS } from "./game/miracleSchools";
 import { IsoRenderer, visibleTileBounds, type TileBounds } from "./render/IsoRenderer";
-import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
+import { describeMatchEvent, describeStageRating, formatMatchTime } from "./render/matchEventLabels";
 import { Minimap, minimapHeight } from "./render/Minimap";
 import { PopulationGauge } from "./render/PopulationGauge";
 import { GAME_PALETTE } from "./render/palette";
@@ -358,7 +358,16 @@ async function bootstrap(world: WorldDefinition) {
   const showMatchRecord = (outcome: GameOutcome, events: readonly MatchEvent[]) => {
     if (!matchRecordPanel || !matchRecordTitle || !matchRecordList) return;
     matchRecordTitle.textContent = outcome.winner ? `GAME OVER — ${outcome.winner} wins` : "GAME OVER — draw";
+
+    // 「面の評価は稲妻マーク10個（約5万点）が上限」 — the stage's own rating,
+    // above the log rather than inside it: it is what the whole match added
+    // up to, not another thing that happened during it. See game/score.ts.
+    const rating = document.createElement("div");
+    rating.id = "match-record-rating";
+    rating.textContent = `評価 ${describeStageRating(simulation.getStageRating("player"))}`;
+
     matchRecordList.replaceChildren(
+      rating,
       ...events.map((event) => {
         const line = document.createElement("div");
         line.textContent = `${formatMatchTime(event.time)} ${describeMatchEvent(event.type, event.faction)}`;

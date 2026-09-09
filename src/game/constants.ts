@@ -286,6 +286,43 @@ export const IMPACT_EFFECT_DURATION = 0.5;
 export const DISASTER_MARKER_DURATION = 12;
 
 /**
+ * What each of the original's four score sources is worth — 「経験点の
+ * 稼ぎ方（効果の高い順）：地下巨石・岩礁を使う／敵リーダーを倒す／
+ * ウォーカー同士の直接戦闘に勝つ／時間が経つ」 (see game/score.ts).
+ *
+ * The *order* is the original's and is what these numbers exist to
+ * preserve: one 地下巨石 or 岩礁 outweighs a leader, a leader outweighs a
+ * won fight, and a won fight outweighs a good many seconds of simply being
+ * alive. The magnitudes are game2's own, calibrated against a real match
+ * rather than borrowed from the original's five-figure scale — see
+ * stageRating on why that scale is deliberately not transplanted.
+ */
+export const SCORE_VALUE = {
+  /** 地下巨石 and 岩礁 — 「低コストでスコア効率が高い」. */
+  stonework: 300,
+  /** Killing the opposing リーダー. */
+  enemyLeader: 120,
+  /** Winning one walker-on-walker fight. */
+  fightWon: 20,
+} as const;
+
+/** Score for simply staying in the match, per second. The weakest source, as the original ranks it. */
+export const SCORE_PER_SECOND = 1;
+
+/**
+ * The score that fills the bar — ten 稲妻マーク.
+ *
+ * Reachable but not by drifting: a ten-minute match that never builds
+ * anything earns roughly a fifth of it. Filling it means using 地下巨石 and
+ * 岩礁 the way the original rewards, which is exactly the behaviour the
+ * score is there to name.
+ */
+export const MAX_STAGE_SCORE = 5000;
+
+/** 「稲妻マーク10個」 — the original's own count. */
+export const MAX_STAGE_MARKS = 10;
+
+/**
  * Placeholder land-scarcity proxy: roughly how many map tiles a faction
  * needs per house it's allowed to build, used to derive
  * HouseGrowthConfig.maxHousesPerFaction from world size until real
