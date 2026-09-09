@@ -21,3 +21,19 @@ describe("Hud.update", () => {
     expect(hud.view.text).toBe("地形: 岩地\n地形操作: 隆起のみ可");
   });
 });
+
+describe("Hud.setTopOffset", () => {
+  /**
+   * The HUD and the world map are both anchored to the top-left corner, so
+   * the offset the caller passes has to be big enough to clear the map —
+   * see main.ts's layout() and Minimap's minimapHeight.
+   */
+  it("moves the text down by the offset, keeping the left margin", () => {
+    const hud = new Hud();
+
+    hud.setTopOffset(130);
+
+    expect(hud.view.position.x).toBe(10);
+    expect(hud.view.position.y).toBe(140);
+  });
+});

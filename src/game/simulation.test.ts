@@ -107,20 +107,24 @@ describe("Simulation", () => {
       const leader = sim.world.createEntity();
       sim.world.add(leader, Position, { x: 5, y: 5 });
       sim.world.add(leader, Owner, { faction: "enemy" });
-      // Past the enemy AI's own muster bar (ENEMY_MUSTER_HOUSES times the
-      // player's weakest house), so it leaves the "fight" mode this test
-      // sets rather than sending the faction off to gather.
-      // totalPopulation counts a walker as 1 whatever its strength, so
-      // this doesn't move the population ratio the test is about.
-      sim.world.add(leader, Walker, { strength: 20, state: "seeking", speed: 1 });
+      // Past the enemy AI's own muster bar, so it leaves the "fight" mode
+      // this test sets rather than sending the faction off to muster. That
+      // bar is now ENEMY_MUSTER_HOUSES (3) times the player's weakest
+      // house (a hut, defense 3), so it takes strictly more than 9.
+      //
+      // A walker's strength IS its head count (population.ts's
+      // walkerFollowers), so raising it moves the population ratio this
+      // test is about — the two house populations below are picked to put
+      // that ratio back at 0.8.
+      sim.world.add(leader, Walker, { strength: 10, state: "seeking", speed: 1 });
       const enemyHouse = sim.world.createEntity();
       sim.world.add(enemyHouse, Position, { x: 4, y: 4 });
       sim.world.add(enemyHouse, Owner, { faction: "enemy" });
-      sim.world.add(enemyHouse, House, { level: "hut", population: 7 }); // + leader's own +1 = myPopulation 8
+      sim.world.add(enemyHouse, House, { level: "hut", population: 2 }); // + the leader's 10 = myPopulation 12
       const playerHouse = sim.world.createEntity();
       sim.world.add(playerHouse, Position, { x: 15, y: 15 });
       sim.world.add(playerHouse, Owner, { faction: "player" });
-      sim.world.add(playerHouse, House, { level: "hut", population: 10 }); // ratio 8/10 = 0.8
+      sim.world.add(playerHouse, House, { level: "hut", population: 15 }); // ratio 12/15 = 0.8
       sim.world.add(enemyState, FactionState, {
         ...sim.world.get(enemyState, FactionState)!,
         mana: 999,
@@ -180,7 +184,9 @@ describe("Simulation", () => {
 
     const entities = sim.listInspectableEntities();
     expect(entities).toEqual([
-      { kind: "house", faction: "enemy", position: { x: 3, y: 4 }, level: "manor", population: 12, capacity: HOUSE_LEVELS.manor.capacity },
+      // `entity` is the ECS id, carried so a tap that picked something can
+      // then act on it — see スプログ in main.ts.
+      { entity: house, kind: "house", faction: "enemy", position: { x: 3, y: 4 }, level: "manor", population: 12, capacity: HOUSE_LEVELS.manor.capacity },
     ]);
   });
 
@@ -679,7 +685,12 @@ describe("Simulation", () => {
     expect(leaderIds.every((id) => id !== undefined)).toBe(true);
   });
 
-  it("under goToShrine mode, walks a lone leader to a relocated shrine and settles it there", () => {
+  /**
+   * 「集合：…その間、平地があっても新たな建物は一切建てない」. The walker
+   * marches to the symbol and *stands there*. It used to found a hut on
+   * arrival, which turned the order to muster into 定住 with extra steps.
+   */
+  it("under goToShrine mode, walks a lone leader to a relocated shrine and builds nothing there", () => {
     const sim = new Simulation({ worldWidth: 20, worldHeight: 20, initialWalkersPerFaction: 1 });
     // Assigning leaderId directly (rather than via a "gather" pass) sidesteps
     // gatherTargetingSystem's own "nobody else left to gather" fallback (see
@@ -694,14 +705,14 @@ describe("Simulation", () => {
     sim.moveShrine("player", shrine);
 
     // Starting distance is 10 tiles at DEFAULT_WALKER_SPEED=1.5 tiles/s: ~6.7s to arrive.
-    // Stay well under the ~5s-after-arrival mark where the settled hut would
-    // finish accumulating enough population to spawn (and instantly settle)
-    // a second walker at the same spot.
     for (let i = 0; i < 100; i++) sim.update(0.1);
 
+    const playerWalkers = sim.world.query(Walker, Owner, Position).filter((entity) => sim.world.get(entity, Owner)!.faction === "player");
+    expect(playerWalkers).toHaveLength(1);
+    expect(sim.world.get(playerWalkers[0], Position)).toEqual(shrine);
+
     const playerHouses = sim.world.query(House, Owner, Position).filter((entity) => sim.world.get(entity, Owner)!.faction === "player");
-    expect(playerHouses).toHaveLength(1);
-    expect(sim.world.get(playerHouses[0], Position)).toEqual(shrine);
+    expect(playerHouses).toHaveLength(0);
   });
 
   it("a knighted leader hunts down the enemy regardless of behaviorMode, and survives the kill", () => {
@@ -856,5 +867,50 @@ describe("Simulation — the opening", () => {
         expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeLessThanOrEqual(INITIAL_WALKER_SPREAD * 2 + 0.001);
       }
     }
+  });
+});
+
+/**
+ * 合体 is the one order whose correctness lives in the *scheduler*, not in
+ * a single system: mergeTargetingSystem has to run before
+ * createWanderTargetSystem, or every walker is handed a random destination
+ * first and never once walks toward a neighbour. A unit test on the system
+ * cannot see that, so it is checked here, through the real tick order.
+ */
+describe("Simulation under 合体", () => {
+  it("walks a faction's people into each other, growing one of them", () => {
+    const heightmap = flatHeightmap(32, 32, 5);
+    const sim = new Simulation({ worldWidth: 32, worldHeight: 32, initialWalkersPerFaction: 4, heightmap });
+    sim.setBehaviorMode("player", "merge");
+
+    // Peak rather than final: merging is not the end state. A walker with
+    // nobody left in range goes on to settle (「近くに他の信者がいない場合は
+    // 定住に同じ」), so by the last tick the strong one is a house.
+    let peakStrength = 0;
+    for (let tick = 0; tick < 200; tick++) {
+      sim.update(0.1);
+      for (const entity of sim.world.query(Walker, Owner)) {
+        if (sim.world.get(entity, Owner)!.faction !== "player") continue;
+        peakStrength = Math.max(peakStrength, sim.world.get(entity, Walker)!.strength);
+      }
+    }
+
+    expect(peakStrength).toBeGreaterThan(1);
+  });
+
+  it("leaves them at strength 1 under 定住, so the growth above is the order and not the clock", () => {
+    const heightmap = flatHeightmap(32, 32, 5);
+    const sim = new Simulation({ worldWidth: 32, worldHeight: 32, initialWalkersPerFaction: 4, heightmap });
+
+    let peakStrength = 0;
+    for (let tick = 0; tick < 200; tick++) {
+      sim.update(0.1);
+      for (const entity of sim.world.query(Walker, Owner)) {
+        if (sim.world.get(entity, Owner)!.faction !== "player") continue;
+        peakStrength = Math.max(peakStrength, sim.world.get(entity, Walker)!.strength);
+      }
+    }
+
+    expect(peakStrength).toBe(1);
   });
 });

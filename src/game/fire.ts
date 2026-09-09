@@ -1,4 +1,5 @@
 import type { World } from "../ecs";
+import { resistsMiracle } from "./protection";
 import { House, Position, Walker } from "./components";
 import type { OnImpactEffect } from "./systems/effects";
 
@@ -29,11 +30,11 @@ export function burnFire(
   }
 
   for (const entity of world.query(Position, Walker)) {
-    // アキレス 「火が効かず焼死しない」 (docs/original-miracles.md #23) —
-    // the other half of fire rain, and the reason a hero is worth casting
-    // *before* an enemy answers your forest with a torch. Houses have no
-    // such exemption: the hero survives, what they were defending does not.
-    if (world.get(entity, Walker)!.state === "achilles") continue;
+    // 火の雨「※アキレス除く」 — the other half of fire rain, and the reason
+    // a hero is worth casting *before* an enemy answers your forest with a
+    // torch. Houses have no such exemption: the hero survives, what they
+    // were defending does not. 「同じカテゴリーの攻撃神技は効果がない」 — see miracleSchools.ts's resistsSchool.
+    if (resistsMiracle(world, entity, "fire")) continue;
 
     const pos = world.get(entity, Position)!;
     if (!isScorched(pos)) continue;

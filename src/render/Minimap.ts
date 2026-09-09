@@ -26,6 +26,14 @@ const TERRAIN_COLOR: Record<Heightmap["terrain"], number> = {
 
 const WATER_COLOR = GAME_PALETTE.waterDark;
 
+/** Rock showing around the map on the island's top face, in px — see drawIsland. */
+const ISLAND_RIM = 5;
+/** How far the island's body drops below that face before the shards start. */
+const ISLAND_DEPTH = 11;
+/** How many shards trail into the void, and how far the longest reaches. */
+const ISLAND_SHARD_COUNT = 7;
+const ISLAND_SHARD_LENGTH = 18;
+
 const HOUSE_DOT_SIZE = 3;
 const WALKER_DOT_RADIUS = 1;
 
@@ -38,6 +46,111 @@ const WALKER_DOT_RADIUS = 1;
 const TERRAIN_GRID_RESOLUTION = 24;
 /** How many discrete brightness bands terrainColorAt quantizes elevation into — "数段階の明暗" per plan/0087, not a smooth gradient. */
 const TERRAIN_HEIGHT_BANDS = 4;
+
+/**
+ * The rock the overview map is set into — 「世界の縮小模型が岩盤ごと虚空に
+ * 浮いている」.
+ *
+ * Not a border. The original does not frame its world map; it hangs a lump
+ * of rock in the same black space the world itself hangs in and sets the
+ * map into its top face. So this is drawn with a top surface, a body that
+ * tapers away below it, and shards trailing off the underside — the same
+ * three parts the world's own cut edge has (see IsoRenderer's EDGE_STRATA),
+ * because it is meant to read as the same material.
+ *
+ * A flat rectangle with a stone-coloured stroke says "this is a UI panel".
+ * Volume is what says "this is a piece of the world, shrunk".
+ *
+ * Drawn once at construction, deterministically: it is a fixture of the
+ * screen, not something that should look different on each run.
+ */
+/**
+ * How far shard `i` trails into the void. Shared by drawIsland and
+ * minimapHeight so the widget's drawn extent and its reported extent
+ * cannot drift apart — a caller laying something out underneath the
+ * minimap is placing it under these, not under the map square.
+ */
+function shardLength(i: number): number {
+  const t = (i + 0.5) / ISLAND_SHARD_COUNT;
+  return ISLAND_SHARD_LENGTH * (0.4 + 0.6 * Math.sin(t * Math.PI)) * (i % 3 === 0 ? 0.65 : 1);
+}
+
+/**
+ * How far the whole widget reaches below its own origin, in px.
+ *
+ * Bigger than `size`, and that is the point: the map is set into a lump of
+ * rock that tapers away below it and sheds shards into the void, so laying
+ * anything out under the minimap by its `size` alone puts that thing inside
+ * the island. See main.ts's layout(), which is where that had actually
+ * happened — the HUD's terrain line was drawn at the same corner and
+ * disappeared behind the rock.
+ */
+export function minimapHeight(size: number): number {
+  const shardTop = size + ISLAND_RIM + ISLAND_DEPTH * 1.7 - 1;
+  let longest = 0;
+  for (let i = 0; i < ISLAND_SHARD_COUNT; i++) longest = Math.max(longest, shardLength(i));
+  return shardTop + longest;
+}
+
+function drawIsland(size: number): Graphics {
+  const g = new Graphics();
+  const rim = ISLAND_RIM;
+  const left = -rim;
+  const right = size + rim;
+  const top = -rim;
+  const bottom = size + rim;
+
+  // The body: the rim's footprint tapering down into the dark.
+  const taper = (right - left) * 0.16;
+  g.poly([left, bottom - 2, right, bottom - 2, right - taper, bottom + ISLAND_DEPTH, left + taper, bottom + ISLAND_DEPTH]).fill(
+    GAME_PALETTE.soilMid,
+  );
+  g.poly([
+    left + taper,
+    bottom + ISLAND_DEPTH,
+    right - taper,
+    bottom + ISLAND_DEPTH,
+    right - taper * 1.6,
+    bottom + ISLAND_DEPTH * 1.7,
+    left + taper * 1.6,
+    bottom + ISLAND_DEPTH * 1.7,
+  ]).fill(GAME_PALETTE.stoneShadow);
+
+  // Shards hanging into the void, longest toward the middle.
+  const shardTop = bottom + ISLAND_DEPTH * 1.7 - 1;
+  for (let i = 0; i < ISLAND_SHARD_COUNT; i++) {
+    const t = (i + 0.5) / ISLAND_SHARD_COUNT;
+    const span = right - taper * 1.6 - (left + taper * 1.6);
+    const x = left + taper * 1.6 + t * span;
+    const half = span / ISLAND_SHARD_COUNT / 2;
+    const length = shardLength(i);
+    g.poly([x - half, shardTop, x + half, shardTop, x, shardTop + length]).fill(
+      i % 2 === 0 ? GAME_PALETTE.stoneShadow : GAME_PALETTE.soilDark,
+    );
+  }
+
+  // The top face the map is set into: lit soil, with the near edge in
+  // shadow so the surface reads as facing up rather than at the viewer.
+  //
+  // Chipped rather than rectangular. A clean rectangle around a map is a
+  // picture frame however it is coloured; broken corners are what say the
+  // map is set into a piece of ground that was torn out of somewhere.
+  const chip = ISLAND_RIM * 1.6;
+  g.poly([
+    left + chip, top,
+    right - chip * 0.6, top,
+    right, top + chip * 0.7,
+    right, bottom - chip,
+    right - chip * 1.2, bottom,
+    left + chip * 0.7, bottom,
+    left, bottom - chip * 0.8,
+    left, top + chip,
+  ]).fill(GAME_PALETTE.soilLight);
+  g.rect(left + chip * 0.7, bottom - 3, right - chip * 1.9, 3).fill(GAME_PALETTE.soilMid);
+  // The socket the map sits in.
+  g.rect(-1, -1, size + 2, size + 2).fill(GAME_PALETTE.stoneShadow);
+  return g;
+}
 
 function lerpColor(from: number, to: number, t: number): number {
   const clamped = Math.max(0, Math.min(1, t));
@@ -92,12 +205,7 @@ export class Minimap {
     private readonly heightmap: Heightmap,
     readonly size: number,
   ) {
-    const frame = new Graphics()
-      .rect(-3, -3, size + 6, size + 6)
-      .fill(GAME_PALETTE.bronzeDark)
-      .rect(0, 0, size, size)
-      .fill(GAME_PALETTE.stoneShadow);
-    this.view.addChild(frame, this.terrainLayer, this.entities, this.viewportIndicator);
+    this.view.addChild(drawIsland(size), this.terrainLayer, this.entities, this.viewportIndicator);
     this.redrawTerrain();
   }
 

@@ -78,6 +78,17 @@
        * enough (small icons, no per-button subtitle text) to fit a phone
        * screen without needing to scroll.
        */
+      /*
+       * A carved slab, not a bar of flat colour. The original's commands sit
+       * on stone: a grainy face, a 雷文 (Greek key) band running along the
+       * edge that faces the world, and a bevel deep enough to read as
+       * thickness. See src/ui/panelFrame.ts, which draws both patterns from
+       * GAME_PALETTE so a palette pass carries the panel with it.
+       *
+       * The band is padded for rather than overlaid: the icon grid starts
+       * below it, so nothing the player needs to read ever sits on top of
+       * the pattern.
+       */
       #command-panel {
         position: fixed;
         left: 0;
@@ -86,11 +97,30 @@
         display: flex;
         flex-direction: column;
         gap: 5px;
-        padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
-        background: var(--stone-mid);
+        padding: calc(6px + var(--meander-size, 8px)) 6px calc(6px + env(safe-area-inset-bottom));
+        background-color: var(--stone-mid);
+        background-image: var(--stone-grain-image);
+        background-size: var(--stone-grain-size, 7px) var(--stone-grain-size, 7px);
+        image-rendering: pixelated;
         border-top: 3px solid var(--bronze-dark);
-        box-shadow: inset 0 2px 0 var(--stone-light);
+        box-shadow:
+          inset 0 2px 0 var(--stone-light),
+          inset 0 -2px 0 var(--stone-shadow);
         box-sizing: border-box;
+      }
+
+      #command-panel::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 2px;
+        height: var(--meander-size, 8px);
+        background-image: var(--meander-image);
+        background-repeat: repeat-x;
+        background-size: var(--meander-size, 8px) var(--meander-size, 8px);
+        image-rendering: pixelated;
+        border-bottom: 1px solid var(--stone-shadow);
       }
 
       /*
@@ -384,6 +414,24 @@
         flex: none;
         font-size: 15px;
         font-weight: bold;
+        margin-bottom: 4px;
+      }
+
+      /*
+        Who the player is — 「プレイヤーは『ゼウスと人間の女性の間に生まれた
+        青年』という設定」. The world select is the campaign's front door and
+        the only screen that ever shows the whole roster of gods, so it is
+        where the premise belongs. Quieter than the title: it is read once.
+      */
+      #world-select-premise {
+        flex: none;
+        font-size: 12px;
+        line-height: 1.7;
+        /* Full ink, like the title. The panel field is mid-stone, so both
+           the dim greys that work on the dark map and --ink-faded come out
+           around 2:1 against it — legible in a mockup, not on a phone. Size
+           and weight already keep this under the title it sits below. */
+        color: var(--ink);
         margin-bottom: 10px;
       }
 
@@ -588,6 +636,9 @@
 
     <div id="world-select">
       <div id="world-select-title">ワールドを選択</div>
+      <div id="world-select-premise">
+        あなたはゼウスと人間の女性の間に生まれた青年。16人の神が、それぞれ3つの世界で待ち受ける。
+      </div>
       <div id="world-select-list"></div>
       <div id="world-select-password-row">
         <input type="text" id="world-select-password" placeholder="パスワード" autocomplete="off" />
@@ -621,27 +672,30 @@
           <div class="status-bar-track"><div id="mana-bar-fill" style="width: 0%"></div></div>
           <span class="status-value" id="mana-value">0</span>
         </div>
-        <div class="status-item">
-          <canvas class="status-icon" id="population-status-icon"></canvas>
-          <div class="status-bar-track">
-            <div id="population-bar-player" style="width: 50%"></div>
-            <div id="population-bar-enemy" style="width: 50%"></div>
-          </div>
-        </div>
+        <!--
+          The population comparison moved out of this row and onto the map
+          itself, as the colonnade hanging opposite the overview map — see
+          src/render/PopulationGauge.ts. Keeping a bar here as well would
+          have said the same thing twice, and the row's remaining job (mana)
+          is the one number that is genuinely a quantity rather than a
+          standing.
+        -->
       </div>
       <div id="toolbar">
         <div class="command-row">
           <button type="button" class="command-button" data-mode="settle" aria-pressed="true">定住</button>
           <button type="button" class="command-button" data-mode="gather">集結</button>
+          <button type="button" class="command-button" data-mode="merge">合体</button>
           <button type="button" class="command-button" data-mode="goToShrine">集結地へ</button>
           <button type="button" class="command-button" data-mode="fight">戦闘</button>
-          <button type="button" class="command-button" id="release-population">送出</button>
+          <button type="button" class="command-button" data-tool="sprog">スプログ</button>
           <button type="button" class="command-button" data-tool="inspect">照会</button>
         </div>
         <div class="command-row tool-group">
           <button type="button" class="command-button" aria-pressed="true" data-tool="raise">隆起</button>
           <button type="button" class="command-button" data-tool="lower">沈降</button>
           <button type="button" class="command-button" data-tool="flatten">平坦化</button>
+          <button type="button" class="command-button" data-tool="autoFlatten">自動整地</button>
         </div>
         <!-- The original's own six schools of miracle — see src/ui/miracleCategories.ts. -->
         <div class="command-row category-row" id="miracle-categories">
@@ -688,6 +742,7 @@
         </div>
         <div class="command-row miracle-group" data-category="water" hidden>
           <button type="button" class="command-button" data-tool="reef">岩礁</button>
+          <button type="button" class="command-button" data-tool="whirlpool">渦巻き</button>
           <button type="button" class="command-button" data-tool="holyWater">聖水の泉</button>
           <button type="button" class="command-button" data-tool="helen">トロイのヘレン</button>
           <button type="button" class="command-button" data-tool="tsunami">津波</button>

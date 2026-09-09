@@ -35,7 +35,7 @@ export const MIRACLE_CATEGORIES = MIRACLE_SCHOOLS;
  * repeated action in the game to tidy up a panel. 平坦化 joins them for
  * the same reason (it is game2's own shortcut for the same job).
  */
-export const ALWAYS_VISIBLE_TOOLS: readonly ToolMode[] = ["inspect", "raise", "lower", "flatten"];
+export const ALWAYS_VISIBLE_TOOLS: readonly ToolMode[] = ["inspect", "raise", "lower", "flatten", "autoFlatten", "sprog"];
 
 /**
  * Which school each miracle belongs to. Identical to game/'s own map —

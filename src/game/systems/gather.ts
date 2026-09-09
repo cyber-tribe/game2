@@ -4,13 +4,26 @@ import { FactionState, Owner, Position, Walker, type FactionId } from "../compon
 import { distance } from "./geometry";
 
 /**
- * Under "gather" behaviorMode, a faction's own seeking walkers within
- * GATHER_RANGE of each other merge into one, combining strength — per
- * docs/game-system.md, "ウォーカー同士が合流して1体の強いウォーカーに
- * なる". Factions not in "gather" mode are untouched.
+ * Wherever two of a faction's own seeking walkers come within GATHER_RANGE
+ * of each other under an order that calls for it, they merge into one,
+ * combining strength — per docs/game-system.md, "ウォーカー同士が合流して
+ * 1体の強いウォーカーになる". Factions under 定住 or 戦闘 are untouched.
+ *
+ * 合体 is the order this exists for — 「近くにいる信者達と合体し、その力を
+ * 増していく」 — and mergeTargeting.ts is what walks its people into range.
+ * The two mustering orders share the pass rather than having one of their
+ * own, because the merging they need is the same merging.
+ *
+ * 集結シンボルへ merges too, not just 集結. The original describes the two
+ * as one order and says the merging is the *reason* to give it:
+ * 「以後一般信者はリーダーの元へ集うようになる。…よって多数の信者を合体
+ * させ、強力なヒーローを生み出すのに不可欠な操作である」. Marching without
+ * merging leaves a crowd standing on the leader's toes — and since a
+ * mustering faction founds no houses either (see settle.ts), that crowd
+ * would do nothing at all.
  */
 export const gatherSystem: System = (world) => {
-  const gatheringFactions = factionsInGatherMode(world);
+  const gatheringFactions = factionsInMergingMode(world);
   if (gatheringFactions.size === 0) return;
 
   const walkers = world.query(Position, Walker, Owner);
@@ -31,11 +44,13 @@ export const gatherSystem: System = (world) => {
   }
 };
 
-function factionsInGatherMode(world: World): Set<FactionId> {
+function factionsInMergingMode(world: World): Set<FactionId> {
   const factions = new Set<FactionId>();
   for (const entity of world.query(FactionState)) {
     const state = world.get(entity, FactionState)!;
-    if (state.behaviorMode === "gather") factions.add(state.id);
+    if (state.behaviorMode === "gather" || state.behaviorMode === "goToShrine" || state.behaviorMode === "merge") {
+      factions.add(state.id);
+    }
   }
   return factions;
 }

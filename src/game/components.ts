@@ -85,7 +85,7 @@ export function isAdvancingHeroState(state: WalkerState): boolean {
  * its own per-kind check. Notably NOT used by swampSystem: heroes drown
  * in swamps just like anyone else.
  */
-export function isHeroState(state: WalkerState): boolean {
+export function isHeroState(state: WalkerState): state is HeroKind {
   return (HERO_KINDS as readonly string[]).includes(state);
 }
 
@@ -95,19 +95,6 @@ export interface Walker {
   state: WalkerState;
   /** Tiles per second. */
   speed: number;
-  /**
-   * What this walker's strength and speed were before any hero miracle
-   * multiplied them (see hero.ts's promoteHero and HERO_TRAITS). Absent on
-   * a walker that has never been promoted.
-   *
-   * Kept so re-specializing from one hero to another re-derives both
-   * numbers from the same base instead of compounding: without it, a
-   * leader cycled ヘラクレス → オディッセウス → ヘラクレス would come out
-   * four times as strong as one that was simply cast ヘラクレス once, and
-   * the cheapest path to the strongest hero would be to buy every other
-   * hero first.
-   */
-  heroBase?: { strength: number; speed: number };
 }
 
 /** Where a Position-having entity is currently walking to. Removed on arrival. */
@@ -137,13 +124,21 @@ export interface House {
 }
 
 /**
- * The four influence modes from docs/game-system.md, all enforced by
+ * The influence modes from docs/game-system.md, all enforced by
  * dedicated systems: "settle" (the wander/settle systems' implicit
  * default), "gather" (gatherTargetingSystem + gatherSystem — also the only
- * mode leaderSystem promotes a leader under), "fight" (fightTargetingSystem),
+ * mode leaderSystem promotes a leader under), "merge"
+ * (mergeTargetingSystem + gatherSystem), "fight" (fightTargetingSystem),
  * and "goToShrine" (goToShrineSystem).
+ *
+ * The original names four 神の啓示 — 集合・合体・戦闘・定住 — and "merge" is
+ * 合体: 「近くにいる信者達と合体し、その力を増していく。近くに他の信者が
+ * いない場合は定住に同じ」. It is deliberately *not* a variant of 集合: no
+ * shrine, no leader, no hero, and building never stops. "goToShrine" is
+ * game2's split of 集合 into "march to the flag" and "rally on whoever gets
+ * there first", which is why there are five here rather than four.
  */
-export type BehaviorMode = "settle" | "gather" | "goToShrine" | "fight";
+export type BehaviorMode = "settle" | "gather" | "merge" | "goToShrine" | "fight";
 
 /**
  * One FactionState entity per side. Mana is the only resource spent on
@@ -167,13 +162,25 @@ export interface FactionState {
 
 /**
  * A hazard placed at a Position: any walker that wanders within `radius`
- * drowns. Consumes one unit of `remainingCapacity` per walker swallowed
- * and disappears once it hits zero — per docs/game-system.md, "一定数を
- * 飲み込むと消えるタイプ". The permanent variant isn't implemented.
+ * drowns.
+ *
+ * The original has both kinds, and which one a stage gets is the stage's
+ * own property: 「面ごとに底なしかどうか設定される」
+ * (docs/original-miracles.md #8). game2 picks it per world — see
+ * game/worlds.ts's WorldDefinition.bottomlessSwamp.
+ *
+ * - `bottomless: false` — 「一定数を飲み込むと消えるタイプ」: consumes one
+ *   unit of `remainingCapacity` per walker swallowed and dries up once it
+ *   hits zero.
+ * - `bottomless: true` — 底なし沼: never fills and never dries up. The
+ *   ground it stands on is lost for the rest of the match, so a swamp is a
+ *   place the enemy can no longer walk rather than a trap with a budget.
+ *   `remainingCapacity` is left untouched and unread in this case.
  */
 export interface Swamp {
   radius: number;
   remainingCapacity: number;
+  bottomless: boolean;
 }
 
 /**
@@ -213,6 +220,12 @@ export interface Tornado {
   remaining: number;
   headingX: number;
   headingY: number;
+  /**
+   * Seconds since this tornado last threw off a 渦巻き while crossing open
+   * water — 「海上では渦巻きを**大量発生**させる」. Only advances at sea;
+   * over land it sits where it was. See systems/tornado.ts.
+   */
+  sinceWhirlpool: number;
 }
 
 /**

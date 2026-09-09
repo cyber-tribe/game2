@@ -1,4 +1,5 @@
 import type { System } from "../../ecs";
+import { resistsMiracle } from "../protection";
 import { isFungus, spreadFungus, type Heightmap } from "../../world/heightmap";
 import { FUNGUS_GROWTH_INTERVAL } from "../constants";
 import { House, Position, Walker } from "../components";
@@ -68,6 +69,9 @@ export function createFungusSystem(config: Partial<FungusConfig> = {}): System {
     }
 
     for (const entity of world.query(Walker, Position)) {
+      // 毒カビ is 植物 like the 沼 it behaves as, so アドニス walks through
+      // it — see miracleSchools.ts's resistsSchool.
+      if (resistsMiracle(world, entity, "plant")) continue;
       const pos = world.get(entity, Position)!;
       if (!isFungus(heightmap, pos.x, pos.y)) continue;
       world.destroyEntity(entity);

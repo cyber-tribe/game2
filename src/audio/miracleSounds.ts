@@ -8,7 +8,7 @@
  * later — see main.ts's onEnemyAction, which already does this for the
  * screen-shake/toast but had no audio equivalent before this.
  */
-export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "holyWater" | "tornado" | "firePillar" | "lightning" | "storm" | "plague" | "hurricane" | "volcano" | "perseus" | "hercules" | "odysseus" | "achilles" | "adonis" | "helen" | "guardian" | "armageddon" | "tsunami" | "forest" | "fireRain" | "flower" | "reef" | "road" | "wall" | "megalith" | "fungus";
+export type MiracleSoundType = "shrineMove" | "earthquake" | "swamp" | "holyWater" | "tornado" | "firePillar" | "lightning" | "storm" | "plague" | "hurricane" | "volcano" | "perseus" | "hercules" | "odysseus" | "achilles" | "adonis" | "helen" | "guardian" | "armageddon" | "tsunami" | "whirlpool" | "forest" | "fireRain" | "flower" | "reef" | "road" | "wall" | "megalith" | "fungus";
 
 /** Every MiracleSoundType, for tests and any future UI that wants to list them. */
 export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
@@ -32,6 +32,7 @@ export const MIRACLE_SOUND_TYPES: readonly MiracleSoundType[] = [
   "guardian",
   "armageddon",
   "tsunami",
+  "whirlpool",
   "forest",
   "flower",
   "fireRain",
@@ -209,6 +210,13 @@ export const RECIPES: Record<MiracleSoundType, MiracleSoundRecipe> = {
   tsunami: {
     tones: [{ waveform: "sine", startFrequency: 300, endFrequency: 150, delay: 0, duration: 0.7, peakGain: 0.18 }],
     noise: { delay: 0, duration: 0.8, peakGain: 0.28, filterFrequency: 1200 },
+  },
+  // A tightening spiral rather than the tsunami's falling wash: the pitch
+  // climbs while the noise narrows, so the two water miracles a player is
+  // most likely to hear at the same coastline never read as each other.
+  whirlpool: {
+    tones: [{ waveform: "sine", startFrequency: 140, endFrequency: 320, delay: 0, duration: 0.6, peakGain: 0.15 }],
+    noise: { delay: 0, duration: 0.7, peakGain: 0.22, filterFrequency: 700 },
   },
   // Short, hard and dry — stone breaking the surface, deliberately nothing
   // like the tsunami's long wash, since the two are used against each other.

@@ -37,7 +37,9 @@ export interface SettleConfig {
  * MoveTarget, createWanderTargetSystem will hand it a fresh destination
  * next tick. Skipped entirely once a faction's FactionState.finalBattle is
  * set (the "最終決戦" miracle) — otherwise walkers converging on the
- * shared shrine would just found a peaceful town there instead of fighting.
+ * shared shrine would just found a peaceful town there instead of fighting
+ * — and, for a faction whose standing order is 集結シンボルへ: the original
+ * states plainly that under 集合 「平地があっても新たな建物は一切建てない」.
  *
  * Also skipped for whichever walker is currently serving as a "gather"-mode
  * faction's leader, but only while there's still someone left to gather
@@ -59,6 +61,7 @@ export function createSettleSystem(config: Partial<SettleConfig> = {}): System {
 
   return (world) => {
     const warringFactions = factionsInFinalBattle(world);
+    const musteringFactions = factionsHeadingToShrine(world);
     const gatheringLeaders = currentGatheringLeaders(world);
     const houseCountByFaction = countHousesByFaction(world);
     // Rebuilt per tick and appended to as houses go up, so two walkers
@@ -76,6 +79,13 @@ export function createSettleSystem(config: Partial<SettleConfig> = {}): System {
 
       const owner = world.get(entity, Owner)!;
       if (warringFactions.has(owner.faction)) continue;
+      // 「集合：…その間、平地があっても新たな建物は一切建てない」 — a faction
+      // under 集結シンボルへ founds nothing while it is marching, however
+      // good the ground it crosses. Without this the order quietly turned
+      // into 定住: a follower that reached its leader lost its MoveTarget,
+      // and this system then built a house on the spot, so mustering an
+      // army scattered a line of huts across the map instead.
+      if (musteringFactions.has(owner.faction)) continue;
       if ((houseCountByFaction.get(owner.faction) ?? 0) >= maxHousesPerFaction) continue;
 
       const pos = world.get(entity, Position)!;
@@ -107,6 +117,20 @@ function factionsInFinalBattle(world: World): Set<FactionId> {
   for (const entity of world.query(FactionState)) {
     const state = world.get(entity, FactionState)!;
     if (state.finalBattle) factions.add(state.id);
+  }
+  return factions;
+}
+
+/**
+ * Factions currently under "goToShrine" — the original's 集合, which
+ * suspends building outright for as long as it is the standing order. See
+ * the check in createSettleSystem.
+ */
+function factionsHeadingToShrine(world: World): Set<FactionId> {
+  const factions = new Set<FactionId>();
+  for (const entity of world.query(FactionState)) {
+    const state = world.get(entity, FactionState)!;
+    if (state.behaviorMode === "goToShrine") factions.add(state.id);
   }
   return factions;
 }

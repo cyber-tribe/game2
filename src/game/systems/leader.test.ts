@@ -31,7 +31,29 @@ describe("leaderSystem", () => {
     expect(world.get(faction, FactionState)!.leaderId).toBe(walker);
   });
 
-  it("does not promote anyone outside gather mode, even standing right at the shrine", () => {
+  /**
+   * 「最初に辿り着いた信者は「リーダー」となり」 — the original attaches the
+   * promotion to arriving at the symbol, not to which of the two mustering
+   * orders sent the walker there. 集結シンボルへ needs a leader to follow,
+   * so it has to be able to appoint one.
+   */
+  it("promotes a walker that has reached the shrine under goToShrine too", () => {
+    const world = new World();
+    const faction = world.createEntity();
+    world.add(faction, FactionState, {
+      id: "player",
+      mana: 0,
+      behaviorMode: "goToShrine",
+      shrinePosition: SHRINE,
+    });
+    const walker = spawnWalker(world, "player");
+
+    leaderSystem(world, 1);
+
+    expect(world.get(faction, FactionState)!.leaderId).toBe(walker);
+  });
+
+  it("does not promote anyone outside the mustering modes, even standing right at the shrine", () => {
     const world = new World();
     const faction = world.createEntity();
     world.add(faction, FactionState, {

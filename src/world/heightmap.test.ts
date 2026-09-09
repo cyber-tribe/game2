@@ -9,6 +9,10 @@ import {
   VOLCANO_ROCK_HARDNESS,
   applyEarthquake,
   applyReef,
+  AUTO_FLATTEN_SIZE,
+  planAutoFlatten,
+  megalithScatterCandidates,
+  MEGALITH_SCATTER_RADIUS,
   applyTsunami,
   applyFireRain,
   applyFlower,
@@ -16,7 +20,10 @@ import {
   applyFungus,
   applyRoad,
   applyWall,
+  isLevelVertex,
+  touchesLand,
   applyMegalith,
+  DEFAULT_MEGALITH_RADIUS,
   isBoulder,
   MEGALITH_HEIGHT,
   isWall,
@@ -37,6 +44,7 @@ import {
   isCrevice,
   isRock,
   REEF_HEIGHT,
+  REEF_LENGTH,
   isTerrainEditAllowed,
   pickTerrainEditRule,
   raiseTile,
@@ -202,6 +210,133 @@ describe("raiseTile", () => {
 
     expect(heightmap.rockHardness[0][0]).toBe(2);
     expect(heightmap.rockHardness[1][1]).toBe(1);
+  });
+});
+
+describe("planAutoFlatten", () => {
+  /**
+   * 「Xボタンで建物を中心に7x7マスの平地を確保」. The size is the promise: a
+   * plot this wide is 8x8 vertices, comfortably more than the 5x5 window
+   * countFlatNeighbors checks at HOUSE_UPGRADE_FLATNESS_RADIUS, so the
+   * house it is aimed at can actually reach 城砦 on it.
+   */
+  it("plans the full AUTO_FLATTEN_SIZE square around the centre", () => {
+    const heightmap = flatHeightmap(30, 30, 3);
+    // Every tile bumpy, so none is filtered out for already being level.
+    for (let y = 0; y <= 30; y++) {
+      for (let x = 0; x <= 30; x++) heightmap.vertices[y][x] = (x + y) % 2 === 0 ? 3 : 5;
+    }
+
+    const { tiles } = planAutoFlatten(heightmap, 15, 15, "both");
+
+    expect(tiles).toHaveLength(AUTO_FLATTEN_SIZE * AUTO_FLATTEN_SIZE);
+    const half = Math.floor(AUTO_FLATTEN_SIZE / 2);
+    expect(tiles.every((t) => Math.abs(t.x - 15) <= half && Math.abs(t.y - 15) <= half)).toBe(true);
+  });
+
+  /**
+   * The point of aiming at a building: the ground it stands on must not
+   * move out from under it. Averaging the whole 7x7 would drag the house's
+   * own tile toward whatever the surrounding hills happen to average to.
+   */
+  it("takes its target elevation from the centre tile, not the whole plot", () => {
+    const heightmap = flatHeightmap(30, 30, 2);
+    for (let y = 0; y <= 30; y++) {
+      for (let x = 0; x <= 30; x++) heightmap.vertices[y][x] = 9;
+    }
+    for (const [x, y] of [
+      [15, 15],
+      [16, 15],
+      [16, 16],
+      [15, 16],
+    ]) {
+      heightmap.vertices[y][x] = 2;
+    }
+
+    const { elevation } = planAutoFlatten(heightmap, 15, 15, "both");
+
+    expect(elevation).toBe(2);
+  });
+
+  it("levels the whole plot to that elevation once applied", () => {
+    const heightmap = flatHeightmap(30, 30, 9);
+    for (const [x, y] of [
+      [15, 15],
+      [16, 15],
+      [16, 16],
+      [15, 16],
+    ]) {
+      heightmap.vertices[y][x] = 2;
+    }
+
+    const { elevation, tiles } = planAutoFlatten(heightmap, 15, 15, "both");
+    for (const tile of tiles) flattenTile(heightmap, tile.x, tile.y, elevation, "both");
+
+    // The interior of the plot — every vertex whose 4 surrounding tiles are
+    // all inside it — is now one flat terrace.
+    for (let y = 13; y <= 18; y++) {
+      for (let x = 13; x <= 18; x++) expect(heightmap.vertices[y][x]).toBe(2);
+    }
+  });
+
+  /**
+   * Priced as the same work done by hand, so a second press on a plot that
+   * is already level is free rather than charging for 49 no-ops. This is
+   * also why the target elevation is rounded — a fractional one would leave
+   * every tile forever "needing" work.
+   */
+  it("plans nothing on ground that is already level", () => {
+    const heightmap = flatHeightmap(30, 30, 4);
+
+    expect(planAutoFlatten(heightmap, 15, 15, "both").tiles).toEqual([]);
+  });
+
+  it("clips the plot to the map rather than running off it", () => {
+    const heightmap = flatHeightmap(30, 30, 3);
+    for (let y = 0; y <= 30; y++) {
+      for (let x = 0; x <= 30; x++) heightmap.vertices[y][x] = (x + y) % 2 === 0 ? 3 : 5;
+    }
+
+    const { tiles } = planAutoFlatten(heightmap, 0, 0, "both");
+
+    expect(tiles.every((t) => t.x >= 0 && t.y >= 0)).toBe(true);
+    expect(tiles.length).toBeLessThan(AUTO_FLATTEN_SIZE * AUTO_FLATTEN_SIZE);
+  });
+
+  /**
+   * Some worlds forbid reshaping land inside the enemy's territory. A plot
+   * straddling that border levels the part it may and simply leaves the
+   * rest — and, since the blocked tiles never enter the plan, is not
+   * charged for them either.
+   */
+  it("drops tiles the caller forbids instead of failing the whole plan", () => {
+    const heightmap = flatHeightmap(30, 30, 3);
+    for (let y = 0; y <= 30; y++) {
+      for (let x = 0; x <= 30; x++) heightmap.vertices[y][x] = (x + y) % 2 === 0 ? 3 : 5;
+    }
+
+    const { tiles } = planAutoFlatten(heightmap, 15, 15, "both", AUTO_FLATTEN_SIZE, (tile) => tile.x <= 15);
+
+    expect(tiles.length).toBeGreaterThan(0);
+    expect(tiles.every((t) => t.x <= 15)).toBe(true);
+  });
+
+  it("under raiseOnly, levels up to the centre tile's highest corner", () => {
+    const heightmap = flatHeightmap(30, 30, 3);
+    heightmap.vertices[15][15] = 6;
+
+    const { elevation } = planAutoFlatten(heightmap, 15, 15, "raiseOnly");
+
+    expect(elevation).toBe(6);
+  });
+
+  it("under lowerOnly, levels down to the centre tile's lowest corner", () => {
+    const heightmap = flatHeightmap(30, 30, 3);
+    heightmap.vertices[15][15] = 1;
+
+    const { elevation } = planAutoFlatten(heightmap, 15, 15, "lowerOnly");
+
+    expect(elevation).toBe(1);
   });
 });
 
@@ -670,10 +805,17 @@ describe("isTerrainEditAllowed", () => {
     expect(isTerrainEditAllowed("lowerOnly", -1)).toBe(true);
     expect(isTerrainEditAllowed("lowerOnly", 1)).toBe(false);
   });
+
+  // 「土地上下不可ステージ」 — the original's third restricted kind.
+  it("allows nothing at all under 'neither'", () => {
+    expect(isTerrainEditAllowed("neither", 1)).toBe(false);
+    expect(isTerrainEditAllowed("neither", -1)).toBe(false);
+    expect(isTerrainEditAllowed("neither", 0)).toBe(false);
+  });
 });
 
 describe("pickTerrainEditRule", () => {
-  const weights: Record<TerrainEditRule, number> = { both: 2, raiseOnly: 1, lowerOnly: 1 };
+  const weights: Record<TerrainEditRule, number> = { both: 2, raiseOnly: 1, lowerOnly: 1, neither: 0 };
 
   it("picks the rule whose weighted slice the roll lands in", () => {
     // Slices in Object.entries order: both=[0,2), raiseOnly=[2,3), lowerOnly=[3,4).
@@ -683,8 +825,13 @@ describe("pickTerrainEditRule", () => {
     expect(pickTerrainEditRule(weights, () => 0.99)).toBe("lowerOnly");
   });
 
+  it("can deal 土地上下不可 when it carries weight", () => {
+    const always: Record<TerrainEditRule, number> = { both: 0, raiseOnly: 0, lowerOnly: 0, neither: 1 };
+    expect(pickTerrainEditRule(always, () => 0.5)).toBe("neither");
+  });
+
   it("never picks a rule with zero weight", () => {
-    const onlyBoth: Record<TerrainEditRule, number> = { both: 1, raiseOnly: 0, lowerOnly: 0 };
+    const onlyBoth: Record<TerrainEditRule, number> = { both: 1, raiseOnly: 0, lowerOnly: 0, neither: 0 };
     for (let roll = 0; roll < 1; roll += 0.1) {
       expect(pickTerrainEditRule(onlyBoth, () => roll)).toBe("both");
     }
@@ -766,10 +913,13 @@ describe("applyTsunami", () => {
    */
   it("is stopped by a reef wall even though the reef is far shorter than the wave", () => {
     const heightmap = flatHeightmap(40, 40, 1);
+    // A north-south channel for the wall to stand in, carved before any
+    // reef is laid so each cast can see the open water it runs along.
+    for (let y = 8; y <= 32; y++) heightmap.vertices[y][24] = MIN_ELEVATION;
     // Spanning the wave's whole reach: anything shorter is flowed around
     // (see the next test), and beyond this span the radius stops it anyway.
-    for (let y = 8; y <= 32; y++) {
-      heightmap.vertices[y][24] = MIN_ELEVATION;
+    // REEF_LENGTH vertices per cast, so a handful of taps closes it.
+    for (let y = 8 + Math.floor(REEF_LENGTH / 2); y <= 32; y += REEF_LENGTH) {
       applyReef(heightmap, 24, y);
     }
 
@@ -786,12 +936,15 @@ describe("applyTsunami", () => {
    * "build a seawall" a real decision instead of a single cheap cast that
    * switches the enemy's most expensive miracle off.
    */
-  it("flows around a reef too short to span the wave, sheltering nothing", () => {
+  it("flows around a single reef cast, too short to span the wave", () => {
     const heightmap = flatHeightmap(40, 40, 1);
-    for (let y = 19; y <= 21; y++) {
-      heightmap.vertices[y][24] = MIN_ELEVATION;
-      applyReef(heightmap, 24, y);
-    }
+    for (let y = 8; y <= 32; y++) heightmap.vertices[y][24] = MIN_ELEVATION;
+    // One cast — REEF_LENGTH vertices of breakwater, against a wave whose
+    // front is 24 vertices across. A line is necessary but not sufficient:
+    // "build a seawall" stays a decision about how much of the coast to
+    // close, rather than one cheap cast that switches the enemy's most
+    // expensive miracle off.
+    applyReef(heightmap, 24, 20);
 
     applyTsunami(heightmap, 20, 20, 12, 6);
 
@@ -799,35 +952,161 @@ describe("applyTsunami", () => {
   });
 });
 
+describe("megalithScatterCandidates", () => {
+  /**
+   * 「発生ボタンを押し続けると、一帯により多くの巨石を発生させる」 — a held
+   * cast needs somewhere to put the next stone, and the area it may use is
+   * wider than one stone's own footprint. Otherwise holding would be
+   * indistinguishable from tapping the same spot.
+   */
+  it("offers vertices across the whole scatter area, wider than one stone", () => {
+    const heightmap = flatHeightmap(40, 40, 4);
+
+    const candidates = megalithScatterCandidates(heightmap, 20, 20);
+
+    expect(candidates.length).toBeGreaterThan(0);
+    expect(candidates.every((v) => Math.hypot(v.x - 20, v.y - 20) <= MEGALITH_SCATTER_RADIUS)).toBe(true);
+    expect(candidates.some((v) => Math.hypot(v.x - 20, v.y - 20) > DEFAULT_MEGALITH_RADIUS)).toBe(true);
+  });
+
+  it("skips vertices that already carry a stone", () => {
+    const heightmap = flatHeightmap(40, 40, 4);
+    applyMegalith(heightmap, 20, 20);
+
+    const candidates = megalithScatterCandidates(heightmap, 20, 20);
+
+    expect(candidates.some((v) => heightmap.boulder[v.y][v.x])).toBe(false);
+    expect(candidates).not.toContainEqual({ x: 20, y: 20 });
+  });
+
+  it("skips water and torn ground, where applyMegalith would raise nothing", () => {
+    const heightmap = flatHeightmap(40, 40, 4);
+    heightmap.vertices[20][21] = MIN_ELEVATION;
+    heightmap.crevice[20][19] = true;
+
+    const candidates = megalithScatterCandidates(heightmap, 20, 20);
+
+    expect(candidates).not.toContainEqual({ x: 21, y: 20 });
+    expect(candidates).not.toContainEqual({ x: 19, y: 20 });
+  });
+
+  /**
+   * An empty list is how a held cast knows to stop, rather than spending
+   * MEGALITH_MANA_COST per interval on casts that raise nothing.
+   */
+  it("comes back empty once the whole area is stone", () => {
+    const heightmap = flatHeightmap(40, 40, 4);
+    for (let y = 20 - MEGALITH_SCATTER_RADIUS; y <= 20 + MEGALITH_SCATTER_RADIUS; y++) {
+      for (let x = 20 - MEGALITH_SCATTER_RADIUS; x <= 20 + MEGALITH_SCATTER_RADIUS; x++) {
+        heightmap.boulder[y][x] = true;
+      }
+    }
+
+    expect(megalithScatterCandidates(heightmap, 20, 20)).toEqual([]);
+  });
+
+  it("stays inside the map at a corner", () => {
+    const heightmap = flatHeightmap(40, 40, 4);
+
+    const candidates = megalithScatterCandidates(heightmap, 0, 0);
+
+    expect(candidates.length).toBeGreaterThan(0);
+    expect(candidates.every((v) => v.x >= 0 && v.y >= 0)).toBe(true);
+  });
+});
+
 describe("applyReef", () => {
   it("raises rock just above sea level on a water vertex", () => {
-    const heightmap = flatHeightmap(10, 10, MIN_ELEVATION);
+    const heightmap = flatHeightmap(20, 20, MIN_ELEVATION);
 
-    expect(applyReef(heightmap, 5, 5)).toBe(true);
-    expect(heightmap.vertices[5][5]).toBe(heightmap.waterLevel + REEF_HEIGHT);
-    expect(isRock(heightmap, 5, 5)).toBe(true);
+    expect(applyReef(heightmap, 10, 10)).toContainEqual({ x: 10, y: 10 });
+    expect(heightmap.vertices[10][10]).toBe(heightmap.waterLevel + REEF_HEIGHT);
+    expect(isRock(heightmap, 10, 10)).toBe(true);
+  });
+
+  /**
+   * 「海面上に建物が建てられない土地を**線分状に**発生させる」. The shape is the
+   * miracle: applyTsunami spreads as a front and flows around a partial
+   * barrier, so a single stone shelters nothing. One cast has to produce a
+   * length of breakwater or the miracle's stated defensive role is really
+   * just an instruction to tap the same coast six times.
+   */
+  it("lays a line of reef, not a single stone", () => {
+    const heightmap = flatHeightmap(20, 20, MIN_ELEVATION);
+
+    const raised = applyReef(heightmap, 10, 10);
+
+    expect(raised).toHaveLength(REEF_LENGTH);
+    // A straight line: every vertex on one row or one column, evenly spaced.
+    const sameRow = raised.every((v) => v.y === raised[0].y);
+    const sameColumn = raised.every((v) => v.x === raised[0].x);
+    expect(sameRow || sameColumn).toBe(true);
+  });
+
+  it("centres the line on the cast point", () => {
+    const heightmap = flatHeightmap(20, 20, MIN_ELEVATION);
+
+    const raised = applyReef(heightmap, 10, 10);
+
+    expect(raised).toContainEqual({ x: 10, y: 10 });
+  });
+
+  /**
+   * A breakwater lies along the shore it shelters. Cast against a coast
+   * running north-south, the segment runs north-south too — the heading
+   * that keeps it on water — rather than jutting out into the sea or
+   * running aground.
+   */
+  it("lies along the coast rather than into it", () => {
+    const heightmap = flatHeightmap(20, 20, MIN_ELEVATION);
+    for (let y = 0; y <= 20; y++) {
+      for (let x = 11; x <= 20; x++) heightmap.vertices[y][x] = 3;
+    }
+
+    const raised = applyReef(heightmap, 10, 10);
+
+    expect(raised).toHaveLength(REEF_LENGTH);
+    expect(raised.every((v) => v.x === 10)).toBe(true);
+  });
+
+  it("never overwrites land — the line stops where the shore begins", () => {
+    const heightmap = flatHeightmap(20, 20, MIN_ELEVATION);
+    // A headland cutting the east-west line short on one side. Land to the
+    // north and south as well, so running along the coast is not an option
+    // and the segment has to run into the headland to be truncated by it.
+    for (let x = 0; x <= 20; x++) {
+      heightmap.vertices[9][x] = 3;
+      heightmap.vertices[11][x] = 3;
+    }
+    heightmap.vertices[10][12] = 3;
+
+    const raised = applyReef(heightmap, 10, 10);
+
+    expect(heightmap.vertices[10][12]).toBe(3);
+    expect(raised).not.toContainEqual({ x: 12, y: 10 });
+    expect(raised).toContainEqual({ x: 10, y: 10 });
   });
 
   it("is not buildable land — that is the point of a reef", () => {
-    const heightmap = flatHeightmap(10, 10, MIN_ELEVATION);
+    const heightmap = flatHeightmap(20, 20, MIN_ELEVATION);
 
-    applyReef(heightmap, 5, 5);
+    applyReef(heightmap, 10, 10);
 
-    expect(isBuildable(heightmap, 5, 5)).toBe(false);
+    expect(isBuildable(heightmap, 10, 10)).toBe(false);
   });
 
   it("refuses dry land, where it would just be a pointless volcano", () => {
     const heightmap = flatHeightmap(10, 10, 5);
 
-    expect(applyReef(heightmap, 5, 5)).toBe(false);
+    expect(applyReef(heightmap, 5, 5)).toEqual([]);
     expect(heightmap.vertices[5][5]).toBe(5);
   });
 
   it("refuses vertices outside the map", () => {
     const heightmap = flatHeightmap(10, 10, MIN_ELEVATION);
 
-    expect(applyReef(heightmap, -1, 5)).toBe(false);
-    expect(applyReef(heightmap, 5, 99)).toBe(false);
+    expect(applyReef(heightmap, -1, 5)).toEqual([]);
+    expect(applyReef(heightmap, 5, 99)).toEqual([]);
   });
 });
 
@@ -1336,3 +1615,109 @@ describe("spreadFungus", () => {
     expect(FUNGUS_WITHER_CHANCE).toBeGreaterThan(0);
   });
 });
+
+/** 道と城壁：「なお、敵陣や斜面には設置できない」——その斜面の側。 */
+describe("isLevelVertex", () => {
+  it("is true on ground whose neighbours all stand at the same height", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    expect(isLevelVertex(heightmap, 10, 10)).toBe(true);
+  });
+
+  it("is false beside a step of even one", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    heightmap.vertices[10][11] = 6;
+
+    expect(isLevelVertex(heightmap, 10, 10)).toBe(false);
+  });
+
+  /**
+   * A 城壁 lifts the ground it stands on, so counting that rise as terrain
+   * would make a wall's first segment refuse its second — and the original
+   * describes walls as something you chain: 「通常は手動で延ばして連続した
+   * 城壁を設置する」.
+   */
+  it("does not read a walled neighbour's own parapet as a slope", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyWall(heightmap, 11, 10, 0);
+
+    expect(heightmap.vertices[10][11]).toBeGreaterThan(5);
+    expect(isLevelVertex(heightmap, 10, 10)).toBe(true);
+  });
+});
+
+describe("道と城壁を斜面に置けないこと", () => {
+  it("refuses to pave a slope", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    heightmap.vertices[10][11] = 7;
+
+    expect(applyRoad(heightmap, 10, 10, 0)).toEqual([]);
+  });
+
+  it("refuses to wall a slope", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    heightmap.vertices[10][11] = 7;
+
+    expect(applyWall(heightmap, 10, 10, 0)).toEqual([]);
+  });
+
+  it("still lets a wall be chained into a line across level ground", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+
+    for (let y = 8; y <= 12; y++) expect(applyWall(heightmap, 10, y, 0)).toHaveLength(1);
+  });
+});
+
+/** 「城壁にかかる土地上下ができなくなる」. */
+describe("raiseVertex under a 城壁", () => {
+  it("cannot lift or lower the ground a wall stands on", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyWall(heightmap, 10, 10, 0);
+    const walled = heightmap.vertices[10][10];
+
+    raiseVertex(heightmap, 10, 10, 1);
+    raiseVertex(heightmap, 10, 10, -1);
+
+    expect(heightmap.vertices[10][10]).toBe(walled);
+  });
+
+  it("leaves the ground beside it editable", () => {
+    const heightmap = flatHeightmap(20, 20, 5);
+    applyWall(heightmap, 10, 10, 0);
+
+    raiseVertex(heightmap, 12, 10, 1);
+
+    expect(heightmap.vertices[10][12]).toBe(6);
+  });
+});
+
+/** 「どこでも↑↓」「海上に土地↑↓」 — see game/worlds.ts's openTerraforming. */
+describe("touchesLand", () => {
+  function seaWithIsland(size: number): Heightmap {
+    const heightmap = createHeightmap(size, size, "grass");
+    for (const row of heightmap.vertices) row.fill(heightmap.waterLevel);
+    heightmap.vertices[10][10] = 3;
+    return heightmap;
+  }
+
+  it("is true on the land itself", () => {
+    expect(touchesLand(seaWithIsland(20), 10, 10)).toBe(true);
+  });
+
+  it("is true one step out from a coast, so a shore can be widened", () => {
+    const heightmap = seaWithIsland(20);
+
+    expect(touchesLand(heightmap, 11, 10)).toBe(true);
+    expect(touchesLand(heightmap, 10, 11)).toBe(true);
+  });
+
+  it("is false in open sea", () => {
+    expect(touchesLand(seaWithIsland(20), 15, 15)).toBe(false);
+  });
+
+  /** Two steps out is open sea: the coast has to be grown, not jumped. */
+  it("is false just past the reach of a coast", () => {
+    expect(touchesLand(seaWithIsland(20), 12, 10)).toBe(false);
+  });
+});
+

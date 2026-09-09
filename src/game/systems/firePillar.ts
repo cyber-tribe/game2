@@ -1,11 +1,12 @@
 import type { System } from "../../ecs";
-import { scorchGround, type Heightmap } from "../../world/heightmap";
+import { sampleElevation, scorchGround, type Heightmap } from "../../world/heightmap";
 import { FirePillar, House, Position, Walker } from "../components";
 import {
   FIRE_PILLAR_RADIUS,
   FIRE_PILLAR_SPEED,
-  FIRE_PILLAR_WANDER,
+  FIRE_PILLAR_UPHILL_BIAS, FIRE_PILLAR_WANDER,
 } from "../constants";
+import { resistsMiracle } from "../protection";
 import type { OnImpactEffect } from "./effects";
 import { distance } from "./geometry";
 
@@ -41,6 +42,24 @@ export interface FirePillarConfig {
  * survives one and not the other would just be a rule nobody could
  * remember.
  */
+/**
+ * A unit vector pointing up the local slope, or zero on level ground —
+ * sampled from the four neighbouring tiles rather than from the vertex grid
+ * so it reads the same hill the pillar is standing on.
+ */
+function uphillDirection(heightmap: Heightmap, x: number, y: number): { x: number; y: number } {
+  const east = sampleElevation(heightmap, x + 1, y);
+  const west = sampleElevation(heightmap, x - 1, y);
+  const south = sampleElevation(heightmap, x, y + 1);
+  const north = sampleElevation(heightmap, x, y - 1);
+
+  const gradientX = east - west;
+  const gradientY = south - north;
+  const magnitude = Math.hypot(gradientX, gradientY);
+  if (magnitude === 0) return { x: 0, y: 0 };
+  return { x: gradientX / magnitude, y: gradientY / magnitude };
+}
+
 export function createFirePillarSystem(config: Partial<FirePillarConfig> = {}): System {
   const onImpact = config.onImpact ?? (() => {});
   const onScorch = config.onScorch ?? (() => {});
@@ -59,8 +78,12 @@ export function createFirePillarSystem(config: Partial<FirePillarConfig> = {}): 
       }
 
       const wander = (rng() * 2 - 1) * FIRE_PILLAR_WANDER * deltaSeconds;
-      const headingX = pillar.headingX - pillar.headingY * wander;
-      const headingY = pillar.headingY + pillar.headingX * wander;
+      // 「移動方向はランダムだが、段差があると高い方へ動きやすい傾向がある」.
+      // The wander turns it; the slope leans it. On level ground the lean is
+      // zero and this is exactly the old random walk.
+      const uphill = heightmap ? uphillDirection(heightmap, pos.x, pos.y) : { x: 0, y: 0 };
+      const headingX = pillar.headingX - pillar.headingY * wander + uphill.x * FIRE_PILLAR_UPHILL_BIAS;
+      const headingY = pillar.headingY + pillar.headingX * wander + uphill.y * FIRE_PILLAR_UPHILL_BIAS;
       const magnitude = Math.hypot(headingX, headingY) || 1;
       const stepX = headingX / magnitude;
       const stepY = headingY / magnitude;
@@ -69,13 +92,23 @@ export function createFirePillarSystem(config: Partial<FirePillarConfig> = {}): 
         y: pos.y + stepY * FIRE_PILLAR_SPEED * deltaSeconds,
       };
 
+      // 「Ｌ＋Ｂ(3×3土地下げ)等で水中に落とすと消火できる」 — the one answer
+      // the player has to a pillar already burning, and the reason 沈降 is
+      // worth reaching for mid-disaster. Checked after the step, so digging
+      // a channel in front of one puts it out when it walks in.
+      if (heightmap && sampleElevation(heightmap, next.x, next.y) <= heightmap.waterLevel) {
+        world.destroyEntity(entity);
+        continue;
+      }
+
       world.add(entity, Position, next);
       world.add(entity, FirePillar, { remaining, headingX: stepX, headingY: stepY });
 
       if (heightmap && scorchGround(heightmap, next.x, next.y, FIRE_PILLAR_RADIUS).length > 0) onScorch();
 
       for (const walkerEntity of world.query(Walker, Position)) {
-        if (world.get(walkerEntity, Walker)!.state === "achilles") continue;
+        // 火柱「※アキレス除く」 — 「同じカテゴリーの攻撃神技は効果がない」 — see miracleSchools.ts's resistsSchool.
+        if (resistsMiracle(world, walkerEntity, "fire")) continue;
         const walkerPos = world.get(walkerEntity, Position)!;
         if (distance(next, walkerPos) > FIRE_PILLAR_RADIUS) continue;
         world.destroyEntity(walkerEntity);

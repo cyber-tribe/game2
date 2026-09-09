@@ -22,9 +22,12 @@ import {
   HELEN_MANA_COST,
   MAX_MANA,
   SHRINE_MOVE_MANA_COST,
+  SWAMP_CAPACITY,
   SWAMP_MANA_COST,
+  SWAMP_RADIUS,
   HOLY_WATER_MANA_COST,
   TORNADO_MANA_COST,
+  WHIRLPOOL_MANA_COST,
   FIRE_PILLAR_MANA_COST,
   LIGHTNING_MANA_COST,
   STORM_MANA_COST,
@@ -62,7 +65,7 @@ import { createFirePillar } from "./game/firePillar";
 import { strikeLightning } from "./game/lightning";
 import { seedPlague } from "./game/plague";
 import { createStorm } from "./game/storm";
-import { createTornado } from "./game/tornado";
+import { createTornado, createWhirlpool } from "./game/tornado";
 import { collapseSwampsNear, createSwamp } from "./game/swamp";
 import { burnFire } from "./game/fire";
 import { eruptVolcano } from "./game/volcano";
@@ -74,13 +77,15 @@ import { Hud } from "./render/Hud";
 import { MIRACLE_SCHOOLS } from "./game/miracleSchools";
 import { IsoRenderer, visibleTileBounds, type TileBounds } from "./render/IsoRenderer";
 import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
-import { Minimap } from "./render/Minimap";
+import { Minimap, minimapHeight } from "./render/Minimap";
+import { PopulationGauge } from "./render/PopulationGauge";
 import { GAME_PALETTE } from "./render/palette";
 import { mountCommandIcons } from "./ui/commandIcons";
+import { mountPanelFrame } from "./ui/panelFrame";
 import { loadCommandIcons } from "./ui/pixelIcons";
 import { StatusPanel } from "./ui/statusPanel";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
-import { DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyFlower, applyForest, applyFungus, DEFAULT_FLOWER_RADIUS, applyReef, applyRoad, applyWall, applyMegalith, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, raiseVertex } from "./world/heightmap";
+import { AUTO_FLATTEN_SIZE, DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyFlower, applyForest, applyFungus, DEFAULT_FLOWER_RADIUS, applyReef, applyRoad, applyWall, applyMegalith, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, megalithScatterCandidates, planAutoFlatten, raiseVertex, touchesLand } from "./world/heightmap";
 
 /**
  * The camera's fixed base scale — see layout()'s doc comment for why this
@@ -108,6 +113,17 @@ const DRAG_THRESHOLD = 10;
  */
 const LONG_PRESS_DURATION_MS = 350;
 /**
+ * How often a held 地下巨石 raises the next stone — 「発生ボタンを押し続けると、
+ * 一帯により多くの巨石を発生させる」.
+ *
+ * Far slower than the terraforming brush, which is bounded by the pointer
+ * actually moving onto a new tile. This one repeats while the finger sits
+ * still, and each repeat spends MEGALITH_MANA_COST, so the interval is
+ * what keeps "hold to scatter a field of stones" from being "hold to empty
+ * the mana bar before you notice".
+ */
+const MEGALITH_HOLD_INTERVAL_MS = 500;
+/**
  * How much one mouse-wheel "notch" (deltaY around ±100) zooms the map on
  * PC — see plan/0039-pc-support.md. Chosen so a single notch feels close
  * to one pinch-zoom step; exponential so repeated notches compound evenly
@@ -127,6 +143,15 @@ const TUTORIAL_HINT_TIMEOUT_MS = 15000;
 const SHAKE_DURATION = 0.3;
 /** Screen size (px) of the top-right overview map — see render/Minimap.ts. */
 const MINIMAP_SIZE = 72;
+
+/** Breathing room between the world map's lowest shard and the HUD text below it. */
+const HUD_GAP_BELOW_MINIMAP = 8;
+/**
+ * Width of the population colonnade hanging opposite the overview map — see
+ * render/PopulationGauge.ts. Wider than the minimap because it is read at a
+ * glance rather than studied, and its whole content is a left/right split.
+ */
+const POPULATION_GAUGE_WIDTH = 96;
 
 /**
  * The device's top safe-area inset (notch/status bar), read from the CSS
@@ -225,7 +250,14 @@ async function bootstrap(world: WorldDefinition) {
   const minimap = new Minimap(heightmap, MINIMAP_SIZE);
   app.stage.addChild(minimap.view);
 
+  // The two things the original hangs in the black space either side of the
+  // world: its overview map at top left (on Minimap's own slab) and the
+  // population standing at top right, as a colonnade rather than a bar.
+  const populationGauge = new PopulationGauge(POPULATION_GAUGE_WIDTH);
+  app.stage.addChild(populationGauge.view);
+
   mountCommandIcons();
+  mountPanelFrame();
   const statusPanel = new StatusPanel(MAX_MANA);
 
   // The command panel's single message line (see index.html's
@@ -338,18 +370,10 @@ async function bootstrap(world: WorldDefinition) {
     enemyPersonality: world.enemyPersonality,
     enemySchool: world.enemySchool,
     instantDrowning: world.instantDrowning,
+    bottomlessSwamp: world.bottomlessSwamp,
     onEnemyAction,
   });
 
-  // The "人口放出" action (see game/populationRelease.ts) — free and
-  // instant like a behaviorMode change, so it's a plain button rather than
-  // a ToolMode requiring a follow-up map tap. Only vibrates when it
-  // actually did something, since a tap while no house has grown enough
-  // yet is a silent no-op.
-  const releasePopulationButton = document.getElementById("release-population");
-  releasePopulationButton?.addEventListener("click", () => {
-    if (simulation.releasePopulation("player") > 0) vibrate(15);
-  });
 
   // The map is now far bigger than any one screen (see
   // plan/0062-original-scale-map.md) — like the original, the camera
@@ -416,8 +440,15 @@ async function bootstrap(world: WorldDefinition) {
       hasCenteredOnce = true;
     }
     hud.setMaxWidth(app.screen.width);
-    hud.setTopInset(safeAreaTop);
-    minimap.view.position.set(app.screen.width - MINIMAP_SIZE - 10, 10 + safeAreaTop);
+    // Top left, opposite the population gauge — the original's own arrangement.
+    minimap.view.position.set(10, 10 + safeAreaTop);
+    // Clear of the world map rather than behind it. These two lines and the
+    // minimap were both anchored to the same corner, so 「地形: 草原」 and
+    // any 地形操作 restriction have been hidden under the rock since the map
+    // moved here (plan/0130). Measured from minimapHeight rather than
+    // MINIMAP_SIZE because the island is taller than the map it holds.
+    hud.setTopOffset(safeAreaTop + minimapHeight(MINIMAP_SIZE) + HUD_GAP_BELOW_MINIMAP);
+    populationGauge.view.position.set(app.screen.width - POPULATION_GAUGE_WIDTH - 10, 10 + safeAreaTop);
     if (tutorialHint) tutorialHint.style.bottom = `${toolbarHeight + 12}px`;
   };
   layout();
@@ -543,8 +574,11 @@ async function bootstrap(world: WorldDefinition) {
 
   // Defaults to whichever direction terrainEditRule actually allows —
   // defaulting to the disabled "raise" under lowerOnly would otherwise
-  // leave the player's very first tap doing nothing.
-  let toolMode: ToolMode = terrainEditRule === "lowerOnly" ? "lower" : "raise";
+  // leave the player's very first tap doing nothing. Under 土地上下不可
+  // there is no allowed direction at all, so it falls back to 照会, the
+  // panel's own neutral "nothing is armed" tool (see ui/toolbar.ts, which
+  // already disarms to 照会 when the player changes school).
+  let toolMode: ToolMode = terrainEditRule === "neither" ? "inspect" : terrainEditRule === "lowerOnly" ? "lower" : "raise";
 
   // Finds the walker/house closest to a tapped point in renderer.view's
   // local space, for the "照会" tool — mirrors IsoRenderer.pickVertex's
@@ -650,10 +684,127 @@ async function bootstrap(world: WorldDefinition) {
       showEntityInfo("この面では敵の陣地を直接操作できません", "warning");
       return;
     }
+    // 「どこでも↑↓」「海上に土地↑↓」 — × on 43 of the original's 48 stages,
+    // where the spade reaches only ground that already touches land. See
+    // WorldDefinition's openTerraforming.
+    if (!world.openTerraforming && !touchesLand(heightmap, vertex.x, vertex.y)) {
+      showEntityInfo("この面では何もない海に土地を起こせません", "warning");
+      return;
+    }
     if (!trySpendPlayerMana(TERRAIN_EDIT_MANA_COST)) return;
     raiseVertex(heightmap, vertex.x, vertex.y, delta);
     renderer.redraw(visibleBounds());
     dismissTutorialHint();
+  };
+
+  /**
+   * The original's 自動整地 — 「Xボタンで建物を中心に7x7マスの平地を確保」,
+   * one of the two conveniences the original is praised for by name.
+   *
+   * Aimed at a *house*, not at the ground: the plot this levels is the one
+   * a particular building sits in, which is what makes it a single press
+   * rather than an accurate 49-tile drag with 平坦化. Only the player's own
+   * houses — this is a shortcut for tending your own village, not a way to
+   * reshape the ground under the enemy's.
+   *
+   * Priced at exactly what the same work costs by hand (one
+   * TERRAIN_EDIT_MANA_COST per tile that actually moves), and quoted in
+   * full before anything is spent, so this is an ergonomic convenience
+   * rather than a discount on terraforming.
+   */
+  const applyAutoFlattenAt = (localX: number, localY: number): void => {
+    const target = pickInspectableEntity(localX, localY);
+    if (!target || target.kind !== "house" || target.faction !== "player") {
+      showEntityInfo("自動整地は自分の家をタップしてください", "warning");
+      return;
+    }
+
+    const { elevation, tiles } = planAutoFlatten(
+      heightmap,
+      target.position.x,
+      target.position.y,
+      terrainEditRule,
+      AUTO_FLATTEN_SIZE,
+      // Same restriction the manual tools honour — see applyFlattenEditAt.
+      // Blocked tiles drop out of the plan, so they are neither levelled
+      // nor charged for, and the rest of the plot still levels.
+      (tile) => world.enemyTerritoryEditable || !simulation.isEnemyTerritory("player", tile),
+    );
+
+    if (tiles.length === 0) {
+      showEntityInfo("この家の周りはすでに平地です");
+      return;
+    }
+    if (!trySpendPlayerMana(tiles.length * TERRAIN_EDIT_MANA_COST)) return;
+
+    for (const tile of tiles) flattenTile(heightmap, tile.x, tile.y, elevation, terrainEditRule);
+    renderer.redraw(visibleBounds());
+    vibrate(30);
+    dismissTutorialHint();
+  };
+
+  /**
+   * The original's スプログ (see game/populationRelease.ts) — 「建物の中心に
+   * カーソルを合わせてBボタンを押すと、信者の一部が追い出される」.
+   *
+   * Aimed at one house, like 自動整地 above and for the same reason: the
+   * original puts the cursor on a building. This replaced a free-standing
+   * 送出 button that emptied *every* house the player owned at once — with
+   * that on the panel there was never a reason to aim, so the original's
+   * command could not meaningfully exist beside it.
+   *
+   * Free, like a behaviorMode change. Only vibrates when it actually did
+   * something: a tap on a house that hasn't grown to
+   * POPULATION_RELEASE_MIN_FRACTION yet is refused, and says so rather than
+   * reading as a tap that failed to register.
+   */
+  const applySprogAt = (localX: number, localY: number): void => {
+    // 「スプログ」 is one of the ten per-stage settings, and ゼウス's three
+    // stages turn it off — see WorldDefinition's sprogAllowed.
+    if (!world.sprogAllowed) {
+      showEntityInfo("この面ではスプログが使えません", "warning");
+      return;
+    }
+    const target = pickInspectableEntity(localX, localY);
+    if (!target || target.kind !== "house" || target.faction !== "player") {
+      showEntityInfo("スプログは自分の家をタップしてください", "warning");
+      return;
+    }
+    if (!simulation.sprogHouse(target.entity)) {
+      showEntityInfo("この家はまだ人を出せません", "warning");
+      return;
+    }
+    vibrate(15);
+  };
+
+  /**
+   * One 地下巨石 cast. Split out of applyTool because the original's own
+   * description makes this repeatable: 「発生ボタンを押し続けると、一帯に
+   * より多くの巨石を発生させる」 — see the hold handling in the pointer
+   * events below, which calls this once per repeat.
+   *
+   * `announce` is off for the repeats: a held press that wanders onto
+   * water should quietly place nothing there, not fill the info panel with
+   * one warning per interval tick.
+   *
+   * Returns whether a stone actually went up, so a hold can stop itself
+   * once the mana runs out or the whole area is already stone.
+   */
+  const castMegalithAt = (vertex: { x: number; y: number }, announce: boolean): boolean => {
+    if (!canAffordPlayerMana(MEGALITH_MANA_COST)) return false;
+    const raised = applyMegalith(heightmap, vertex.x, vertex.y);
+    if (raised.length === 0) {
+      if (announce) showEntityInfo("ここには巨石を起こせません", "warning");
+      return false;
+    }
+    trySpendPlayerMana(MEGALITH_MANA_COST);
+    raiseMegalith(simulation.world, raised);
+    renderer.redraw(visibleBounds());
+    simulation.recordEvent("player", "megalith");
+    triggerShake(6);
+    vibrate([30, 20, 40]);
+    playMiracleSound("megalith");
+    return true;
   };
 
   // Dispatches to whichever of the two above the current toolMode needs —
@@ -688,6 +839,16 @@ async function bootstrap(world: WorldDefinition) {
       return;
     }
 
+    if (toolMode === "autoFlatten") {
+      applyAutoFlattenAt(local.x, local.y);
+      return;
+    }
+
+    if (toolMode === "sprog") {
+      applySprogAt(local.x, local.y);
+      return;
+    }
+
     if (toolMode === "raise" || toolMode === "lower" || toolMode === "flatten") {
       const point = pickTerrainEditPoint(local.x, local.y);
       if (point) applyTerrainEditAt(point);
@@ -698,6 +859,13 @@ async function bootstrap(world: WorldDefinition) {
     if (!vertex) return;
 
     if (toolMode === "shrine") {
+      // Checked before spending, like 岩礁's "only at sea": 「リーダーが
+      // いない状態ではこのコマンドは使用できない」, and charging for a cast
+      // that does nothing reads as the game being broken.
+      if (!simulation.hasLeader("player")) {
+        showEntityInfo("リーダーが居ないと集結地は動かせません（まず集結を）", "warning");
+        return;
+      }
       if (!trySpendPlayerMana(SHRINE_MOVE_MANA_COST)) return;
       simulation.moveShrine("player", vertex);
       simulation.recordEvent("player", "shrineMove");
@@ -726,7 +894,9 @@ async function bootstrap(world: WorldDefinition) {
 
     if (toolMode === "swamp") {
       if (!trySpendPlayerMana(SWAMP_MANA_COST)) return;
-      createSwamp(simulation.world, vertex.x, vertex.y);
+      // 「面ごとに底なしかどうか設定される」 — the enemy god's own swamps on
+      // this stage are the same kind (see Simulation's bottomlessSwamp).
+      createSwamp(simulation.world, vertex.x, vertex.y, SWAMP_RADIUS, SWAMP_CAPACITY, world.bottomlessSwamp);
       simulation.recordEvent("player", "swamp");
       vibrate(25);
       playMiracleSound("swamp");
@@ -875,6 +1045,15 @@ async function bootstrap(world: WorldDefinition) {
       // paving is refused outright on 毒カビ (see applyRoad) — the
       // interaction is that you lay a road *ahead* of an outbreak.
       if (!canAffordPlayerMana(ROAD_MANA_COST)) return;
+      // 「なお、敵陣や斜面には設置できない」. The slope half lives in
+      // applyRoad (isLevelVertex); territory needs the world, so it is
+      // asked here — the same split the per-world terrain-edit rule uses.
+      // Unlike that one this is not a per-world setting: 道 and 城壁 are
+      // never laid on enemy ground in any stage.
+      if (simulation.isEnemyTerritory("player", vertex)) {
+        showEntityInfo("敵陣には道を敷けません", "warning");
+        return;
+      }
       if (applyRoad(heightmap, vertex.x, vertex.y).length === 0) {
         showEntityInfo("ここには道を敷けません", "warning");
         return;
@@ -892,6 +1071,11 @@ async function bootstrap(world: WorldDefinition) {
       // and refuse the cast outright where a wall cannot stand (water, a
       // crevice, 毒カビ, or ground already walled — see applyWall).
       if (!canAffordPlayerMana(WALL_MANA_COST)) return;
+      // 「道と同じく、敵陣や斜面には設置できない」 — see the road above.
+      if (simulation.isEnemyTerritory("player", vertex)) {
+        showEntityInfo("敵陣には城壁を築けません", "warning");
+        return;
+      }
       if (applyWall(heightmap, vertex.x, vertex.y).length === 0) {
         showEntityInfo("ここには城壁を築けません", "warning");
         return;
@@ -907,19 +1091,7 @@ async function bootstrap(world: WorldDefinition) {
     if (toolMode === "megalith") {
       // Pay only once the stone is actually up, same as the wall — and a
       // cast on water or a crevice raises nothing (see applyMegalith).
-      if (!canAffordPlayerMana(MEGALITH_MANA_COST)) return;
-      const raised = applyMegalith(heightmap, vertex.x, vertex.y);
-      if (raised.length === 0) {
-        showEntityInfo("ここには巨石を起こせません", "warning");
-        return;
-      }
-      trySpendPlayerMana(MEGALITH_MANA_COST);
-      raiseMegalith(simulation.world, raised);
-      renderer.redraw(visibleBounds());
-      simulation.recordEvent("player", "megalith");
-      triggerShake(6);
-      vibrate([30, 20, 40]);
-      playMiracleSound("megalith");
+      if (!castMegalithAt(vertex, true)) return;
       return;
     }
 
@@ -998,11 +1170,34 @@ async function bootstrap(world: WorldDefinition) {
         return;
       }
       if (!trySpendPlayerMana(REEF_MANA_COST)) return;
+      // One cast lays a whole breakwater — a line parallel to the coast,
+      // per the original's 「線分状に発生させる」. See applyReef.
       applyReef(heightmap, vertex.x, vertex.y);
       renderer.redraw(visibleBounds());
       simulation.recordEvent("player", "reef");
       vibrate(30);
       playMiracleSound("reef");
+      return;
+    }
+
+    if (toolMode === "whirlpool") {
+      // 「渦巻き：海面上をランダムに動き回り、既にある土地を削り取る」 — it
+      // lives on water and nowhere else, so the same up-front check 岩礁
+      // uses: charging for a cast that does nothing reads as the game being
+      // broken.
+      if (sampleElevation(heightmap, vertex.x, vertex.y) > heightmap.waterLevel) {
+        showEntityInfo("渦巻きは海にしか作れません", "warning");
+        return;
+      }
+      if (!trySpendPlayerMana(WHIRLPOOL_MANA_COST)) return;
+      // Headed away from the caster's own shrine, like the 竜巻 that can
+      // also produce one: the only thing a whirlpool does is take land
+      // away, and a tap carries no second axis to aim it with.
+      const from = simulation.getShrinePosition("player") ?? vertex;
+      createWhirlpool(simulation.world, vertex.x, vertex.y, vertex.x - from.x, vertex.y - from.y);
+      simulation.recordEvent("player", "whirlpool");
+      vibrate(30);
+      playMiracleSound("whirlpool");
       return;
     }
 
@@ -1040,6 +1235,17 @@ async function bootstrap(world: WorldDefinition) {
   // often expensive miracle cast that a drag should never be able to repeat.
   let longPressTimer: ReturnType<typeof setTimeout> | undefined;
   let painting = false;
+  /**
+   * The one miracle a held press repeats: 地下巨石. 「発生ボタンを押し続けると、
+   * 一帯により多くの巨石を発生させる」 — see castMegalithAt and
+   * megalithScatterCandidates. Every other miracle stays a single
+   * deliberate cast, which is why this is its own flag rather than another
+   * toolMode in the brush's list: the brush edits whatever the pointer
+   * moves over, while this stays put and scatters around where it was
+   * first pressed.
+   */
+  let megalithHoldTimer: ReturnType<typeof setInterval> | undefined;
+  let megalithHolding = false;
   // A vertex for raise/lower, a tile for flatten — see pickTerrainEditPoint.
   let lastPaintedPoint: { x: number; y: number } | undefined;
 
@@ -1049,8 +1255,15 @@ async function bootstrap(world: WorldDefinition) {
     longPressTimer = undefined;
   };
 
+  const stopMegalithHold = () => {
+    if (megalithHoldTimer !== undefined) clearInterval(megalithHoldTimer);
+    megalithHoldTimer = undefined;
+    megalithHolding = false;
+  };
+
   const stopPainting = () => {
     clearLongPressTimer();
+    stopMegalithHold();
     painting = false;
     lastPaintedPoint = undefined;
     flattenTargetElevation = undefined;
@@ -1150,14 +1363,39 @@ async function bootstrap(world: WorldDefinition) {
       viewStartPos = { x: renderer.view.position.x, y: renderer.view.position.y };
       flattenTargetElevation = undefined; // fresh gesture — see its own doc comment
 
-      if (toolMode === "raise" || toolMode === "lower" || toolMode === "flatten") {
+      if (toolMode === "raise" || toolMode === "lower" || toolMode === "flatten" || toolMode === "megalith") {
         clearLongPressTimer();
         longPressTimer = setTimeout(() => {
           longPressTimer = undefined;
           if (!pointerActive || isDragging || activePointers.size !== 1) return;
+          const local = renderer.view.toLocal(event.global);
+
+          if (toolMode === "megalith") {
+            const center = renderer.pickVertex(local.x, local.y);
+            if (!center) return;
+            megalithHolding = true;
+            vibrate(10); // brief confirmation that the hold just engaged
+            // The first stone lands here, exactly where a plain tap would
+            // have put it — holding adds to that cast rather than
+            // replacing it.
+            if (!castMegalithAt(center, true)) {
+              stopMegalithHold();
+              return;
+            }
+            megalithHoldTimer = setInterval(() => {
+              const candidates = megalithScatterCandidates(heightmap, center.x, center.y);
+              if (candidates.length === 0) {
+                stopMegalithHold();
+                return;
+              }
+              const next = candidates[Math.floor(Math.random() * candidates.length)];
+              if (!castMegalithAt(next, false)) stopMegalithHold();
+            }, MEGALITH_HOLD_INTERVAL_MS);
+            return;
+          }
+
           painting = true;
           vibrate(10); // brief confirmation that painting just engaged
-          const local = renderer.view.toLocal(event.global);
           const point = pickTerrainEditPoint(local.x, local.y);
           if (point) {
             applyTerrainEditAt(point);
@@ -1190,6 +1428,16 @@ async function bootstrap(world: WorldDefinition) {
 
     if (!pointerActive) return;
 
+    // A held 地下巨石 scatters around where it was pressed, so the pointer
+    // drifting is not a brush stroke — it just ends the hold, the same way
+    // moving before the hold engaged turns the gesture into a pan.
+    if (megalithHolding) {
+      const dx = event.global.x - dragStart.x;
+      const dy = event.global.y - dragStart.y;
+      if (Math.hypot(dx, dy) > DRAG_THRESHOLD) stopMegalithHold();
+      return;
+    }
+
     if (painting) {
       const local = renderer.view.toLocal(event.global);
       const point = pickTerrainEditPoint(local.x, local.y);
@@ -1220,7 +1468,7 @@ async function bootstrap(world: WorldDefinition) {
     activePointers.delete(event.pointerId);
     if (activePointers.size < 2) rotating = false;
 
-    if (pointerActive && !isDragging && !painting && !gestureHadTwoFingers) applyTool(event);
+    if (pointerActive && !isDragging && !painting && !megalithHolding && !gestureHadTwoFingers) applyTool(event);
 
     stopPainting();
     pointerActive = false;
@@ -1247,8 +1495,18 @@ async function bootstrap(world: WorldDefinition) {
   // Reflects terrainEditRule in the toolbar itself: a player should never
   // be able to select the forbidden direction in the first place, rather
   // than tapping it and having nothing happen.
-  if (terrainEditRule !== "both") {
-    const forbidden: ToolMode = terrainEditRule === "raiseOnly" ? "lower" : "raise";
+  // Under 土地上下不可 that is every terrain tool there is: 平坦化 and
+  // 自動整地 are made of the same vertex edits (flattenTile), so leaving
+  // them enabled would offer two buttons that spend a tap and do nothing.
+  const forbiddenTools: ToolMode[] =
+    terrainEditRule === "neither"
+      ? ["raise", "lower", "flatten", "autoFlatten"]
+      : terrainEditRule === "raiseOnly"
+        ? ["lower"]
+        : terrainEditRule === "lowerOnly"
+          ? ["raise"]
+          : [];
+  for (const forbidden of forbiddenTools) {
     document.querySelector<HTMLButtonElement>(`#toolbar [data-tool="${forbidden}"]`)?.setAttribute("disabled", "true");
   }
   // Same idea for allowedMiracles: a player should never be able to select
@@ -1258,11 +1516,16 @@ async function bootstrap(world: WorldDefinition) {
     if (world.allowedMiracles.includes(miracle)) continue;
     document.querySelector<HTMLButtonElement>(`#toolbar [data-tool="${miracle}"]`)?.setAttribute("disabled", "true");
   }
+  // スプログ is not a miracle (it costs no mana) but it is one of the ten
+  // per-stage settings, so it goes dark the same way — see sprogAllowed.
+  if (!world.sprogAllowed) {
+    document.querySelector<HTMLButtonElement>('#toolbar [data-tool="sprog"]')?.setAttribute("disabled", "true");
+  }
   // Syncs the toolbar's visual "pressed" state with toolMode's actual
   // default set above — index.html hardcodes "raise" as pressed, which is
   // wrong whenever terrainEditRule forced the default to "lower" instead.
   document
-    .querySelectorAll<HTMLButtonElement>('#toolbar [data-tool="raise"], #toolbar [data-tool="lower"]')
+    .querySelectorAll<HTMLButtonElement>('#toolbar [data-tool="raise"], #toolbar [data-tool="lower"], #toolbar [data-tool="inspect"]')
     .forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.tool === toolMode)));
 
   // Every tool that spends the player's mana, and how much — used below to
@@ -1280,6 +1543,7 @@ async function bootstrap(world: WorldDefinition) {
     swamp: SWAMP_MANA_COST,
     holyWater: HOLY_WATER_MANA_COST,
     tornado: TORNADO_MANA_COST,
+    whirlpool: WHIRLPOOL_MANA_COST,
     firePillar: FIRE_PILLAR_MANA_COST,
     lightning: LIGHTNING_MANA_COST,
     storm: STORM_MANA_COST,
@@ -1355,7 +1619,12 @@ async function bootstrap(world: WorldDefinition) {
     entityLayer.update(simulation.world, deltaSeconds, simulation.getImpactEffects());
     const outcome = simulation.getOutcome();
     hud.update();
-    statusPanel.update(simulation.summarize());
+    const summaries = simulation.summarize();
+    statusPanel.update(summaries);
+    const playerPopulation = summaries.find((f) => f.id === "player")?.population ?? 0;
+    const enemyPopulation = summaries.find((f) => f.id === "enemy")?.population ?? 0;
+    const totalPopulation = playerPopulation + enemyPopulation;
+    populationGauge.update(totalPopulation > 0 ? playerPopulation / totalPopulation : 0.5);
     updateToolbarAffordability();
     if (outcome.over && !matchRecordShown) {
       matchRecordShown = true;
@@ -1406,7 +1675,10 @@ function showWorldSelect(): void {
 
         const name = document.createElement("span");
         name.className = "world-select-name";
-        name.textContent = world.name;
+        // 「アルゴス(プロメテウス)」 — the original pairs the place with the
+        // god waiting in it, and the god is the opponent the player is
+        // actually about to face.
+        name.textContent = `${world.name}（${world.god}）`;
 
         const detail = document.createElement("span");
         detail.className = "world-select-detail";
@@ -1422,6 +1694,9 @@ function showWorldSelect(): void {
         // match (see game/miracleSchools.ts), so there is no "default"
         // worth leaving unsaid.
         const schoolLabel = `・敵の系統: ${MIRACLE_SCHOOLS.find(({ id }) => id === world.enemySchool)!.label}`;
+        // The original's two acts: ground-level Greece, then the halls of
+        // the gods. Worth naming because it is where the campaign turns.
+        const chapterLabel = `${world.chapter}・`;
         // WORLDS is itself ordered by difficulty (see its own doc comment),
         // so the world's own position in the list doubles as a simple
         // difficulty indicator — no separate derived score needed. Map
@@ -1429,7 +1704,7 @@ function showWorldSelect(): void {
         // fixed 64x64 (see plan/0062-original-scale-map.md).
         detail.textContent = locked
           ? "パスワードが必要です"
-          : `${TERRAIN_LABELS[world.terrain]}${ruleLabel}${personalityLabel}${schoolLabel}・難易度${index + 1}/${WORLDS.length}`;
+          : `${chapterLabel}${TERRAIN_LABELS[world.terrain]}${ruleLabel}${personalityLabel}${schoolLabel}・難易度${index + 1}/${WORLDS.length}`;
 
         button.append(name, detail);
         if (!locked) {

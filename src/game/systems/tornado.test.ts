@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
 import { MIN_ELEVATION, createHeightmap, type Heightmap } from "../../world/heightmap";
-import { Owner, Position, Tornado, Walker, Whirlpool } from "../components";
+import { House, Owner, Position, Tornado, Walker, Whirlpool } from "../components";
 import { TORNADO_DAMAGE_PER_SECOND, TORNADO_LIFETIME } from "../constants";
 import { createTornado } from "../tornado";
 import { createTornadoSystem } from "./tornado";
@@ -93,24 +93,99 @@ describe("createTornadoSystem", () => {
   });
 
   /**
-   * The interaction both miracles exist for (docs/original-miracles.md
-   * #17): 「水地形へ入ると渦巻きへ変化する」. Without it the tornado is a
-   * slow fire rain and the 渦巻き never exists at all, since nothing else
-   * creates one.
+   * 「一定時間、ランダムに動き回って**建物を吹き飛ばし**、信者を巻き込む」 —
+   * buildings come first in the original's own sentence. This used to skip
+   * houses outright on the reading that the tornado's damage was "entirely
+   * in terms of people", which made a wandering hazard that cannot touch a
+   * settlement: an anti-army weapon only, when the original's tornado is
+   * the one miracle you send into a town.
    */
-  it("becomes a 渦巻き when it reaches open water", () => {
+  it("throws down a house it passes over", () => {
+    const heightmap = flatHeightmap(40, 5);
+    const world = new World();
+    const house = world.createEntity();
+    world.add(house, Position, { x: 12, y: 10 });
+    world.add(house, Owner, { faction: "enemy" });
+    world.add(house, House, { level: "hut", population: 4 });
+    createTornado(world, 10, 10, 1, 0);
+
+    const system = createTornadoSystem({ heightmap, rng: straight });
+    for (let tick = 0; tick < 8 && world.isAlive(house); tick++) system(world, 0.5);
+
+    expect(world.isAlive(house)).toBe(false);
+  });
+
+  it("leaves a house well outside its radius standing", () => {
+    const heightmap = flatHeightmap(40, 20);
+    const world = new World();
+    const house = world.createEntity();
+    world.add(house, Position, { x: 12, y: 18 });
+    world.add(house, Owner, { faction: "enemy" });
+    world.add(house, House, { level: "hut", population: 4 });
+    createTornado(world, 10, 2, 1, 0);
+
+    const system = createTornadoSystem({ heightmap, rng: straight });
+    for (let tick = 0; tick < 8; tick++) system(world, 0.5);
+
+    expect(world.isAlive(house)).toBe(true);
+  });
+
+  /**
+   * The interaction both miracles exist for (docs/original-miracles.md
+   * #17). Without it the tornado is a slow fire rain and the 渦巻き never
+   * exists at all, since nothing else creates one.
+   */
+  it("throws off a 渦巻き once it reaches open water", () => {
     const heightmap = withSea(flatHeightmap(40, 5), 20);
     const world = new World();
     createTornado(world, 18, 10, 1, 0);
 
     const system = createTornadoSystem({ heightmap, rng: straight });
-    // Checked by component rather than by the entity handle: World recycles
-    // ids the instant one is freed, so the whirlpool can be handed the
-    // tornado's own id and a stale handle would still report alive.
-    for (let tick = 0; tick < 20 && world.query(Tornado).length > 0; tick++) system(world, 0.5);
+    for (let tick = 0; tick < 8 && world.query(Whirlpool).length === 0; tick++) system(world, 0.5);
+
+    expect(world.query(Whirlpool)).toHaveLength(1);
+  });
+
+  /**
+   * 「海上では渦巻きを**大量発生**させるため、敵陣の海岸付近に大量に仕掛けると
+   * 土地を広げにくくなるので効果的」 — the tactic the original names, and it
+   * needs one cast to be worth more than one whirlpool. game2 used to
+   * destroy the tornado on the first one, so 「大量」 could only ever mean
+   * "cast 竜巻 many times".
+   */
+  it("keeps crossing the sea and sheds several, rather than being spent on the first", () => {
+    const heightmap = withSea(flatHeightmap(60, 5), 5);
+    const world = new World();
+    createTornado(world, 10, 10, 1, 0);
+
+    const system = createTornadoSystem({ heightmap, rng: straight });
+    for (let tick = 0; tick < TORNADO_LIFETIME * 2; tick++) system(world, 0.5);
+
+    expect(world.query(Whirlpool).length).toBeGreaterThan(1);
+  });
+
+  it("does not shed one every tick — they come at TORNADO_WHIRLPOOL_INTERVAL", () => {
+    const heightmap = withSea(flatHeightmap(60, 5), 5);
+    const world = new World();
+    createTornado(world, 10, 10, 1, 0);
+
+    const system = createTornadoSystem({ heightmap, rng: straight });
+    for (let tick = 0; tick < 4; tick++) system(world, 0.5);
+
+    // Two seconds at sea is under one interval past the first, immediate one.
+    expect(world.query(Whirlpool)).toHaveLength(1);
+  });
+
+  /** A tornado still dies of old age; the sea does not extend its life. */
+  it("expires at the end of its 一定時間 even over water", () => {
+    const heightmap = withSea(flatHeightmap(60, 5), 5);
+    const world = new World();
+    createTornado(world, 10, 10, 1, 0);
+
+    const system = createTornadoSystem({ heightmap, rng: straight });
+    for (let tick = 0; tick < TORNADO_LIFETIME + 1; tick++) system(world, 1);
 
     expect(world.query(Tornado)).toHaveLength(0);
-    expect(world.query(Whirlpool)).toHaveLength(1);
   });
 
   it("stays a 竜巻 over dry land for its whole life", () => {
@@ -135,3 +210,22 @@ describe("createTornadoSystem", () => {
     expect(world.query(Whirlpool)).toHaveLength(0);
   });
 });
+
+/** 竜巻「※オディッセウス除く」 — 気 の神技なので、気 の英雄は巻き込まれない。 */
+describe("tornadoSystem and the air school's own hero", () => {
+  it("passes straight through オディッセウス", () => {
+    const heightmap = flatHeightmap(20, 5);
+    const world = new World();
+    const odysseus = world.createEntity();
+    world.add(odysseus, Position, { x: 10, y: 10 });
+    world.add(odysseus, Owner, { faction: "enemy" });
+    world.add(odysseus, Walker, { strength: 1, state: "odysseus", speed: 1 });
+    createTornado(world, 10, 10, 1, 0);
+
+    createTornadoSystem({ heightmap })(world, 1);
+
+    expect(world.isAlive(odysseus)).toBe(true);
+    expect(world.get(odysseus, Walker)!.strength).toBe(1);
+  });
+});
+

@@ -3,17 +3,27 @@ import { Position, Swamp } from "./components";
 import { SWAMP_CAPACITY, SWAMP_RADIUS } from "./constants";
 import { distance } from "./systems/geometry";
 
-/** Conjures a swamp at (x, y) — see the Swamp component and swampSystem. */
+/**
+ * Conjures a swamp at (x, y) — see the Swamp component and swampSystem.
+ *
+ * `bottomless` is the per-world 底なし setting
+ * (docs/original-miracles.md #8: 「面ごとに底なしかどうか設定される」), so
+ * both call sites — the player's own cast in main.ts and the enemy god's
+ * in enemyMiracles.ts — pass their world's value and neither side gets a
+ * different kind of swamp from the other. Defaults to the draining kind,
+ * which is what game2 had before the permanent variant existed.
+ */
 export function createSwamp(
   world: World,
   x: number,
   y: number,
   radius: number = SWAMP_RADIUS,
   capacity: number = SWAMP_CAPACITY,
+  bottomless = false,
 ): Entity {
   const entity = world.createEntity();
   world.add(entity, Position, { x, y });
-  world.add(entity, Swamp, { radius, remainingCapacity: capacity });
+  world.add(entity, Swamp, { radius, remainingCapacity: capacity, bottomless });
   return entity;
 }
 

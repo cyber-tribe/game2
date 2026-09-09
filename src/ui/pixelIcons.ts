@@ -11,6 +11,7 @@ export type IconKind =
   | "raise"
   | "lower"
   | "flatten"
+  | "autoFlatten"
   | "shrine"
   | "earthquake"
   | "swamp"
@@ -33,6 +34,7 @@ export type IconKind =
   | "flower"
   | "fireRain"
   | "tsunami"
+  | "whirlpool"
   | "reef"
   | "road"
   | "wall"
@@ -42,9 +44,10 @@ export type IconKind =
   | "inspect"
   | "settle"
   | "gather"
+  | "merge"
   | "goToShrine"
   | "fight"
-  | "releasePopulation"
+  | "sprog"
   | "mana"
   | "population";
 

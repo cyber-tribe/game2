@@ -1,4 +1,5 @@
 import type { System } from "../../ecs";
+import { resistsMiracle } from "../protection";
 import { HolyWater, Owner, Position, Walker } from "../components";
 import type { OnImpactEffect } from "./effects";
 import { distance } from "./geometry";
@@ -45,6 +46,11 @@ export function createHolyWaterSystem(config: Partial<HolyWaterConfig> = {}): Sy
 
       for (const walkerEntity of world.query(Walker, Position, Owner)) {
         if (!world.isAlive(springEntity)) break;
+
+        // 聖水の泉「※トロイのヘレン除く」 — see miracleSchools.ts's
+        // resistsSchool. She is the water school's own hero, and turning
+        // her would hand her prisoners straight back besides.
+        if (resistsMiracle(world, walkerEntity, "water")) continue;
 
         const owner = world.get(walkerEntity, Owner)!;
         if (owner.faction === springFaction) continue;

@@ -1,4 +1,4 @@
-import { Scheduler, World } from "../ecs";
+import { Scheduler, World, type Entity } from "../ecs";
 import type { Heightmap, TerrainEditRule } from "../world/heightmap";
 import { triggerArmageddon } from "./armageddon";
 import {
@@ -14,10 +14,10 @@ import {
   type WalkerState,
 } from "./components";
 import { DEFAULT_WALKER_SPEED, FARMLAND_RADIUS, HOUSE_LEVELS, IMPACT_EFFECT_DURATION, INITIAL_WALKER_SPREAD, TILES_PER_HOUSE_CAP } from "./constants";
-import { createFaction, findFactionEntity, moveShrine } from "./faction";
+import { createFaction, findFactionEntity, hasLiveLeader, moveShrine } from "./faction";
 import { promoteHero } from "./hero";
 import { totalPopulation } from "./population";
-import { releasePopulation } from "./populationRelease";
+import { sprogHouse } from "./populationRelease";
 import { createHouseCaptureSystem, createWalkerCombatSystem } from "./systems/combat";
 import type { ImpactEffectEvent, ImpactEffectSnapshot } from "./systems/effects";
 import { createDrowningSystem } from "./systems/drowning";
@@ -27,6 +27,7 @@ import { createEnemyTerraformSystem } from "./systems/enemyTerraform";
 import { fightTargetingSystem } from "./systems/fightTargeting";
 import { gatherSystem } from "./systems/gather";
 import { gatherTargetingSystem } from "./systems/gatherTargeting";
+import { mergeTargetingSystem } from "./systems/mergeTargeting";
 import { goToShrineSystem } from "./systems/goToShrine";
 import { createHouseGrowthSystem } from "./systems/houseGrowth";
 import { createHouseUpgradeSystem } from "./systems/houseUpgrade";
@@ -130,6 +131,15 @@ export interface SimulationConfig {
    * that don't care about it.
    */
   instantDrowning?: boolean;
+  /**
+   * Same per-world 底なし setting (see game/worlds.ts's
+   * WorldDefinition.bottomlessSwamp) applied to the enemy god's own 沼
+   * casts, so both sides conjure the same kind of swamp on a given stage.
+   * The player's own casts pass it to createSwamp directly (main.ts).
+   * Defaults to false — the draining kind — which is what tests that don't
+   * care about it should get.
+   */
+  bottomlessSwamp?: boolean;
 }
 
 export interface FactionSummary {
@@ -152,9 +162,23 @@ export interface FactionSummary {
  * IsoRenderer.project, and render/entityInfoLabel.ts turns the result
  * into the Japanese text actually shown.
  */
+/**
+ * `entity` is the ECS id the row was built from, so a tap that picked
+ * something on screen can then *act* on it — スプログ aims at one house
+ * (see sprogHouse), and picking it is the same screen-space nearest-thing
+ * search the 照会 panel already does.
+ */
 export type InspectableEntity =
-  | { kind: "walker"; faction: FactionId; position: Position; strength: number; state: WalkerState }
-  | { kind: "house"; faction: FactionId; position: Position; level: HouseLevel; population: number; capacity: number };
+  | { entity: Entity; kind: "walker"; faction: FactionId; position: Position; strength: number; state: WalkerState }
+  | {
+      entity: Entity;
+      kind: "house";
+      faction: FactionId;
+      position: Position;
+      level: HouseLevel;
+      population: number;
+      capacity: number;
+    };
 
 export interface GameOutcome {
   over: boolean;
@@ -201,6 +225,7 @@ export type MatchEventType =
   | "heroLost"
   | "armageddon"
   | "tsunami"
+  | "whirlpool"
   | "reef"
   | "road"
   | "wall"
@@ -291,9 +316,10 @@ export class Simulation {
       .add(fightTargetingSystem)
       .add(goToShrineSystem)
       .add(gatherTargetingSystem)
+      .add(mergeTargetingSystem)
       .add(heroAdvanceTargetingSystem)
       .add(guardianTargetingSystem)
-      .add(createHelenSystem())
+      .add(createHelenSystem({ onImpact: (event) => this.recordImpactEffect(event) }))
       .add(heroCooldownSystem)
       .add(createHeroLossSystem({ onHeroLost: (faction) => this.recordEvent(faction, "heroLost") }))
       .add(createWanderTargetSystem({ heightmap: config.heightmap }))
@@ -378,6 +404,7 @@ export class Simulation {
           allowedMiracles: config.allowedMiracles ?? ALL_MIRACLES,
           personality: config.enemyPersonality,
           school: config.enemySchool,
+          bottomlessSwamp: config.bottomlessSwamp,
           onImpact: (event) => this.recordImpactEffect(event),
           onAction: (event) => {
             this.recordEvent("enemy", event.type);
@@ -497,9 +524,14 @@ export class Simulation {
     return false;
   }
 
-  /** The "集結シンボル移動" miracle — relocates where "goToShrine" mode leads the army. */
-  moveShrine(faction: FactionId, position: { x: number; y: number }): void {
-    moveShrine(this.world, faction, position);
+  /**
+   * The "集結シンボル移動" miracle — relocates where "goToShrine" mode leads
+   * the army. Returns whether it moved: 「リーダーがいない状態ではこの
+   * コマンドは使用できない」, so a faction without one is refused (see
+   * faction.ts's moveShrine) and the caller should not charge for it.
+   */
+  moveShrine(faction: FactionId, position: { x: number; y: number }): boolean {
+    return moveShrine(this.world, faction, position);
   }
 
   /**
@@ -508,6 +540,12 @@ export class Simulation {
    * map is otherwise far bigger than any one screen (see
    * plan/0062-original-scale-map.md).
    */
+  /** Whether a faction currently has a leader — 集結地移動 needs one (see moveShrine). */
+  hasLeader(faction: FactionId): boolean {
+    const entity = findFactionEntity(this.world, faction);
+    return entity !== undefined && hasLiveLeader(this.world, this.world.get(entity, FactionState)!);
+  }
+
   getShrinePosition(faction: FactionId): Position | undefined {
     const entity = findFactionEntity(this.world, faction);
     return entity === undefined ? undefined : this.world.get(entity, FactionState)!.shrinePosition;
@@ -519,12 +557,12 @@ export class Simulation {
   }
 
   /**
-   * The "人口放出" action — see populationRelease.ts. Free, like
-   * setBehaviorMode; returns how many walkers were actually released so
-   * callers can skip feedback (haptics, etc.) on a no-op tap.
+   * The original's スプログ — see populationRelease.ts. Free, like
+   * setBehaviorMode; returns whether anyone actually walked out so callers
+   * can skip feedback (haptics, etc.) on a no-op tap.
    */
-  releasePopulation(faction: FactionId): number {
-    return releasePopulation(this.world, faction, this.maxHousesPerFaction);
+  sprogHouse(house: Entity): boolean {
+    return sprogHouse(this.world, house, this.maxHousesPerFaction);
   }
 
   /**
@@ -584,6 +622,7 @@ export class Simulation {
     for (const entity of this.world.query(Walker, Position, Owner)) {
       const walker = this.world.get(entity, Walker)!;
       entities.push({
+        entity,
         kind: "walker",
         faction: this.world.get(entity, Owner)!.faction,
         position: this.world.get(entity, Position)!,
@@ -595,6 +634,7 @@ export class Simulation {
     for (const entity of this.world.query(House, Position, Owner)) {
       const house = this.world.get(entity, House)!;
       entities.push({
+        entity,
         kind: "house",
         faction: this.world.get(entity, Owner)!.faction,
         position: this.world.get(entity, Position)!,

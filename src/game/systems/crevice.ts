@@ -1,6 +1,7 @@
 import type { System } from "../../ecs";
 import { isCrevice, type Heightmap } from "../../world/heightmap";
 import { Position, Walker } from "../components";
+import { resistsMiracle } from "../protection";
 import type { OnImpactEffect } from "./effects";
 
 export interface CreviceConfig {
@@ -39,7 +40,8 @@ export function createCreviceSystem(config: Partial<CreviceConfig> = {}): System
     if (!heightmap) return;
 
     for (const entity of world.query(Walker, Position)) {
-      if (world.get(entity, Walker)!.state === "hercules") continue;
+      // 地割れ「※ヘラクレス除く」 — 「同じカテゴリーの攻撃神技は効果がない」 — see miracleSchools.ts's resistsSchool.
+      if (resistsMiracle(world, entity, "earth")) continue;
 
       const pos = world.get(entity, Position)!;
       if (!isCrevice(heightmap, pos.x, pos.y)) continue;

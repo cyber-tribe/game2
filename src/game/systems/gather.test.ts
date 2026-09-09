@@ -26,7 +26,41 @@ describe("gatherSystem", () => {
     expect(world.get(a, Walker)!.strength).toBe(5);
   });
 
-  it("does nothing when the faction is not in gather mode", () => {
+  /**
+   * 「以後一般信者はリーダーの元へ集うようになる。…よって多数の信者を合体
+   * させ、強力なヒーローを生み出すのに不可欠な操作である」 — the original
+   * treats 集結 and 集結シンボルへ as one order, and the merging is the
+   * reason to give it. Marching without merging would leave a crowd
+   * standing on the leader's toes doing nothing, since a mustering faction
+   * founds no houses either.
+   */
+  it("merges under the 集結シンボルへ march too, not only 集結", () => {
+    const world = new World();
+    createFaction(world, "player", { x: 0, y: 0 }, "goToShrine");
+    const a = createWalker(world, "player", 0, 0, 3);
+    const b = createWalker(world, "player", 0.5, 0, 2);
+
+    gatherSystem(world, 0);
+
+    expect(world.isAlive(a)).toBe(true);
+    expect(world.isAlive(b)).toBe(false);
+    expect(world.get(a, Walker)!.strength).toBe(5);
+  });
+
+  it("merges under 合体 — the order this pass exists for", () => {
+    const world = new World();
+    createFaction(world, "player", { x: 0, y: 0 }, "merge");
+    const a = createWalker(world, "player", 0, 0, 3);
+    const b = createWalker(world, "player", 0.5, 0, 2);
+
+    gatherSystem(world, 0);
+
+    expect(world.isAlive(a)).toBe(true);
+    expect(world.isAlive(b)).toBe(false);
+    expect(world.get(a, Walker)!.strength).toBe(5);
+  });
+
+  it("does nothing when the faction is settling or fighting", () => {
     const world = new World();
     createFaction(world, "player", { x: 0, y: 0 }, "settle");
     const a = createWalker(world, "player", 0, 0, 3);

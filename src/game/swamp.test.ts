@@ -10,14 +10,31 @@ describe("createSwamp", () => {
     const entity = createSwamp(world, 3, 4);
 
     expect(world.get(entity, Position)).toEqual({ x: 3, y: 4 });
-    expect(world.get(entity, Swamp)).toEqual({ radius: SWAMP_RADIUS, remainingCapacity: SWAMP_CAPACITY });
+    expect(world.get(entity, Swamp)).toEqual({
+      radius: SWAMP_RADIUS,
+      remainingCapacity: SWAMP_CAPACITY,
+      bottomless: false,
+    });
   });
 
   it("accepts an explicit radius and capacity", () => {
     const world = new World();
     const entity = createSwamp(world, 0, 0, 2.5, 9);
 
-    expect(world.get(entity, Swamp)).toEqual({ radius: 2.5, remainingCapacity: 9 });
+    expect(world.get(entity, Swamp)).toEqual({ radius: 2.5, remainingCapacity: 9, bottomless: false });
+  });
+
+  /**
+   * 「面ごとに底なしかどうか設定される」 (docs/original-miracles.md #8) —
+   * see WorldDefinition.bottomlessSwamp. Both sides' casts pass their
+   * world's own value, so the kind of swamp is a property of the stage
+   * rather than of who conjured it.
+   */
+  it("makes a 底なし沼 when the world says so", () => {
+    const world = new World();
+    const entity = createSwamp(world, 0, 0, SWAMP_RADIUS, SWAMP_CAPACITY, true);
+
+    expect(world.get(entity, Swamp)!.bottomless).toBe(true);
   });
 });
 

@@ -88,3 +88,31 @@ describe("eruptVolcano", () => {
     expect(world.isAlive(house)).toBe(false);
   });
 });
+
+/** 火山は火の神技なので「※アキレス以外」——溶岩に埋まって焼死するのは他の全員である。 */
+describe("eruptVolcano and the fire school's own hero", () => {
+  it("leaves アキレス standing in the lava", () => {
+    const world = new World();
+    const achilles = world.createEntity();
+    world.add(achilles, Position, { x: 4, y: 4 });
+    world.add(achilles, Owner, { faction: "player" });
+    world.add(achilles, Walker, { strength: 1, state: "achilles", speed: 1 });
+
+    eruptVolcano(world, [{ x: 4, y: 4 }]);
+
+    expect(world.isAlive(achilles)).toBe(true);
+  });
+
+  it("still buries every other hero", () => {
+    const world = new World();
+    const hercules = world.createEntity();
+    world.add(hercules, Position, { x: 4, y: 4 });
+    world.add(hercules, Owner, { faction: "player" });
+    world.add(hercules, Walker, { strength: 1, state: "hercules", speed: 1 });
+
+    eruptVolcano(world, [{ x: 4, y: 4 }]);
+
+    expect(world.isAlive(hercules)).toBe(false);
+  });
+});
+

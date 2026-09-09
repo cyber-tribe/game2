@@ -44,6 +44,20 @@ export const FINAL_BATTLE_WALKER_SPEED = 0.5;
 /** Radius (in tiles) a "seeking" walker without a target wanders within. */
 export const DEFAULT_WANDER_RADIUS = 6;
 
+/**
+ * How strongly a wandering walker leans away from the middle of the map.
+ *
+ * 原作の定住は「ウォーカーは適当に歩き回り、平地に建物を建てます。マップ
+ * 中央よりは端に向かいやすい傾向があります」 — a *tendency*, not a rule, so
+ * this blends the outward direction into an otherwise uniform random one
+ * rather than replacing it. At 0 the walk is the old isotropic one; at 1 it
+ * always marches straight for the nearest edge. 0.35 leaves every direction
+ * reachable (the blend of a unit vector with 0.35 of another can still point
+ * anywhere) while making the outward half of the circle noticeably more
+ * likely, which is what "傾向" asks for.
+ */
+export const WANDER_OUTWARD_BIAS = 0.35;
+
 /** Population units a house accumulates per second. */
 export const DEFAULT_POPULATION_GROWTH_RATE = 2;
 
@@ -80,6 +94,11 @@ export const TERRAIN_EDIT_RULE_WEIGHTS: Record<TerrainEditRule, number> = {
   both: 2,
   raiseOnly: 1,
   lowerOnly: 1,
+  // Rarest by a distance. The original has 土地上下不可 stages and the
+  // article files them under 問題点 — 「トリッキーを超えて苦痛でしかない」 —
+  // so a custom match should be able to deal one, and should almost never
+  // deal one to a player who did not ask for it.
+  neither: 0.25,
 };
 
 /** Japanese display name for each terrain-edit rule, shown in the HUD so a restriction is never a silent mystery. */
@@ -87,6 +106,7 @@ export const TERRAIN_EDIT_RULE_LABELS: Record<TerrainEditRule, string> = {
   both: "隆起・沈降とも可",
   raiseOnly: "隆起のみ可",
   lowerOnly: "沈降のみ可",
+  neither: "土地上下不可",
 };
 
 /**
@@ -118,21 +138,32 @@ export const HOUSE_LEVEL_LABELS: Record<HouseLevel, string> = {
 };
 
 /**
- * Minimum house.population / capacity fraction releasePopulation requires
- * before it'll empty a house early — see that function's doc comment.
- * Below this, giving up the house's progress toward a real, full-strength
- * spawn isn't judged worth the walker it would produce.
+ * Minimum house.population / capacity fraction sprogHouse requires before
+ * it'll push anyone out early — see that function's doc comment. Below
+ * this, giving up the house's progress toward a real, full-strength spawn
+ * isn't judged worth the walker it would produce.
  */
 export const POPULATION_RELEASE_MIN_FRACTION = 0.5;
 
 /**
  * Share of a released walker's population fraction that becomes its
- * strength — see releasePopulation. Kept below 1 so cashing population out
- * early is a genuine trade-off (a weaker walker, sooner) against letting a
- * house grow all the way to capacity on its own (strength 1, per
+ * strength — see sprogHouse. Kept below 1 so cashing population out early
+ * is a genuine trade-off (a weaker walker, sooner) against letting a house
+ * grow all the way to capacity on its own (strength 1, per
  * createHouseGrowthSystem) — not a strictly better way to grow.
  */
 export const POPULATION_RELEASE_EFFICIENCY = 0.75;
+
+/**
+ * How much of a house's population one スプログ pushes out — the original
+ * says 「信者の**一部**が追い出される」, not all of them. Half leaves the
+ * house still standing on real progress rather than back at zero, which is
+ * what makes the command "don't wait for capacity" instead of "cash this
+ * house in". Taking a share of what is *left* each time also makes repeated
+ * presses run themselves dry: a full house yields two walkers before it
+ * drops under POPULATION_RELEASE_MIN_FRACTION and refuses.
+ */
+export const SPROG_FRACTION = 0.5;
 
 /**
  * Ceiling on how much of a faction's total mana rate hut-level houses can
@@ -150,6 +181,26 @@ export const POPULATION_RELEASE_EFFICIENCY = 0.75;
  * (cost 20) a repeatable button.
  */
 export const HUT_MANA_RATE_CAP = 5 * HOUSE_LEVELS.hut.manaRate;
+
+/**
+ * Mana per second from one follower who is out on the field rather than
+ * living in a house — 「マナは**信者数**と時間経過に応じて蓄積される」.
+ *
+ * Exactly what that person produced while indoors in a hut
+ * (manaRate / capacity), so stepping outside is income-neutral. It used to
+ * be a total loss: a walker only ever *left* a house, taking its share of
+ * that house's population with it, so mustering an army or sprogging a town
+ * cut the faction's income to nothing while the people involved were still
+ * very much alive and still believers. The original praises スプログ for
+ * making the game move faster; it cannot be the button that bankrupts you.
+ *
+ * Counted inside HUT_MANA_RATE_CAP rather than beside it (see manaSystem):
+ * people standing in a field are the least-developed state a faction's
+ * population can be in, so they belong under the same ceiling as its
+ * least-developed housing. Letting them earn outside it would mean emptying
+ * every hut out-earned upgrading them.
+ */
+export const FOLLOWER_MANA_RATE = HOUSE_LEVELS.hut.manaRate / HOUSE_LEVELS.hut.capacity;
 
 /** How far around a house (in tiles) countFlatNeighbors looks when checking for an upgrade. */
 export const HOUSE_UPGRADE_FLATNESS_RADIUS = 2;
@@ -244,6 +295,20 @@ export const EARTHQUAKE_MANA_COST = 20;
 /** Two same-faction walkers within this many tiles merge under "gather". */
 export const GATHER_RANGE = 1.5;
 
+/**
+ * How far a walker under 合体 will go looking for someone to merge with —
+ * 「**近くにいる**信者達と合体し、その力を増していく」
+ * (systems/mergeTargeting.ts).
+ *
+ * A neighbourhood, not the map. Unbounded, 合体 would be strictly better
+ * than 集合 — every walker on the board would converge into one titan with
+ * no flag to plant and no pause in building — and the order the original
+ * actually describes is a local one, which is why it has a "nobody nearby"
+ * case at all. Slightly wider than DEFAULT_WANDER_RADIUS so that walkers
+ * which would have wandered within sight of each other close instead.
+ */
+export const MERGE_SEEK_RADIUS = 8;
+
 /** How often (in seconds) the enemy AI re-evaluates its behaviorMode. */
 export const ENEMY_AI_DECISION_INTERVAL = 5;
 
@@ -324,8 +389,22 @@ export const SWAMP_MANA_COST = 15;
 /** Radius (in tiles) a conjured swamp drowns walkers within. */
 export const SWAMP_RADIUS = 1.2;
 
-/** How many walkers a swamp swallows before it dries up and disappears. */
-export const SWAMP_CAPACITY = 5;
+/**
+ * How many walkers a swamp swallows before it dries up and disappears —
+ * only on stages where 底なし沼 is off (see game/worlds.ts).
+ *
+ * One. 「インフォメーションの『底無し沼』が○の場合は修復されるまで有効だが、
+ * ×の場合は**1人が落ちると埋まって普通の地面に戻る**」. game2 had five,
+ * which made the two kinds of swamp differ only in degree; at one they are
+ * different miracles. A fillable swamp is a single trap — worth spending on
+ * a leader walking toward you, worthless sprayed across a settlement — and
+ * the original's own advice on facing one follows from that: 「底無し沼×の
+ * 場合はある程度埋めたら完全に埋めるよりも他の作業に移った方が良い」.
+ *
+ * The stage list makes this the rarer case anyway: of the original's 48
+ * maps only five turn 底なし沼 off (docs/original-maps.md).
+ */
+export const SWAMP_CAPACITY = 1;
 
 /** How far from its cast point a 聖水の泉 converts walkers — see holyWater.ts. */
 export const HOLY_WATER_RADIUS = 1.5;
@@ -461,18 +540,23 @@ export const HELEN_MANA_COST = 32;
  */
 export const HELEN_CHARM_RADIUS = 3;
 
-/**
- * How many enemy walkers トロイのヘレン can hold at once.
- *
- * The limit is what keeps her from quietly absorbing an entire army, and
- * it is also what can get her killed: the enemy she has no room left for
- * walks right up to her. Casting her into a crowd is a gamble, which is
- * the shape a hero who cannot fight ought to have.
- */
-export const HELEN_CHARM_CAPACITY = 4;
-
 /** How closely a charmed walker trails トロイのヘレン, in tiles. */
 export const HELEN_FOLLOW_DISTANCE = 1;
+
+/**
+ * How fast a walker トロイのヘレン is holding loses strength, per second —
+ * 「拘束した敵ウォーカーは歩き回っているうちに次第にパワーが減少し、力尽きる
+ * と死んでしまう」 (systems/helen.ts).
+ *
+ * This is what bounds the miracle, and it replaced a cap on how many she
+ * could hold at once. The original says she takes 「かなり多くの敵ウォーカー」
+ * and never mentions a limit; what it does say is that the ones she takes
+ * wear out. Slow enough that she is worth casting for the walking-away
+ * alone — a strength-1 follower lasts about half a minute, long enough to
+ * be led well clear of home — and fast enough that a razed castle's sixty
+ * do not follow her for the rest of the match.
+ */
+export const HELEN_CAPTIVE_DRAIN_RATE = 0.03;
 
 export const GUARDIAN_MANA_COST = 25;
 
@@ -827,6 +911,18 @@ export const FIRE_PILLAR_RADIUS = 1.2;
 export const FIRE_PILLAR_WANDER = 1.1;
 
 /**
+ * How strongly a 火柱 leans uphill — 「移動方向はランダムだが、段差があると
+ * **高い方へ動きやすい傾向**がある」 (systems/firePillar.ts).
+ *
+ * A lean, not a rule: the wander still decides where it actually goes, and
+ * on flat ground this contributes nothing at all. What it changes is where
+ * a pillar cast on a hillside tends to end up — climbing toward the high
+ * ground a settlement was built on rather than rolling off into the sea,
+ * which is what makes the miracle worth aiming below a town.
+ */
+export const FIRE_PILLAR_UPHILL_BIAS = 0.5;
+
+/**
  * Mana cost of a 火柱 — above fire rain.
  *
  * Fire rain is a bigger circle *once*; this is a smaller circle that keeps
@@ -837,7 +933,32 @@ export const FIRE_PILLAR_WANDER = 1.1;
 export const FIRE_PILLAR_MANA_COST = 32;
 
 /** Mana cost of a 竜巻 — "中" tier. Cheaper than fire rain: it is slower, avoidable, and where it goes is not entirely up to the caster. */
+/**
+ * Seconds between the 渦巻き a tornado throws off while it is over open
+ * water — 「海上では渦巻きを大量発生させるため、敵陣の海岸付近に大量に
+ * 仕掛けると土地を広げにくくなるので効果的」.
+ *
+ * Sized against TORNADO_LIFETIME (14s) so a tornado that spends its whole
+ * life at sea leaves a handful of whirlpools rather than one or a swarm.
+ * Each of those then splits up to WHIRLPOOL_MAX_SPLITS times on its own, so
+ * the 「大量」 is mostly what the whirlpools do afterwards; this is what
+ * gives them something to start from.
+ */
+export const TORNADO_WHIRLPOOL_INTERVAL = 3.5;
+
 export const TORNADO_MANA_COST = 22;
+
+/**
+ * Mana cost of casting a 渦巻き directly — 「渦巻き：海面上をランダムに
+ * 動き回り、既にある土地を削り取る。一定時間で分裂し被害が広がる」.
+ *
+ * Cheaper than the 竜巻 that can throw off several of them, dearer than a
+ * 岩礁: one whirlpool, placed where you want it, is a smaller thing than a
+ * tornado's whole run at sea, but it is the only miracle in the game that
+ * takes land away permanently and it arrives already next to the coast you
+ * aimed it at. A tornado has to survive its way out to water first.
+ */
+export const WHIRLPOOL_MANA_COST = 18;
 
 /** How long a 渦巻き lives once a 竜巻 reaches water, in seconds. */
 export const WHIRLPOOL_LIFETIME = 16;

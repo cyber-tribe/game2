@@ -1,6 +1,7 @@
 import type { Entity, System, World } from "../../ecs";
 import { ADONIS_MIN_SPLIT_STRENGTH, ADONIS_SPLIT_GAP, COMBAT_RANGE, HERO_ACTION_COOLDOWN, HOUSE_LEVELS } from "../constants";
 import { Charmed, HeroCooldown, House, Owner, Position, Walker, isAdvancingHeroState, type FactionId } from "../components";
+import { isShieldedAtMagnet } from "../protection";
 import type { OnImpactEffect } from "./effects";
 import { distance, type Point } from "./geometry";
 
@@ -42,6 +43,10 @@ export function createWalkerCombatSystem(config: Partial<WalkerCombatConfig> = {
         // and out of the fight entirely. They are still the enemy's people
         // (they are not converted), they are simply not fighting for them.
         if (world.has(a, Charmed) || world.has(b, Charmed)) continue;
+        // 「リーダーがマグネットに到達すると…青い炎に包まれます(この間は
+        // 無敵状態になります)」 — a leader waiting at its own flag under
+        // 集合 cannot be fought either. See protection.ts.
+        if (isShieldedAtMagnet(world, a) || isShieldedAtMagnet(world, b)) continue;
 
         resolveWalkerFight(world, a, b, onImpact);
         if (!world.isAlive(a)) break;
@@ -56,26 +61,22 @@ function resolveWalkerFight(world: World, a: Entity, b: Entity, onImpact: OnImpa
   const posA = world.get(a, Position)!;
   const posB = world.get(b, Position)!;
 
-  // トロイのヘレン 「敵と戦わない」 (docs/original-miracles.md #28). Not
-  // "wins without fighting" and not "cannot be touched": she deals no
-  // damage at all and dies to anyone who reaches her, whatever their
-  // strength. That is the risk her charm is meant to keep her out of —
-  // HELEN_CHARM_RADIUS is six times COMBAT_RANGE, so an approaching walker
-  // is normally taken long before it arrives, and only the one she has no
-  // room left for gets through.
-  const helenA = walkerA.state === "helen";
-  const helenB = walkerB.state === "helen";
-  if (helenA || helenB) {
-    if (helenA) {
-      world.destroyEntity(a);
-      onImpact({ position: posA, type: "combatDeath" });
-    }
-    if (helenB) {
-      world.destroyEntity(b);
-      onImpact({ position: posB, type: "combatDeath" });
-    }
-    return;
-  }
+  // トロイのヘレン: 「戦闘することが出来ず、**神業でしか潰せない**」. She
+  // deals no damage and takes none — a fight involving her simply does not
+  // happen, and both sides walk on.
+  //
+  // This used to kill her instead, reading 「敵と戦わない」 as "cannot win a
+  // fight" rather than "cannot be in one". The original article is explicit
+  // that only a miracle can end her, and the difference is what she is for:
+  // killable by contact, she is a fragile unit the enemy answers by walking
+  // one spare follower at her, and the charm becomes a delaying tactic.
+  // Untouchable by hand, she is a problem the enemy *god* has to spend
+  // mana on — which is exactly the pressure the miracle is meant to apply.
+  //
+  // Nothing else changes: every miracle that destroys a walker does so
+  // directly rather than through this function, so 雷, 火の雨, 沼, 地割れ,
+  // 竜巻 and the rest still take her. 神業でしか潰せない, precisely.
+  if (walkerA.state === "helen" || walkerB.state === "helen") return;
 
   if (walkerA.strength > walkerB.strength) {
     world.add(a, Walker, { ...walkerA, strength: walkerA.strength - walkerB.strength });
@@ -136,9 +137,11 @@ export function createHouseCaptureSystem(config: Partial<HouseCaptureConfig> = {
       const walkerPos = world.get(walkerEntity, Position)!;
       const walkerOwner = world.get(walkerEntity, Owner)!;
       const walker = world.get(walkerEntity, Walker)!;
-      // トロイのヘレン 「敵と戦わない」 — she has no way to hurt a house
-      // and must not be consumed capturing one; and anyone she is holding
-      // is 拘束, not free to storm a building on the way past.
+      // トロイのヘレン 「戦闘することが出来ず」 — she has no way to hurt a
+      // house and must not be consumed capturing one; and anyone she is
+      // holding is 拘束, not free to storm a building on the way past
+      // (what the charmed *do* pull down is their own side's houses, and
+      // systems/helen.ts is where that happens).
       if (walker.state === "helen" || world.has(walkerEntity, Charmed)) continue;
 
       for (const houseEntity of world.query(Position, House, Owner)) {

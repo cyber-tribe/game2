@@ -144,3 +144,21 @@ describe("createFungusSystem", () => {
 function countFungus(heightmap: Heightmap): number {
   return heightmap.fungus.reduce((total, row) => total + row.filter(Boolean).length, 0);
 }
+
+/** 毒カビ is 植物, and behaves as a 沼 does — so アドニス walks through it. */
+describe("fungusSystem and the plant school's own hero", () => {
+  it("does not swallow アドニス", () => {
+    const heightmap = flatHeightmap(20, 5);
+    const world = new World();
+    const adonis = world.createEntity();
+    world.add(adonis, Position, { x: 10, y: 10 });
+    world.add(adonis, Owner, { faction: "player" });
+    world.add(adonis, Walker, { strength: 1, state: "adonis", speed: 1 });
+    applyFungus(heightmap, 10, 10);
+
+    createFungusSystem({ heightmap })(world, 0.1);
+
+    expect(world.isAlive(adonis)).toBe(true);
+  });
+});
+

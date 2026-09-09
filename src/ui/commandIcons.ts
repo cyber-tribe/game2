@@ -6,6 +6,7 @@ import { createIconCanvas, type IconKind } from "./pixelIcons";
 const BEHAVIOR_ICON: Record<BehaviorMode, IconKind> = {
   settle: "settle",
   gather: "gather",
+  merge: "merge",
   goToShrine: "goToShrine",
   fight: "fight",
 };
@@ -15,6 +16,8 @@ const TOOL_ICON: Record<ToolMode, IconKind> = {
   raise: "raise",
   lower: "lower",
   flatten: "flatten",
+  autoFlatten: "autoFlatten",
+  sprog: "sprog",
   shrine: "shrine",
   earthquake: "earthquake",
   swamp: "swamp",
@@ -37,6 +40,7 @@ const TOOL_ICON: Record<ToolMode, IconKind> = {
   flower: "flower",
   fireRain: "fireRain",
   tsunami: "tsunami",
+  whirlpool: "whirlpool",
   reef: "reef",
   road: "road",
   wall: "wall",
@@ -62,6 +66,4 @@ export function mountCommandIcons(): void {
     const tool = button.dataset.tool as ToolMode;
     button.prepend(createIconCanvas(TOOL_ICON[tool]));
   }
-  const releaseButton = document.getElementById("release-population");
-  releaseButton?.prepend(createIconCanvas("releasePopulation"));
 }

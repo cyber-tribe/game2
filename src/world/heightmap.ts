@@ -180,12 +180,23 @@ export function createHeightmap(
  * enemyTerraform.ts's AI are gated through equally ("敵の神はプレイヤーと
  * 同じルールで介入する").
  */
-export type TerrainEditRule = "both" | "raiseOnly" | "lowerOnly";
+export type TerrainEditRule = "both" | "raiseOnly" | "lowerOnly" | "neither";
 
-/** Whether raiseVertex(..., delta) is permitted under `rule` — see TerrainEditRule. */
+/**
+ * Whether raiseVertex(..., delta) is permitted under `rule` — see
+ * TerrainEditRule.
+ *
+ * The original has all three restricted kinds: 「土地上げ不可ステージ」,
+ * 「土地下げ不可ステージ」 and 「土地上下不可ステージ」. The last one takes
+ * the game's basic verb away entirely, and the article says plainly what
+ * is left when it does: 「よって神業で敵の住める土地をゼロにすることに
+ * なる」. You still build on the flat ground you were given, and everything
+ * else has to be a miracle.
+ */
 export function isTerrainEditAllowed(rule: TerrainEditRule, delta: number): boolean {
   if (rule === "raiseOnly") return delta > 0;
   if (rule === "lowerOnly") return delta < 0;
+  if (rule === "neither") return false;
   return true;
 }
 
@@ -221,6 +232,12 @@ export function pickTerrainEditRule(
 export function raiseVertex(heightmap: Heightmap, x: number, y: number, delta: number): void {
   const row = heightmap.vertices[y];
   if (!row || row[x] === undefined) return;
+  // 「城壁にかかる土地上下ができなくなる」. A wall pins the ground it stands
+  // on: the barrier is the point of the miracle, and land you could simply
+  // lower out from under it would not be one. It is also the only way to
+  // spend a cheap 城壁 to deny an opponent's terraforming, which is what
+  // makes it worth casting at all (the original calls it hard to use).
+  if (heightmap.wall[y][x]) return;
   row[x] = Math.min(MAX_ELEVATION, Math.max(MIN_ELEVATION, row[x] + delta));
 
   const hardnessRow = heightmap.rockHardness[y];
@@ -293,6 +310,114 @@ export function flattenTile(heightmap: Heightmap, tileX: number, tileY: number, 
     // for would decide whether the stone was destructible.
     if (heightmap.boulder[y][x] && row[x] <= heightmap.waterLevel) heightmap.boulder[y][x] = false;
   }
+}
+
+/**
+ * How many tiles across one 自動整地 levels — 「Xボタンで建物を中心に
+ * 7x7マスの平地を確保」. See planAutoFlatten.
+ *
+ * Deliberately the original's number rather than one derived from
+ * HOUSE_UPGRADE_FLATNESS_RADIUS: 7x7 tiles is 8x8 vertices, comfortably
+ * more than the 5x5 vertex window countFlatNeighbors checks at radius 2,
+ * so a plot secured this way actually carries the house all the way to
+ * 城砦 instead of landing exactly on the threshold.
+ */
+export const AUTO_FLATTEN_SIZE = 7;
+
+/** Whether flattenTile would move any of this tile's corners. */
+function tileNeedsFlattening(
+  heightmap: Heightmap,
+  tileX: number,
+  tileY: number,
+  elevation: number,
+  rule: TerrainEditRule,
+): boolean {
+  const clamped = Math.min(MAX_ELEVATION, Math.max(MIN_ELEVATION, elevation));
+  for (const [x, y] of [
+    [tileX, tileY],
+    [tileX + 1, tileY],
+    [tileX + 1, tileY + 1],
+    [tileX, tileY + 1],
+  ] as const) {
+    const row = heightmap.vertices[y];
+    if (!row || row[x] === undefined) continue;
+    const delta = clamped - row[x];
+    if (delta !== 0 && isTerrainEditAllowed(rule, delta)) return true;
+  }
+  return false;
+}
+
+/**
+ * The original's 自動整地 (「Xボタンで建物を中心に7x7マスの平地を確保」),
+ * one of the two conveniences the original is praised for by name —
+ * 「操作性も練られている」.
+ *
+ * game2's own 平坦化 is a brush: the player drags it over a plot and every
+ * tile the gesture touches is levelled to the elevation the first tile
+ * seeded. That works, but securing the plot a house needs to reach 城砦
+ * means dragging accurately over 49 tiles, and the original hands the same
+ * result to one button press aimed at the building itself.
+ *
+ * This plans the edit rather than performing it, so the caller can price it
+ * (one TERRAIN_EDIT_MANA_COST per tile, exactly what doing it by hand
+ * costs — this is an ergonomic convenience, not a discount) and refuse the
+ * whole thing before spending anything.
+ *
+ * The target elevation comes from the *centre* tile only, under the same
+ * rule the brush uses for the tile that seeds a stroke. Averaging the whole
+ * 7x7 would shift the ground under the building the plot is being levelled
+ * for; taking the centre keeps the house exactly where it stands and moves
+ * the surroundings to meet it.
+ *
+ * `isEditable` filters out tiles the caller isn't allowed to reshape (the
+ * enemy-territory restriction some worlds impose). Those are skipped rather
+ * than failing the cast, and — since they're absent from the returned list
+ * — never charged for.
+ */
+export function planAutoFlatten(
+  heightmap: Heightmap,
+  centerTileX: number,
+  centerTileY: number,
+  rule: TerrainEditRule,
+  size: number = AUTO_FLATTEN_SIZE,
+  isEditable: (tile: { x: number; y: number }) => boolean = () => true,
+): { elevation: number; tiles: { x: number; y: number }[] } {
+  const cx = Math.min(Math.max(Math.round(centerTileX), 0), heightmap.width - 1);
+  const cy = Math.min(Math.max(Math.round(centerTileY), 0), heightmap.height - 1);
+
+  const corners = [
+    heightmap.vertices[cy][cx],
+    heightmap.vertices[cy][cx + 1],
+    heightmap.vertices[cy + 1][cx + 1],
+    heightmap.vertices[cy + 1][cx],
+  ];
+  // Rounded, unlike the brush's fractional average: the brush's target is
+  // whatever the first tile of a stroke happened to average to, but a plot
+  // this tool "secures" should land on a whole terrace, so a second press
+  // on the same house is a no-op (and free) rather than forever chasing a
+  // fractional height no neighbouring tile shares.
+  const elevation =
+    rule === "raiseOnly"
+      ? Math.max(...corners)
+      : rule === "lowerOnly"
+        ? Math.min(...corners)
+        : Math.round(corners.reduce((sum, h) => sum + h, 0) / corners.length);
+
+  const back = Math.floor((size - 1) / 2);
+  const tiles: { x: number; y: number }[] = [];
+  for (let dy = 0; dy < size; dy++) {
+    const y = cy + dy - back;
+    if (y < 0 || y >= heightmap.height) continue;
+    for (let dx = 0; dx < size; dx++) {
+      const x = cx + dx - back;
+      if (x < 0 || x >= heightmap.width) continue;
+      if (!isEditable({ x, y })) continue;
+      if (!tileNeedsFlattening(heightmap, x, y, elevation, rule)) continue;
+      tiles.push({ x, y });
+    }
+  }
+
+  return { elevation, tiles };
 }
 
 /**
@@ -802,6 +927,71 @@ export const REEF_HEIGHT = 1;
 export const REEF_HARDNESS = 6;
 
 /**
+ * How many vertices long one 岩礁 cast is. The original is specific about
+ * the shape — 「海面上に建物が建てられない土地を**線分状に**発生させる」 —
+ * and the shape is the whole miracle: a breakwater is a line or it is
+ * nothing. See applyReef.
+ */
+export const REEF_LENGTH = 5;
+
+/**
+ * The headings a reef segment can lie along. Only half the compass: a
+ * segment and its reverse are the same line. Listed in the order ties are
+ * resolved, so a cast in open water — where every heading is as good as
+ * every other — always lays the same predictable east–west bar.
+ */
+const REEF_HEADINGS = [
+  { x: 1, y: 0 },
+  { x: 1, y: 1 },
+  { x: 0, y: 1 },
+  { x: -1, y: 1 },
+] as const;
+
+/** How many vertices of a length-`length` segment from (cx, cy) are open water. */
+function reefWaterSpan(
+  heightmap: Heightmap,
+  cx: number,
+  cy: number,
+  heading: { x: number; y: number },
+  length: number,
+): number {
+  const back = Math.floor((length - 1) / 2);
+  let span = 0;
+  for (let step = 0; step < length; step++) {
+    const vx = cx + heading.x * (step - back);
+    const vy = cy + heading.y * (step - back);
+    if (vx < 0 || vy < 0 || vx > heightmap.width || vy > heightmap.height) continue;
+    if (heightmap.vertices[vy][vx] > heightmap.waterLevel) continue;
+    span++;
+  }
+  return span;
+}
+
+/**
+ * The heading a reef cast at (cx, cy) lies along: whichever one keeps the
+ * most of the segment on open water.
+ *
+ * That single rule gives the behaviour a breakwater needs without needing
+ * to reason about coastlines explicitly. Hugging a shore, the heading
+ * running *along* the water is the one parallel to the coast, so the reef
+ * shelters the beach behind it instead of jutting out to sea; inside a
+ * channel it follows the channel; in open water every heading ties and the
+ * first listed wins.
+ */
+function reefHeading(heightmap: Heightmap, cx: number, cy: number, length: number): { x: number; y: number } {
+  let best: { x: number; y: number } = REEF_HEADINGS[0];
+  let bestSpan = -1;
+  for (const heading of REEF_HEADINGS) {
+    const span = reefWaterSpan(heightmap, cx, cy, heading, length);
+    if (span > bestSpan) {
+      bestSpan = span;
+      best = heading;
+    }
+  }
+  return best;
+}
+
+/**
  * The wave's height at `distance` from its origin — full height at the
  * center, tapering to nothing at the rim.
  */
@@ -904,21 +1094,54 @@ export function applyTsunami(
  * Only meaningful on water: on dry land this would just be a small,
  * pointless volcano, so it refuses to place there.
  *
- * One reef is not a breakwater. applyTsunami spreads as a front and flows
- * around a partial barrier, so sheltering a coast means building a wall of
- * these across the wave's approach — which is why they are cheap
- * (REEF_MANA_COST). A single cast that switched off the enemy's most
- * expensive miracle would be the more boring mechanic.
+ * One cast lays a *line* of reef — REEF_LENGTH vertices centred on the tap
+ * — not a single stone. The original says so outright
+ * (「**線分状に**発生させる」), and the shape is the entire point: applyTsunami
+ * spreads as a front and flows around a partial barrier, so a lone vertex
+ * shelters nothing at all. game2 used to place exactly one, which left the
+ * player tapping the same coast five or six times to build what the
+ * original hands them in a single cast — the miracle's own defensive role
+ * ("津波の侵食を防ぐ効果も") delegated to the player's patience.
+ *
+ * The segment lies along whichever heading keeps it on open water (see
+ * reefHeading), which against a shore is the one parallel to it — so the
+ * reef shelters the beach behind it rather than jutting out to sea. Land is
+ * never overwritten: vertices of the segment that are already above water
+ * are skipped, so a reef laid against a headland wraps up to it and stops.
+ *
+ * Returns the vertices actually raised, so a cast that would do nothing can
+ * be refused rather than silently charged for.
  */
-export function applyReef(heightmap: Heightmap, x: number, y: number, hardness: number = REEF_HARDNESS): boolean {
-  const vx = Math.round(x);
-  const vy = Math.round(y);
-  if (vx < 0 || vy < 0 || vx > heightmap.width || vy > heightmap.height) return false;
-  if (heightmap.vertices[vy][vx] > heightmap.waterLevel) return false;
+export function applyReef(
+  heightmap: Heightmap,
+  x: number,
+  y: number,
+  hardness: number = REEF_HARDNESS,
+  length: number = REEF_LENGTH,
+): { x: number; y: number }[] {
+  const cx = Math.round(x);
+  const cy = Math.round(y);
+  const raised: { x: number; y: number }[] = [];
+  if (cx < 0 || cy < 0 || cx > heightmap.width || cy > heightmap.height) return raised;
+  if (heightmap.vertices[cy][cx] > heightmap.waterLevel) return raised;
 
-  heightmap.vertices[vy][vx] = Math.min(MAX_ELEVATION, heightmap.waterLevel + REEF_HEIGHT);
-  heightmap.rockHardness[vy][vx] = hardness;
-  return true;
+  const heading = reefHeading(heightmap, cx, cy, length);
+  // Centred on the tap: an odd length puts the tapped vertex in the middle,
+  // an even one leans the extra vertex forward along the heading.
+  const back = Math.floor((length - 1) / 2);
+
+  for (let step = 0; step < length; step++) {
+    const vx = cx + heading.x * (step - back);
+    const vy = cy + heading.y * (step - back);
+    if (vx < 0 || vy < 0 || vx > heightmap.width || vy > heightmap.height) continue;
+    if (heightmap.vertices[vy][vx] > heightmap.waterLevel) continue;
+
+    heightmap.vertices[vy][vx] = Math.min(MAX_ELEVATION, heightmap.waterLevel + REEF_HEIGHT);
+    heightmap.rockHardness[vy][vx] = hardness;
+    raised.push({ x: vx, y: vy });
+  }
+
+  return raised;
 }
 
 /** How far from its cast point a forest plants trees, in vertices. */
@@ -1134,6 +1357,13 @@ export function applyRoad(
       // isBuildable already rejects fungus, water, rock and crevices —
       // exactly the ground a road cannot be laid on.
       if (!isBuildable(heightmap, vx, vy)) continue;
+      // 「なお、敵陣や斜面には設置できない」 — the slope half. Paving and
+      // walling are both laid *flat*: a road up a hillside and a wall on a
+      // gradient are things the original simply will not build. The enemy-
+      // territory half needs the world rather than the map, so it is
+      // checked where the cast is (main.ts), the same way the per-world
+      // terrain-edit territory rule is.
+      if (!isLevelVertex(heightmap, vx, vy)) continue;
 
       heightmap.road[vy][vx] = true;
       paved.push({ x: vx, y: vy });
@@ -1141,6 +1371,68 @@ export function applyRoad(
   }
 
   return paved;
+}
+
+/**
+ * Whether the ground at a vertex is level — it and every in-bounds
+ * orthogonal neighbour stand at the same height.
+ *
+ * What 道 and 城壁 are laid on: 「なお、敵陣や斜面には設置できない」. A
+ * gradient of even one step counts as a slope, which is strict, and
+ * deliberately so — this is the same standard the player already meets to
+ * build, so "flat enough for a house" and "flat enough for a road" are one
+ * idea rather than two thresholds to remember.
+ *
+ * **A walled neighbour is not a slope.** A 城壁 lifts the ground it stands
+ * on (see applyWall's WALL_ELEVATION_RISE), so measuring that rise as
+ * terrain would make a wall's own first segment disqualify its second — and
+ * the original describes walls exactly as something you chain: 「通常は手動
+ * で延ばして連続した城壁を設置する」. The parapet is the structure, not the
+ * hillside, so it is not what "slope" means here. The same reading lets a
+ * road run up to a wall and stop rather than being refused beside it.
+ */
+export function isLevelVertex(heightmap: Heightmap, x: number, y: number): boolean {
+  const here = heightmap.vertices[y]?.[x];
+  if (here === undefined) return false;
+
+  for (const [dx, dy] of [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ] as const) {
+    const nx = x + dx;
+    const ny = y + dy;
+    const neighbor = heightmap.vertices[ny]?.[nx];
+    if (neighbor === undefined) continue;
+    if (heightmap.wall[ny][nx]) continue;
+    if (neighbor !== here) return false;
+  }
+  return true;
+}
+
+/**
+ * Whether a vertex touches land that is already above water — what the
+ * spade can reach on a stage whose 「どこでも↑↓／海上に土地↑↓」 are ×
+ * (see game/worlds.ts's openTerraforming).
+ *
+ * The vertex itself counts, so raising a coast outward works one step at a
+ * time; open sea, with nothing dry on any side, does not. That is the
+ * difference between widening the island you were given and conjuring a new
+ * one wherever you like.
+ */
+export function touchesLand(heightmap: Heightmap, x: number, y: number): boolean {
+  for (const [dx, dy] of [
+    [0, 0],
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ] as const) {
+    const elevation = heightmap.vertices[y + dy]?.[x + dx];
+    if (elevation !== undefined && elevation > heightmap.waterLevel) return true;
+  }
+  return false;
 }
 
 /** How far from its cast point a fungus outbreak starts, in vertices. */
@@ -1376,6 +1668,10 @@ export function applyWall(
       if (heightmap.crevice[vy][vx]) continue;
       if (heightmap.fungus[vy][vx]) continue;
       if (heightmap.vertices[vy][vx] <= heightmap.waterLevel) continue;
+      // 「道と同じく、敵陣や斜面には設置できない」 — see applyRoad, and
+      // isLevelVertex on why a wall's own parapet does not count as the
+      // slope that would stop the next segment of it.
+      if (!isLevelVertex(heightmap, vx, vy)) continue;
 
       heightmap.wall[vy][vx] = true;
       heightmap.forest[vy][vx] = false;
@@ -1412,6 +1708,53 @@ export const DEFAULT_MEGALITH_RADIUS = 3;
  * *large* building in particular.
  */
 export const MEGALITH_HEIGHT = 8;
+
+/**
+ * How wide an area a held 地下巨石 cast scatters over — 「発生ボタンを
+ * 押し続けると、**一帯に**より多くの巨石を発生させる」.
+ *
+ * Wider than DEFAULT_MEGALITH_RADIUS so a hold spreads across ground the
+ * first stone did not reach; that spreading is the whole difference
+ * between holding the button and tapping it repeatedly on one spot.
+ */
+export const MEGALITH_SCATTER_RADIUS = 6;
+
+/**
+ * Vertices within `radius` of (cx, cy) where a 地下巨石 could still be
+ * raised — the same per-vertex conditions applyMegalith itself applies.
+ *
+ * Held casts pick their next centre from this list (see main.ts), which is
+ * what makes a hold spread stone over 「一帯」 rather than stack it on the
+ * one vertex under the finger. An empty list means the area is used up, so
+ * the hold can stop itself instead of charging mana for casts that raise
+ * nothing.
+ */
+export function megalithScatterCandidates(
+  heightmap: Heightmap,
+  cx: number,
+  cy: number,
+  radius: number = MEGALITH_SCATTER_RADIUS,
+): { x: number; y: number }[] {
+  const centerX = Math.round(cx);
+  const centerY = Math.round(cy);
+  const candidates: { x: number; y: number }[] = [];
+
+  for (let dy = -radius; dy <= radius; dy++) {
+    const vy = centerY + dy;
+    if (vy < 0 || vy > heightmap.height) continue;
+    for (let dx = -radius; dx <= radius; dx++) {
+      const vx = centerX + dx;
+      if (vx < 0 || vx > heightmap.width) continue;
+      if (Math.hypot(dx, dy) > radius) continue;
+      if (heightmap.boulder[vy][vx]) continue;
+      if (heightmap.crevice[vy][vx]) continue;
+      if (heightmap.vertices[vy][vx] <= heightmap.waterLevel) continue;
+      candidates.push({ x: vx, y: vy });
+    }
+  }
+
+  return candidates;
+}
 
 /** Whether the vertex nearest (x, y) is covered by a 地下巨石 — see Heightmap.boulder. */
 export function isBoulder(heightmap: Heightmap, x: number, y: number): boolean {

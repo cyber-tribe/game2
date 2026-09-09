@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
 import { Owner, Position, Swamp, Walker, type WalkerState } from "../components";
+import { SWAMP_CAPACITY, SWAMP_RADIUS } from "../constants";
 import { createSwamp } from "../swamp";
 import type { ImpactEffectEvent } from "./effects";
 import { createSwampSystem } from "./swamp";
@@ -14,6 +15,39 @@ function createWalker(world: World, x: number, y: number, state: WalkerState = "
 }
 
 describe("swampSystem", () => {
+  /**
+   * 底なし沼 — 「面ごとに底なしかどうか設定される」
+   * (docs/original-miracles.md #8, see WorldDefinition.bottomlessSwamp).
+   * It never fills, so the ground it covers is denied for the rest of the
+   * match instead of being a trap with a budget.
+   */
+  describe("a 底なし沼", () => {
+    it("keeps swallowing past what would have exhausted an ordinary swamp", () => {
+      const world = new World();
+      const swamp = createSwamp(world, 5, 5, 1, 1, true);
+      const first = createWalker(world, 5.2, 5);
+
+      createSwampSystem()(world, 0);
+      expect(world.isAlive(first)).toBe(false);
+      expect(world.isAlive(swamp)).toBe(true);
+
+      const second = createWalker(world, 4.8, 5);
+      createSwampSystem()(world, 0);
+      expect(world.isAlive(second)).toBe(false);
+      expect(world.isAlive(swamp)).toBe(true);
+    });
+
+    it("leaves remainingCapacity untouched — it is not read for this kind", () => {
+      const world = new World();
+      const swamp = createSwamp(world, 5, 5, 1, 3, true);
+      createWalker(world, 5.2, 5);
+
+      createSwampSystem()(world, 0);
+
+      expect(world.get(swamp, Swamp)!.remainingCapacity).toBe(3);
+    });
+  });
+
   it("drowns a walker within the swamp's radius and decrements its capacity", () => {
     const world = new World();
     const swamp = createSwamp(world, 5, 5, 1, 3);
@@ -101,3 +135,63 @@ describe("swampSystem", () => {
     expect(impacts).toEqual([{ position: { x: 5, y: 5 }, type: "drowned" }]);
   });
 });
+
+/** 沼「※アドニス除く」 — 植物 の神技なので、植物 の英雄が沈まない。 */
+describe("swampSystem and the plant school's own hero", () => {
+  it("does not swallow アドニス", () => {
+    const world = new World();
+    const adonis = createWalker(world, 5, 5, "adonis");
+    createSwamp(world, 5, 5);
+
+    createSwampSystem()(world, 0.1);
+
+    expect(world.isAlive(adonis)).toBe(true);
+  });
+
+  it("still swallows every other hero", () => {
+    const world = new World();
+    const hercules = createWalker(world, 5, 5, "hercules");
+    const achilles = createWalker(world, 5, 5, "achilles");
+    // Bottomless, so the first one in does not fill it — this is about who
+    // sinks, not about how many a fillable swamp takes (SWAMP_CAPACITY).
+    createSwamp(world, 5, 5, SWAMP_RADIUS, SWAMP_CAPACITY, true);
+
+    createSwampSystem()(world, 0.1);
+
+    expect(world.isAlive(hercules)).toBe(false);
+    expect(world.isAlive(achilles)).toBe(false);
+  });
+});
+
+/**
+ * 「インフォメーションの『底無し沼』が○の場合は修復されるまで有効だが、
+ * ×の場合は1人が落ちると埋まって普通の地面に戻る」.
+ */
+describe("底なしでない沼は1人で埋まる", () => {
+  it("dries up after taking one walker", () => {
+    const world = new World();
+    const first = createWalker(world, 5, 5);
+    const second = createWalker(world, 5, 5);
+    createSwamp(world, 5, 5);
+
+    createSwampSystem()(world, 0.1);
+
+    expect(world.isAlive(first) && world.isAlive(second)).toBe(false); // one of them went in
+    expect(world.isAlive(first) || world.isAlive(second)).toBe(true); // the other walked over ground
+    expect(world.query(Swamp)).toHaveLength(0);
+  });
+
+  it("still takes everyone when the stage's swamps are bottomless", () => {
+    const world = new World();
+    const first = createWalker(world, 5, 5);
+    const second = createWalker(world, 5, 5);
+    createSwamp(world, 5, 5, SWAMP_RADIUS, SWAMP_CAPACITY, true);
+
+    createSwampSystem()(world, 0.1);
+
+    expect(world.isAlive(first)).toBe(false);
+    expect(world.isAlive(second)).toBe(false);
+    expect(world.query(Swamp)).toHaveLength(1);
+  });
+});
+

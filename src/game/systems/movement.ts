@@ -1,7 +1,7 @@
-import type { System } from "../../ecs";
+import type { Entity, System, World } from "../../ecs";
 import { isRoad, isWall, type Heightmap } from "../../world/heightmap";
 import { ROAD_SPEED_MULTIPLIER } from "../constants";
-import { Detour, MoveTarget, Position, Walker, isHeroState } from "../components";
+import { Detour, FactionState, MoveTarget, Position, Walker, isHeroState } from "../components";
 
 export interface MovementConfig {
   /**
@@ -105,15 +105,28 @@ export function stepAroundWalls(
  * is worth following even when it isn't the straight line.
  *
  * A 城壁 in the way is walked around instead of through (see
- * stepAroundWalls) — except by heroes, who cross it: 「英雄以外は越えられ
- * ない」 (docs/original-miracles.md #12). A walker that somehow finds
- * itself standing *on* a wall — the stone went up around it — ignores
- * walls for that step, so a cast can never entomb anyone permanently.
+ * stepAroundWalls) — except by heroes *and leaders*, who cross it. The
+ * original is specific about which two: 「敵リーダー・ヒーロー以外の信者を
+ * 遮る効果を持つ」. docs/original-miracles.md #12 recorded both readings
+ * ("英雄以外は越えられない（資料により「敵リーダー・英雄だけが越えられる」
+ * とも）") and game2 had implemented the narrower one.
+ *
+ * The wider one is also the one that keeps the rest of the game working. A
+ * leader is what a hero is *made from* (see hero.ts), and it is the thing
+ * everyone else walks toward while mustering (goToShrine.ts) — so a wall
+ * that stopped leaders could pen one in and, with it, the faction's whole
+ * ability to raise a hero, from a miracle costing a fraction of one.
+ *
+ * A walker that somehow finds itself standing *on* a wall — the stone went
+ * up around it — ignores walls for that step, so a cast can never entomb
+ * anyone permanently.
  */
 export function createMovementSystem(config: Partial<MovementConfig> = {}): System {
   const heightmap = config.heightmap;
 
   return (world, deltaSeconds) => {
+    const leaders = currentLeaders(world);
+
     for (const entity of world.query(Position, MoveTarget, Walker)) {
       const pos = world.get(entity, Position)!;
       const target = world.get(entity, MoveTarget)!;
@@ -126,7 +139,10 @@ export function createMovementSystem(config: Partial<MovementConfig> = {}): Syst
       const step = walker.speed * (onRoad ? ROAD_SPEED_MULTIPLIER : 1) * deltaSeconds;
 
       const blockable =
-        heightmap !== undefined && !isHeroState(walker.state) && !isWall(heightmap, pos.x, pos.y);
+        heightmap !== undefined &&
+        !isHeroState(walker.state) &&
+        !leaders.has(entity) &&
+        !isWall(heightmap, pos.x, pos.y);
 
       if (blockable) {
         const detour = world.get(entity, Detour);
@@ -158,3 +174,17 @@ export function createMovementSystem(config: Partial<MovementConfig> = {}): Syst
 
 /** The terrain-unaware movement system — see createMovementSystem. */
 export const movementSystem: System = createMovementSystem();
+
+
+/**
+ * Every faction's current leader — the walkers a 城壁 does not stop, along
+ * with the heroes. See createMovementSystem's doc comment.
+ */
+function currentLeaders(world: World): Set<Entity> {
+  const leaders = new Set<Entity>();
+  for (const entity of world.query(FactionState)) {
+    const leaderId = world.get(entity, FactionState)!.leaderId;
+    if (leaderId !== undefined && world.isAlive(leaderId)) leaders.add(leaderId);
+  }
+  return leaders;
+}

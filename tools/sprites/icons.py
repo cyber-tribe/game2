@@ -125,6 +125,28 @@ ICONS: dict[str, list[str]] = {
         "..oooooooooooo..",
         "................",
     ],
+    # 自動整地 — the plot, not the act. Four corner posts staking out the
+    # ground around a house is what this command actually does; reusing the
+    # flatten icon's arrows would have said "level land" without saying
+    # *where*, which is the only thing separating the two buttons.
+    "autoFlatten": [
+        "ooo..........ooo",
+        "oSo..........oSo",
+        "ooo..........ooo",
+        "................",
+        ".......oo.......",
+        "......obbo......",
+        ".....obbbbo.....",
+        "....obbbbbbo....",
+        "...oooooooooo...",
+        ".....oddddo.....",
+        ".....oddddo.....",
+        ".....oooooo.....",
+        "................",
+        "ooo..........ooo",
+        "oSo..........oSo",
+        "ooo..........ooo",
+    ],
     # A slab split by a crack that actually runs through it. The old icon
     # scattered short strokes across the tile with no ground under them, so
     # there was nothing for the crack to be a crack *in*.
@@ -428,6 +450,28 @@ ICONS: dict[str, list[str]] = {
         "................",
         "................",
     ],
+    # 渦巻き seen from above: a dark funnel with water turning around it, and
+    # one arm sweeping out to the right so it reads as rotating rather than
+    # as a ring. Deliberately nothing like 津波's row of waves — the two are
+    # the water miracles most often aimed at the same coastline.
+    "whirlpool": [
+        "................",
+        "................",
+        ".....oooooo.....",
+        "...oowwwwwwooo..",
+        "..owwwooooowwwo.",
+        ".owwwoWWWWowwwww",
+        ".owwoWWoooWWwwwo",
+        "owwwoWoooooWwwo.",
+        "owwwoWoooooWwo..",
+        ".owwoWWoooWWwo..",
+        ".owwwoWWWWowwo..",
+        "..owwwooooowwo..",
+        "...oowwwwwwoo...",
+        ".....oooooo.....",
+        "................",
+        "................",
+    ],
     "armageddon": [
         "................",
         "....oooooo......",
@@ -704,6 +748,29 @@ ICONS.update({
         "................",
         "................",
     ],
+    # Merge: the same converging arrows as 集結, but closing on a *person*
+    # rather than on a post. That is exactly the difference between the two
+    # orders — 集合 sends everyone to a place, 合体 sends them into each
+    # other — so the two icons deliberately share a shape and differ only in
+    # what sits between the arrows.
+    "merge": [
+        "................",
+        "................",
+        "................",
+        "......ooo.......",
+        ".....okkko......",
+        "o....okkko....o.",
+        "oo....ooo....oo.",
+        "obo..offfo..obo.",
+        "obbooffffffoobbo",
+        "obo.offfffo.obo.",
+        "oo...offfo...oo.",
+        "o....oo.oo....o.",
+        ".....od.do......",
+        ".....oo.oo......",
+        "................",
+        "................",
+    ],
     # Fight: crossed blades. The old icon was a thin bent line that read as
     # nothing; two crossed swords are unmistakable even at 16px.
     "fight": [
@@ -748,7 +815,7 @@ ICONS.update({
         "................",
     ],
     # Release population: a figure stepping out through a doorway.
-    "releasePopulation": [
+    "sprog": [
         "................",
         "..oooooo........",
         "..oSSSSo........",
@@ -894,13 +961,15 @@ ICONS.update({
 ICON_KINDS = (
     "settle",
     "gather",
+    "merge",
     "goToShrine",
     "fight",
-    "releasePopulation",
+    "sprog",
     "inspect",
     "raise",
     "lower",
     "flatten",
+    "autoFlatten",
     "shrine",
     "earthquake",
     "swamp",
@@ -928,6 +997,7 @@ ICON_KINDS = (
     "megalith",
     "fungus",
     "tsunami",
+    "whirlpool",
     "armageddon",
     "mana",
     "population",
