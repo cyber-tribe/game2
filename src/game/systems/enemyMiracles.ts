@@ -13,6 +13,7 @@ import { createHolyWater } from "../holyWater";
 import { strikeLightning } from "../lightning";
 import { ENEMY_SIGNATURE_MIRACLE, type MiracleSchool } from "../miracleSchools";
 import { seedPlague } from "../plague";
+import { createLavaFlow } from "../lavaFlow";
 import { createQuake } from "../quake";
 import { collapseSwampsNear, createSwamp } from "../swamp";
 import { FactionState, House, Owner, Position, Walker, type FactionId } from "../components";
@@ -246,7 +247,11 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
     if (allowedMiracles.includes("volcano") && populationRatio >= VOLCANO_POPULATION_RATIO * tuning.volcanoRatioMultiplier) {
       const target = densestReachableCluster(world, factionId, opponentId, DEFAULT_VOLCANO_RADIUS, viewport, rng);
       if (target && trySpendMana(world, factionId, VOLCANO_MANA_COST)) {
-        eruptVolcano(world, applyVolcano(heightmap, target.x, target.y, undefined, undefined, undefined, undefined, rng), target, rng);
+        const eruption = applyVolcano(heightmap, target.x, target.y, undefined, undefined, undefined, undefined, rng);
+        eruptVolcano(world, eruption.covered, target, rng);
+        // The god's lava waits on a shoreline the same way the player's
+        // does — see game/lavaFlow.ts.
+        createLavaFlow(world, eruption.stalled);
         onAction({ type: "volcano", position: target });
         return;
       }

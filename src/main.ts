@@ -74,6 +74,7 @@ import { createStorm } from "./game/storm";
 import { createTornado, createWhirlpool } from "./game/tornado";
 import { collapseSwampsNear, createSwamp } from "./game/swamp";
 import { burnFire } from "./game/fire";
+import { createLavaFlow } from "./game/lavaFlow";
 import { eruptVolcano } from "./game/volcano";
 import { raiseMegalith } from "./game/megalith";
 import {
@@ -1298,7 +1299,12 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
 
     if (toolMode === "volcano") {
       if (!trySpendPlayerMana(VOLCANO_MANA_COST)) return;
-      eruptVolcano(simulation.world, applyVolcano(heightmap, vertex.x, vertex.y), vertex);
+      const eruption = applyVolcano(heightmap, vertex.x, vertex.y);
+      eruptVolcano(simulation.world, eruption.covered, vertex);
+      // 「水を埋め立てるとさらに外側へ流れ出す」 — whatever the flow could
+      // not spend waits on the shoreline that stopped it. See
+      // game/lavaFlow.ts.
+      createLavaFlow(simulation.world, eruption.stalled);
       renderer.redraw(visibleBounds());
       simulation.recordEvent("player", "volcano");
       triggerShake(8);

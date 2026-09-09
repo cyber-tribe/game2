@@ -16,6 +16,8 @@ export { goToShrineSystem } from "./systems/goToShrine";
 export { createSwamp } from "./swamp";
 export { createCreviceSystem, type CreviceConfig } from "./systems/crevice";
 export { createQuakeSystem } from "./systems/quake";
+export { createLavaFlowSystem, type LavaFlowConfig } from "./systems/lavaFlow";
+export { createLavaFlow } from "./lavaFlow";
 export { createQuake, isGroundShaking } from "./quake";
 export { createSwampSystem, type SwampConfig } from "./systems/swamp";
 export type { ImpactEffectEvent, ImpactEffectSnapshot, ImpactEffectType, OnImpactEffect } from "./systems/effects";
