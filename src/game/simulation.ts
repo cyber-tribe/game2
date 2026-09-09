@@ -337,14 +337,11 @@ export class Simulation {
       .add(createHeroLossSystem({ onHeroLost: (faction) => this.recordEvent(faction, "heroLost") }))
       .add(
         createLeaderLossSystem({
-          onLeaderLost: (faction) => {
-            this.recordEvent(faction, "leaderLost");
-            // 「敵リーダーを倒す」 — the score goes to whoever is *not* the
-            // side that lost one. It is paid even when nobody killed it
-            // directly (a leader that walks into the sea is still a leader
-            // the opponent no longer has to deal with).
-            this.addScore(faction === "player" ? "enemy" : "player", "enemyLeader");
-          },
+          // Logged, not scored. Killing a leader used to pay points on the
+          // strength of a 「敵リーダーを倒す」 line that turns out not to be
+          // in the source at all (see SCORE_VALUE) — but losing one is
+          // still worth a line in the recap.
+          onLeaderLost: (faction) => this.recordEvent(faction, "leaderLost"),
         }),
       )
       .add(createWanderTargetSystem({ heightmap: config.heightmap }))
@@ -418,16 +415,7 @@ export class Simulation {
           onImpact: (event) => this.recordImpactEffect(event),
         }),
       )
-      .add(
-        createWalkerCombatSystem({
-          onImpact: (event) => this.recordImpactEffect(event),
-          // 「ウォーカー同士の直接戦闘に勝つ」 — one of the four score
-          // sources, and the only one that has to come from inside the
-          // fight, since the event log deliberately does not record every
-          // skirmish.
-          onFightWon: (faction) => this.addScore(faction, "fightWon"),
-        }),
-      )
+      .add(createWalkerCombatSystem({ onImpact: (event) => this.recordImpactEffect(event) }))
       .add(
         createHouseCaptureSystem({
           onCapture: (faction) => this.recordEvent(faction, "houseCaptured"),
@@ -491,11 +479,12 @@ export class Simulation {
    */
   recordEvent(faction: FactionId, type: MatchEventType): void {
     this.matchEvents.push({ time: this.elapsedTime, faction, type });
-    // 「地下巨石・岩礁を使う」 — the best-paying of the four sources, and the
-    // one the original singles out (「低コストでスコア効率が高い」). Taken
-    // from the event log rather than from the cast sites so the player's
-    // taps and the enemy AI's casts are counted by the same rule.
-    if (type === "megalith" || type === "reef") this.addScore(faction, "stonework");
+    // The two the guide names — 地下巨石「なぜか経験点が非常に高い」 and
+    // 岩礁「地下巨石ほどではないがそれなりに」 — and they are worth
+    // different amounts (see SCORE_VALUE). Taken from the event log rather
+    // than from the cast sites so the player's taps and the enemy AI's
+    // casts are counted by the same rule.
+    if (type === "megalith" || type === "reef") this.addScore(faction, type);
   }
 
   /** Adds one occurrence of a score source to a faction's total — see game/score.ts. */

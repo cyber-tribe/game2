@@ -943,7 +943,7 @@ describe("Simulation's score", () => {
     expect(sim.getScore("enemy")).toBe(2 * SCORE_PER_SECOND);
   });
 
-  /** 「地下巨石・岩礁を使う」 — counted off the event log, so a cast is a cast whoever made it. */
+  /** 地下巨石と岩礁だけ。イベントログから拾うので、誰が撃っても同じ規則。 */
   it("pays for 地下巨石 and 岩礁, and for nothing else cast", () => {
     const sim = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 0 });
 
@@ -951,7 +951,18 @@ describe("Simulation's score", () => {
     sim.recordEvent("player", "reef");
     sim.recordEvent("player", "earthquake");
 
-    expect(sim.getScore("player")).toBe(SCORE_VALUE.stonework * 2);
+    expect(sim.getScore("player")).toBe(SCORE_VALUE.megalith + SCORE_VALUE.reef);
+  });
+
+  /** 「地下巨石ほどではないが」——同額ではない。 */
+  it("pays less for 岩礁 than for 地下巨石", () => {
+    const withMegalith = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 0 });
+    const withReef = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 0 });
+
+    withMegalith.recordEvent("player", "megalith");
+    withReef.recordEvent("player", "reef");
+
+    expect(withReef.getScore("player")).toBeLessThan(withMegalith.getScore("player"));
   });
 
   it("pays the enemy for its own stonework, not the player", () => {
@@ -959,7 +970,7 @@ describe("Simulation's score", () => {
 
     sim.recordEvent("enemy", "megalith");
 
-    expect(sim.getScore("enemy")).toBe(SCORE_VALUE.stonework);
+    expect(sim.getScore("enemy")).toBe(SCORE_VALUE.megalith);
     expect(sim.getScore("player")).toBe(0);
   });
 
@@ -967,7 +978,7 @@ describe("Simulation's score", () => {
     const sim = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 0 });
 
     expect(sim.getStageRating("player")).toBe(0);
-    for (let i = 0; i < Math.ceil(MAX_STAGE_SCORE / SCORE_VALUE.stonework); i++) {
+    for (let i = 0; i < Math.ceil(MAX_STAGE_SCORE / SCORE_VALUE.megalith); i++) {
       sim.recordEvent("player", "megalith");
     }
 
