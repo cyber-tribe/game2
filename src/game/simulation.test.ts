@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyTsunami, applyVolcano, isBuildable, isRock, type Heightmap } from "../world/heightmap";
 import { FactionState, House, Owner, Position, Swamp, Walker } from "./components";
-import { ARMAGEDDON_MANA_COST, HOUSE_LEVELS, INITIAL_WALKER_SPREAD, MAX_MANA } from "./constants";
+import { ARMAGEDDON_MANA_COST, HOUSE_LEVELS, INITIAL_WALKER_SPREAD, MAX_MANA, MAX_STAGE_MARKS, MAX_STAGE_SCORE, SCORE_PER_SECOND, SCORE_VALUE } from "./constants";
 import { drownFlood } from "./flood";
 import { Simulation } from "./simulation";
 import { createSwamp } from "./swamp";
@@ -347,7 +347,10 @@ describe("Simulation", () => {
     sim.update(2);
     sim.recordEvent("player", "volcano");
 
-    expect(sim.getMatchEvents()).toEqual([
+    // The player's own casts only: the simulation logs its own events too
+    // (a leader lost in the scuffle these two walkers get into), and this
+    // is about the timestamping of a recordEvent call.
+    expect(sim.getMatchEvents().filter((event) => event.faction === "player")).toEqual([
       { time: 3, faction: "player", type: "earthquake" },
       { time: 5, faction: "player", type: "volcano" },
     ]);
@@ -912,5 +915,80 @@ describe("Simulation under 合体", () => {
     }
 
     expect(peakStrength).toBe(1);
+  });
+});
+
+/**
+ * 原作「各マップごとにスコアに応じて経験点が入り」, whose four sources are
+ * ranked in game/score.ts. This checks the wiring — that each source
+ * actually reaches the total — rather than the values, which score.test.ts
+ * owns.
+ */
+describe("Simulation's score", () => {
+  it("starts both sides at nothing", () => {
+    const sim = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 0 });
+
+    expect(sim.getScore("player")).toBe(0);
+    expect(sim.getScore("enemy")).toBe(0);
+  });
+
+  it("pays both sides for time passing", () => {
+    // A wide map and one walker each, so nobody meets anybody in two
+    // seconds and time is the only source in play.
+    const sim = new Simulation({ worldWidth: 40, worldHeight: 40, initialWalkersPerFaction: 1 });
+
+    sim.update(2);
+
+    expect(sim.getScore("player")).toBe(2 * SCORE_PER_SECOND);
+    expect(sim.getScore("enemy")).toBe(2 * SCORE_PER_SECOND);
+  });
+
+  /** 「地下巨石・岩礁を使う」 — counted off the event log, so a cast is a cast whoever made it. */
+  it("pays for 地下巨石 and 岩礁, and for nothing else cast", () => {
+    const sim = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 0 });
+
+    sim.recordEvent("player", "megalith");
+    sim.recordEvent("player", "reef");
+    sim.recordEvent("player", "earthquake");
+
+    expect(sim.getScore("player")).toBe(SCORE_VALUE.stonework * 2);
+  });
+
+  it("pays the enemy for its own stonework, not the player", () => {
+    const sim = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 0 });
+
+    sim.recordEvent("enemy", "megalith");
+
+    expect(sim.getScore("enemy")).toBe(SCORE_VALUE.stonework);
+    expect(sim.getScore("player")).toBe(0);
+  });
+
+  it("reports the stage's 稲妻マーク from the score", () => {
+    const sim = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 0 });
+
+    expect(sim.getStageRating("player")).toBe(0);
+    for (let i = 0; i < Math.ceil(MAX_STAGE_SCORE / SCORE_VALUE.stonework); i++) {
+      sim.recordEvent("player", "megalith");
+    }
+
+    expect(sim.getStageRating("player")).toBe(MAX_STAGE_MARKS);
+  });
+
+  it("stops paying for time once the match is over", () => {
+    const sim = new Simulation({ worldWidth: 40, worldHeight: 40, initialWalkersPerFaction: 1 });
+    sim.update(2);
+    const settled = sim.getScore("player");
+
+    for (const entity of sim.world.query(Owner)) {
+      if (sim.world.get(entity, Owner)!.faction !== "player") continue;
+      if (sim.world.has(entity, Walker) || sim.world.has(entity, House)) sim.world.destroyEntity(entity);
+    }
+    sim.update(1); // the tick that notices
+    const atDefeat = sim.getScore("player");
+    sim.update(60);
+
+    expect(sim.getOutcome().over).toBe(true);
+    expect(sim.getScore("player")).toBe(atDefeat);
+    expect(atDefeat).toBeGreaterThanOrEqual(settled);
   });
 });

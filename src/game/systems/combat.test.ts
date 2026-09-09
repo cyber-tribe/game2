@@ -372,3 +372,55 @@ describe("アドニス — 戦闘に勝つと2体に分裂する", () => {
     expect(world.query(Walker, Owner).filter((e) => world.get(e, Owner)!.faction === "player")).toHaveLength(0);
   });
 });
+
+/**
+ * 「ウォーカー同士の直接戦闘に勝つ」 — one of the four things the original's
+ * score is made of (see game/score.ts). Reported from inside the fight
+ * because the match event log deliberately does not record every skirmish.
+ */
+describe("createWalkerCombatSystem's onFightWon", () => {
+  it("names the faction left standing", () => {
+    const world = new World();
+    createWalker(world, "player", 0, 0, 9);
+    createWalker(world, "enemy", 0, 0, 3);
+    const won: FactionId[] = [];
+
+    createWalkerCombatSystem({ onFightWon: (faction) => won.push(faction) })(world, 1);
+
+    expect(won).toEqual(["player"]);
+  });
+
+  it("names nobody when both die", () => {
+    const world = new World();
+    createWalker(world, "player", 0, 0, 4);
+    createWalker(world, "enemy", 0, 0, 4);
+    const won: FactionId[] = [];
+
+    createWalkerCombatSystem({ onFightWon: (faction) => won.push(faction) })(world, 1);
+
+    expect(won).toEqual([]);
+  });
+
+  it("names nobody when the two never meet", () => {
+    const world = new World();
+    createWalker(world, "player", 0, 0, 9);
+    createWalker(world, "enemy", 30, 30, 3);
+    const won: FactionId[] = [];
+
+    createWalkerCombatSystem({ onFightWon: (faction) => won.push(faction) })(world, 1);
+
+    expect(won).toEqual([]);
+  });
+
+  it("counts one call per fight, not per walker destroyed", () => {
+    const world = new World();
+    createWalker(world, "enemy", 0, 0, 20);
+    createWalker(world, "player", 0, 0, 1);
+    createWalker(world, "player", 0, 0, 1);
+    const won: FactionId[] = [];
+
+    createWalkerCombatSystem({ onFightWon: (faction) => won.push(faction) })(world, 1);
+
+    expect(won).toEqual(["enemy", "enemy"]);
+  });
+});

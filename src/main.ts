@@ -3,6 +3,10 @@ import { playMiracleSound } from "./audio/miracleSounds";
 import {
   ARMAGEDDON_MANA_COST,
   EARTHQUAKE_MANA_COST,
+  EARTHQUAKE_SHAKE_DURATION,
+  FIRE_PILLAR_LIFETIME,
+  STORM_LIFETIME,
+  TORNADO_LIFETIME,
   ENEMY_PERSONALITY_LABELS,
   REEF_MANA_COST,
   FIRE_RAIN_MANA_COST,
@@ -64,23 +68,46 @@ import { applyHurricane } from "./game/hurricane";
 import { createFirePillar } from "./game/firePillar";
 import { strikeLightning } from "./game/lightning";
 import { seedPlague } from "./game/plague";
+import { rescueDrowning } from "./game/rescue";
+import { createQuake, isGroundShaking } from "./game/quake";
 import { createStorm } from "./game/storm";
 import { createTornado, createWhirlpool } from "./game/tornado";
 import { collapseSwampsNear, createSwamp } from "./game/swamp";
 import { burnFire } from "./game/fire";
 import { eruptVolcano } from "./game/volcano";
 import { raiseMegalith } from "./game/megalith";
-import { ALL_MIRACLES, WORLDS, nextWorldId, unlockedCountForPassword, type MiracleId, type WorldDefinition } from "./game/worlds";
+import {
+  ALL_MIRACLES,
+  WORLDS,
+  buildPassword,
+  nextWorldId,
+  passwordExperienceCode,
+  unlockedCountForPassword,
+  type MiracleId,
+  type WorldDefinition,
+} from "./game/worlds";
 import { EntityLayer } from "./render/EntityLayer";
 import { describeInspectableEntity } from "./render/entityInfoLabel";
 import { Hud } from "./render/Hud";
-import { MIRACLE_SCHOOLS } from "./game/miracleSchools";
+import { MIRACLE_SCHOOLS, MIRACLE_SCHOOL, type MiracleSchool } from "./game/miracleSchools";
+import {
+  awardStage,
+  decodeExperience,
+  durationScaleAt,
+  encodeExperience,
+  fungusRadiusAt,
+  levelOf,
+  lightningScatterAt,
+  noExperience,
+  type MiracleExperience,
+} from "./game/miracleLevels";
 import { IsoRenderer, visibleTileBounds, type TileBounds } from "./render/IsoRenderer";
-import { describeMatchEvent, formatMatchTime } from "./render/matchEventLabels";
+import { describeMatchEvent, describeStageRating, formatMatchTime } from "./render/matchEventLabels";
 import { Minimap, minimapHeight } from "./render/Minimap";
 import { PopulationGauge } from "./render/PopulationGauge";
 import { GAME_PALETTE } from "./render/palette";
 import { mountCommandIcons } from "./ui/commandIcons";
+import { DisasterMarkers } from "./ui/disasterMarkers";
 import { mountPanelFrame } from "./ui/panelFrame";
 import { loadCommandIcons } from "./ui/pixelIcons";
 import { StatusPanel } from "./ui/statusPanel";
@@ -123,6 +150,17 @@ const LONG_PRESS_DURATION_MS = 350;
  * the mana bar before you notice".
  */
 const MEGALITH_HOLD_INTERVAL_MS = 500;
+/**
+ * How often a held 雷 drops the next volley — 「雷はボタンを押し続けている
+ * 間は落ち続ける」.
+ *
+ * Slower than 地下巨石's hold even though the two cost almost the same
+ * (20 vs 24), because a volley is five bolts that kill outright while a
+ * stone only raises ground: at 500ms a held 雷 would wipe a settlement
+ * before the finger registered it had been held at all. 800ms leaves the
+ * player a beat to see what the first volley did and lift off.
+ */
+const LIGHTNING_HOLD_INTERVAL_MS = 800;
 /**
  * How much one mouse-wheel "notch" (deltaY around ±100) zooms the map on
  * PC — see plan/0039-pc-support.md. Chosen so a single notch feels close
@@ -177,7 +215,14 @@ function vibrate(pattern: number | number[]): void {
   navigator.vibrate?.(pattern);
 }
 
-async function bootstrap(world: WorldDefinition) {
+async function bootstrap(world: WorldDefinition, experience: MiracleExperience = noExperience()) {
+  /**
+   * 原作の奇跡のレベル — 「各マップごとにスコアに応じて経験点が入り、各
+   * カテゴリーのレベルを上げていくことができる」. Carried in from the
+   * campaign password (see game/miracleLevels.ts); a fresh start is level 1
+   * in every school, which is the game as it has always played.
+   */
+  const levelOfSchool = (school: MiracleSchool) => levelOf(experience, school);
   const app = new Application();
   await app.init({
     resizeTo: window,
@@ -307,8 +352,20 @@ async function bootstrap(world: WorldDefinition) {
     guardian: 3,
   };
 
+  /**
+   * 「災害箇所表示」 — where the enemy's miracles just landed, for the world
+   * map to point at. Recorded on every stage and only *shown* where the
+   * stage allows it (see disasterMarkersVisible): the toast and the shake
+   * tell you something happened either way; what the setting grants is
+   * knowing where.
+   */
+  const disasterMarkers = new DisasterMarkers();
+
   const onEnemyAction = (event: EnemyMiracleEvent) => {
     showEnemyEventToast(describeMatchEvent(event.type, "enemy"));
+    // ペルセウス/守護者化/最終決戦 have no place to point at — they are
+    // done to the whole board, not to a spot on it.
+    if ("position" in event) disasterMarkers.record(event.position, simulation.matchTime);
     triggerShake(ENEMY_SHAKE_MAGNITUDE[event.type]);
     playMiracleSound(event.type);
   };
@@ -334,7 +391,16 @@ async function bootstrap(world: WorldDefinition) {
   const showMatchRecord = (outcome: GameOutcome, events: readonly MatchEvent[]) => {
     if (!matchRecordPanel || !matchRecordTitle || !matchRecordList) return;
     matchRecordTitle.textContent = outcome.winner ? `GAME OVER — ${outcome.winner} wins` : "GAME OVER — draw";
+
+    // 「面の評価は稲妻マーク10個（約5万点）が上限」 — the stage's own rating,
+    // above the log rather than inside it: it is what the whole match added
+    // up to, not another thing that happened during it. See game/score.ts.
+    const rating = document.createElement("div");
+    rating.id = "match-record-rating";
+    rating.textContent = `評価 ${describeStageRating(simulation.getStageRating("player"))}`;
+
     matchRecordList.replaceChildren(
+      rating,
       ...events.map((event) => {
         const line = document.createElement("div");
         line.textContent = `${formatMatchTime(event.time)} ${describeMatchEvent(event.type, event.faction)}`;
@@ -349,7 +415,18 @@ async function bootstrap(world: WorldDefinition) {
     // on #world-select next time, the same manual "code on paper" flow the
     // doc's own "パスワード" wording implies.
     if (outcome.winner === "player") {
-      const password = nextWorldId(world.id);
+      // 「各マップごとにスコアに応じて経験点が入り」 — the stage's marks are
+      // awarded to the schools the player actually cast from on it, and the
+      // result rides out in the password (see game/miracleLevels.ts).
+      const earned = awardStage(
+        experience,
+        events
+          .filter((event) => event.faction === "player" && event.type in MIRACLE_SCHOOL)
+          .map((event) => event.type as MiracleId),
+        simulation.getStageRating("player"),
+      );
+      const nextId = nextWorldId(world.id);
+      const password = nextId ? buildPassword(nextId, encodeExperience(earned)) : undefined;
       const passwordLine = document.createElement("div");
       passwordLine.id = "match-record-password";
       passwordLine.textContent = password ? `次のワールドのパスワード: ${password}` : "全ワールドを制覇しました！";
@@ -626,6 +703,13 @@ async function bootstrap(world: WorldDefinition) {
       showEntityInfo("この面では敵の陣地を直接操作できません", "warning");
       return;
     }
+    // Also before flattenTargetElevation is seeded, and for the same reason
+    // — a tile refused here must not get to decide what the rest of the
+    // gesture levels toward. See game/quake.ts.
+    if (isGroundShaking(simulation.world, tile.x, tile.y)) {
+      showEntityInfo("地震が続いている間は土地を直せません", "warning");
+      return;
+    }
     if (flattenTargetElevation === undefined) {
       // The tile's own corners decide the target, biased by direction
       // when this match restricts one — per TerrainEditRule's own doc
@@ -691,6 +775,12 @@ async function bootstrap(world: WorldDefinition) {
       showEntityInfo("この面では何もない海に土地を起こせません", "warning");
       return;
     }
+    // 「地震が続いている間は修復が出来ない」 — checked before spending, like
+    // the two restrictions above. See game/quake.ts.
+    if (isGroundShaking(simulation.world, vertex.x, vertex.y)) {
+      showEntityInfo("地震が続いている間は土地を直せません", "warning");
+      return;
+    }
     if (!trySpendPlayerMana(TERRAIN_EDIT_MANA_COST)) return;
     raiseVertex(heightmap, vertex.x, vertex.y, delta);
     renderer.redraw(visibleBounds());
@@ -728,11 +818,22 @@ async function bootstrap(world: WorldDefinition) {
       // Same restriction the manual tools honour — see applyFlattenEditAt.
       // Blocked tiles drop out of the plan, so they are neither levelled
       // nor charged for, and the rest of the plot still levels.
-      (tile) => world.enemyTerritoryEditable || !simulation.isEnemyTerritory("player", tile),
+      // Shaking ground drops out the same way (「地震が続いている間は修復が
+      // 出来ない」, see game/quake.ts) — a quake through a village's plot
+      // levels what it has not torn and leaves the rest for later.
+      (tile) =>
+        (world.enemyTerritoryEditable || !simulation.isEnemyTerritory("player", tile)) &&
+        !isGroundShaking(simulation.world, tile.x, tile.y),
     );
 
     if (tiles.length === 0) {
-      showEntityInfo("この家の周りはすでに平地です");
+      // Nothing left to level is the ordinary case; a plot entirely inside
+      // a fissure's shaking is the one worth naming, since it is temporary.
+      showEntityInfo(
+        isGroundShaking(simulation.world, target.position.x, target.position.y)
+          ? "地震が続いている間は土地を直せません"
+          : "この家の周りはすでに平地です",
+      );
       return;
     }
     if (!trySpendPlayerMana(tiles.length * TERRAIN_EDIT_MANA_COST)) return;
@@ -778,6 +879,27 @@ async function bootstrap(world: WorldDefinition) {
   };
 
   /**
+   * The original's 「溺れた人間の救出」 — one of the ten per-stage settings,
+   * and the only one of them that hands the player an operation rather
+   * than taking one away. See game/rescue.ts.
+   *
+   * Free, like スプログ: the ○× table lists operations, not miracles, and
+   * a rescue that cost mana would be unavailable exactly when it matters.
+   */
+  const applyRescueAt = (vertex: { x: number; y: number }): void => {
+    if (!world.rescueAllowed) {
+      showEntityInfo("この面では溺れた人を救出できません", "warning");
+      return;
+    }
+    if (rescueDrowning(simulation.world, heightmap, "player", vertex) === undefined) {
+      showEntityInfo("このあたりに溺れている自分の民は居ません", "warning");
+      return;
+    }
+    vibrate(15);
+    showEntityInfo("溺れていた民を岸へ引き上げました");
+  };
+
+  /**
    * One 地下巨石 cast. Split out of applyTool because the original's own
    * description makes this repeatable: 「発生ボタンを押し続けると、一帯に
    * より多くの巨石を発生させる」 — see the hold handling in the pointer
@@ -804,6 +926,39 @@ async function bootstrap(world: WorldDefinition) {
     triggerShake(6);
     vibrate([30, 20, 40]);
     playMiracleSound("megalith");
+    return true;
+  };
+
+  /**
+   * The other miracle a held press repeats: 雷. 「雷はボタンを押し続けて
+   * いる間は落ち続ける」 — see the hold handling in the pointer handlers
+   * below, and game/lightning.ts.
+   *
+   * Unlike 地下巨石's hold this does not need somewhere new to aim: one
+   * cast already scatters its bolts around the aim point (LIGHTNING_SCATTER),
+   * so holding on one spot walks a storm over the same neighbourhood rather
+   * than striking the identical vertex over and over.
+   *
+   * Returns whether a volley actually fell, so a hold stops itself the
+   * moment the mana runs out.
+   */
+  const castLightningAt = (vertex: { x: number; y: number }): boolean => {
+    if (!trySpendPlayerMana(LIGHTNING_MANA_COST)) return false;
+    // 「気レベルが上がると命中精度が上がる」 — the one miracle a level makes
+    // *accurate* rather than longer. See game/miracleLevels.ts.
+    strikeLightning(
+      simulation.world,
+      heightmap,
+      vertex,
+      Math.random,
+      (event) => simulation.recordImpactEffect(event),
+      lightningScatterAt(levelOfSchool("air")),
+    );
+    renderer.redraw(visibleBounds());
+    simulation.recordEvent("player", "lightning");
+    triggerShake(6);
+    vibrate([15, 40, 15]);
+    playMiracleSound("lightning");
     return true;
   };
 
@@ -858,6 +1013,11 @@ async function bootstrap(world: WorldDefinition) {
     const vertex = renderer.pickVertex(local.x, local.y);
     if (!vertex) return;
 
+    if (toolMode === "rescue") {
+      applyRescueAt(vertex);
+      return;
+    }
+
     if (toolMode === "shrine") {
       // Checked before spending, like 岩礁's "only at sea": 「リーダーが
       // いない状態ではこのコマンドは使用できない」, and charging for a cast
@@ -882,7 +1042,11 @@ async function bootstrap(world: WorldDefinition) {
       // where I struck" gives one for free — and never cracks the ground
       // back toward your own settlement.
       const from = simulation.getShrinePosition("player") ?? vertex;
-      applyEarthquake(heightmap, vertex.x, vertex.y, vertex.x - from.x, vertex.y - from.y);
+      const fissure = applyEarthquake(heightmap, vertex.x, vertex.y, vertex.x - from.x, vertex.y - from.y);
+      // 「地震が続いている間は修復が出来ない」 — the ground along the crack
+      // goes on moving for a while, and no spade works on it until it
+      // stops. See game/quake.ts.
+      createQuake(simulation.world, fissure, EARTHQUAKE_SHAKE_DURATION * durationScaleAt(levelOfSchool("earth")));
       collapseSwampsNear(simulation.world, vertex.x, vertex.y, DEFAULT_EARTHQUAKE_RADIUS);
       renderer.redraw(visibleBounds());
       simulation.recordEvent("player", "earthquake");
@@ -922,7 +1086,14 @@ async function bootstrap(world: WorldDefinition) {
       // and "from where I am, through where I struck" gives one for free —
       // and never sets a wandering hazard off toward your own people.
       const from = simulation.getShrinePosition("player") ?? vertex;
-      createTornado(simulation.world, vertex.x, vertex.y, vertex.x - from.x, vertex.y - from.y);
+      createTornado(
+        simulation.world,
+        vertex.x,
+        vertex.y,
+        vertex.x - from.x,
+        vertex.y - from.y,
+        TORNADO_LIFETIME * durationScaleAt(levelOfSchool("air")),
+      );
       simulation.recordEvent("player", "tornado");
       triggerShake(4);
       vibrate([20, 20, 20]);
@@ -931,15 +1102,7 @@ async function bootstrap(world: WorldDefinition) {
     }
 
     if (toolMode === "lightning") {
-      if (!trySpendPlayerMana(LIGHTNING_MANA_COST)) return;
-      strikeLightning(simulation.world, heightmap, vertex, Math.random, (event) =>
-        simulation.recordImpactEffect(event),
-      );
-      renderer.redraw(visibleBounds());
-      simulation.recordEvent("player", "lightning");
-      triggerShake(6);
-      vibrate([15, 40, 15]);
-      playMiracleSound("lightning");
+      castLightningAt(vertex);
       return;
     }
 
@@ -960,7 +1123,7 @@ async function bootstrap(world: WorldDefinition) {
 
     if (toolMode === "storm") {
       if (!trySpendPlayerMana(STORM_MANA_COST)) return;
-      createStorm(simulation.world, vertex.x, vertex.y);
+      createStorm(simulation.world, vertex.x, vertex.y, STORM_LIFETIME * durationScaleAt(levelOfSchool("air")));
       simulation.recordEvent("player", "storm");
       triggerShake(3);
       vibrate([20, 30, 20, 30]);
@@ -974,7 +1137,14 @@ async function bootstrap(world: WorldDefinition) {
       // caster's own shrine, through the tapped point. It wanders from
       // there, so this is a push rather than a path.
       const from = simulation.getShrinePosition("player") ?? vertex;
-      createFirePillar(simulation.world, vertex.x, vertex.y, vertex.x - from.x, vertex.y - from.y);
+      createFirePillar(
+        simulation.world,
+        vertex.x,
+        vertex.y,
+        vertex.x - from.x,
+        vertex.y - from.y,
+        FIRE_PILLAR_LIFETIME * durationScaleAt(levelOfSchool("fire")),
+      );
       simulation.recordEvent("player", "firePillar");
       triggerShake(4);
       vibrate([30, 15, 30]);
@@ -1098,7 +1268,10 @@ async function bootstrap(world: WorldDefinition) {
     if (toolMode === "fungus") {
       // Nothing takes root on water, rock, a crevice or a road.
       if (!canAffordPlayerMana(FUNGUS_MANA_COST)) return;
-      if (applyFungus(heightmap, vertex.x, vertex.y).length === 0) {
+      // 「植物のレベルが高いと一瞬かなりえげつないことになる」 — sown
+      // wider, which is what makes the automaton take off rather than
+      // wither. See game/miracleLevels.ts.
+      if (applyFungus(heightmap, vertex.x, vertex.y, fungusRadiusAt(levelOfSchool("plant"))).length === 0) {
         showEntityInfo("ここには毒カビが根付きません", "warning");
         return;
       }
@@ -1125,7 +1298,7 @@ async function bootstrap(world: WorldDefinition) {
 
     if (toolMode === "volcano") {
       if (!trySpendPlayerMana(VOLCANO_MANA_COST)) return;
-      eruptVolcano(simulation.world, applyVolcano(heightmap, vertex.x, vertex.y));
+      eruptVolcano(simulation.world, applyVolcano(heightmap, vertex.x, vertex.y), vertex);
       renderer.redraw(visibleBounds());
       simulation.recordEvent("player", "volcano");
       triggerShake(8);
@@ -1236,16 +1409,16 @@ async function bootstrap(world: WorldDefinition) {
   let longPressTimer: ReturnType<typeof setTimeout> | undefined;
   let painting = false;
   /**
-   * The one miracle a held press repeats: 地下巨石. 「発生ボタンを押し続けると、
-   * 一帯により多くの巨石を発生させる」 — see castMegalithAt and
-   * megalithScatterCandidates. Every other miracle stays a single
-   * deliberate cast, which is why this is its own flag rather than another
-   * toolMode in the brush's list: the brush edits whatever the pointer
-   * moves over, while this stays put and scatters around where it was
-   * first pressed.
+   * The two miracles a held press repeats: 地下巨石 (「発生ボタンを押し
+   * 続けると、一帯により多くの巨石を発生させる」) and 雷 (「雷はボタンを
+   * 押し続けている間は落ち続ける」) — see castMegalithAt and
+   * castLightningAt. Every other miracle stays a single deliberate cast,
+   * which is why this is its own flag rather than more toolModes in the
+   * brush's list: the brush edits whatever the pointer moves over, while
+   * these stay put and repeat around where the press first landed.
    */
-  let megalithHoldTimer: ReturnType<typeof setInterval> | undefined;
-  let megalithHolding = false;
+  let holdCastTimer: ReturnType<typeof setInterval> | undefined;
+  let holdCasting = false;
   // A vertex for raise/lower, a tile for flatten — see pickTerrainEditPoint.
   let lastPaintedPoint: { x: number; y: number } | undefined;
 
@@ -1255,15 +1428,15 @@ async function bootstrap(world: WorldDefinition) {
     longPressTimer = undefined;
   };
 
-  const stopMegalithHold = () => {
-    if (megalithHoldTimer !== undefined) clearInterval(megalithHoldTimer);
-    megalithHoldTimer = undefined;
-    megalithHolding = false;
+  const stopHoldCast = () => {
+    if (holdCastTimer !== undefined) clearInterval(holdCastTimer);
+    holdCastTimer = undefined;
+    holdCasting = false;
   };
 
   const stopPainting = () => {
     clearLongPressTimer();
-    stopMegalithHold();
+    stopHoldCast();
     painting = false;
     lastPaintedPoint = undefined;
     flattenTargetElevation = undefined;
@@ -1363,7 +1536,13 @@ async function bootstrap(world: WorldDefinition) {
       viewStartPos = { x: renderer.view.position.x, y: renderer.view.position.y };
       flattenTargetElevation = undefined; // fresh gesture — see its own doc comment
 
-      if (toolMode === "raise" || toolMode === "lower" || toolMode === "flatten" || toolMode === "megalith") {
+      if (
+        toolMode === "raise" ||
+        toolMode === "lower" ||
+        toolMode === "flatten" ||
+        toolMode === "megalith" ||
+        toolMode === "lightning"
+      ) {
         clearLongPressTimer();
         longPressTimer = setTimeout(() => {
           longPressTimer = undefined;
@@ -1373,24 +1552,43 @@ async function bootstrap(world: WorldDefinition) {
           if (toolMode === "megalith") {
             const center = renderer.pickVertex(local.x, local.y);
             if (!center) return;
-            megalithHolding = true;
+            holdCasting = true;
             vibrate(10); // brief confirmation that the hold just engaged
             // The first stone lands here, exactly where a plain tap would
             // have put it — holding adds to that cast rather than
             // replacing it.
             if (!castMegalithAt(center, true)) {
-              stopMegalithHold();
+              stopHoldCast();
               return;
             }
-            megalithHoldTimer = setInterval(() => {
+            holdCastTimer = setInterval(() => {
               const candidates = megalithScatterCandidates(heightmap, center.x, center.y);
               if (candidates.length === 0) {
-                stopMegalithHold();
+                stopHoldCast();
                 return;
               }
               const next = candidates[Math.floor(Math.random() * candidates.length)];
-              if (!castMegalithAt(next, false)) stopMegalithHold();
+              if (!castMegalithAt(next, false)) stopHoldCast();
             }, MEGALITH_HOLD_INTERVAL_MS);
+            return;
+          }
+
+          if (toolMode === "lightning") {
+            const center = renderer.pickVertex(local.x, local.y);
+            if (!center) return;
+            holdCasting = true;
+            vibrate(10);
+            // Same shape as 地下巨石's hold: the first volley is the one a
+            // plain tap would have thrown, and holding adds to it. Every
+            // repeat aims at the same point — the bolts' own scatter is
+            // what spreads them (see castLightningAt).
+            if (!castLightningAt(center)) {
+              stopHoldCast();
+              return;
+            }
+            holdCastTimer = setInterval(() => {
+              if (!castLightningAt(center)) stopHoldCast();
+            }, LIGHTNING_HOLD_INTERVAL_MS);
             return;
           }
 
@@ -1428,13 +1626,13 @@ async function bootstrap(world: WorldDefinition) {
 
     if (!pointerActive) return;
 
-    // A held 地下巨石 scatters around where it was pressed, so the pointer
+    // A held 地下巨石 or 雷 stays where it was pressed, so the pointer
     // drifting is not a brush stroke — it just ends the hold, the same way
     // moving before the hold engaged turns the gesture into a pan.
-    if (megalithHolding) {
+    if (holdCasting) {
       const dx = event.global.x - dragStart.x;
       const dy = event.global.y - dragStart.y;
-      if (Math.hypot(dx, dy) > DRAG_THRESHOLD) stopMegalithHold();
+      if (Math.hypot(dx, dy) > DRAG_THRESHOLD) stopHoldCast();
       return;
     }
 
@@ -1468,7 +1666,7 @@ async function bootstrap(world: WorldDefinition) {
     activePointers.delete(event.pointerId);
     if (activePointers.size < 2) rotating = false;
 
-    if (pointerActive && !isDragging && !painting && !megalithHolding && !gestureHadTwoFingers) applyTool(event);
+    if (pointerActive && !isDragging && !painting && !holdCasting && !gestureHadTwoFingers) applyTool(event);
 
     stopPainting();
     pointerActive = false;
@@ -1518,6 +1716,11 @@ async function bootstrap(world: WorldDefinition) {
   }
   // スプログ is not a miracle (it costs no mana) but it is one of the ten
   // per-stage settings, so it goes dark the same way — see sprogAllowed.
+  // 「溺れた人間の救出」 is the same kind of per-stage setting, and goes
+  // dark the same way — see rescueAllowed.
+  if (!world.rescueAllowed) {
+    document.querySelector<HTMLButtonElement>('#toolbar [data-tool="rescue"]')?.setAttribute("disabled", "true");
+  }
   if (!world.sprogAllowed) {
     document.querySelector<HTMLButtonElement>('#toolbar [data-tool="sprog"]')?.setAttribute("disabled", "true");
   }
@@ -1631,7 +1834,12 @@ async function bootstrap(world: WorldDefinition) {
       showMatchRecord(outcome, simulation.getMatchEvents());
     }
     minimap.redrawTerrain();
-    minimap.update(simulation.world, strictVisibleBounds());
+    minimap.update(simulation.world, strictVisibleBounds(), {
+      // 「敵の位置表示」/「災害箇所表示」 — the two per-stage settings that
+      // take away information rather than an operation.
+      showEnemies: world.enemyPositionsVisible,
+      disasters: world.disasterMarkersVisible ? disasterMarkers.active(simulation.matchTime) : [],
+    });
 
     if (shakeTimeRemaining > 0) {
       shakeTimeRemaining = Math.max(0, shakeTimeRemaining - deltaSeconds);
@@ -1664,8 +1872,26 @@ function showWorldSelect(): void {
   if (!panel || !list) return;
 
   let unlockedCount = 1;
+  /** 奇跡のレベル carried in on the password — see game/miracleLevels.ts. */
+  let experience = noExperience();
+
+  const levelsRow = document.getElementById("world-select-levels");
+
+  /**
+   * 「各カテゴリーのレベル」 — shown only once something has been learned.
+   * A row of level 1s on a fresh start would be six numbers that mean
+   * nothing yet, and the player has no way to act on them anyway.
+   */
+  const renderLevels = () => {
+    if (!levelsRow) return;
+    const trained = MIRACLE_SCHOOLS.filter(({ id }) => levelOf(experience, id) > 1);
+    levelsRow.textContent = trained.length
+      ? `奇跡のレベル　${trained.map(({ id, label }) => `${label} Lv${levelOf(experience, id)}`).join("　")}`
+      : "";
+  };
 
   const renderList = () => {
+    renderLevels();
     list.replaceChildren(
       ...WORLDS.map((world, index) => {
         const locked = index >= unlockedCount;
@@ -1710,7 +1936,7 @@ function showWorldSelect(): void {
         if (!locked) {
           button.addEventListener("click", () => {
             panel.classList.add("hidden");
-            bootstrap(world);
+            bootstrap(world, experience);
           });
         }
         return button;
@@ -1721,12 +1947,18 @@ function showWorldSelect(): void {
 
   passwordSubmit?.addEventListener("click", () => {
     if (!passwordInput) return;
-    const count = unlockedCountForPassword(passwordInput.value.trim());
+    const entered = passwordInput.value.trim();
+    const count = unlockedCountForPassword(entered);
     if (count === undefined) {
       passwordError?.classList.remove("hidden");
       return;
     }
     unlockedCount = Math.max(unlockedCount, count);
+    // A password from before the levels existed carries no code, and a
+    // mistyped one decodes to nothing: either way the god simply starts
+    // over at level 1 rather than the world select refusing an unlock it
+    // has already accepted.
+    experience = decodeExperience(passwordExperienceCode(entered)) ?? experience;
     passwordInput.value = "";
     passwordError?.classList.add("hidden");
     renderList();

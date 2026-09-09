@@ -1,5 +1,6 @@
 import type { System } from "../../ecs";
 import { findLeastFlatVertex, isTerrainEditAllowed, raiseVertex, type Heightmap, type TerrainEditRule } from "../../world/heightmap";
+import { isGroundShaking } from "../quake";
 import { HOUSE_UPGRADE_FLATNESS_RADIUS, TERRAIN_EDIT_MANA_COST } from "../constants";
 import { House, Owner, Position, type FactionId } from "../components";
 import { trySpendMana } from "../faction";
@@ -55,6 +56,11 @@ export function createEnemyTerraformSystem(config: Partial<EnemyTerraformConfig>
       const target = findLeastFlatVertex(heightmap, pos.x, pos.y, radius);
       if (!target) continue;
       if (!isTerrainEditAllowed(terrainEditRule, target.delta)) continue;
+      // The god plays by the same rule the player does: 「地震が続いている
+      // 間は修復が出来ない」. Checked before spending, so a quake through
+      // its village costs the AI the same waiting the player pays. See
+      // game/quake.ts.
+      if (isGroundShaking(world, target.x, target.y)) continue;
       if (!trySpendMana(world, factionId, TERRAIN_EDIT_MANA_COST)) continue;
 
       raiseVertex(heightmap, target.x, target.y, target.delta);

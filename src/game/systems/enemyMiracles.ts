@@ -13,6 +13,7 @@ import { createHolyWater } from "../holyWater";
 import { strikeLightning } from "../lightning";
 import { ENEMY_SIGNATURE_MIRACLE, type MiracleSchool } from "../miracleSchools";
 import { seedPlague } from "../plague";
+import { createQuake } from "../quake";
 import { collapseSwampsNear, createSwamp } from "../swamp";
 import { FactionState, House, Owner, Position, Walker, type FactionId } from "../components";
 import {
@@ -245,7 +246,7 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
     if (allowedMiracles.includes("volcano") && populationRatio >= VOLCANO_POPULATION_RATIO * tuning.volcanoRatioMultiplier) {
       const target = densestReachableCluster(world, factionId, opponentId, DEFAULT_VOLCANO_RADIUS, viewport, rng);
       if (target && trySpendMana(world, factionId, VOLCANO_MANA_COST)) {
-        eruptVolcano(world, applyVolcano(heightmap, target.x, target.y));
+        eruptVolcano(world, applyVolcano(heightmap, target.x, target.y, undefined, undefined, undefined, undefined, rng), target, rng);
         onAction({ type: "volcano", position: target });
         return;
       }
@@ -275,7 +276,12 @@ export function createEnemyMiracleSystem(config: Partial<EnemyMiracleConfig> = {
       // shrine, through the target.
       const shrineEntity = findFactionEntity(world, factionId);
       const from = shrineEntity === undefined ? target : world.get(shrineEntity, FactionState)!.shrinePosition;
-      applyEarthquake(heightmap, target.x, target.y, target.x - from.x, target.y - from.y, undefined, rng);
+      const fissure = applyEarthquake(heightmap, target.x, target.y, target.x - from.x, target.y - from.y, undefined, rng);
+      // The god's quake denies the player's spade exactly as the player's
+      // own does — 「地震が続いている間は修復が出来ない」 — and this is the
+      // side of it that bites: an enemy 地震 the defender could fill back in
+      // on the next tap was never a threat. See game/quake.ts.
+      createQuake(world, fissure);
       collapseSwampsNear(world, target.x, target.y, DEFAULT_EARTHQUAKE_RADIUS);
       onAction({ type: "earthquake", position: target });
     }

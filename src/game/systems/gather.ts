@@ -26,6 +26,7 @@ export const gatherSystem: System = (world) => {
   const gatheringFactions = factionsInMergingMode(world);
   if (gatheringFactions.size === 0) return;
 
+  const leaders = liveLeaders(world);
   const walkers = world.query(Position, Walker, Owner);
 
   for (let i = 0; i < walkers.length; i++) {
@@ -39,10 +40,27 @@ export const gatherSystem: System = (world) => {
       if (!isGatheringWalker(world, b, gatheringFactions)) continue;
       if (distance(world.get(a, Position)!, world.get(b, Position)!) > GATHER_RANGE) continue;
 
-      mergeWalkers(world, a, b);
+      // The leader is always the one left standing. 集結 gathers people
+      // *onto* the leader — gatherTargeting walks them to it, and hero
+      // miracles are cast on it — so a follower absorbing its own leader
+      // would quietly dissolve the thing the order exists to build, and
+      // would read to systems/leaderLoss.ts as the leader having died.
+      const [survivor, absorbed] = leaders.has(b) && !leaders.has(a) ? [b, a] : [a, b];
+      mergeWalkers(world, survivor, absorbed);
+      if (survivor === b) break; // `a` is gone; move on to the next walker
     }
   }
 };
+
+/** Every faction's current leader, so a merge never absorbs one — see the merge above. */
+function liveLeaders(world: World): Set<Entity> {
+  const leaders = new Set<Entity>();
+  for (const entity of world.query(FactionState)) {
+    const leaderId = world.get(entity, FactionState)!.leaderId;
+    if (leaderId !== undefined && world.isAlive(leaderId)) leaders.add(leaderId);
+  }
+  return leaders;
+}
 
 function factionsInMergingMode(world: World): Set<FactionId> {
   const factions = new Set<FactionId>();

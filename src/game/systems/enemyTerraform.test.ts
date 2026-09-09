@@ -4,7 +4,9 @@ import type { Heightmap } from "../../world/heightmap";
 import { FactionState, House, Owner, Position } from "../components";
 import { TERRAIN_EDIT_MANA_COST } from "../constants";
 import { createFaction } from "../faction";
+import { createQuake } from "../quake";
 import { createEnemyTerraformSystem } from "./enemyTerraform";
+import { createQuakeSystem } from "./quake";
 function blankLayer(width: number, height: number): boolean[][] {
   return Array.from({ length: height + 1 }, () => new Array<boolean>(width + 1).fill(false));
 }
@@ -153,5 +155,51 @@ describe("createEnemyTerraformSystem", () => {
     system(world, 4); // interval not yet elapsed
 
     expect(heightmap.vertices[5][6]).toBe(8);
+  });
+});
+
+/**
+ * 「地震が続いている間は修復が出来ない」 — the god waits out a quake the
+ * same way the player does. Without this the AI would repair a fissure
+ * through its own village on the next pass, while the player it cast the
+ * quake on could not.
+ */
+describe("createEnemyTerraformSystem under a live quake", () => {
+  it("leaves shaking ground alone, and spends nothing on it", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: 10 });
+    createHouse(world, "enemy", 5, 5);
+    createQuake(world, [{ x: 6, y: 5 }]);
+
+    const heightmap = flatHeightmap(10, 10, 5);
+    heightmap.vertices[5][6] = 8;
+
+    createEnemyTerraformSystem({ decisionInterval: 5, heightmap })(world, 5);
+
+    expect(heightmap.vertices[5][6]).toBe(8);
+    expect(world.get(enemy, FactionState)!.mana).toBe(10);
+  });
+
+  it("goes back to levelling once the shaking has run out", () => {
+    const world = new World();
+    const enemy = createFaction(world, "enemy", { x: 0, y: 0 });
+    world.add(enemy, FactionState, { ...world.get(enemy, FactionState)!, mana: 10 });
+    createHouse(world, "enemy", 5, 5);
+    createQuake(world, [{ x: 6, y: 5 }], 3);
+
+    const heightmap = flatHeightmap(10, 10, 5);
+    heightmap.vertices[5][6] = 8;
+
+    const terraform = createEnemyTerraformSystem({ decisionInterval: 5, heightmap });
+    const quake = createQuakeSystem();
+
+    quake(world, 1);
+    terraform(world, 5);
+    expect(heightmap.vertices[5][6]).toBe(8); // still shaking
+
+    quake(world, 5);
+    terraform(world, 5);
+    expect(heightmap.vertices[5][6]).toBe(7);
   });
 });

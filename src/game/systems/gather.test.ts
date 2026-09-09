@@ -135,3 +135,61 @@ describe("FactionState behaviorMode sanity", () => {
     expect(world.get(player, FactionState)!.behaviorMode).toBe("settle");
   });
 });
+
+/**
+ * 集結 gathers people *onto* the leader — gatherTargeting walks them to it,
+ * hero miracles are cast on it, and systems/leaderLoss.ts reads its
+ * disappearance as a death. A follower absorbing its own leader would
+ * dissolve the thing the order exists to build.
+ */
+describe("gatherSystem and the leader", () => {
+  function withLeader(world: World, faction: FactionId, leader: number) {
+    const factionEntity = [...world.query(FactionState)].find(
+      (entity) => world.get(entity, FactionState)!.id === faction,
+    )!;
+    world.add(factionEntity, FactionState, { ...world.get(factionEntity, FactionState)!, leaderId: leader });
+  }
+
+  it("leaves the leader standing when a follower merges into it", () => {
+    const world = new World();
+    createFaction(world, "player", { x: 0, y: 0 }, "gather");
+    const follower = createWalker(world, "player", 0, 0, 3);
+    const leader = createWalker(world, "player", 0.5, 0, 2);
+    withLeader(world, "player", leader);
+
+    gatherSystem(world, 0);
+
+    expect(world.isAlive(leader)).toBe(true);
+    expect(world.isAlive(follower)).toBe(false);
+    expect(world.get(leader, Walker)!.strength).toBe(5);
+  });
+
+  it("still merges the ordinary way when neither is the leader", () => {
+    const world = new World();
+    createFaction(world, "player", { x: 0, y: 0 }, "gather");
+    const a = createWalker(world, "player", 0, 0, 3);
+    const b = createWalker(world, "player", 0.5, 0, 2);
+    const elsewhere = createWalker(world, "player", 40, 40, 1);
+    withLeader(world, "player", elsewhere);
+
+    gatherSystem(world, 0);
+
+    expect(world.isAlive(a)).toBe(true);
+    expect(world.isAlive(b)).toBe(false);
+  });
+
+  it("gathers a whole crowd onto the leader rather than into each other", () => {
+    const world = new World();
+    createFaction(world, "player", { x: 0, y: 0 }, "gather");
+    const leader = createWalker(world, "player", 0, 0, 1);
+    withLeader(world, "player", leader);
+    createWalker(world, "player", 0.2, 0, 2);
+    createWalker(world, "player", 0.4, 0, 3);
+
+    gatherSystem(world, 0);
+
+    expect(world.isAlive(leader)).toBe(true);
+    expect(world.get(leader, Walker)!.strength).toBe(6);
+    expect(world.query(Walker)).toHaveLength(1);
+  });
+});

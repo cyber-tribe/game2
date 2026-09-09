@@ -248,12 +248,110 @@ export const COMBAT_RANGE = 0.5;
 export const DROWNING_BREATH_SECONDS = 4;
 
 /**
+ * How far from the tap 救出 looks for one of your own drowning followers,
+ * in tiles — 「溺れた人間の救出」, see game/rescue.ts.
+ *
+ * Generous, because the thing being aimed at is thrashing in water rather
+ * than standing still, and a rescue that misses costs the walker its life
+ * while the player taps again.
+ */
+export const RESCUE_RADIUS = 6;
+
+/**
+ * How far 救出 will search for a shore to put the rescued walker on, in
+ * vertices.
+ *
+ * Beyond this the walker is genuinely adrift and the rescue fails: hauling
+ * someone across half the map would be a teleport, and a free teleport is
+ * a far bigger operation than the one the original's ○× is granting.
+ */
+export const RESCUE_SHORE_SEARCH = 8;
+
+/**
  * Seconds an ImpactEffect (see systems/effects.ts) stays on screen before
  * effectAgingSystem destroys it — a kill/capture/drowning's visible
  * lifetime is brief on purpose: it's a punctuation mark on the moment it
  * happened, not a lingering marker of the spot.
  */
 export const IMPACT_EFFECT_DURATION = 0.5;
+
+/**
+ * Seconds an enemy miracle stays marked on the world map — 「災害箇所表示」,
+ * see ui/disasterMarkers.ts.
+ *
+ * Long enough to pan across a 64x64 map and see what happened, short enough
+ * that the marks read as "go there now" rather than accumulating into a
+ * history of the whole match.
+ */
+export const DISASTER_MARKER_DURATION = 12;
+
+/**
+ * What each of the original's four score sources is worth — 「経験点の
+ * 稼ぎ方（効果の高い順）：地下巨石・岩礁を使う／敵リーダーを倒す／
+ * ウォーカー同士の直接戦闘に勝つ／時間が経つ」 (see game/score.ts).
+ *
+ * The *order* is the original's and is what these numbers exist to
+ * preserve: one 地下巨石 or 岩礁 outweighs a leader, a leader outweighs a
+ * won fight, and a won fight outweighs a good many seconds of simply being
+ * alive. The magnitudes are game2's own, calibrated against a real match
+ * rather than borrowed from the original's five-figure scale — see
+ * stageRating on why that scale is deliberately not transplanted.
+ */
+export const SCORE_VALUE = {
+  /** 地下巨石 and 岩礁 — 「低コストでスコア効率が高い」. */
+  stonework: 300,
+  /** Killing the opposing リーダー. */
+  enemyLeader: 120,
+  /** Winning one walker-on-walker fight. */
+  fightWon: 20,
+} as const;
+
+/** Score for simply staying in the match, per second. The weakest source, as the original ranks it. */
+export const SCORE_PER_SECOND = 1;
+
+/**
+ * The score that fills the bar — ten 稲妻マーク.
+ *
+ * Reachable but not by drifting: a ten-minute match that never builds
+ * anything earns roughly a fifth of it. Filling it means using 地下巨石 and
+ * 岩礁 the way the original rewards, which is exactly the behaviour the
+ * score is there to name.
+ */
+export const MAX_STAGE_SCORE = 5000;
+
+/** 「稲妻マーク10個」 — the original's own count. */
+export const MAX_STAGE_MARKS = 10;
+
+/**
+ * How high a school's level can go — 原作「各カテゴリーのレベルを上げて
+ * いくことができる」.
+ *
+ * The original's own numbers are far larger (it speaks of 雷 becoming
+ * usable 「レベルが上がる（50〜100程度）」), and are not transplanted for
+ * the same reason its 5万点 is not: they are steps on the original's own
+ * scale, over a campaign whose scoring is not game2's. Five is what 48
+ * stages of game2 can actually walk up.
+ */
+export const MAX_MIRACLE_LEVEL = 5;
+
+/** Experience points per level. One stage's 稲妻マーク is at most MAX_STAGE_MARKS, so this is a couple of good stages per level in a school. */
+export const MIRACLE_LEVEL_STEP = 20;
+
+/**
+ * How much longer 地震・竜巻・嵐・火柱 last per level — 「効果の持続時間が
+ * それぞれのレベルで伸びる」. At MAX_MIRACLE_LEVEL this doubles them, which
+ * is a real difference without turning one cast into the whole match.
+ */
+export const MIRACLE_LEVEL_DURATION_STEP = 0.25;
+
+/**
+ * What 雷's scatter shrinks to at MAX_MIRACLE_LEVEL — 「一撃必殺の破壊力」.
+ *
+ * Not zero. Even at its best the original's 雷 is a scatter of bolts around
+ * a point rather than a sniper's shot, and a scatter of zero would stack
+ * every bolt on one vertex, which is a different miracle.
+ */
+export const MIRACLE_LEVEL_MIN_SCATTER = 0.75;
 
 /**
  * Placeholder land-scarcity proxy: roughly how many map tiles a faction
@@ -863,6 +961,33 @@ export const FUNGUS_GROWTH_INTERVAL = 1.5;
  */
 export const TORNADO_LIFETIME = 14;
 
+/**
+ * Seconds the ground goes on shaking along a fissure after 地震 is cast.
+ *
+ * 原作「地震が続いている間は修復が出来ない」. game2's quake used to be over
+ * the instant it was cast, so the crack could be filled back in on the very
+ * next tap — which made 地震 a mana tax rather than a weapon: the defender
+ * paid a spade-tap and lost nothing. Holding the ground for a while is what
+ * gives the miracle its window, and it is the reason the crevice kills:
+ * whoever is on the wrong side of it has to walk around.
+ *
+ * Comparable to TORNADO_LIFETIME's order of magnitude but shorter — the
+ * original lists 地震 among the miracles whose 持続時間 grows with its
+ * school's level (docs/original-miracles.md), so this is the low end of a
+ * range, not a fixed truth about the original.
+ */
+export const EARTHQUAKE_SHAKE_DURATION = 8;
+
+/**
+ * How far from the fissure itself the ground counts as still shaking, in
+ * vertices. The fissure is a line one vertex wide (see applyEarthquake), so
+ * with no margin at all a player could stand a spade one vertex away and
+ * push land into the crack sideways, which is the very repair the original
+ * denies. Two vertices is the same DEFAULT_EARTHQUAKE_RADIUS the rest of
+ * the game already uses as "roughly how much ground a quake disturbs".
+ */
+export const EARTHQUAKE_SHAKE_RADIUS = 2;
+
 /** Tiles per second a 竜巻 drifts. Slower than a walker (DEFAULT_WALKER_SPEED), so people can outrun it if they notice it. */
 export const TORNADO_SPEED = 1;
 
@@ -900,6 +1025,22 @@ export const TORNADO_WANDER = 0.9;
  * to stay a wound rather than become the shape of the map.
  */
 export const FIRE_PILLAR_LIFETIME = 9;
+
+/**
+ * How many 火柱 one 火山 throws out — 原作「火山からは火柱が数本発生する」.
+ * 「数本」 is a handful; three is enough to surround a settlement's edge
+ * without turning one cast into an unanswerable wipe.
+ */
+export const VOLCANO_FIRE_PILLARS = 3;
+
+/**
+ * How far from the crater those pillars are born, in tiles.
+ *
+ * Clear of the cone and of the puddles around it (VOLCANO_PUDDLE_RING), for
+ * the reason raiseFirePillars gives: a 火柱 leans uphill, so one started on
+ * the volcano's own slope walks back up it and burns nothing.
+ */
+export const VOLCANO_FIRE_PILLAR_RING = 4;
 
 /** Tiles per second a 火柱 drifts. Slower than a walker, like the 竜巻 — it can be outrun. */
 export const FIRE_PILLAR_SPEED = 0.9;

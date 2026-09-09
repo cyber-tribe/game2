@@ -14,9 +14,9 @@ import { distance, type Point } from "./systems/geometry";
  * Several bolts scattered around the aim point rather than one on it. That
  * scatter is the miracle's character, not sloppiness: the original's own
  * level rule improves *accuracy* rather than damage, which only makes
- * sense for a miracle that misses. game2 has no miracle levels, so nothing
- * tightens the scatter yet — when they exist, LIGHTNING_SCATTER is what
- * they should move.
+ * sense for a miracle that misses. `scatter` is what the 気 level moves —
+ * see miracleLevels.ts's lightningScatterAt — and it defaults to
+ * LIGHTNING_SCATTER, which is level 1.
  *
  * **アキレス dies to this.** He is immune to fire — 「火が効かず焼死
  * しない」 (#23) — and this kills by the strike itself; the burning it
@@ -33,6 +33,7 @@ export function strikeLightning(
   aim: Point,
   rng: () => number = Math.random,
   onImpact: OnImpactEffect = () => {},
+  scatter: number = LIGHTNING_SCATTER,
 ): Point[] {
   const bolts: Point[] = [];
 
@@ -41,7 +42,7 @@ export function strikeLightning(
     // root is what keeps the bolts from bunching at the aim point, which
     // would quietly turn the scatter back into a single strike.
     const angle = rng() * Math.PI * 2;
-    const reach = Math.sqrt(rng()) * LIGHTNING_SCATTER;
+    const reach = Math.sqrt(rng()) * scatter;
     const at = { x: aim.x + Math.cos(angle) * reach, y: aim.y + Math.sin(angle) * reach };
     bolts.push(at);
 

@@ -18,6 +18,7 @@ const TOOL_ICON: Record<ToolMode, IconKind> = {
   flatten: "flatten",
   autoFlatten: "autoFlatten",
   sprog: "sprog",
+  rescue: "rescue",
   shrine: "shrine",
   earthquake: "earthquake",
   swamp: "swamp",
