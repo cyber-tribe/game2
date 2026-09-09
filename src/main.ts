@@ -7,6 +7,7 @@ import {
   FIRE_PILLAR_LIFETIME,
   STORM_LIFETIME,
   TORNADO_LIFETIME,
+  WIDE_EDIT_SIZE,
   ENEMY_PERSONALITY_LABELS,
   REEF_MANA_COST,
   FIRE_RAIN_MANA_COST,
@@ -113,7 +114,7 @@ import { mountPanelFrame } from "./ui/panelFrame";
 import { loadCommandIcons } from "./ui/pixelIcons";
 import { StatusPanel } from "./ui/statusPanel";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
-import { AUTO_FLATTEN_SIZE, DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyFlower, applyForest, applyFungus, DEFAULT_FLOWER_RADIUS, applyReef, applyRoad, applyWall, applyMegalith, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, megalithScatterCandidates, planAutoFlatten, raiseVertex, touchesLand } from "./world/heightmap";
+import { AUTO_FLATTEN_SIZE, DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyFlower, applyForest, applyFungus, DEFAULT_FLOWER_RADIUS, applyReef, applyRoad, applyWall, applyMegalith, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, isWall, spadeBlock, megalithScatterCandidates, planAutoFlatten, raiseVertex, touchesLand } from "./world/heightmap";
 
 /**
  * The camera's fixed base scale — see layout()'s doc comment for why this
@@ -690,6 +691,14 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
   // see stopPainting and the pointerdown handler further down.
   let flattenTargetElevation: number | undefined;
 
+  /**
+   * The original's 3×3 spade modifier — 「Ｌ＋Ａで3×3マスを1段上げ」. A
+   * sticky toggle rather than a held button, since a touchscreen has no
+   * second button to hold; it modifies 隆起/沈降 without replacing them,
+   * the same way Ｌ modifies Ａ/Ｂ. See spadeVertices.
+   */
+  let wideEdit = false;
+
   // "平坦化" stays tile/area-based (see flattenTile's own doc comment on
   // why leveling a plot is inherently about an area, not a point) — picks
   // via pickTile, unlike applyRaiseEditAt below.
@@ -755,6 +764,54 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
   // no jagged edge to speak of. "平坦化" keeps the tile-based raiseTile
   // pattern (see applyFlattenEditAt) since leveling a whole plot is
   // inherently area-shaped, unlike a plain raise/lower nudge.
+  /**
+   * Why the spade cannot touch this vertex, or undefined when it can.
+   *
+   * Split out of applyRaiseEditAt because the 3×3 modifier below has to ask
+   * the same question of nine vertices and charge only for the ones that
+   * answer "no reason" — the same rule 自動整地 already follows.
+   */
+  const terrainEditRefusal = (vertex: { x: number; y: number }): string | undefined => {
+    // Some worlds forbid reshaping land inside the enemy's own territory —
+    // see WorldDefinition's enemyTerritoryEditable.
+    if (!world.enemyTerritoryEditable && simulation.isEnemyTerritory("player", vertex)) {
+      return "この面では敵の陣地を直接操作できません";
+    }
+    // 「どこでも↑↓」「海上に土地↑↓」 — × on 43 of the original's 48 stages,
+    // where the spade reaches only ground that already touches land. See
+    // WorldDefinition's openTerraforming.
+    if (!world.openTerraforming && !touchesLand(heightmap, vertex.x, vertex.y)) {
+      return "この面では何もない海に土地を起こせません";
+    }
+    // 「地震が続いている間は修復が出来ない」 — see game/quake.ts.
+    if (isGroundShaking(simulation.world, vertex.x, vertex.y)) {
+      return "地震が続いている間は土地を直せません";
+    }
+    // 城壁 pins the ground it stands on (see raiseVertex, which refuses).
+    // Named here so the tap is not charged for an edit that cannot happen —
+    // it used to be, silently, for a single vertex.
+    if (isWall(heightmap, vertex.x, vertex.y)) {
+      return "城壁のかかった土地は上下できません";
+    }
+    return undefined;
+  };
+
+  /**
+   * The vertices one spade tap moves: just the one, or the 3×3 block around
+   * it when the modifier is on — 原作「便利な操作としては**Ｌ＋Ａで3×3マスを
+   * 1段上げ**……Ｌ＋Ｂで3×3マスを1段下げる」.
+   *
+   * The original offers this as a convenience on a machine with a D-pad and
+   * a visible cursor; on a phone it is closer to a necessity. At the map's
+   * usual scale adjacent vertices sit 32px apart across and 16px down, while
+   * a fingertip covers 40-50px — so a tap lands somewhere inside a 2×3 block
+   * of vertices and the player cannot tell which one they will get. Widening
+   * the edit does not make the aim better; it makes the aim not matter,
+   * which is the same answer the original reached.
+   */
+  const spadeVertices = (vertex: { x: number; y: number }): { x: number; y: number }[] =>
+    wideEdit ? spadeBlock(heightmap, vertex, WIDE_EDIT_SIZE) : [vertex];
+
   const applyRaiseEditAt = (vertex: { x: number; y: number }): void => {
     const delta = toolMode === "lower" ? -1 : 1;
     // Should be unreachable in practice — the toolbar disables whichever
@@ -762,28 +819,22 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
     // here too so a stale toolMode can never spend mana for an edit that
     // silently does nothing.
     if (!isTerrainEditAllowed(terrainEditRule, delta)) return;
-    // Some worlds forbid reshaping land inside the enemy's own territory —
-    // see WorldDefinition's enemyTerritoryEditable — checked (and reported)
-    // before spending any mana, same as isOwnFactionVisible above.
-    if (!world.enemyTerritoryEditable && simulation.isEnemyTerritory("player", vertex)) {
-      showEntityInfo("この面では敵の陣地を直接操作できません", "warning");
+
+    const targets = spadeVertices(vertex);
+    const movable = targets.filter((target) => terrainEditRefusal(target) === undefined);
+    if (movable.length === 0) {
+      // Only the reason for the vertex actually aimed at, so a 3×3 whose
+      // corner clips the enemy's border does not explain itself twice.
+      const why = terrainEditRefusal(vertex) ?? terrainEditRefusal(targets[0]!);
+      if (why) showEntityInfo(why, "warning");
       return;
     }
-    // 「どこでも↑↓」「海上に土地↑↓」 — × on 43 of the original's 48 stages,
-    // where the spade reaches only ground that already touches land. See
-    // WorldDefinition's openTerraforming.
-    if (!world.openTerraforming && !touchesLand(heightmap, vertex.x, vertex.y)) {
-      showEntityInfo("この面では何もない海に土地を起こせません", "warning");
-      return;
-    }
-    // 「地震が続いている間は修復が出来ない」 — checked before spending, like
-    // the two restrictions above. See game/quake.ts.
-    if (isGroundShaking(simulation.world, vertex.x, vertex.y)) {
-      showEntityInfo("地震が続いている間は土地を直せません", "warning");
-      return;
-    }
-    if (!trySpendPlayerMana(TERRAIN_EDIT_MANA_COST)) return;
-    raiseVertex(heightmap, vertex.x, vertex.y, delta);
+
+    // Priced per vertex that actually moves, exactly what the same work
+    // costs one tap at a time — 自動整地's own rule. The modifier is an
+    // ergonomic convenience, not a discount on terraforming.
+    if (!trySpendPlayerMana(TERRAIN_EDIT_MANA_COST * movable.length)) return;
+    for (const target of movable) raiseVertex(heightmap, target.x, target.y, delta);
     renderer.redraw(visibleBounds());
     dismissTutorialHint();
   };
@@ -1690,6 +1741,9 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
   });
 
   wireToolbar({
+    onWideEdit: (on) => {
+      wideEdit = on;
+    },
     onBehaviorMode: (mode) => simulation.setBehaviorMode("player", mode),
     onToolMode: (mode) => {
       toolMode = mode;

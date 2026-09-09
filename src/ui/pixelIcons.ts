@@ -49,6 +49,7 @@ export type IconKind =
   | "fight"
   | "sprog"
   | "rescue"
+  | "wideEdit"
   | "mana"
   | "population";
 

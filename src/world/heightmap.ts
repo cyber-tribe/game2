@@ -444,6 +444,43 @@ export function sampleElevation(heightmap: Heightmap, x: number, y: number): num
   return top + (bottom - top) * ty;
 }
 
+/**
+ * The block of vertices one spade tap covers — a single vertex at size 1,
+ * the 3×3 around it at size 3, clipped to the map.
+ *
+ * 原作「便利な操作としては**Ｌ＋Ａで3×3マスを1段上げ**(ＡＡＢと同じ効果)、
+ * Ｌ＋Ｂで3×3マスを1段下げる」. The original offers it as a convenience on a
+ * machine with a D-pad and a visible cursor; on a touchscreen it is closer
+ * to a necessity, because a fingertip covers several vertices at once (see
+ * main.ts's spadeVertices).
+ *
+ * Lives here rather than in main.ts because clipping to the map is this
+ * module's business, and because a pure block is something a test can hold.
+ * An even size has no centre vertex, so it is rounded down to the odd size
+ * below it — 2 behaves as 1, not as a block hanging off one corner.
+ */
+export function spadeBlock(
+  heightmap: Heightmap,
+  center: { x: number; y: number },
+  size: number,
+): { x: number; y: number }[] {
+  const reach = Math.max(0, Math.floor((Math.floor(size) - 1) / 2));
+  const cx = Math.round(center.x);
+  const cy = Math.round(center.y);
+  const block: { x: number; y: number }[] = [];
+
+  for (let dy = -reach; dy <= reach; dy++) {
+    for (let dx = -reach; dx <= reach; dx++) {
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 0 || y < 0 || x > heightmap.width || y > heightmap.height) continue;
+      block.push({ x, y });
+    }
+  }
+
+  return block;
+}
+
 /** True if the vertex nearest (x, y) is volcano rock — see applyVolcano. */
 export function isRock(heightmap: Heightmap, x: number, y: number): boolean {
   const cx = Math.round(Math.min(Math.max(x, 0), heightmap.width));
