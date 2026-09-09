@@ -13,7 +13,8 @@ import {
   type HouseLevel,
   type WalkerState,
 } from "./components";
-import { DEFAULT_WALKER_SPEED, FARMLAND_RADIUS, HOUSE_LEVELS, IMPACT_EFFECT_DURATION, INITIAL_WALKER_SPREAD, TILES_PER_HOUSE_CAP } from "./constants";
+import { DEFAULT_WALKER_SPEED, FARMLAND_RADIUS, HOUSE_LEVELS, IMPACT_EFFECT_DURATION, INITIAL_WALKER_SPREAD, MAX_STAGE_SCORE, TILES_PER_HOUSE_CAP } from "./constants";
+import { scoreValue, stageRating, type ScoreSource } from "./score";
 import { createFaction, findFactionEntity, hasLiveLeader, moveShrine } from "./faction";
 import { promoteHero } from "./hero";
 import { totalPopulation } from "./population";
@@ -39,11 +40,13 @@ import { createSettleSystem } from "./systems/settle";
 import { createCreviceSystem } from "./systems/crevice";
 import { createFungusSystem } from "./systems/fungus";
 import { createHelenSystem } from "./systems/helen";
+import { createLeaderLossSystem } from "./systems/leaderLoss";
 import { createHeroLossSystem } from "./systems/heroLoss";
 import { createHolyWaterSystem } from "./systems/holyWater";
 import { createFirePillarSystem } from "./systems/firePillar";
 import { createPlagueSystem } from "./systems/plague";
 import { createStormSystem } from "./systems/storm";
+import { createQuakeSystem } from "./systems/quake";
 import { createTornadoSystem } from "./systems/tornado";
 import { createWhirlpoolSystem } from "./systems/whirlpool";
 import { createSwampSystem } from "./systems/swamp";
@@ -223,6 +226,7 @@ export type MatchEventType =
   | "helen"
   | "guardian"
   | "heroLost"
+  | "leaderLost"
   | "armageddon"
   | "tsunami"
   | "whirlpool"
@@ -266,6 +270,14 @@ export class Simulation {
 
   private readonly matchEvents: MatchEvent[] = [];
   private elapsedTime = 0;
+
+  /**
+   * Each faction's running score — 原作の「スコア」, whose four sources are
+   * named in game/score.ts. Kept per faction rather than for the player
+   * alone because the enemy earns it under the same rules: a stage where
+   * the god out-built you is one the recap should be able to say so about.
+   */
+  private scores: Record<FactionId, number> = { player: 0, enemy: 0 };
   /**
    * Set whenever a system changes the terrain on its own — 毒カビ's
    * growth (see systems/fungus.ts), a 渦巻き eating the coast (see
@@ -322,6 +334,18 @@ export class Simulation {
       .add(createHelenSystem({ onImpact: (event) => this.recordImpactEffect(event) }))
       .add(heroCooldownSystem)
       .add(createHeroLossSystem({ onHeroLost: (faction) => this.recordEvent(faction, "heroLost") }))
+      .add(
+        createLeaderLossSystem({
+          onLeaderLost: (faction) => {
+            this.recordEvent(faction, "leaderLost");
+            // 「敵リーダーを倒す」 — the score goes to whoever is *not* the
+            // side that lost one. It is paid even when nobody killed it
+            // directly (a leader that walks into the sea is still a leader
+            // the opponent no longer has to deal with).
+            this.addScore(faction === "player" ? "enemy" : "player", "enemyLeader");
+          },
+        }),
+      )
       .add(createWanderTargetSystem({ heightmap: config.heightmap }))
       .add(createMovementSystem({ heightmap: config.heightmap }))
       .add(gatherSystem)
@@ -362,6 +386,10 @@ export class Simulation {
         }),
       )
       .add(createCreviceSystem({ heightmap: config.heightmap, onImpact: (event) => this.recordImpactEffect(event) }))
+      // Runs down 地震's shaking — see game/quake.ts. Next to the crevice
+      // system because the two are the same miracle's two aftermaths: the
+      // crack that kills, and the ground that cannot be repaired yet.
+      .add(createQuakeSystem())
       .add(
         createFungusSystem({
           heightmap: config.heightmap,
@@ -378,7 +406,16 @@ export class Simulation {
           onImpact: (event) => this.recordImpactEffect(event),
         }),
       )
-      .add(createWalkerCombatSystem({ onImpact: (event) => this.recordImpactEffect(event) }))
+      .add(
+        createWalkerCombatSystem({
+          onImpact: (event) => this.recordImpactEffect(event),
+          // 「ウォーカー同士の直接戦闘に勝つ」 — one of the four score
+          // sources, and the only one that has to come from inside the
+          // fight, since the event log deliberately does not record every
+          // skirmish.
+          onFightWon: (faction) => this.addScore(faction, "fightWon"),
+        }),
+      )
       .add(
         createHouseCaptureSystem({
           onCapture: (faction) => this.recordEvent(faction, "houseCaptured"),
@@ -423,6 +460,10 @@ export class Simulation {
   update(deltaSeconds: number): void {
     if (this.getOutcome().over) return;
     this.elapsedTime += deltaSeconds;
+    // 「時間が経つ」 — the weakest of the four sources, and the only one
+    // that needs no event: both sides earn it simply by still being here.
+    this.scores.player += deltaSeconds * scoreValue("time");
+    this.scores.enemy += deltaSeconds * scoreValue("time");
     this.scheduler.update(this.world, deltaSeconds);
 
     this.impactEffects = this.impactEffects
@@ -438,6 +479,38 @@ export class Simulation {
    */
   recordEvent(faction: FactionId, type: MatchEventType): void {
     this.matchEvents.push({ time: this.elapsedTime, faction, type });
+    // 「地下巨石・岩礁を使う」 — the best-paying of the four sources, and the
+    // one the original singles out (「低コストでスコア効率が高い」). Taken
+    // from the event log rather than from the cast sites so the player's
+    // taps and the enemy AI's casts are counted by the same rule.
+    if (type === "megalith" || type === "reef") this.addScore(faction, "stonework");
+  }
+
+  /** Adds one occurrence of a score source to a faction's total — see game/score.ts. */
+  addScore(faction: FactionId, source: ScoreSource): void {
+    this.scores[faction] += scoreValue(source);
+  }
+
+  /** A faction's score so far. */
+  getScore(faction: FactionId): number {
+    return this.scores[faction];
+  }
+
+  /**
+   * A faction's 稲妻マーク for this stage, 0 to 10 — see stageRating.
+   */
+  getStageRating(faction: FactionId): number {
+    return stageRating(this.scores[faction], MAX_STAGE_SCORE);
+  }
+
+  /**
+   * How long the match has run, in seconds — the same clock the event log
+   * is stamped against. main.ts ages its 災害箇所 marks by it (see
+   * ui/disasterMarkers.ts) rather than by wall time, so the marks stop
+   * moving whenever the match itself does.
+   */
+  get matchTime(): number {
+    return this.elapsedTime;
   }
 
   /** The match's full event log so far, oldest first — see MatchEvent. */

@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { MIRACLE_SCHOOLS } from "./miracleSchools";
-import { ALL_MIRACLES, GODS, STAGES_PER_GOD, WORLDS, nextWorldId, unlockedCountForPassword, type EnemyPersonality } from "./worlds";
+import {
+  ALL_MIRACLES,
+  GODS,
+  STAGES_PER_GOD,
+  WORLDS,
+  buildPassword,
+  nextWorldId,
+  passwordExperienceCode,
+  passwordWorldId,
+  unlockedCountForPassword,
+  type EnemyPersonality,
+} from "./worlds";
 
 const KNOWN_PERSONALITIES: readonly EnemyPersonality[] = ["balanced", "aggressive", "defensive"];
 
@@ -230,6 +241,40 @@ describe("unlockedCountForPassword", () => {
   it("returns undefined for an unrecognized password", () => {
     expect(unlockedCountForPassword("not-a-real-password")).toBeUndefined();
   });
+
+  /**
+   * The password grew a second half to carry 奇跡のレベル (see
+   * game/miracleLevels.ts). Every password game2 has handed out so far is a
+   * bare world id, and a player who wrote one down must not find it
+   * rejected because the format changed.
+   */
+  it("still accepts a bare world id, the only kind that existed before", () => {
+    expect(unlockedCountForPassword(WORLDS[2].id)).toBe(3);
+  });
+
+  it("accepts one carrying experience, and unlocks the same world", () => {
+    const password = buildPassword(WORLDS[2].id, "0a0b0c0d0e0f");
+
+    expect(unlockedCountForPassword(password)).toBe(3);
+  });
+});
+
+describe("the password's two halves", () => {
+  it("splits one that carries experience", () => {
+    const password = buildPassword("crete-2", "0a0b0c0d0e0f");
+
+    expect(passwordWorldId(password)).toBe("crete-2");
+    expect(passwordExperienceCode(password)).toBe("0a0b0c0d0e0f");
+  });
+
+  it("reads a bare id as a world with no experience at all", () => {
+    expect(passwordWorldId("crete-2")).toBe("crete-2");
+    expect(passwordExperienceCode("crete-2")).toBe("");
+  });
+
+  it("builds a bare id when there is nothing to carry", () => {
+    expect(buildPassword("crete-2", "")).toBe("crete-2");
+  });
 });
 
 /**
@@ -275,6 +320,45 @@ describe("面ごとに落とされる操作", () => {
 
     expect(denied).toEqual([46, 47, 48]);
     for (const stage of denied) expect(WORLDS[stage - 1].god).toBe("ゼウス");
+  });
+
+  /**
+   * 「溺れた人間の救出」 — × on all fifteen of the first stages and then
+   * largely ○ from No.16 on, with two later exceptions. The shape matters:
+   * the operation arrives mid-campaign rather than being there from the
+   * start, and can still be taken away again afterwards.
+   */
+  it("withholds 救出 on exactly the seventeen stages the source names", () => {
+    const denied = WORLDS.map((world, i) => (world.rescueAllowed ? 0 : i + 1)).filter(Boolean);
+
+    expect(denied).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 26, 39]);
+  });
+
+  /**
+   * 「敵の位置表示」「災害箇所表示」 — the two settings that take away
+   * information rather than an operation. 「表示を奪うことが難易度の軸に
+   * なっている」.
+   */
+  it("hides the enemy on exactly the eleven stages the source names", () => {
+    const hidden = WORLDS.map((world, i) => (world.enemyPositionsVisible ? 0 : i + 1)).filter(Boolean);
+
+    expect(hidden).toEqual([16, 18, 19, 25, 26, 40, 41, 42, 43, 45, 48]);
+  });
+
+  it("hides 災害箇所 on exactly the six stages the source names", () => {
+    const hidden = WORLDS.map((world, i) => (world.disasterMarkersVisible ? 0 : i + 1)).filter(Boolean);
+
+    expect(hidden).toEqual([25, 40, 41, 42, 45, 48]);
+  });
+
+  /**
+   * Every stage that hides the strikes also hides the enemy — the two are
+   * dealt as a pair at the hard end, never the other way round.
+   */
+  it("never hides 災害箇所 on a stage that still shows the enemy", () => {
+    for (const world of WORLDS) {
+      if (!world.disasterMarkersVisible) expect(world.enemyPositionsVisible).toBe(false);
+    }
   });
 
   it("keeps 底なし沼 off on exactly the five stages the source names", () => {
