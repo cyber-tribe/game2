@@ -511,6 +511,44 @@ export function nextWorldId(worldId: string): string | undefined {
  * one. Undefined for a password that doesn't match any world's id.
  */
 export function unlockedCountForPassword(password: string): number | undefined {
-  const index = WORLDS.findIndex((world) => world.id === password);
+  const index = WORLDS.findIndex((world) => world.id === passwordWorldId(password));
   return index === -1 ? undefined : index + 1;
+}
+
+/**
+ * The separator between the world a password unlocks and the experience it
+ * carries — see buildPassword.
+ */
+const PASSWORD_SEPARATOR = ".";
+
+/**
+ * A password's world half. A bare world id is still a valid password:
+ * every one game2 has handed out so far is one, and a player who wrote one
+ * down should not find it rejected because the format grew.
+ */
+export function passwordWorldId(password: string): string {
+  const separator = password.indexOf(PASSWORD_SEPARATOR);
+  return separator === -1 ? password : password.slice(0, separator);
+}
+
+/**
+ * A password's experience half, or "" when it carries none — decoded by
+ * miracleLevels.ts's decodeExperience. A password without it means a god
+ * who has learned nothing, which is what every pre-levels password was.
+ */
+export function passwordExperienceCode(password: string): string {
+  const separator = password.indexOf(PASSWORD_SEPARATOR);
+  return separator === -1 ? "" : password.slice(separator + 1);
+}
+
+/**
+ * The password handed out after clearing `worldId` — the next world plus
+ * the god's accumulated experience.
+ *
+ * game2 keeps progress on paper rather than in storage (see nextWorldId),
+ * so anything that has to survive between stages has to fit in this string.
+ * The levels do, at twelve characters.
+ */
+export function buildPassword(nextId: string, experienceCode: string): string {
+  return experienceCode ? `${nextId}${PASSWORD_SEPARATOR}${experienceCode}` : nextId;
 }

@@ -3,6 +3,10 @@ import { playMiracleSound } from "./audio/miracleSounds";
 import {
   ARMAGEDDON_MANA_COST,
   EARTHQUAKE_MANA_COST,
+  EARTHQUAKE_SHAKE_DURATION,
+  FIRE_PILLAR_LIFETIME,
+  STORM_LIFETIME,
+  TORNADO_LIFETIME,
   ENEMY_PERSONALITY_LABELS,
   REEF_MANA_COST,
   FIRE_RAIN_MANA_COST,
@@ -72,11 +76,31 @@ import { collapseSwampsNear, createSwamp } from "./game/swamp";
 import { burnFire } from "./game/fire";
 import { eruptVolcano } from "./game/volcano";
 import { raiseMegalith } from "./game/megalith";
-import { ALL_MIRACLES, WORLDS, nextWorldId, unlockedCountForPassword, type MiracleId, type WorldDefinition } from "./game/worlds";
+import {
+  ALL_MIRACLES,
+  WORLDS,
+  buildPassword,
+  nextWorldId,
+  passwordExperienceCode,
+  unlockedCountForPassword,
+  type MiracleId,
+  type WorldDefinition,
+} from "./game/worlds";
 import { EntityLayer } from "./render/EntityLayer";
 import { describeInspectableEntity } from "./render/entityInfoLabel";
 import { Hud } from "./render/Hud";
-import { MIRACLE_SCHOOLS } from "./game/miracleSchools";
+import { MIRACLE_SCHOOLS, MIRACLE_SCHOOL, type MiracleSchool } from "./game/miracleSchools";
+import {
+  awardStage,
+  decodeExperience,
+  durationScaleAt,
+  encodeExperience,
+  fungusRadiusAt,
+  levelOf,
+  lightningScatterAt,
+  noExperience,
+  type MiracleExperience,
+} from "./game/miracleLevels";
 import { IsoRenderer, visibleTileBounds, type TileBounds } from "./render/IsoRenderer";
 import { describeMatchEvent, describeStageRating, formatMatchTime } from "./render/matchEventLabels";
 import { Minimap, minimapHeight } from "./render/Minimap";
@@ -190,7 +214,14 @@ function vibrate(pattern: number | number[]): void {
   navigator.vibrate?.(pattern);
 }
 
-async function bootstrap(world: WorldDefinition) {
+async function bootstrap(world: WorldDefinition, experience: MiracleExperience = noExperience()) {
+  /**
+   * 原作の奇跡のレベル — 「各マップごとにスコアに応じて経験点が入り、各
+   * カテゴリーのレベルを上げていくことができる」. Carried in from the
+   * campaign password (see game/miracleLevels.ts); a fresh start is level 1
+   * in every school, which is the game as it has always played.
+   */
+  const levelOfSchool = (school: MiracleSchool) => levelOf(experience, school);
   const app = new Application();
   await app.init({
     resizeTo: window,
@@ -382,7 +413,18 @@ async function bootstrap(world: WorldDefinition) {
     // on #world-select next time, the same manual "code on paper" flow the
     // doc's own "パスワード" wording implies.
     if (outcome.winner === "player") {
-      const password = nextWorldId(world.id);
+      // 「各マップごとにスコアに応じて経験点が入り」 — the stage's marks are
+      // awarded to the schools the player actually cast from on it, and the
+      // result rides out in the password (see game/miracleLevels.ts).
+      const earned = awardStage(
+        experience,
+        events
+          .filter((event) => event.faction === "player" && event.type in MIRACLE_SCHOOL)
+          .map((event) => event.type as MiracleId),
+        simulation.getStageRating("player"),
+      );
+      const nextId = nextWorldId(world.id);
+      const password = nextId ? buildPassword(nextId, encodeExperience(earned)) : undefined;
       const passwordLine = document.createElement("div");
       passwordLine.id = "match-record-password";
       passwordLine.textContent = password ? `次のワールドのパスワード: ${password}` : "全ワールドを制覇しました！";
@@ -900,8 +942,15 @@ async function bootstrap(world: WorldDefinition) {
    */
   const castLightningAt = (vertex: { x: number; y: number }): boolean => {
     if (!trySpendPlayerMana(LIGHTNING_MANA_COST)) return false;
-    strikeLightning(simulation.world, heightmap, vertex, Math.random, (event) =>
-      simulation.recordImpactEffect(event),
+    // 「気レベルが上がると命中精度が上がる」 — the one miracle a level makes
+    // *accurate* rather than longer. See game/miracleLevels.ts.
+    strikeLightning(
+      simulation.world,
+      heightmap,
+      vertex,
+      Math.random,
+      (event) => simulation.recordImpactEffect(event),
+      lightningScatterAt(levelOfSchool("air")),
     );
     renderer.redraw(visibleBounds());
     simulation.recordEvent("player", "lightning");
@@ -995,7 +1044,7 @@ async function bootstrap(world: WorldDefinition) {
       // 「地震が続いている間は修復が出来ない」 — the ground along the crack
       // goes on moving for a while, and no spade works on it until it
       // stops. See game/quake.ts.
-      createQuake(simulation.world, fissure);
+      createQuake(simulation.world, fissure, EARTHQUAKE_SHAKE_DURATION * durationScaleAt(levelOfSchool("earth")));
       collapseSwampsNear(simulation.world, vertex.x, vertex.y, DEFAULT_EARTHQUAKE_RADIUS);
       renderer.redraw(visibleBounds());
       simulation.recordEvent("player", "earthquake");
@@ -1035,7 +1084,14 @@ async function bootstrap(world: WorldDefinition) {
       // and "from where I am, through where I struck" gives one for free —
       // and never sets a wandering hazard off toward your own people.
       const from = simulation.getShrinePosition("player") ?? vertex;
-      createTornado(simulation.world, vertex.x, vertex.y, vertex.x - from.x, vertex.y - from.y);
+      createTornado(
+        simulation.world,
+        vertex.x,
+        vertex.y,
+        vertex.x - from.x,
+        vertex.y - from.y,
+        TORNADO_LIFETIME * durationScaleAt(levelOfSchool("air")),
+      );
       simulation.recordEvent("player", "tornado");
       triggerShake(4);
       vibrate([20, 20, 20]);
@@ -1065,7 +1121,7 @@ async function bootstrap(world: WorldDefinition) {
 
     if (toolMode === "storm") {
       if (!trySpendPlayerMana(STORM_MANA_COST)) return;
-      createStorm(simulation.world, vertex.x, vertex.y);
+      createStorm(simulation.world, vertex.x, vertex.y, STORM_LIFETIME * durationScaleAt(levelOfSchool("air")));
       simulation.recordEvent("player", "storm");
       triggerShake(3);
       vibrate([20, 30, 20, 30]);
@@ -1079,7 +1135,14 @@ async function bootstrap(world: WorldDefinition) {
       // caster's own shrine, through the tapped point. It wanders from
       // there, so this is a push rather than a path.
       const from = simulation.getShrinePosition("player") ?? vertex;
-      createFirePillar(simulation.world, vertex.x, vertex.y, vertex.x - from.x, vertex.y - from.y);
+      createFirePillar(
+        simulation.world,
+        vertex.x,
+        vertex.y,
+        vertex.x - from.x,
+        vertex.y - from.y,
+        FIRE_PILLAR_LIFETIME * durationScaleAt(levelOfSchool("fire")),
+      );
       simulation.recordEvent("player", "firePillar");
       triggerShake(4);
       vibrate([30, 15, 30]);
@@ -1203,7 +1266,10 @@ async function bootstrap(world: WorldDefinition) {
     if (toolMode === "fungus") {
       // Nothing takes root on water, rock, a crevice or a road.
       if (!canAffordPlayerMana(FUNGUS_MANA_COST)) return;
-      if (applyFungus(heightmap, vertex.x, vertex.y).length === 0) {
+      // 「植物のレベルが高いと一瞬かなりえげつないことになる」 — sown
+      // wider, which is what makes the automaton take off rather than
+      // wither. See game/miracleLevels.ts.
+      if (applyFungus(heightmap, vertex.x, vertex.y, fungusRadiusAt(levelOfSchool("plant"))).length === 0) {
         showEntityInfo("ここには毒カビが根付きません", "warning");
         return;
       }
@@ -1804,8 +1870,26 @@ function showWorldSelect(): void {
   if (!panel || !list) return;
 
   let unlockedCount = 1;
+  /** 奇跡のレベル carried in on the password — see game/miracleLevels.ts. */
+  let experience = noExperience();
+
+  const levelsRow = document.getElementById("world-select-levels");
+
+  /**
+   * 「各カテゴリーのレベル」 — shown only once something has been learned.
+   * A row of level 1s on a fresh start would be six numbers that mean
+   * nothing yet, and the player has no way to act on them anyway.
+   */
+  const renderLevels = () => {
+    if (!levelsRow) return;
+    const trained = MIRACLE_SCHOOLS.filter(({ id }) => levelOf(experience, id) > 1);
+    levelsRow.textContent = trained.length
+      ? `奇跡のレベル　${trained.map(({ id, label }) => `${label} Lv${levelOf(experience, id)}`).join("　")}`
+      : "";
+  };
 
   const renderList = () => {
+    renderLevels();
     list.replaceChildren(
       ...WORLDS.map((world, index) => {
         const locked = index >= unlockedCount;
@@ -1850,7 +1934,7 @@ function showWorldSelect(): void {
         if (!locked) {
           button.addEventListener("click", () => {
             panel.classList.add("hidden");
-            bootstrap(world);
+            bootstrap(world, experience);
           });
         }
         return button;
@@ -1861,12 +1945,18 @@ function showWorldSelect(): void {
 
   passwordSubmit?.addEventListener("click", () => {
     if (!passwordInput) return;
-    const count = unlockedCountForPassword(passwordInput.value.trim());
+    const entered = passwordInput.value.trim();
+    const count = unlockedCountForPassword(entered);
     if (count === undefined) {
       passwordError?.classList.remove("hidden");
       return;
     }
     unlockedCount = Math.max(unlockedCount, count);
+    // A password from before the levels existed carries no code, and a
+    // mistyped one decodes to nothing: either way the god simply starts
+    // over at level 1 rather than the world select refusing an unlock it
+    // has already accepted.
+    experience = decodeExperience(passwordExperienceCode(entered)) ?? experience;
     passwordInput.value = "";
     passwordError?.classList.add("hidden");
     renderList();
