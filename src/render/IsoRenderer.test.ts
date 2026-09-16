@@ -7,6 +7,7 @@ import {
   TILE_HEIGHT,
   TILE_WIDTH,
   faceBrightnessOf,
+  heightTint,
   isWithinTileBounds,
   turfFillFor,
   visibleTileBounds,
@@ -41,6 +42,14 @@ function drawInstructions(renderer: IsoRenderer) {
     action: string;
     data: { style?: { color: number; texture?: Texture } };
   }[];
+}
+
+/** The single turf texture tile (2, 2) is painted with. */
+function turfOf(heightmap: Heightmap): Texture {
+  const renderer = new IsoRenderer(heightmap);
+  renderer.redraw({ minX: 2, maxX: 2, minY: 2, maxY: 2 });
+  const [fill] = drawInstructions(renderer).filter((i) => i.action === "fill");
+  return fill.data.style!.texture!;
 }
 
 function channels(color: number): [number, number, number] {
@@ -372,29 +381,46 @@ describe("IsoRenderer.redraw (sloped mesh)", () => {
     expect(drawInstructions(renderer).filter((i) => i.action === "fill")).toHaveLength(1);
   });
 
-  it("gives a slope the turf of its own shade, and a flat tile the unshaded one", () => {
+  it("shades a tile by its slope and its height together", () => {
     const tileCorners = (heightmap: Heightmap, x: number, y: number): Vec3[] => [
       { x, y, z: heightmap.vertices[y][x] },
       { x: x + 1, y, z: heightmap.vertices[y][x + 1] },
       { x: x + 1, y: y + 1, z: heightmap.vertices[y + 1][x + 1] },
       { x, y: y + 1, z: heightmap.vertices[y + 1][x] },
     ];
-    const turfOf = (heightmap: Heightmap): Texture => {
-      const renderer = new IsoRenderer(heightmap);
-      renderer.redraw({ minX: 2, maxX: 2, minY: 2, maxY: 2 });
-      const [fill] = drawInstructions(renderer).filter((i) => i.action === "fill");
-      return fill.data.style!.texture!;
-    };
+    const averageZ = (corners: Vec3[]): number => corners.reduce((sum, c) => sum + c.z, 0) / corners.length;
 
+    // Level ground carries no slope shading at all, so its height is the
+    // only thing left to say about it.
     const flat = flatHeightmap(6, 6, 5);
     flat.terrain = "desert";
-    expect(turfOf(flat)).toBe(turfFillFor("desert", 1).texture);
+    expect(turfOf(flat)).toBe(turfFillFor("desert", heightTint(5)).texture);
 
     const sloped = flatHeightmap(6, 6, 5);
     sloped.terrain = "desert";
     sloped.vertices[2][2] += 4;
-    expect(turfOf(sloped)).toBe(turfFillFor("desert", faceBrightnessOf(tileCorners(sloped, 2, 2))).texture);
-    expect(turfOf(sloped)).not.toBe(turfFillFor("desert", 1).texture);
+    const corners = tileCorners(sloped, 2, 2);
+    expect(turfOf(sloped)).toBe(
+      turfFillFor("desert", faceBrightnessOf(corners) * heightTint(averageZ(corners))).texture,
+    );
+    expect(turfOf(sloped)).not.toBe(turfOf(flat));
+  });
+
+  /**
+   * The whole point of the height tint, per feedback: 「高度が読み取りに
+   * くいです。上なのか下なのか分かりにくいので、平坦にするためには上げ
+   * たら良いのか下げたら良いのかがわからない」. Two level plateaus are
+   * equally flat, so Lambert shading has nothing to say about either, and
+   * they used to be drawn pixel-identical — leaving vertical screen
+   * position, which an isometric view cannot tell apart from depth, as the
+   * only cue.
+   */
+  it("draws two level plateaus at different heights in different shades, lighter higher", () => {
+    const low = flatHeightmap(6, 6, 2);
+    const high = flatHeightmap(6, 6, 8);
+
+    expect(turfOf(low)).not.toBe(turfOf(high));
+    expect(heightTint(8)).toBeGreaterThan(heightTint(2));
   });
 
   it("dithers a flat grass square with the speckled texture instead of a flat color", () => {
@@ -508,6 +534,44 @@ describe("faceBrightnessOf", () => {
   it("lightens a face turned toward the light and darkens one turned away", () => {
     expect(faceBrightnessOf(tile(4.5, 4.5, 5, 5))).toBeGreaterThan(1);
     expect(faceBrightnessOf(tile(5.5, 5.5, 5, 5))).toBeLessThan(1);
+  });
+});
+
+/**
+ * The other half of a tile's shade — see HEIGHT_TINT_PER_STEP. These are
+ * the rules a player has to be able to rely on to read a map: brighter is
+ * always higher, one step is always a visible amount, and the extremes
+ * never wash out.
+ */
+describe("heightTint", () => {
+  it("leaves the midpoint elevation at the terrain's own colour", () => {
+    expect(heightTint(3)).toBeCloseTo(1);
+  });
+
+  it("rises with elevation, so brighter always means higher", () => {
+    for (let elevation = 0; elevation < 6; elevation++) {
+      expect(heightTint(elevation + 1)).toBeGreaterThan(heightTint(elevation));
+    }
+  });
+
+  /**
+   * A step has to survive turfFillFor's quantization, or neighbouring
+   * elevations collapse back into the same texture and the cue is gone
+   * again for exactly the small differences it is there to show.
+   */
+  it("separates two adjacent elevations by more than one turf shade bucket", () => {
+    expect(turfFillFor("grass", heightTint(4)).texture).not.toBe(turfFillFor("grass", heightTint(5)).texture);
+  });
+
+  /**
+   * Clamped at the top, so a volcano's peak is still ground rather than a
+   * white hole. The bottom of the generated range is left well inside the
+   * clamp — see MAX_HEIGHT_TINT.
+   */
+  it("saturates above the generated range instead of blowing out to white", () => {
+    expect(heightTint(20)).toBe(heightTint(7));
+    expect(heightTint(20)).toBeLessThan(1.35);
+    expect(heightTint(0)).toBeGreaterThan(0.7);
   });
 });
 

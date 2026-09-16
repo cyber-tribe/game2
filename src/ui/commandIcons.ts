@@ -11,6 +11,9 @@ const BEHAVIOR_ICON: Record<BehaviorMode, IconKind> = {
   fight: "fight",
 };
 
+/** Which pixel icon each modifier toggle gets — see wireToolbar. */
+const TOGGLE_ICON = { wideEdit: "wideEdit" } as const satisfies Record<string, IconKind>;
+
 /** Which pixel icon each ToolMode button gets — 1:1 with IconKind by name for every miracle/terrain tool. */
 const TOOL_ICON: Record<ToolMode, IconKind> = {
   raise: "raise",
@@ -66,5 +69,10 @@ export function mountCommandIcons(): void {
   for (const button of document.querySelectorAll<HTMLButtonElement>("#toolbar [data-tool]")) {
     const tool = button.dataset.tool as ToolMode;
     button.prepend(createIconCanvas(TOOL_ICON[tool]));
+  }
+  // Modifiers rather than tools — they change how the selected tool
+  // behaves instead of replacing it, so they carry their own icon name.
+  for (const button of document.querySelectorAll<HTMLButtonElement>("#toolbar [data-toggle]")) {
+    button.prepend(createIconCanvas(TOGGLE_ICON[button.dataset.toggle as keyof typeof TOGGLE_ICON]));
   }
 }

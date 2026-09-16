@@ -435,6 +435,58 @@ const TURF_HEIGHT = TILE_HEIGHT;
  */
 const TURF_SHADE_STEPS = 24;
 
+/**
+ * How much one elevation step lightens the ground it covers.
+ *
+ * Without this the map does not show height at all. Shading here is
+ * Lambert (see faceBrightnessOf): it reads a face's *slope*, and
+ * fillTerrainQuad gives every flat tile a brightness of exactly 1 — so a
+ * plateau at elevation 2 and a plateau at elevation 7 are drawn
+ * **pixel-identical**, and in an isometric view the only remaining cue,
+ * vertical screen position, is indistinguishable from depth. Per feedback:
+ * 「高度が読み取りにくいです。上なのか下なのか分かりにくいので、平坦に
+ * するためには上げたら良いのか下げたら良いのかがわからない」.
+ *
+ * Lighter is higher, which is the language the world map already speaks
+ * (see Minimap's terrainColorAt, 「高さを4段階の明暗に量子化」 per
+ * plan/archived/0087) — the two views should not disagree about which way
+ * is up. The original's own players read heights as countable steps
+ * (「1段まで下げたほうが」「3段以上の土地」 in the walkthrough), so the
+ * information is meant to be on the map.
+ *
+ * Deliberately smaller than the slope range (MAX_SLOPE_DARKEN /
+ * MAX_SLOPE_LIGHTEN): on a slope the Lambert term dominates and should,
+ * because there the shape is already visible. This is for the flats, where
+ * there is currently no signal whatsoever.
+ */
+const HEIGHT_TINT_PER_STEP = 0.08;
+
+/**
+ * Ceiling on that tint. Placed so the whole band createHeightmap actually
+ * generates (0〜7) stays strictly monotonic — every step in it is a step
+ * you can see — and only ground raised past that, a mountain or a
+ * volcano's 20, saturates rather than blowing out to white. Terrain that
+ * high is steep terrain, where the Lambert term is already doing the work.
+ * The clamp's other end is never reached: MIN_ELEVATION is 0, which sits
+ * inside it.
+ */
+const MAX_HEIGHT_TINT = 0.32;
+
+/**
+ * The elevation that reads as neutral, i.e. exactly the terrain's own
+ * colour — the median of what createHeightmap generates (0〜7, median 3).
+ * Fixed rather than tracking waterLevel: "lighter is higher" is only worth
+ * learning if it means the same thing all match, and a flood would
+ * otherwise silently repaint every hill the player had already read.
+ */
+const HEIGHT_TINT_MIDPOINT = 3;
+
+/** See HEIGHT_TINT_PER_STEP. Exported so the shading test can hold the rule. */
+export function heightTint(elevation: number): number {
+  const offset = (elevation - HEIGHT_TINT_MIDPOINT) * HEIGHT_TINT_PER_STEP;
+  return 1 + Math.max(-MAX_HEIGHT_TINT, Math.min(MAX_HEIGHT_TINT, offset));
+}
+
 const turfFills = new Map<string, { texture: Texture; textureSpace: "global" }>();
 
 /**
@@ -1047,7 +1099,11 @@ export class IsoRenderer {
       points.push(projected.sx, projected.sy);
     }
     const isFlat = corners.every((corner) => Math.abs(corner.z - corners[0].z) < FLAT_EPSILON);
-    const brightness = isFlat ? 1 : faceBrightnessOf(corners);
+    // Slope *and* height. The Lambert term alone says nothing about a flat
+    // tile — see HEIGHT_TINT_PER_STEP, which is the whole reason the second
+    // factor is here.
+    const averageZ = (corners[0].z + corners[1].z + corners[2].z + corners[3].z) / 4;
+    const brightness = (isFlat ? 1 : faceBrightnessOf(corners)) * heightTint(averageZ);
 
     // `hasOwnColor` marks the tiles that are not ordinary ground at all —
     // a crevice, a wall, a boulder, cooling lava rock. Those replace the

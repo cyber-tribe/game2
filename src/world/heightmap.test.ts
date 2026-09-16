@@ -33,6 +33,7 @@ import {
   FUNGUS_WITHER_CHANCE,
   applyVolcano,
   resumeLava,
+  spadeBlock,
   VOLCANO_PUDDLES,
   VOLCANO_PUDDLE_RING,
   countFlatNeighbors,
@@ -1928,3 +1929,59 @@ describe("touchesLand", () => {
   });
 });
 
+/**
+ * 原作「便利な操作としては**Ｌ＋Ａで3×3マスを1段上げ**……Ｌ＋Ｂで3×3マスを
+ * 1段下げる」——スマホでは1頂点を狙うこと自体が難しいので、狙いの精度を
+ * 上げる代わりに**精度が要らないようにする**（`plan/0165`）。
+ */
+describe("spadeBlock", () => {
+  const map = flatHeightmap(20, 20, 3);
+
+  it("is just the vertex itself at size 1", () => {
+    expect(spadeBlock(map, { x: 10, y: 10 }, 1)).toEqual([{ x: 10, y: 10 }]);
+  });
+
+  it("is the 3×3 around it at size 3, centred on the tap", () => {
+    const block = spadeBlock(map, { x: 10, y: 10 }, 3);
+
+    expect(block).toHaveLength(9);
+    expect(block).toContainEqual({ x: 10, y: 10 });
+    expect(block).toContainEqual({ x: 9, y: 9 });
+    expect(block).toContainEqual({ x: 11, y: 11 });
+    for (const { x, y } of block) {
+      expect(Math.max(Math.abs(x - 10), Math.abs(y - 10))).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("clips at the map's edge rather than running off it", () => {
+    const corner = spadeBlock(map, { x: 0, y: 0 }, 3);
+
+    expect(corner).toHaveLength(4); // a quarter of the block is off the map
+    for (const { x, y } of corner) {
+      expect(x).toBeGreaterThanOrEqual(0);
+      expect(y).toBeGreaterThanOrEqual(0);
+    }
+    expect(spadeBlock(map, { x: 20, y: 20 }, 3)).toHaveLength(4);
+  });
+
+  it("never repeats a vertex", () => {
+    const block = spadeBlock(map, { x: 5, y: 5 }, 3);
+    expect(new Set(block.map(({ x, y }) => `${x},${y}`)).size).toBe(block.length);
+  });
+
+  /** An even size has no centre vertex, so it rounds down to the odd one below. */
+  it("treats an even size as the odd size below it", () => {
+    expect(spadeBlock(map, { x: 5, y: 5 }, 2)).toEqual(spadeBlock(map, { x: 5, y: 5 }, 1));
+    expect(spadeBlock(map, { x: 5, y: 5 }, 4)).toEqual(spadeBlock(map, { x: 5, y: 5 }, 3));
+  });
+
+  it("snaps a fractional tap to the nearest vertex before blocking out", () => {
+    expect(spadeBlock(map, { x: 5.4, y: 5.6 }, 1)).toEqual([{ x: 5, y: 6 }]);
+  });
+
+  it("never returns nothing, however the size is abused", () => {
+    for (const size of [0, -3, 0.5]) {
+      expect(spadeBlock(map, { x: 5, y: 5 }, size)).toEqual([{ x: 5, y: 5 }]);
+    }
+  });
+});
