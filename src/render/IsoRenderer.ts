@@ -40,7 +40,7 @@ const ELEVATION_EASE_TIME_CONSTANT = 0.05;
  * hard vertical drop is the map's own outer edge (see drawEdgeWall) — never
  * routine terrain. An earlier version tried the opposite: flatten every
  * tile to its own average height and paint a flat-shaded vertical wall
- * wherever that differed from a neighbor (plan/0064-terraced-terrain.md),
+ * wherever that differed from a neighbor (plan/archived/0064-terraced-terrain.md),
  * tuning the wall's darkness down for small drops and rounding elevations
  * to hide createHeightmap's routine 1-2 unit noise (plan/0073-grass-cliff-
  * legibility.md) — but no amount of tuning a wall's *color* fixes a slope
@@ -350,7 +350,7 @@ function tileHash(x: number, y: number): number {
 }
 
 /**
- * One frame of a simple pixel-art water animation — per plan/0087's
+ * One frame of a simple pixel-art water animation — per plan/archived/0087's
  * "SFCゲームとして動いて見える水" (not a realistic shader/reflection): a
  * few horizontal wave-crest bands, offset by `phase` (0..1) so consecutive
  * frames read as the crests scrolling sideways. `phase` shifts the sine
@@ -365,7 +365,7 @@ function createWaveTexture(size: number, baseColor: number, waveColor: number, p
     // A gentle per-row offset (y * 0.4, not a steep diagonal) keeps this
     // reading as wavy crest lines rather than a rigid horizontal stripe,
     // and a high threshold (0.75) keeps the crest itself a thin
-    // highlight rather than filling half of each band — per plan/0087's
+    // highlight rather than filling half of each band — per plan/archived/0087's
     // own "リアルな水ではなくSFCゲームとして動いて見える水" (a couple of
     // thin bright pixels, not a bold candy-stripe).
     const wave = Math.sin(((x / size) * WATER_WAVE_CYCLES + phase) * Math.PI * 2 + y * 0.4);
@@ -435,6 +435,58 @@ const TURF_HEIGHT = TILE_HEIGHT;
  */
 const TURF_SHADE_STEPS = 24;
 
+/**
+ * How much one elevation step lightens the ground it covers.
+ *
+ * Without this the map does not show height at all. Shading here is
+ * Lambert (see faceBrightnessOf): it reads a face's *slope*, and
+ * fillTerrainQuad gives every flat tile a brightness of exactly 1 — so a
+ * plateau at elevation 2 and a plateau at elevation 7 are drawn
+ * **pixel-identical**, and in an isometric view the only remaining cue,
+ * vertical screen position, is indistinguishable from depth. Per feedback:
+ * 「高度が読み取りにくいです。上なのか下なのか分かりにくいので、平坦に
+ * するためには上げたら良いのか下げたら良いのかがわからない」.
+ *
+ * Lighter is higher, which is the language the world map already speaks
+ * (see Minimap's terrainColorAt, 「高さを4段階の明暗に量子化」 per
+ * plan/archived/0087) — the two views should not disagree about which way
+ * is up. The original's own players read heights as countable steps
+ * (「1段まで下げたほうが」「3段以上の土地」 in the walkthrough), so the
+ * information is meant to be on the map.
+ *
+ * Deliberately smaller than the slope range (MAX_SLOPE_DARKEN /
+ * MAX_SLOPE_LIGHTEN): on a slope the Lambert term dominates and should,
+ * because there the shape is already visible. This is for the flats, where
+ * there is currently no signal whatsoever.
+ */
+const HEIGHT_TINT_PER_STEP = 0.08;
+
+/**
+ * Ceiling on that tint. Placed so the whole band createHeightmap actually
+ * generates (0〜7) stays strictly monotonic — every step in it is a step
+ * you can see — and only ground raised past that, a mountain or a
+ * volcano's 20, saturates rather than blowing out to white. Terrain that
+ * high is steep terrain, where the Lambert term is already doing the work.
+ * The clamp's other end is never reached: MIN_ELEVATION is 0, which sits
+ * inside it.
+ */
+const MAX_HEIGHT_TINT = 0.32;
+
+/**
+ * The elevation that reads as neutral, i.e. exactly the terrain's own
+ * colour — the median of what createHeightmap generates (0〜7, median 3).
+ * Fixed rather than tracking waterLevel: "lighter is higher" is only worth
+ * learning if it means the same thing all match, and a flood would
+ * otherwise silently repaint every hill the player had already read.
+ */
+const HEIGHT_TINT_MIDPOINT = 3;
+
+/** See HEIGHT_TINT_PER_STEP. Exported so the shading test can hold the rule. */
+export function heightTint(elevation: number): number {
+  const offset = (elevation - HEIGHT_TINT_MIDPOINT) * HEIGHT_TINT_PER_STEP;
+  return 1 + Math.max(-MAX_HEIGHT_TINT, Math.min(MAX_HEIGHT_TINT, offset));
+}
+
 const turfFills = new Map<string, { texture: Texture; textureSpace: "global" }>();
 
 /**
@@ -484,7 +536,7 @@ const WATER_WAVE_SIZE = 16;
 const WATER_WAVE_COLOR = lerpColor(WATER_COLOR, 0xffffff, 0.35);
 /** How many distinct animation frames the water cycles through — see WATER_FRAMES/waterFrameIndex. */
 const WATER_FRAME_COUNT = 3;
-/** Frames per second the water animation advances — slow and gentle, per plan/0087's "動いて見える" rather than a fast realistic ripple. */
+/** Frames per second the water animation advances — slow and gentle, per plan/archived/0087's "動いて見える" rather than a fast realistic ripple. */
 const WATER_FRAME_RATE = 2;
 const WATER_FRAMES: { texture: Texture; textureSpace: "global" }[] = Array.from({ length: WATER_FRAME_COUNT }, (_, i) => ({
   texture: createWaveTexture(WATER_WAVE_SIZE, WATER_COLOR, WATER_WAVE_COLOR, i / WATER_FRAME_COUNT),
@@ -563,7 +615,7 @@ const TILE_BOUNDS_MARGIN = Math.ceil(MAX_ELEVATION / 2) + 2;
  * TILE_BOUNDS_MARGIN). Lets redraw() skip tiles nowhere near the camera
  * instead of rebuilding the whole map's mesh every frame regardless of
  * zoom/pan — necessary once the map is much bigger than a single screen
- * (see plan/0062-original-scale-map.md), the same technical constraint the
+ * (see plan/archived/0062-original-scale-map.md), the same technical constraint the
  * original game's own hardware was built around. Pulled out as a pure
  * function so the tile selection is unit-testable without a Graphics/
  * canvas context or a live PixiJS view.
@@ -606,7 +658,7 @@ export function visibleTileBounds(
  * the far vertex of the last visible tile (x = bounds.maxX + 1) still
  * counts. Used by main.ts's "is any of the player's own walkers/houses/
  * shrine currently on screen" check — see
- * plan/0063-visibility-gated-casting.md.
+ * plan/archived/0063-visibility-gated-casting.md.
  */
 export function isWithinTileBounds(point: { x: number; y: number }, bounds: TileBounds): boolean {
   return (
@@ -620,7 +672,7 @@ export function isWithinTileBounds(point: { x: number; y: number }, bounds: Tile
  * difference between tiles reads as a continuous, shaded slope rather than
  * a flat block with a separate vertical cliff face — see redraw() and
  * LIGHT_DIRECTION's own doc comment for why (plan/0073-grass-cliff-
- * legibility.md's "追記" section, and plan/0064-terraced-terrain.md for
+ * legibility.md's "追記" section, and plan/archived/0064-terraced-terrain.md for
  * the flat-block approach this replaced). The map's own outer edge is the
  * one place that still gets a genuine vertical wall (see drawEdgeWall) —
  * every reference image checked against this renderer agrees a real,
@@ -689,7 +741,7 @@ export class IsoRenderer {
    * `bounds`. Lets the caller (main.ts's ticker) skip rebuilding the whole
    * terrain mesh on a frame where nothing *visible* would actually look
    * different — the dominant cost once the map is much bigger than one
-   * screen (see plan/0062-original-scale-map.md). Scoped to `bounds`
+   * screen (see plan/archived/0062-original-scale-map.md). Scoped to `bounds`
    * rather than the whole map on purpose: the enemy AI terraforms and
    * fights continuously wherever its own houses are, often nowhere near
    * the player's current view, and that shouldn't by itself keep forcing
@@ -767,7 +819,7 @@ export class IsoRenderer {
    * of pickVertex, used by the raise/lower terrain tool so one edit
    * affects a whole tile at once instead of a single corner point, per
    * the original game's tile-based terraforming (see
-   * plan/0065-tile-based-terraform.md). Same maxDistance semantics as
+   * plan/archived/0065-tile-based-terraform.md). Same maxDistance semantics as
    * pickVertex. A tile's center sits at its 4 corners' average height —
    * exactly what `sampleElevation` at the tile's midpoint (x+0.5, y+0.5)
    * already computes, so this reads the true heightmap rather than
@@ -918,7 +970,7 @@ export class IsoRenderer {
           // a whole lake is one continuous color, so outlining every tile
           // seam would draw a visible grid across it for no reason. A
           // simple pixel wave animation (see WATER_FRAMES/waterFrameIndex)
-          // replaces the old flat WATER_COLOR fill, per plan/0087.
+          // replaces the old flat WATER_COLOR fill, per plan/archived/0087.
           const p0 = this.toScreen(x, y, avgElevation);
           const p1 = this.toScreen(x + 1, y, avgElevation);
           const p2 = this.toScreen(x + 1, y + 1, avgElevation);
@@ -1047,7 +1099,11 @@ export class IsoRenderer {
       points.push(projected.sx, projected.sy);
     }
     const isFlat = corners.every((corner) => Math.abs(corner.z - corners[0].z) < FLAT_EPSILON);
-    const brightness = isFlat ? 1 : faceBrightnessOf(corners);
+    // Slope *and* height. The Lambert term alone says nothing about a flat
+    // tile — see HEIGHT_TINT_PER_STEP, which is the whole reason the second
+    // factor is here.
+    const averageZ = (corners[0].z + corners[1].z + corners[2].z + corners[3].z) / 4;
+    const brightness = (isFlat ? 1 : faceBrightnessOf(corners)) * heightTint(averageZ);
 
     // `hasOwnColor` marks the tiles that are not ordinary ground at all —
     // a crevice, a wall, a boulder, cooling lava rock. Those replace the

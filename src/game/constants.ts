@@ -30,7 +30,7 @@ export const DEFAULT_WALKER_SPEED = 1.5;
 
 /**
  * Tiles per second for every walker once 最終決戦 has been triggered —
- * see armageddon.ts and plan/0046-final-battle-pacing.md. Slower than
+ * see armageddon.ts and plan/archived/0046-final-battle-pacing.md. Slower than
  * DEFAULT_WALKER_SPEED: measured with the mana/pacing fixes in plan/0043-
  * 0045 already in place, the final battle itself (armageddon → game over)
  * still only took ~22s on average, mostly spent marching to the center —
@@ -40,6 +40,18 @@ export const DEFAULT_WALKER_SPEED = 1.5;
  * houses — takes long enough to feel like the finale it's meant to be.
  */
 export const FINAL_BATTLE_WALKER_SPEED = 0.5;
+
+/**
+ * How wide one spade tap reaches with the 3×3 modifier on — 原作「便利な
+ * 操作としては**Ｌ＋Ａで3×3マスを1段上げ**(ＡＡＢと同じ効果)、Ｌ＋Ｂで
+ * 3×3マスを1段下げる」.
+ *
+ * Three because the original says three, and because it happens to be the
+ * size of the problem on a phone: adjacent vertices sit 32px apart across
+ * and 16px down at the map's usual scale, so a fingertip already covers
+ * roughly this much. See main.ts's spadeVertices.
+ */
+export const WIDE_EDIT_SIZE = 3;
 
 /** Radius (in tiles) a "seeking" walker without a target wanders within. */
 export const DEFAULT_WANDER_RADIUS = 6;
@@ -286,27 +298,45 @@ export const IMPACT_EFFECT_DURATION = 0.5;
 export const DISASTER_MARKER_DURATION = 12;
 
 /**
- * What each of the original's four score sources is worth — 「経験点の
- * 稼ぎ方（効果の高い順）：地下巨石・岩礁を使う／敵リーダーを倒す／
- * ウォーカー同士の直接戦闘に勝つ／時間が経つ」 (see game/score.ts).
+ * What the original actually says a score is made of.
  *
- * The *order* is the original's and is what these numbers exist to
- * preserve: one 地下巨石 or 岩礁 outweighs a leader, a leader outweighs a
- * won fight, and a won fight outweighs a good many seconds of simply being
- * alive. The magnitudes are game2's own, calibrated against a real match
- * rather than borrowed from the original's five-figure scale — see
- * stageRating on why that scale is deliberately not transplanted.
+ * Two things, and only two:
+ *
+ * - 地下巨石「この神技には**「なぜか経験点が非常に高い」**という特徴が
+ *   あるため、もっぱら点数稼ぎに使われる」
+ * - 岩礁「**地下巨石ほどではない**がそれなりに経験点が入るので点数稼ぎに」
+ *
+ * This used to be four sources — 地下巨石・岩礁 / 敵リーダーを倒す /
+ * 直接戦闘に勝つ / 時間が経つ — quoted from a "経験点の稼ぎ方（効果の高い
+ * 順）" line in docs/original-miracles.md. **That line is not in the
+ * source.** Searching the guide's twenty-two pages: 「効果の高い順」 0 hits,
+ * 「稼ぎ方」 0 hits, and the two combat entries appear only as tactics,
+ * never as scoring. It was written into game2's own notes and then built
+ * on (see plan/0167).
+ *
+ * The two that survive are not equal either: the guide puts 地下巨石 well
+ * above 岩礁, and they used to share one value.
  */
 export const SCORE_VALUE = {
-  /** 地下巨石 and 岩礁 — 「低コストでスコア効率が高い」. */
-  stonework: 300,
-  /** Killing the opposing リーダー. */
-  enemyLeader: 120,
-  /** Winning one walker-on-walker fight. */
-  fightWon: 20,
+  /** 地下巨石 — 「なぜか経験点が非常に高い」, and the reason to cast it at all. */
+  megalith: 300,
+  /** 岩礁 — 「地下巨石ほどではないがそれなりに」. Worth casting for points, worth less. */
+  reef: 120,
 } as const;
 
-/** Score for simply staying in the match, per second. The weakest source, as the original ranks it. */
+/**
+ * Score for simply staying in the match, per second.
+ *
+ * **game2's own, not the original's.** The guide never names a third
+ * source, but it does say a stage without 地下巨石 has a problem —
+ * 「ただし地下巨石は無いので、他の方法でスコアを確保したいところです」
+ * (No.34-36) — so something else must exist; it just never says what. A
+ * slow trickle is the smallest thing that keeps such a stage scoreable
+ * without inventing a mechanic the source is silent about.
+ *
+ * Deliberately tiny against the two real sources: ten minutes of it is
+ * worth two 地下巨石.
+ */
 export const SCORE_PER_SECOND = 1;
 
 /**
@@ -360,8 +390,8 @@ export const MIRACLE_LEVEL_MIN_SCATTER = 0.75;
  * terrain-based flat-land scarcity is implemented.
  *
  * Raised from 8 to 12 alongside the map going from 20x20 to 32x32
- * (plan/0055-map-expansion.md), then to 48 when every world became a fixed
- * 64x64 (plan/0062-original-scale-map.md) — in both cases deliberately
+ * (plan/archived/0055-map-expansion.md), then to 48 when every world became a fixed
+ * 64x64 (plan/archived/0062-original-scale-map.md) — in both cases deliberately
  * scaled right along with the tile count (so maxHousesPerFaction itself
  * stays roughly flat, ~85, across all three sizes) rather than growing
  * with it. A bigger map is meant to buy more geographic space (room for
@@ -659,6 +689,23 @@ export const HELEN_CAPTIVE_DRAIN_RATE = 0.03;
 export const GUARDIAN_MANA_COST = 25;
 
 /**
+ * What each hero costs to promote to, in one table.
+ *
+ * Lived in main.ts until the enemy god started choosing among them too
+ * (see systems/enemyMiracles.ts and WorldDefinition's enemyHero) — both
+ * sides pay the same price for the same hero, so both read the same table.
+ */
+export const HERO_MANA_COST: Record<HeroKind, number> = {
+  perseus: PERSEUS_MANA_COST,
+  hercules: HERCULES_MANA_COST,
+  odysseus: ODYSSEUS_MANA_COST,
+  achilles: ACHILLES_MANA_COST,
+  adonis: ADONIS_MANA_COST,
+  helen: HELEN_MANA_COST,
+  guardian: GUARDIAN_MANA_COST,
+};
+
+/**
  * What each hero kind multiplies its leader's strength and speed by when
  * the miracle lands — see hero.ts's promoteHero.
  *
@@ -711,7 +758,7 @@ export const GUARDIAN_DEFENSE_RADIUS = 4;
  * every tick, so a single one could burn/capture through a whole
  * undefended settlement in seconds, collapsing the "小競り合い→復興/逆転"
  * phases a match is meant to have into a single instant (see
- * plan/0044-knight-cooldown.md). Matches the scale of other AI decision
+ * plan/archived/0044-knight-cooldown.md). Matches the scale of other AI decision
  * intervals in this file (ENEMY_AI_DECISION_INTERVAL etc.) rather than
  * being a much larger, separate design.
  */
@@ -792,7 +839,7 @@ export const ARMAGEDDON_POPULATION_RATIO = 1.8;
 /**
  * Seconds since match start before the enemy AI will trigger 最終決戦,
  * however lopsided ARMAGEDDON_POPULATION_RATIO already is — see
- * enemyMiracles.ts, plan/0045-armageddon-timing.md, and plan/0053-
+ * enemyMiracles.ts, plan/archived/0045-armageddon-timing.md, and plan/0053-
  * match-length-tuning.md. A match's early population numbers are noisy (a
  * house's in-progress population resets to 0 every time it overflows into
  * a walker) and can swing past the ratio within the first minute or two
@@ -805,7 +852,7 @@ export const ARMAGEDDON_POPULATION_RATIO = 1.8;
  *
  * Raised from 180s (3 minutes) to 600s (10 minutes) once the 180s floor
  * was measured to no longer be the binding constraint — an AI-vs-AI match
- * (see plan/0053-match-length-tuning.md's measurement method) was already
+ * (see plan/archived/0053-match-length-tuning.md's measurement method) was already
  * averaging ~250s on its own by the time ARMAGEDDON_POPULATION_RATIO was
  * actually reached, well past the old floor. 600s pushes the measured
  * average to ~680s (~11-12 minutes), inside the 10-15 minute range a
@@ -826,7 +873,7 @@ export const VOLCANO_POPULATION_RATIO = 1.3;
  * How much an EnemyPersonality (see worlds.ts) biases enemyMiracles.ts's
  * escalation math, on top of (not instead of) the per-world difficulty
  * knobs above — the qualitative "character" axis docs/game-system.md's
- * 敵AI section was missing (see plan/0072-enemy-personality.md): earlier
+ * 敵AI section was missing (see plan/archived/0072-enemy-personality.md): earlier
  * worlds all played the exact same way, just faster/more trigger-happy.
  *
  * - `volcanoRatioMultiplier`/`armageddonRatioMultiplier` scale

@@ -1,21 +1,15 @@
 import { MAX_STAGE_MARKS, SCORE_PER_SECOND, SCORE_VALUE } from "./constants";
 
 /**
- * What a stage's score is made of — 原作「経験点の稼ぎ方（効果の高い順）：
- * **地下巨石・岩礁を使う**／敵リーダーを倒す／ウォーカー同士の直接戦闘に
- * 勝つ／時間が経つ」(docs/original-miracles.md).
- *
- * The order in that sentence is the whole design: the two *building*
- * miracles are worth more than any amount of killing, which is why the
- * original says of 岩礁 that it is 「低コストでスコア効率が高い」. A player
- * chasing marks builds; a player chasing the win fights. They are not the
- * same game, and the score is what makes them different.
+ * What a stage's score is made of — the two things the guide actually
+ * names, plus the trickle game2 keeps so a stage that deals neither stays
+ * scoreable. See SCORE_VALUE.
  */
-export type ScoreSource = "stonework" | "enemyLeader" | "fightWon" | "time";
+export type ScoreSource = "megalith" | "reef" | "time";
 
 /**
  * The player's rating for a stage, 0 to MAX_STAGE_MARKS — the original's
- * 稲妻マーク, of which 「面の評価は稲妻マーク10個（約5万点）が上限」.
+ * 稲妻マーク, of which 「面の評価は稲妻マーク10個（約5万点以上）が上限」.
  *
  * The count is the original's; the 50,000 is not, and is deliberately not
  * transplanted. game2's score is built out of game2's own events at

@@ -3,7 +3,7 @@
 ## 背景
 
 「POPULOUS 2 グラフィックス原作再現 改修指示」（32項目）のうち、
-PR1（`plan/0084`）に続きユーザー自身が指示した順序で
+PR1（`plan/archived/0084`）に続きユーザー自身が指示した順序で
 **PR2: Isometric settlements**（建物・farmland）に着手した。
 
 これまでのHouseは`src/render/pixelArt.ts`の`HOUSE_PATTERNS`という

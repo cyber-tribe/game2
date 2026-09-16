@@ -277,7 +277,7 @@ describe("createSettleSystem — spacing", () => {
    * founded houses on the same spot: measured on the final world, one
    * faction held three houses at *identical* coordinates at 40 seconds.
    * Stacked houses are invisible, pay full mana each, and die together to
-   * anything with a radius (plan/0107).
+   * anything with a radius (plan/archived/0107).
    */
   it("does not stack a house on top of one that is already there", () => {
     const world = new World();

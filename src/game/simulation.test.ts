@@ -408,7 +408,7 @@ describe("Simulation", () => {
 
     // Not "armageddon": enemyMiracles.ts won't trigger 最終決戦 before
     // MIN_ARMAGEDDON_TIME has elapsed, however lopsided the population
-    // ratio already is — see plan/0045-armageddon-timing.md. With the
+    // ratio already is — see plan/archived/0045-armageddon-timing.md. With the
     // ratio this decisive (20 vs 1) but the match only 0.1s old, the AI
     // falls through to the next-priciest thing it can afford instead.
     expect(sim.getMatchEvents()).toEqual([{ time: 0.1, faction: "enemy", type: "volcano" }]);
@@ -656,7 +656,7 @@ describe("Simulation", () => {
     const [house] = sim.world.query(House, Position);
     const pos = sim.world.get(house, Position)!;
 
-    eruptVolcano(sim.world, applyVolcano(heightmap, pos.x, pos.y, 1));
+    eruptVolcano(sim.world, applyVolcano(heightmap, pos.x, pos.y, 1).covered);
 
     expect(sim.world.isAlive(house)).toBe(false);
     expect(isBuildable(heightmap, pos.x, pos.y)).toBe(false);
@@ -697,7 +697,7 @@ describe("Simulation", () => {
     const sim = new Simulation({ worldWidth: 20, worldHeight: 20, initialWalkersPerFaction: 1 });
     // Assigning leaderId directly (rather than via a "gather" pass) sidesteps
     // gatherTargetingSystem's own "nobody else left to gather" fallback (see
-    // plan/0069-gather-settle-fallback.md) — a lone walker with no one else
+    // plan/archived/0069-gather-settle-fallback.md) — a lone walker with no one else
     // to gather would otherwise fall through to a random wander target in
     // that same transitional tick, which this test isn't about.
     const [playerState] = sim.world.query(FactionState).filter((e) => sim.world.get(e, FactionState)!.id === "player");
@@ -776,7 +776,7 @@ describe("Simulation", () => {
 
     // Houses that had spread far from the center before armageddon convert
     // into walkers that need time to march back in, at FINAL_BATTLE_WALKER_
-    // SPEED (see plan/0046-final-battle-pacing.md) — a 20x20 map's diagonal
+    // SPEED (see plan/archived/0046-final-battle-pacing.md) — a 20x20 map's diagonal
     // at that speed can take close to 60s to cross alone, so this budget is
     // generous on top of that.
     for (let i = 0; i < 1200; i++) sim.update(0.1);
@@ -842,7 +842,7 @@ describe("Simulation — the opening", () => {
    * a faction still occupied a single point at 40 seconds — three walkers,
    * then three houses, all at identical coordinates. One area miracle of
    * any size therefore erased a whole faction, which let an opening cast
-   * end a match outright (plan/0107).
+   * end a match outright (plan/archived/0107).
    */
   it("does not start a faction's walkers all on the same spot", () => {
     const sim = new Simulation({ worldWidth: 32, worldHeight: 32, initialWalkersPerFaction: 3 });
@@ -943,7 +943,7 @@ describe("Simulation's score", () => {
     expect(sim.getScore("enemy")).toBe(2 * SCORE_PER_SECOND);
   });
 
-  /** 「地下巨石・岩礁を使う」 — counted off the event log, so a cast is a cast whoever made it. */
+  /** 地下巨石と岩礁だけ。イベントログから拾うので、誰が撃っても同じ規則。 */
   it("pays for 地下巨石 and 岩礁, and for nothing else cast", () => {
     const sim = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 0 });
 
@@ -951,7 +951,18 @@ describe("Simulation's score", () => {
     sim.recordEvent("player", "reef");
     sim.recordEvent("player", "earthquake");
 
-    expect(sim.getScore("player")).toBe(SCORE_VALUE.stonework * 2);
+    expect(sim.getScore("player")).toBe(SCORE_VALUE.megalith + SCORE_VALUE.reef);
+  });
+
+  /** 「地下巨石ほどではないが」——同額ではない。 */
+  it("pays less for 岩礁 than for 地下巨石", () => {
+    const withMegalith = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 0 });
+    const withReef = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 0 });
+
+    withMegalith.recordEvent("player", "megalith");
+    withReef.recordEvent("player", "reef");
+
+    expect(withReef.getScore("player")).toBeLessThan(withMegalith.getScore("player"));
   });
 
   it("pays the enemy for its own stonework, not the player", () => {
@@ -959,7 +970,7 @@ describe("Simulation's score", () => {
 
     sim.recordEvent("enemy", "megalith");
 
-    expect(sim.getScore("enemy")).toBe(SCORE_VALUE.stonework);
+    expect(sim.getScore("enemy")).toBe(SCORE_VALUE.megalith);
     expect(sim.getScore("player")).toBe(0);
   });
 
@@ -967,7 +978,7 @@ describe("Simulation's score", () => {
     const sim = new Simulation({ worldWidth: 10, worldHeight: 10, initialWalkersPerFaction: 0 });
 
     expect(sim.getStageRating("player")).toBe(0);
-    for (let i = 0; i < Math.ceil(MAX_STAGE_SCORE / SCORE_VALUE.stonework); i++) {
+    for (let i = 0; i < Math.ceil(MAX_STAGE_SCORE / SCORE_VALUE.megalith); i++) {
       sim.recordEvent("player", "megalith");
     }
 

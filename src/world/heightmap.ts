@@ -120,14 +120,14 @@ export const MAX_ELEVATION = 20;
  * fresh 20x20 map, about 15% of vertices already qualified for a "castle"
  * house's flatness requirement and 95%+ for "lodge", with zero player
  * terraforming. That let a match's population/mana explode within under a
- * minute (see plan/0043-terrain-roughness.md) since the core "flatten your
+ * minute (see plan/archived/0043-terrain-roughness.md) since the core "flatten your
  * land to grow a house" loop was already done by worldgen. At these
  * frequencies a fresh map has ~0% castle-ready and single-digit %
  * manor-ready vertices — reaching those tiers again requires actually
  * terraforming.
  *
  * The amplitudes were trimmed down from the original 1.5/1.5/2 (see
- * plan/0073-grass-cliff-legibility.md) once fixing that renderer's cliff
+ * plan/archived/0073-grass-cliff-legibility.md) once fixing that renderer's cliff
  * legibility bug made this same wave's true roughness visible for the
  * first time: at the original amplitude, 18% of all adjacent vertex pairs
  * differed by 3 or more units, rendering as a wall of cliffs almost
@@ -260,7 +260,7 @@ export function raiseVertex(heightmap: Heightmap, x: number, y: number, delta: n
  * Raises/lowers an entire tile (all 4 corner vertices) by the same delta —
  * the player's basic terraforming tool now edits a whole tile face at once
  * rather than a single corner point, per the original game's tile-based
- * land-raising (see plan/0065-tile-based-terraform.md). Each corner is
+ * land-raising (see plan/archived/0065-tile-based-terraform.md). Each corner is
  * still clamped and chips rockHardness independently via raiseVertex, so a
  * tile straddling MAX_ELEVATION or partly-cooled volcano rock behaves the
  * same as 4 individual taps would.
@@ -442,6 +442,43 @@ export function sampleElevation(heightmap: Heightmap, x: number, y: number): num
   const top = h00 + (h10 - h00) * tx;
   const bottom = h01 + (h11 - h01) * tx;
   return top + (bottom - top) * ty;
+}
+
+/**
+ * The block of vertices one spade tap covers — a single vertex at size 1,
+ * the 3×3 around it at size 3, clipped to the map.
+ *
+ * 原作「便利な操作としては**Ｌ＋Ａで3×3マスを1段上げ**(ＡＡＢと同じ効果)、
+ * Ｌ＋Ｂで3×3マスを1段下げる」. The original offers it as a convenience on a
+ * machine with a D-pad and a visible cursor; on a touchscreen it is closer
+ * to a necessity, because a fingertip covers several vertices at once (see
+ * main.ts's spadeVertices).
+ *
+ * Lives here rather than in main.ts because clipping to the map is this
+ * module's business, and because a pure block is something a test can hold.
+ * An even size has no centre vertex, so it is rounded down to the odd size
+ * below it — 2 behaves as 1, not as a block hanging off one corner.
+ */
+export function spadeBlock(
+  heightmap: Heightmap,
+  center: { x: number; y: number },
+  size: number,
+): { x: number; y: number }[] {
+  const reach = Math.max(0, Math.floor((Math.floor(size) - 1) / 2));
+  const cx = Math.round(center.x);
+  const cy = Math.round(center.y);
+  const block: { x: number; y: number }[] = [];
+
+  for (let dy = -reach; dy <= reach; dy++) {
+    for (let dx = -reach; dx <= reach; dx++) {
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 0 || y < 0 || x > heightmap.width || y > heightmap.height) continue;
+      block.push({ x, y });
+    }
+  }
+
+  return block;
 }
 
 /** True if the vertex nearest (x, y) is volcano rock — see applyVolcano. */
@@ -776,7 +813,7 @@ export const VOLCANO_PUDDLES = 5;
 /**
  * Heaves the footprint within `radius` of (centerX, centerY) into a real
  * cone-with-crater shape and covers it in rock — docs/game-system.md's
- * "対象地点を高く隆起させ、岩石で覆う", refined per plan/0087's "外側：
+ * "対象地点を高く隆起させ、岩石で覆う", refined per plan/archived/0087's "外側：
  * 低い→中間：高い→火口縁：さらに高い→中央：少し低い": the ring exactly
  * `radius` vertices out (the crater rim) sits at MAX_ELEVATION, the exact
  * center dips VOLCANO_CRATER_DEPTH below that (the crater floor — still a
@@ -801,7 +838,7 @@ export function applyVolcano(
   lavaVolume: number = DEFAULT_LAVA_VOLUME,
   puddles: number = VOLCANO_PUDDLES,
   rng: () => number = Math.random,
-): { x: number; y: number }[] {
+): Eruption {
   const cx = Math.round(centerX);
   const cy = Math.round(centerY);
   const covered: { x: number; y: number }[] = [];
@@ -834,10 +871,102 @@ export function applyVolcano(
   }
 
   // Melted before the lava runs, because they are what it runs *around* —
-  // see meltPuddles and flowLava's "water is where the flow ends".
+  // see meltPuddles and runLava's "water is where the flow ends".
   covered.push(...meltPuddles(heightmap, cx, cy, radius + VOLCANO_PUDDLE_RING, puddles, rng));
-  covered.push(...flowLava(heightmap, cx, cy, radius, hardness, lavaVolume));
-  return covered;
+
+  const flow = runLava(heightmap, coneEdges(heightmap, cx, cy, radius), hardness, lavaVolume);
+  covered.push(...flow.covered);
+
+  return { covered, stalled: stallOf(flow, hardness) };
+}
+
+/**
+ * What one eruption did, and what it has left to do.
+ *
+ * `stalled` is present only when the flow still had lava to spend and had
+ * nowhere dry to spend it — 原作「水を埋め立てるとさらに外側へ流れ出す」.
+ * game/lavaFlow.ts is what holds onto it and lets it out again; a flow that
+ * simply spent its volume has no `stalled` and never resumes.
+ */
+export interface Eruption {
+  covered: { x: number; y: number }[];
+  stalled?: StalledLava;
+}
+
+/** A lava flow waiting for the water in its way to be filled in — see Eruption. */
+export interface StalledLava {
+  /** The water vertices it stopped against, and where it will resume from. */
+  blocked: { x: number; y: number }[];
+  /** Lava it never got to spend. */
+  remaining: number;
+  /** The rock hardness this flow lays down, carried so a resumed flow matches the eruption that started it. */
+  hardness: number;
+}
+
+/**
+ * Lets a stalled flow out through whichever of the vertices in its way is
+ * now dry land — 原作「溶岩は水地形で止まる。**水を埋め立てるとさらに外側へ
+ * 流れ出す**」.
+ *
+ * The one interaction in the original that makes lava a *lasting* threat
+ * rather than a shape: the crater is over in an instant, but the flow it
+ * started is still sitting against your shoreline, and the spade you would
+ * use to widen that shoreline is what lets it in. See systems/lavaFlow.ts,
+ * which is what notices.
+ *
+ * Returns the same shape applyVolcano does, so a resumed flow can stall
+ * again — against the next channel — as many times as it takes.
+ */
+export function resumeLava(heightmap: Heightmap, stalled: StalledLava): Eruption {
+  const dry = stalled.blocked.filter(({ x, y }) => heightmap.vertices[y][x] > heightmap.waterLevel);
+  if (dry.length === 0) return { covered: [], stalled };
+
+  const flow = runLava(heightmap, dry, stalled.hardness, stalled.remaining, true);
+  // The vertices that are still water go back into the wait, alongside
+  // whatever new shoreline the flow has just reached.
+  const stillBlocked = stalled.blocked.filter(({ x, y }) => heightmap.vertices[y][x] <= heightmap.waterLevel);
+  return {
+    covered: flow.covered,
+    stalled: stallOf({ ...flow, blocked: [...stillBlocked, ...flow.blocked] }, stalled.hardness),
+  };
+}
+
+function stallOf(
+  flow: { blocked: { x: number; y: number }[]; remaining: number },
+  hardness: number,
+): StalledLava | undefined {
+  if (flow.remaining <= 0 || flow.blocked.length === 0) return undefined;
+  return { blocked: flow.blocked, remaining: flow.remaining, hardness };
+}
+
+/**
+ * The vertices just outside the cone's own footprint — where lava leaves
+ * the mountain, from every side rather than squeezing out of one point.
+ */
+function coneEdges(
+  heightmap: Heightmap,
+  centerX: number,
+  centerY: number,
+  radius: number,
+): { x: number; y: number }[] {
+  const edges: { x: number; y: number }[] = [];
+  for (let dy = -radius - 1; dy <= radius + 1; dy++) {
+    for (let dx = -radius - 1; dx <= radius + 1; dx++) {
+      // The ring immediately around the footprint, not the footprint itself.
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius + 1) continue;
+      // ...minus its four diagonal corners, which no footprint vertex is
+      // orthogonally adjacent to. Lava steps in the four directions
+      // (see runLava's consider), so a corner is not somewhere it could
+      // have left the mountain — this ring is that stepping written out
+      // rather than a new shape.
+      if (Math.min(Math.abs(dx), Math.abs(dy)) > radius) continue;
+      const x = centerX + dx;
+      const y = centerY + dy;
+      if (x < 0 || y < 0 || x > heightmap.width || y > heightmap.height) continue;
+      edges.push({ x, y });
+    }
+  }
+  return edges;
 }
 
 /**
@@ -889,7 +1018,7 @@ function meltPuddles(
 }
 
 /**
- * Runs lava out of the crater and downhill until it runs out — the
+ * Runs lava out from `seeds` and downhill until it runs out — the
  * original's "火口から溶岩を流します。溶岩は土地を建築不能な状態へ変え、
  * 水地形で止まります" (docs/original-miracles.md #24).
  *
@@ -903,20 +1032,22 @@ function meltPuddles(
  * around: a channel or a lake is a firebreak, and higher ground is not —
  * lava climbs nothing, but it will happily go around.
  *
- * Not implemented: the original also notes lava can push further out once
- * the water it stopped against is filled in. That needs the flow to be a
- * living thing that resumes later, rather than resolved at cast time, and
- * is deliberately left for when there is a reason to build it.
+ * And it *reports* the water it stopped against, together with what it
+ * never got to spend, because 「水を埋め立てるとさらに外側へ流れ出す」 —
+ * see resumeLava. A flow that runs out of lava while dry ground was still
+ * in front of it is finished and reports no remainder; only one held back
+ * by water can be let out later.
  */
-function flowLava(
+function runLava(
   heightmap: Heightmap,
-  centerX: number,
-  centerY: number,
-  radius: number,
+  seeds: readonly { x: number; y: number }[],
   hardness: number,
   volume: number,
-): { x: number; y: number }[] {
+  /** A resumed flow floods its seeds themselves; an eruption's seeds are the ring outside a cone that is already rock. */
+  takeSeeds = false,
+): { covered: { x: number; y: number }[]; blocked: { x: number; y: number }[]; remaining: number } {
   const covered: { x: number; y: number }[] = [];
+  const blocked: { x: number; y: number }[] = [];
   const key = (x: number, y: number) => y * (heightmap.width + 1) + x;
   const seen = new Set<number>();
   const frontier: { x: number; y: number }[] = [];
@@ -926,24 +1057,25 @@ function flowLava(
     if (seen.has(key(x, y))) return;
     seen.add(key(x, y));
     // Water is where the flow ends: marked seen so it is never
-    // reconsidered, never taken, and never crossed.
-    if (heightmap.vertices[y][x] <= heightmap.waterLevel) return;
+    // reconsidered, never taken, and never crossed — but remembered, since
+    // filling it in is what lets the flow out again (see resumeLava).
+    if (heightmap.vertices[y][x] <= heightmap.waterLevel) {
+      blocked.push({ x, y });
+      return;
+    }
     frontier.push({ x, y });
   };
 
-  // Seed from the cone's own footprint, so lava leaves the mountain from
-  // every side rather than squeezing out of one vertex.
-  for (let dy = -radius; dy <= radius; dy++) {
-    for (let dx = -radius; dx <= radius; dx++) {
-      const x = centerX + dx;
-      const y = centerY + dy;
-      if (x < 0 || y < 0 || x > heightmap.width || y > heightmap.height) continue;
-      seen.add(key(x, y));
-      consider(x + 1, y);
-      consider(x - 1, y);
-      consider(x, y + 1);
-      consider(x, y - 1);
+  for (const seed of seeds) {
+    if (takeSeeds) {
+      consider(seed.x, seed.y);
+      continue;
     }
+    // An eruption's seeds are the ring around the cone: the cone is already
+    // rock, so the ring is where lava starts rather than something to skip.
+    seen.add(key(seed.x, seed.y));
+    if (heightmap.vertices[seed.y][seed.x] <= heightmap.waterLevel) blocked.push(seed);
+    else frontier.push(seed);
   }
 
   // One vertex at a time, always the lowest on the whole frontier — never
@@ -951,7 +1083,8 @@ function flowLava(
   // a modest volume the flow spent its whole budget on the first ring and
   // never got anywhere, so lava could not run *down a valley*, which is the
   // one thing this simulation exists to do.
-  for (let remaining = volume; remaining > 0 && frontier.length > 0; remaining--) {
+  let remaining = volume;
+  while (remaining > 0 && frontier.length > 0) {
     let lowest = 0;
     for (let i = 1; i < frontier.length; i++) {
       if (heightmap.vertices[frontier[i].y][frontier[i].x] < heightmap.vertices[frontier[lowest].y][frontier[lowest].x]) {
@@ -965,6 +1098,7 @@ function flowLava(
     heightmap.wall[y][x] = false;
     heightmap.boulder[y][x] = false;
     covered.push({ x, y });
+    remaining--;
 
     consider(x + 1, y);
     consider(x - 1, y);
@@ -972,7 +1106,9 @@ function flowLava(
     consider(x, y - 1);
   }
 
-  return covered;
+  // Dry ground still in front of it means it simply ran out; there is
+  // nothing for filling water in to release.
+  return { covered, blocked, remaining: frontier.length > 0 ? 0 : remaining };
 }
 
 

@@ -32,6 +32,8 @@ import {
   FUNGUS_SPREAD_CHANCE,
   FUNGUS_WITHER_CHANCE,
   applyVolcano,
+  resumeLava,
+  spadeBlock,
   VOLCANO_PUDDLES,
   VOLCANO_PUDDLE_RING,
   countFlatNeighbors,
@@ -85,7 +87,7 @@ describe("createHeightmap", () => {
   });
 
   it("doesn't hand a house a castle's worth of flatness for free", () => {
-    // Regression guard for plan/0043-terrain-roughness.md: a too-smooth
+    // Regression guard for plan/archived/0043-terrain-roughness.md: a too-smooth
     // wave let rounding alone produce large naturally-flat plateaus, so a
     // freshly settled house could already qualify for the top house level
     // (and often most of the way to it) before any terraforming — the
@@ -727,7 +729,7 @@ describe("applyVolcano", () => {
   it("returns every vertex it covered, so the ECS side can bury what stood there", () => {
     const heightmap = flatHeightmap(10, 10, 3);
 
-    const covered = applyVolcano(heightmap, 5, 5, 1, 7, 0, 0);
+    const { covered } = applyVolcano(heightmap, 5, 5, 1, 7, 0, 0);
 
     expect(covered).toHaveLength(9); // the 3x3 cone footprint
     expect(covered).toContainEqual({ x: 5, y: 5 });
@@ -763,7 +765,7 @@ describe("applyVolcano", () => {
   it("floods lava beyond the cone, covering far more ground than the cone itself", () => {
     const heightmap = flatHeightmap(30, 30, 3);
 
-    const covered = applyVolcano(heightmap, 15, 15, 1, 7, 20, 0);
+    const { covered } = applyVolcano(heightmap, 15, 15, 1, 7, 20, 0);
 
     expect(covered.length).toBe(9 + 20);
     expect(covered.filter(({ x, y }) => Math.abs(x - 15) > 1 || Math.abs(y - 15) > 1).length).toBe(20);
@@ -804,7 +806,7 @@ describe("applyVolcano", () => {
   it("spends exactly its volume, no more", () => {
     const heightmap = flatHeightmap(30, 30, 3);
 
-    const covered = applyVolcano(heightmap, 15, 15, 0, 7, 5, 0);
+    const { covered } = applyVolcano(heightmap, 15, 15, 0, 7, 5, 0);
 
     expect(covered.length).toBe(1 + 5);
   });
@@ -837,7 +839,7 @@ describe("applyVolcano", () => {
     it("reports them as covered, so a house that ends up in one is cleared", () => {
       const heightmap = flatHeightmap(40, 40, 6);
 
-      const covered = applyVolcano(heightmap, 20, 20, 1, 7, 0, VOLCANO_PUDDLES, () => 0.5);
+      const { covered } = applyVolcano(heightmap, 20, 20, 1, 7, 0, VOLCANO_PUDDLES, () => 0.5);
 
       for (let y = 0; y <= 40; y++) {
         for (let x = 0; x <= 40; x++) {
@@ -878,9 +880,111 @@ describe("applyVolcano", () => {
       const heightmap = flatHeightmap(40, 40, 6);
       for (const row of heightmap.vertices) row.fill(MIN_ELEVATION);
 
-      const covered = applyVolcano(heightmap, 20, 20, 1, 7, 0, VOLCANO_PUDDLES, () => 0.5);
+      const { covered } = applyVolcano(heightmap, 20, 20, 1, 7, 0, VOLCANO_PUDDLES, () => 0.5);
 
       expect(covered).toHaveLength(9); // the cone only — every puddle site was water already
+    });
+  });
+
+  /**
+   * 原作「溶岩は水地形で止まる。**水を埋め立てるとさらに外側へ流れ出す**」.
+   * The half that was missing: the flow keeps what it could not spend, and
+   * the shoreline that stopped it is where it comes back.
+   */
+  describe("its stalled lava", () => {
+    /** An island of `size` around the centre, open sea beyond it. */
+    function islandHeightmap(extent: number, radius: number): Heightmap {
+      const heightmap = flatHeightmap(extent, extent, MIN_ELEVATION);
+      const mid = extent / 2;
+      for (let y = 0; y <= extent; y++) {
+        for (let x = 0; x <= extent; x++) {
+          if (Math.max(Math.abs(x - mid), Math.abs(y - mid)) <= radius) heightmap.vertices[y][x] = 3;
+        }
+      }
+      return heightmap;
+    }
+
+    it("reports what it could not spend, and the water it stopped against", () => {
+      const heightmap = islandHeightmap(30, 4);
+
+      const { stalled } = applyVolcano(heightmap, 15, 15, 1, 7, 500, 0);
+
+      expect(stalled).toBeDefined();
+      expect(stalled!.remaining).toBeGreaterThan(0);
+      expect(stalled!.blocked.length).toBeGreaterThan(0);
+      // Everything it is waiting on really is water.
+      for (const { x, y } of stalled!.blocked) {
+        expect(heightmap.vertices[y][x]).toBeLessThanOrEqual(heightmap.waterLevel);
+      }
+    });
+
+    it("reports nothing to wait for when it simply ran out of lava", () => {
+      const heightmap = flatHeightmap(30, 30, 3); // dry ground in every direction
+
+      expect(applyVolcano(heightmap, 15, 15, 1, 7, 8, 0).stalled).toBeUndefined();
+    });
+
+    it("stays put while the water in its way is still water", () => {
+      const heightmap = islandHeightmap(30, 4);
+      const { stalled } = applyVolcano(heightmap, 15, 15, 1, 7, 500, 0);
+
+      const again = resumeLava(heightmap, stalled!);
+
+      expect(again.covered).toEqual([]);
+      expect(again.stalled).toEqual(stalled);
+    });
+
+    it("comes through the moment that water is filled in", () => {
+      const heightmap = islandHeightmap(30, 4);
+      const { stalled } = applyVolcano(heightmap, 15, 15, 1, 7, 500, 0);
+      const shore = stalled!.blocked[0];
+
+      heightmap.vertices[shore.y][shore.x] = 3; // the spade that lets it out
+
+      const again = resumeLava(heightmap, stalled!);
+
+      expect(again.covered).toContainEqual({ x: shore.x, y: shore.y });
+      expect(heightmap.rockHardness[shore.y][shore.x]).toBe(7);
+    });
+
+    it("spends only what it had left, never more", () => {
+      const heightmap = islandHeightmap(30, 4);
+      const { stalled } = applyVolcano(heightmap, 15, 15, 1, 7, 500, 0);
+      const budget = stalled!.remaining;
+      // Fill the whole sea: nothing is in its way any more.
+      for (const row of heightmap.vertices) row.fill(3);
+
+      expect(resumeLava(heightmap, stalled!).covered.length).toBe(budget);
+    });
+
+    it("can stall again against the next channel, as many times as it takes", () => {
+      const heightmap = islandHeightmap(30, 4);
+      const first = applyVolcano(heightmap, 15, 15, 1, 7, 500, 0);
+      const shore = first.stalled!.blocked[0];
+      heightmap.vertices[shore.y][shore.x] = 3;
+
+      const second = resumeLava(heightmap, first.stalled!);
+
+      // One vertex of new land is not the sea filled in, so it is waiting
+      // again — with less lava than before.
+      expect(second.stalled).toBeDefined();
+      expect(second.stalled!.remaining).toBeLessThan(first.stalled!.remaining);
+    });
+
+    it("keeps the eruption's own hardness when it resumes", () => {
+      const heightmap = islandHeightmap(30, 4);
+      const { stalled } = applyVolcano(heightmap, 15, 15, 1, 11, 500, 0);
+
+      expect(stalled!.hardness).toBe(11);
+      expect(resumeLava(heightmap, stalled!).stalled!.hardness).toBe(11);
+    });
+
+    it("is finished once it has spent everything, with nothing left to wait for", () => {
+      const heightmap = islandHeightmap(30, 4);
+      const { stalled } = applyVolcano(heightmap, 15, 15, 1, 7, 500, 0);
+      for (const row of heightmap.vertices) row.fill(3);
+
+      expect(resumeLava(heightmap, stalled!).stalled).toBeUndefined();
     });
   });
 
@@ -1825,3 +1929,59 @@ describe("touchesLand", () => {
   });
 });
 
+/**
+ * 原作「便利な操作としては**Ｌ＋Ａで3×3マスを1段上げ**……Ｌ＋Ｂで3×3マスを
+ * 1段下げる」——スマホでは1頂点を狙うこと自体が難しいので、狙いの精度を
+ * 上げる代わりに**精度が要らないようにする**（`plan/0165`）。
+ */
+describe("spadeBlock", () => {
+  const map = flatHeightmap(20, 20, 3);
+
+  it("is just the vertex itself at size 1", () => {
+    expect(spadeBlock(map, { x: 10, y: 10 }, 1)).toEqual([{ x: 10, y: 10 }]);
+  });
+
+  it("is the 3×3 around it at size 3, centred on the tap", () => {
+    const block = spadeBlock(map, { x: 10, y: 10 }, 3);
+
+    expect(block).toHaveLength(9);
+    expect(block).toContainEqual({ x: 10, y: 10 });
+    expect(block).toContainEqual({ x: 9, y: 9 });
+    expect(block).toContainEqual({ x: 11, y: 11 });
+    for (const { x, y } of block) {
+      expect(Math.max(Math.abs(x - 10), Math.abs(y - 10))).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("clips at the map's edge rather than running off it", () => {
+    const corner = spadeBlock(map, { x: 0, y: 0 }, 3);
+
+    expect(corner).toHaveLength(4); // a quarter of the block is off the map
+    for (const { x, y } of corner) {
+      expect(x).toBeGreaterThanOrEqual(0);
+      expect(y).toBeGreaterThanOrEqual(0);
+    }
+    expect(spadeBlock(map, { x: 20, y: 20 }, 3)).toHaveLength(4);
+  });
+
+  it("never repeats a vertex", () => {
+    const block = spadeBlock(map, { x: 5, y: 5 }, 3);
+    expect(new Set(block.map(({ x, y }) => `${x},${y}`)).size).toBe(block.length);
+  });
+
+  /** An even size has no centre vertex, so it rounds down to the odd one below. */
+  it("treats an even size as the odd size below it", () => {
+    expect(spadeBlock(map, { x: 5, y: 5 }, 2)).toEqual(spadeBlock(map, { x: 5, y: 5 }, 1));
+    expect(spadeBlock(map, { x: 5, y: 5 }, 4)).toEqual(spadeBlock(map, { x: 5, y: 5 }, 3));
+  });
+
+  it("snaps a fractional tap to the nearest vertex before blocking out", () => {
+    expect(spadeBlock(map, { x: 5.4, y: 5.6 }, 1)).toEqual([{ x: 5, y: 6 }]);
+  });
+
+  it("never returns nothing, however the size is abused", () => {
+    for (const size of [0, -3, 0.5]) {
+      expect(spadeBlock(map, { x: 5, y: 5 }, size)).toEqual([{ x: 5, y: 5 }]);
+    }
+  });
+});

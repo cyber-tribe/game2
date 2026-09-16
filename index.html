@@ -73,7 +73,7 @@
        * scrollable HTML toolbar — per feedback: "メニューボタンが増えすぎて
        * 操作するマップ画面が小さいです" led to a scrolling toolbar before,
        * but scrolling itself reads as a "settings screen", not a game
-       * command bar (see plan/0084). This sizes to its own content instead
+       * command bar (see plan/archived/0084). This sizes to its own content instead
        * of capping+scrolling: the icon grid below is deliberately dense
        * enough (small icons, no per-button subtitle text) to fit a phone
        * screen without needing to scroll.
@@ -581,7 +581,7 @@
       /*
        * Kept pinned below the (scrollable) event list rather than inside
        * it, so it's always visible without scrolling down — see
-       * plan/0038-play-again.md. This button is deliberately left in place
+       * plan/archived/0038-play-again.md. This button is deliberately left in place
        * with no other post-game screen: whether a player presses it
        * unprompted is itself the signal being observed (自発的再戦率).
        */
@@ -600,7 +600,7 @@
 
       /*
        * A secondary action below the primary "もう一度遊ぶ" button — see
-       * plan/0040-post-game-feedback.md / plan/0042-feedback-google-form.md.
+       * plan/archived/0040-post-game-feedback.md / plan/archived/0042-feedback-google-form.md.
        * Styled as an outline rather than a solid button so it doesn't
        * compete with the rematch button for attention; opens a Google Form
        * in a new tab (switched from a GitHub Issue — no account needed to
@@ -635,7 +635,7 @@
       /*
        * Landscape is only a problem on a touchscreen (a phone rotated
        * sideways, with no mouse to fall back on) — see
-       * plan/0039-pc-support.md. A mouse-driven device reports
+       * plan/archived/0039-pc-support.md. A mouse-driven device reports
        * `pointer: fine`, so a widescreen PC monitor never matches this and
        * never sees the warning, regardless of its aspect ratio.
        */
@@ -664,7 +664,7 @@
     </div>
 
     <div id="tutorial-hint">
-      まずは自分の民（丸いマーク）の周りをタップして地形を平らにしよう。家が育ち、人口とマナが増えていく。長押ししてなぞると、まとめて地形を編集できる。
+      まずは自分の民（丸いマーク）の周りを平らにしよう。家が育ち、人口とマナが増えていく。明るい地面ほど高い——上げるか下げるか迷ったら「平坦化」でならせる。長押ししてなぞると、まとめて編集できる。
     </div>
 
     <div id="match-record" class="hidden">
@@ -713,6 +713,7 @@
           <button type="button" class="command-button" data-tool="lower">沈降</button>
           <button type="button" class="command-button" data-tool="flatten">平坦化</button>
           <button type="button" class="command-button" data-tool="autoFlatten">自動整地</button>
+          <button type="button" class="command-button" aria-pressed="false" data-toggle="wideEdit">3×3</button>
         </div>
         <!-- The original's own six schools of miracle — see src/ui/miracleCategories.ts. -->
         <div class="command-row category-row" id="miracle-categories">

@@ -3,7 +3,7 @@
 ## 背景
 
 「POPULOUS 2 グラフィックス原作再現 改修指示」（32項目）のうち、PR1
-（`plan/0084`）・PR2（`plan/0085`）・PR3（`plan/0086`）に続きユーザー
+（`plan/archived/0084`）・PR2（`plan/archived/0085`）・PR3（`plan/archived/0086`）に続きユーザー
 自身が指示した順序で **PR4: World surface art**（最終フェーズ）に
 着手した。
 

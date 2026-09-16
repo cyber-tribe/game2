@@ -11,7 +11,7 @@
 
 ## 診断
 
-`plan/0073`〜`0077`（`grass-cliff-legibility`ブランチ、既にマージ済み）
+`plan/archived/0073`〜`0077`（`grass-cliff-legibility`ブランチ、既にマージ済み）
 で地形を頂点ごとの傾斜メッシュ（タイルあたり2枚の三角形）に作り直した
 際、`IsoRenderer.ts`の`fillTerrainTriangle`と水タイルの四角形の両方に
 `.stroke({ width: 1, color: 0x000000, alpha: 0.15 })`が残っていた。

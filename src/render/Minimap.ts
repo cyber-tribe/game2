@@ -52,7 +52,7 @@ const DISASTER_MARK_COLOR = 0xffcc44;
  * number of fills the terrain layer needs regardless of map size.
  */
 const TERRAIN_GRID_RESOLUTION = 24;
-/** How many discrete brightness bands terrainColorAt quantizes elevation into — "数段階の明暗" per plan/0087, not a smooth gradient. */
+/** How many discrete brightness bands terrainColorAt quantizes elevation into — "数段階の明暗" per plan/archived/0087, not a smooth gradient. */
 const TERRAIN_HEIGHT_BANDS = 4;
 
 /**
@@ -175,7 +175,7 @@ function lerpColor(from: number, to: number, t: number): number {
  * submerged, otherwise the terrain's base color shaded by one of
  * TERRAIN_HEIGHT_BANDS discrete brightness levels — low ground reads
  * darker, high ground lighter — so the map's actual shape is legible at a
- * glance instead of a single flat color, per plan/0087's "世界の地形が
+ * glance instead of a single flat color, per plan/archived/0087's "世界の地形が
  * ある程度読める縮小地図".
  */
 function terrainColorAt(heightmap: Heightmap, tileX: number, tileY: number): number {

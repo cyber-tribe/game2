@@ -115,7 +115,7 @@ export function blueFlameTongues(elapsedTime: number): { spread: number; height:
 }
 /**
  * Swamp used to be a translucent purple overlay (a hazard-radius marker,
- * not real ground) — per plan/0087, it's now drawn as an actual dark
+ * not real ground) — per plan/archived/0087, it's now drawn as an actual dark
  * mud/bog surface: a dithered base (mud + a darker purple-brown speckle,
  * see SWAMP_FILL) plus a few deterministic black "holes" and a slow bubble
  * pulse, drawn per-tile in the loop below.
@@ -377,7 +377,7 @@ export class EntityLayer {
   private readonly graphics = new Graphics();
   /**
    * Walkers, as textured quads from the sprite atlas rather than the
-   * immediate-mode rects they used to be (plan/0090). A separate Container
+   * immediate-mode rects they used to be (plan/archived/0090). A separate Container
    * between the two Graphics keeps the old draw order intact: ground and
    * buildings below, impact effects above.
    */

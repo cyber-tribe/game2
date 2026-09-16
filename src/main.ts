@@ -7,6 +7,7 @@ import {
   FIRE_PILLAR_LIFETIME,
   STORM_LIFETIME,
   TORNADO_LIFETIME,
+  WIDE_EDIT_SIZE,
   ENEMY_PERSONALITY_LABELS,
   REEF_MANA_COST,
   FIRE_RAIN_MANA_COST,
@@ -17,13 +18,7 @@ import {
   MEGALITH_MANA_COST,
   FUNGUS_MANA_COST,
   TSUNAMI_MANA_COST,
-  GUARDIAN_MANA_COST,
-  PERSEUS_MANA_COST,
-  HERCULES_MANA_COST,
-  ODYSSEUS_MANA_COST,
-  ACHILLES_MANA_COST,
-  ADONIS_MANA_COST,
-  HELEN_MANA_COST,
+  HERO_MANA_COST,
   MAX_MANA,
   SHRINE_MOVE_MANA_COST,
   SWAMP_CAPACITY,
@@ -54,15 +49,6 @@ import type { HeroKind } from "./game/components";
  * both the toolbar's affordability dimming and applyTool's own dispatch
  * read it, so a new hero cannot be added to one and forgotten in the other.
  */
-const HERO_MANA_COST: Record<HeroKind, number> = {
-  perseus: PERSEUS_MANA_COST,
-  hercules: HERCULES_MANA_COST,
-  odysseus: ODYSSEUS_MANA_COST,
-  achilles: ACHILLES_MANA_COST,
-  adonis: ADONIS_MANA_COST,
-  helen: HELEN_MANA_COST,
-  guardian: GUARDIAN_MANA_COST,
-};
 import { createHolyWater } from "./game/holyWater";
 import { applyHurricane } from "./game/hurricane";
 import { createFirePillar } from "./game/firePillar";
@@ -74,6 +60,7 @@ import { createStorm } from "./game/storm";
 import { createTornado, createWhirlpool } from "./game/tornado";
 import { collapseSwampsNear, createSwamp } from "./game/swamp";
 import { burnFire } from "./game/fire";
+import { createLavaFlow } from "./game/lavaFlow";
 import { eruptVolcano } from "./game/volcano";
 import { raiseMegalith } from "./game/megalith";
 import {
@@ -112,7 +99,7 @@ import { mountPanelFrame } from "./ui/panelFrame";
 import { loadCommandIcons } from "./ui/pixelIcons";
 import { StatusPanel } from "./ui/statusPanel";
 import { wireToolbar, type ToolMode } from "./ui/toolbar";
-import { AUTO_FLATTEN_SIZE, DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyFlower, applyForest, applyFungus, DEFAULT_FLOWER_RADIUS, applyReef, applyRoad, applyWall, applyMegalith, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, megalithScatterCandidates, planAutoFlatten, raiseVertex, touchesLand } from "./world/heightmap";
+import { AUTO_FLATTEN_SIZE, DEFAULT_EARTHQUAKE_RADIUS, applyEarthquake, applyFireRain, applyFlower, applyForest, applyFungus, DEFAULT_FLOWER_RADIUS, applyReef, applyRoad, applyWall, applyMegalith, applyTsunami, sampleElevation, applyVolcano, createHeightmap, flattenTile, isTerrainEditAllowed, isWall, spadeBlock, megalithScatterCandidates, planAutoFlatten, raiseVertex, touchesLand } from "./world/heightmap";
 
 /**
  * The camera's fixed base scale — see layout()'s doc comment for why this
@@ -163,7 +150,7 @@ const MEGALITH_HOLD_INTERVAL_MS = 500;
 const LIGHTNING_HOLD_INTERVAL_MS = 800;
 /**
  * How much one mouse-wheel "notch" (deltaY around ±100) zooms the map on
- * PC — see plan/0039-pc-support.md. Chosen so a single notch feels close
+ * PC — see plan/archived/0039-pc-support.md. Chosen so a single notch feels close
  * to one pinch-zoom step; exponential so repeated notches compound evenly
  * in both directions instead of the zoom-out direction stalling near 0.
  */
@@ -232,7 +219,7 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
     // out-of-bounds area is near-black (see plan/archived/0088-palette-calibration.md).
     background: GAME_PALETTE.ink,
     // Off, not on: MSAA roughly doubled full-screen frame cost in testing
-    // (see plan/0062-original-scale-map.md) once the map — and so the
+    // (see plan/archived/0062-original-scale-map.md) once the map — and so the
     // terrain mesh redrawn every frame — grew from ≤32x32 to 64x64. This
     // game's flat-shaded low-poly style barely shows the difference; a
     // lower, steadier frame rate would be far more noticeable.
@@ -342,13 +329,30 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
     earthquake: 6,
     fireRain: 4,
     lightning: 6,
+    tsunami: 5,
+    hurricane: 5,
+    tornado: 4,
+    firePillar: 4,
+    storm: 3,
     // Neither of these lands with any weight — a spring wells up and a
     // plague shows nothing at all (see game/plague.ts) — so shaking the
     // camera for them would promise damage that isn't there.
     holyWater: 0,
     plague: 0,
     swamp: 0,
+    // Nor do these on the player's own side: a whirlpool is a spiral out at
+    // sea and 毒カビ is a stain on the ground.
+    whirlpool: 0,
+    fungus: 0,
+    // The hero promotions have no player-side shake to match, so they keep
+    // their own small, hero-scale value — one each, now that the god picks
+    // from all of them (see WorldDefinition's enemyHero).
     perseus: 3,
+    hercules: 3,
+    odysseus: 3,
+    achilles: 3,
+    adonis: 3,
+    helen: 3,
     guardian: 3,
   };
 
@@ -378,14 +382,14 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
 
   // Simplest possible reset: reload the page for a fresh heightmap/Simulation
   // and default camera/UI state, rather than hand-rolling teardown of every
-  // stateful object main.ts builds. See plan/0038-play-again.md — this
+  // stateful object main.ts builds. See plan/archived/0038-play-again.md — this
   // button exists as playtesting infrastructure, not a polished transition.
   playAgainButton?.addEventListener("click", () => {
     window.location.reload();
   });
 
   // Shown once, the moment the match ends — a bare win/lose line tells
-  // none of the match's actual story (see plan/0032-match-event-log.md).
+  // none of the match's actual story (see plan/archived/0032-match-event-log.md).
   // Rendered as HTML rather than through Hud's PixiJS Text so a long
   // match's event list can actually scroll (see index.html's #match-record).
   const showMatchRecord = (outcome: GameOutcome, events: readonly MatchEvent[]) => {
@@ -446,6 +450,11 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
     allowedMiracles: world.allowedMiracles,
     enemyPersonality: world.enemyPersonality,
     enemySchool: world.enemySchool,
+    // The god's own repertoire, separate from the player's hand — see
+    // WorldDefinition's enemyMiracles.
+    enemyMiracles: world.enemyMiracles,
+    enemyHero: world.enemyHero,
+    enemyCastRate: world.enemyCastRate,
     instantDrowning: world.instantDrowning,
     bottomlessSwamp: world.bottomlessSwamp,
     onEnemyAction,
@@ -453,7 +462,7 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
 
 
   // The map is now far bigger than any one screen (see
-  // plan/0062-original-scale-map.md) — like the original, the camera
+  // plan/archived/0062-original-scale-map.md) — like the original, the camera
   // always renders at a fixed, comfortably tap-able native scale (see
   // IsoRenderer's own TILE_WIDTH/TILE_HEIGHT doc comment) and the player
   // pans to reach the rest, rather than the whole map ever shrinking to
@@ -522,7 +531,7 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
     // Clear of the world map rather than behind it. These two lines and the
     // minimap were both anchored to the same corner, so 「地形: 草原」 and
     // any 地形操作 restriction have been hidden under the rock since the map
-    // moved here (plan/0130). Measured from minimapHeight rather than
+    // moved here (plan/archived/0130). Measured from minimapHeight rather than
     // MINIMAP_SIZE because the island is taller than the map it holds.
     hud.setTopOffset(safeAreaTop + minimapHeight(MINIMAP_SIZE) + HUD_GAP_BELOW_MINIMAP);
     populationGauge.view.position.set(app.screen.width - POPULATION_GAUGE_WIDTH - 10, 10 + safeAreaTop);
@@ -577,8 +586,8 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
   // docs/game-system.md-inspired original-game rule: the player can only
   // act with their god-given powers while at least one of their own
   // walkers/houses/shrine is somewhere within the current camera view —
-  // see plan/0063-visibility-gated-casting.md. Without this, a much
-  // bigger, freely-pannable map (plan/0062-original-scale-map.md) lets a
+  // see plan/archived/0063-visibility-gated-casting.md. Without this, a much
+  // bigger, freely-pannable map (plan/archived/0062-original-scale-map.md) lets a
   // single tap snipe anywhere on the map instantly, with no need to
   // actually travel there first.
   //
@@ -689,6 +698,14 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
   // see stopPainting and the pointerdown handler further down.
   let flattenTargetElevation: number | undefined;
 
+  /**
+   * The original's 3×3 spade modifier — 「Ｌ＋Ａで3×3マスを1段上げ」. A
+   * sticky toggle rather than a held button, since a touchscreen has no
+   * second button to hold; it modifies 隆起/沈降 without replacing them,
+   * the same way Ｌ modifies Ａ/Ｂ. See spadeVertices.
+   */
+  let wideEdit = false;
+
   // "平坦化" stays tile/area-based (see flattenTile's own doc comment on
   // why leveling a plot is inherently about an area, not a point) — picks
   // via pickTile, unlike applyRaiseEditAt below.
@@ -738,7 +755,7 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
 
   // Raises/lowers a single grid vertex — picked via pickVertex, not
   // pickTile. This used to edit a whole tile's 4 corners (raiseTile) at
-  // once, matching plan/0065-tile-based-terraform.md's original request to
+  // once, matching plan/archived/0065-tile-based-terraform.md's original request to
   // mirror the original game's tile-based terraforming — but every corner
   // is shared with up to 3 *other* tiles, so a single tap visibly tilted
   // every neighboring tile touching that tile's corners too, reading as
@@ -747,13 +764,61 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
   // 動きます" — confirmed by the reporter to mean exactly this, not the
   // brush painting too wide an area). raiseTile's own rationale (raiseVertex
   // alone left the old flat-averaged-per-tile renderer with jagged block
-  // boundaries — plan/0064-terraced-terrain.md) no longer applies: the
-  // renderer hasn't averaged tiles into flat blocks since plan/0073's
+  // boundaries — plan/archived/0064-terraced-terrain.md) no longer applies: the
+  // renderer hasn't averaged tiles into flat blocks since plan/archived/0073's
   // per-vertex sloped mesh, so a single vertex nudge just tilts the (at
   // most 4, half of raiseTile's up-to-8) neighboring tiles smoothly, with
   // no jagged edge to speak of. "平坦化" keeps the tile-based raiseTile
   // pattern (see applyFlattenEditAt) since leveling a whole plot is
   // inherently area-shaped, unlike a plain raise/lower nudge.
+  /**
+   * Why the spade cannot touch this vertex, or undefined when it can.
+   *
+   * Split out of applyRaiseEditAt because the 3×3 modifier below has to ask
+   * the same question of nine vertices and charge only for the ones that
+   * answer "no reason" — the same rule 自動整地 already follows.
+   */
+  const terrainEditRefusal = (vertex: { x: number; y: number }): string | undefined => {
+    // Some worlds forbid reshaping land inside the enemy's own territory —
+    // see WorldDefinition's enemyTerritoryEditable.
+    if (!world.enemyTerritoryEditable && simulation.isEnemyTerritory("player", vertex)) {
+      return "この面では敵の陣地を直接操作できません";
+    }
+    // 「どこでも↑↓」「海上に土地↑↓」 — × on 43 of the original's 48 stages,
+    // where the spade reaches only ground that already touches land. See
+    // WorldDefinition's openTerraforming.
+    if (!world.openTerraforming && !touchesLand(heightmap, vertex.x, vertex.y)) {
+      return "この面では何もない海に土地を起こせません";
+    }
+    // 「地震が続いている間は修復が出来ない」 — see game/quake.ts.
+    if (isGroundShaking(simulation.world, vertex.x, vertex.y)) {
+      return "地震が続いている間は土地を直せません";
+    }
+    // 城壁 pins the ground it stands on (see raiseVertex, which refuses).
+    // Named here so the tap is not charged for an edit that cannot happen —
+    // it used to be, silently, for a single vertex.
+    if (isWall(heightmap, vertex.x, vertex.y)) {
+      return "城壁のかかった土地は上下できません";
+    }
+    return undefined;
+  };
+
+  /**
+   * The vertices one spade tap moves: just the one, or the 3×3 block around
+   * it when the modifier is on — 原作「便利な操作としては**Ｌ＋Ａで3×3マスを
+   * 1段上げ**……Ｌ＋Ｂで3×3マスを1段下げる」.
+   *
+   * The original offers this as a convenience on a machine with a D-pad and
+   * a visible cursor; on a phone it is closer to a necessity. At the map's
+   * usual scale adjacent vertices sit 32px apart across and 16px down, while
+   * a fingertip covers 40-50px — so a tap lands somewhere inside a 2×3 block
+   * of vertices and the player cannot tell which one they will get. Widening
+   * the edit does not make the aim better; it makes the aim not matter,
+   * which is the same answer the original reached.
+   */
+  const spadeVertices = (vertex: { x: number; y: number }): { x: number; y: number }[] =>
+    wideEdit ? spadeBlock(heightmap, vertex, WIDE_EDIT_SIZE) : [vertex];
+
   const applyRaiseEditAt = (vertex: { x: number; y: number }): void => {
     const delta = toolMode === "lower" ? -1 : 1;
     // Should be unreachable in practice — the toolbar disables whichever
@@ -761,28 +826,22 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
     // here too so a stale toolMode can never spend mana for an edit that
     // silently does nothing.
     if (!isTerrainEditAllowed(terrainEditRule, delta)) return;
-    // Some worlds forbid reshaping land inside the enemy's own territory —
-    // see WorldDefinition's enemyTerritoryEditable — checked (and reported)
-    // before spending any mana, same as isOwnFactionVisible above.
-    if (!world.enemyTerritoryEditable && simulation.isEnemyTerritory("player", vertex)) {
-      showEntityInfo("この面では敵の陣地を直接操作できません", "warning");
+
+    const targets = spadeVertices(vertex);
+    const movable = targets.filter((target) => terrainEditRefusal(target) === undefined);
+    if (movable.length === 0) {
+      // Only the reason for the vertex actually aimed at, so a 3×3 whose
+      // corner clips the enemy's border does not explain itself twice.
+      const why = terrainEditRefusal(vertex) ?? terrainEditRefusal(targets[0]!);
+      if (why) showEntityInfo(why, "warning");
       return;
     }
-    // 「どこでも↑↓」「海上に土地↑↓」 — × on 43 of the original's 48 stages,
-    // where the spade reaches only ground that already touches land. See
-    // WorldDefinition's openTerraforming.
-    if (!world.openTerraforming && !touchesLand(heightmap, vertex.x, vertex.y)) {
-      showEntityInfo("この面では何もない海に土地を起こせません", "warning");
-      return;
-    }
-    // 「地震が続いている間は修復が出来ない」 — checked before spending, like
-    // the two restrictions above. See game/quake.ts.
-    if (isGroundShaking(simulation.world, vertex.x, vertex.y)) {
-      showEntityInfo("地震が続いている間は土地を直せません", "warning");
-      return;
-    }
-    if (!trySpendPlayerMana(TERRAIN_EDIT_MANA_COST)) return;
-    raiseVertex(heightmap, vertex.x, vertex.y, delta);
+
+    // Priced per vertex that actually moves, exactly what the same work
+    // costs one tap at a time — 自動整地's own rule. The modifier is an
+    // ergonomic convenience, not a discount on terraforming.
+    if (!trySpendPlayerMana(TERRAIN_EDIT_MANA_COST * movable.length)) return;
+    for (const target of movable) raiseVertex(heightmap, target.x, target.y, delta);
     renderer.redraw(visibleBounds());
     dismissTutorialHint();
   };
@@ -1298,7 +1357,12 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
 
     if (toolMode === "volcano") {
       if (!trySpendPlayerMana(VOLCANO_MANA_COST)) return;
-      eruptVolcano(simulation.world, applyVolcano(heightmap, vertex.x, vertex.y), vertex);
+      const eruption = applyVolcano(heightmap, vertex.x, vertex.y);
+      eruptVolcano(simulation.world, eruption.covered, vertex);
+      // 「水を埋め立てるとさらに外側へ流れ出す」 — whatever the flow could
+      // not spend waits on the shoreline that stopped it. See
+      // game/lavaFlow.ts.
+      createLavaFlow(simulation.world, eruption.stalled);
       renderer.redraw(visibleBounds());
       simulation.recordEvent("player", "volcano");
       triggerShake(8);
@@ -1398,7 +1462,7 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
   let dragStart = { x: 0, y: 0 };
   let viewStartPos = { x: 0, y: 0 };
 
-  // "ブラシ" continuous terraforming (see plan/0054-terraform-brush.md):
+  // "ブラシ" continuous terraforming (see plan/archived/0054-terraform-brush.md):
   // holding a single press still for LONG_PRESS_DURATION_MS — long enough
   // that it hasn't already turned into a pan — engages painting, so every
   // tile the pointer then passes over gets edited once. Leveling a wide
@@ -1490,7 +1554,7 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
 
   // PC support: a mouse has no second finger for the pinch/twist gesture
   // above, so it gets its own inputs that drive the same applyPinchTransform
-  // — see plan/0039-pc-support.md. Pan and tap-to-apply-tool already work
+  // — see plan/archived/0039-pc-support.md. Pan and tap-to-apply-tool already work
   // unmodified, since a mouse fires the same pointerdown/move/up events a
   // single touch does.
   app.canvas.addEventListener(
@@ -1684,6 +1748,9 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
   });
 
   wireToolbar({
+    onWideEdit: (on) => {
+      wideEdit = on;
+    },
     onBehaviorMode: (mode) => simulation.setBehaviorMode("player", mode),
     onToolMode: (mode) => {
       toolMode = mode;
@@ -1805,7 +1872,7 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
     // Rebuilding the whole terrain mesh (redraw()) — recomputing every
     // tile's screen-space quad, its rock/lava state, etc. — is real CPU
     // work that scales with tile count, which now (see
-    // plan/0062-original-scale-map.md) means up to a screen's worth of a
+    // plan/archived/0062-original-scale-map.md) means up to a screen's worth of a
     // 64x64 world instead of a whole ≤32x32 one. Most frames, with the
     // camera held still and no edit in progress, that work would rebuild
     // the exact same mesh already on screen. Skipping it whenever the
@@ -1854,7 +1921,7 @@ async function bootstrap(world: WorldDefinition, experience: MiracleExperience =
 /**
  * 征服モードの入り口（docs/game-system.md 10節）: プレイヤーがワールドを
  * 選ぶまで試合は始まらない。#play-again が window.location.reload() で
- * ページごと作り直す都合上（plan/0038-play-again.md）、この画面も
+ * ページごと作り直す都合上（plan/archived/0038-play-again.md）、この画面も
  * 毎回ここから素通しで出し直せばよく、選択状態を別途持ち回る必要はない。
  *
  * 起動直後は最初のワールドしか選べない — worlds.ts の nextWorldId /
@@ -1927,7 +1994,7 @@ function showWorldSelect(): void {
         // so the world's own position in the list doubles as a simple
         // difficulty indicator — no separate derived score needed. Map
         // size is no longer shown here since every world is the same
-        // fixed 64x64 (see plan/0062-original-scale-map.md).
+        // fixed 64x64 (see plan/archived/0062-original-scale-map.md).
         detail.textContent = locked
           ? "パスワードが必要です"
           : `${chapterLabel}${TERRAIN_LABELS[world.terrain]}${ruleLabel}${personalityLabel}${schoolLabel}・難易度${index + 1}/${WORLDS.length}`;

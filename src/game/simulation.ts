@@ -46,6 +46,7 @@ import { createHolyWaterSystem } from "./systems/holyWater";
 import { createFirePillarSystem } from "./systems/firePillar";
 import { createPlagueSystem } from "./systems/plague";
 import { createStormSystem } from "./systems/storm";
+import { createLavaFlowSystem } from "./systems/lavaFlow";
 import { createQuakeSystem } from "./systems/quake";
 import { createTornadoSystem } from "./systems/tornado";
 import { createWhirlpoolSystem } from "./systems/whirlpool";
@@ -117,6 +118,19 @@ export interface SimulationConfig {
    * to 地, whose signature is the 地震 this AI has always cast.
    */
   enemySchool?: MiracleSchool;
+  /**
+   * What the enemy god itself throws, and which hero it becomes — the
+   * guide's own per-stage 「敵の神技」 (see worlds.ts's
+   * WorldDefinition.enemyMiracles / enemyHero). Distinct from
+   * allowedMiracles, which is the player's hand.
+   */
+  enemyMiracles?: readonly MiracleId[];
+  enemyHero?: HeroKind;
+  /**
+   * Multiplies the god's decision interval — 「執拗に仕掛けてくる」 vs
+   * 「ほとんど仕掛けてこない」. See WorldDefinition.enemyCastRate.
+   */
+  enemyCastRate?: number;
   /**
    * Called whenever the enemy actually casts a miracle (see
    * enemyMiracles.ts's EnemyMiracleEvent) — lets main.ts surface it
@@ -336,14 +350,11 @@ export class Simulation {
       .add(createHeroLossSystem({ onHeroLost: (faction) => this.recordEvent(faction, "heroLost") }))
       .add(
         createLeaderLossSystem({
-          onLeaderLost: (faction) => {
-            this.recordEvent(faction, "leaderLost");
-            // 「敵リーダーを倒す」 — the score goes to whoever is *not* the
-            // side that lost one. It is paid even when nobody killed it
-            // directly (a leader that walks into the sea is still a leader
-            // the opponent no longer has to deal with).
-            this.addScore(faction === "player" ? "enemy" : "player", "enemyLeader");
-          },
+          // Logged, not scored. Killing a leader used to pay points on the
+          // strength of a 「敵リーダーを倒す」 line that turns out not to be
+          // in the source at all (see SCORE_VALUE) — but losing one is
+          // still worth a line in the recap.
+          onLeaderLost: (faction) => this.recordEvent(faction, "leaderLost"),
         }),
       )
       .add(createWanderTargetSystem({ heightmap: config.heightmap }))
@@ -390,6 +401,17 @@ export class Simulation {
       // system because the two are the same miracle's two aftermaths: the
       // crack that kills, and the ground that cannot be repaired yet.
       .add(createQuakeSystem())
+      // 「水を埋め立てるとさらに外側へ流れ出す」 — a volcano's flow waits on
+      // the shoreline that stopped it, and this is what notices when that
+      // shoreline is filled in. See game/lavaFlow.ts.
+      .add(
+        createLavaFlowSystem({
+          heightmap: config.heightmap,
+          onFlow: () => {
+            this.terrainChanged = true;
+          },
+        }),
+      )
       .add(
         createFungusSystem({
           heightmap: config.heightmap,
@@ -406,16 +428,7 @@ export class Simulation {
           onImpact: (event) => this.recordImpactEffect(event),
         }),
       )
-      .add(
-        createWalkerCombatSystem({
-          onImpact: (event) => this.recordImpactEffect(event),
-          // 「ウォーカー同士の直接戦闘に勝つ」 — one of the four score
-          // sources, and the only one that has to come from inside the
-          // fight, since the event log deliberately does not record every
-          // skirmish.
-          onFightWon: (faction) => this.addScore(faction, "fightWon"),
-        }),
-      )
+      .add(createWalkerCombatSystem({ onImpact: (event) => this.recordImpactEffect(event) }))
       .add(
         createHouseCaptureSystem({
           onCapture: (faction) => this.recordEvent(faction, "houseCaptured"),
@@ -437,8 +450,10 @@ export class Simulation {
         createEnemyMiracleSystem({
           heightmap: config.heightmap,
           worldCenter: this.worldCenter,
-          decisionInterval: config.enemyDecisionInterval,
+          decisionInterval: (config.enemyDecisionInterval ?? 8) * (config.enemyCastRate ?? 1),
           allowedMiracles: config.allowedMiracles ?? ALL_MIRACLES,
+          enemyMiracles: config.enemyMiracles ?? config.allowedMiracles ?? ALL_MIRACLES,
+          enemyHero: config.enemyHero,
           personality: config.enemyPersonality,
           school: config.enemySchool,
           bottomlessSwamp: config.bottomlessSwamp,
@@ -479,11 +494,12 @@ export class Simulation {
    */
   recordEvent(faction: FactionId, type: MatchEventType): void {
     this.matchEvents.push({ time: this.elapsedTime, faction, type });
-    // 「地下巨石・岩礁を使う」 — the best-paying of the four sources, and the
-    // one the original singles out (「低コストでスコア効率が高い」). Taken
-    // from the event log rather than from the cast sites so the player's
-    // taps and the enemy AI's casts are counted by the same rule.
-    if (type === "megalith" || type === "reef") this.addScore(faction, "stonework");
+    // The two the guide names — 地下巨石「なぜか経験点が非常に高い」 and
+    // 岩礁「地下巨石ほどではないがそれなりに」 — and they are worth
+    // different amounts (see SCORE_VALUE). Taken from the event log rather
+    // than from the cast sites so the player's taps and the enemy AI's
+    // casts are counted by the same rule.
+    if (type === "megalith" || type === "reef") this.addScore(faction, type);
   }
 
   /** Adds one occurrence of a score source to a faction's total — see game/score.ts. */
@@ -611,7 +627,7 @@ export class Simulation {
    * Where a faction's shrine currently is — main.ts uses this to center
    * the initial camera on the player's own starting village, since the
    * map is otherwise far bigger than any one screen (see
-   * plan/0062-original-scale-map.md).
+   * plan/archived/0062-original-scale-map.md).
    */
   /** Whether a faction currently has a leader — 集結地移動 needs one (see moveShrine). */
   hasLeader(faction: FactionId): boolean {
@@ -731,7 +747,7 @@ export class Simulation {
    * three walkers, then three houses, all at identical coordinates. A
    * single area miracle of any size therefore erased an entire faction,
    * which is what made an opening cast able to end a match outright (see
-   * plan/0107).
+   * plan/archived/0107).
    *
    * Deterministic, not random: a match's opening should not vary in a way
    * nobody can see, and the ring is the shape "everyone gathered at the
