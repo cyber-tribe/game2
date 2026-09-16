@@ -833,6 +833,28 @@ ICONS.update({
         "..oooooo........",
         "................",
     ],
+    # 3x3: the original's 「Ｌ＋Ａで3×3マスを1段上げ」 modifier. Nine cells
+    # with the middle one picked out, because what the toggle changes is
+    # *how many* the tap takes, not which direction it moves them — the
+    # direction stays on the 隆起/沈降 button beside it.
+    "wideEdit": [
+        "................",
+        ".oooo.oooo.oooo.",
+        ".oSSo.oSSo.oSSo.",
+        ".oSSo.oSSo.oSSo.",
+        ".oooo.oooo.oooo.",
+        "................",
+        ".oooo.oooo.oooo.",
+        ".oSSo.oBBo.oSSo.",
+        ".oSSo.oBBo.oSSo.",
+        ".oooo.oooo.oooo.",
+        "................",
+        ".oooo.oooo.oooo.",
+        ".oSSo.oSSo.oSSo.",
+        ".oSSo.oSSo.oSSo.",
+        ".oooo.oooo.oooo.",
+        "................",
+    ],
     # 救出: a life ring. The one per-stage ○× that grants an operation
     # rather than taking one away, so it wants a silhouette that reads as
     # help rather than as a hazard — and a ring is legible at 16px in a way
@@ -993,6 +1015,7 @@ ICON_KINDS = (
     "lower",
     "flatten",
     "autoFlatten",
+    "wideEdit",
     "shrine",
     "earthquake",
     "swamp",

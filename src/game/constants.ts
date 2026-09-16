@@ -41,6 +41,18 @@ export const DEFAULT_WALKER_SPEED = 1.5;
  */
 export const FINAL_BATTLE_WALKER_SPEED = 0.5;
 
+/**
+ * How wide one spade tap reaches with the 3×3 modifier on — 原作「便利な
+ * 操作としては**Ｌ＋Ａで3×3マスを1段上げ**(ＡＡＢと同じ効果)、Ｌ＋Ｂで
+ * 3×3マスを1段下げる」.
+ *
+ * Three because the original says three, and because it happens to be the
+ * size of the problem on a phone: adjacent vertices sit 32px apart across
+ * and 16px down at the map's usual scale, so a fingertip already covers
+ * roughly this much. See main.ts's spadeVertices.
+ */
+export const WIDE_EDIT_SIZE = 3;
+
 /** Radius (in tiles) a "seeking" walker without a target wanders within. */
 export const DEFAULT_WANDER_RADIUS = 6;
 

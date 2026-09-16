@@ -43,6 +43,11 @@ import type { MiracleCategory } from "./miracleCategories";
 export interface ToolbarCallbacks {
   onBehaviorMode: (mode: BehaviorMode) => void;
   onToolMode: (mode: ToolMode) => void;
+  /**
+   * 3×3 modifier for the spade — the original's 「Ｌ＋Ａで3×3マスを1段
+   * 上げ」. Called with whether it is now on.
+   */
+  onWideEdit?: (on: boolean) => void;
 }
 
 /**
@@ -55,6 +60,24 @@ export function wireToolbar(callbacks: ToolbarCallbacks): void {
   wireGroup<BehaviorMode>("[data-mode]", "mode", callbacks.onBehaviorMode);
   wireGroup<ToolMode>("[data-tool]", "tool", callbacks.onToolMode);
   wireMiracleCategories(callbacks.onToolMode);
+  wireToggle("wideEdit", callbacks.onWideEdit);
+}
+
+/**
+ * A sticky modifier rather than a tool: it does not deselect whatever is
+ * selected, it changes what that selection does. The original holds Ｌ while
+ * pressing Ａ/Ｂ; a touchscreen has no second button to hold, so the hold
+ * becomes a toggle that stays on until it is pressed again.
+ */
+function wireToggle(name: string, onChange: ((on: boolean) => void) | undefined): void {
+  const button = document.querySelector<HTMLButtonElement>(`#toolbar [data-toggle="${name}"]`);
+  if (!button || !onChange) return;
+
+  button.addEventListener("click", () => {
+    const on = button.getAttribute("aria-pressed") !== "true";
+    button.setAttribute("aria-pressed", String(on));
+    onChange(on);
+  });
 }
 
 /**
