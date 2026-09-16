@@ -68,9 +68,9 @@ export const guardianTargetingSystem: System = (world) => {
     //
     // 放っておくと本当に立ち尽くす。goToShrineSystem の行軍命令は
     // "seeking" のウォーカーにしか渡らず、守護者の state は "guardian" で
-    // あるため、中央へも呼ばれない。狙いもせず狙われもせずに残るので、
-    // 片方の勢力が守護者だけになると Simulation.getOutcome() は永久に
-    // 決着しない。
+    // あるため、中央へも呼ばれない。総力戦に一切参加しないまま盤上に残り、
+    // summarize() はこれを1人と数えるので、通りかかった敵が偶然倒さない
+    // 限り、その勢力は決着の条件から外れ続ける。
     const threat = isInFinalBattle(world, owner.faction)
       ? findNearestEnemyPosition(world, owner.faction, from)
       : findNearestThreatToOwnHouses(world, owner.faction, from);

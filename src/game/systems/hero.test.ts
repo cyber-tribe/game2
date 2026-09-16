@@ -136,8 +136,9 @@ describe("guardianTargetingSystem", () => {
    * 上の「守るものが無ければ立っている」という規則は最終決戦では
    * **二度と解けない条件**になる。goToShrineSystem の行軍命令も
    * "seeking" のウォーカーにしか渡らない（守護者の state は "guardian"）ので、
-   * 守護者は盤上に立ったまま、狙いもせず狙われもせずに残る。
-   * 片方の勢力が守護者だけになると getOutcome は永久に決着しない。
+   * 守護者は盤上に立ったまま、総力戦に一切参加しない。残りの民を全て
+   * 失っても summarize() はこれを1人と数えるので、通りかかった敵が
+   * 偶然倒さない限り、その勢力は生き残ったままになる。
    */
   it("makes a guardian fight in the final battle, where there are no houses left to defend", () => {
     const world = new World();
