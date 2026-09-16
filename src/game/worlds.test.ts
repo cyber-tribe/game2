@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { HERO_KINDS } from "./components";
 import { MIRACLE_SCHOOLS } from "./miracleSchools";
 import {
   ALL_MIRACLES,
@@ -11,9 +12,22 @@ import {
   passwordWorldId,
   unlockedCountForPassword,
   type EnemyPersonality,
+  type MiracleId,
 } from "./worlds";
 
 const KNOWN_PERSONALITIES: readonly EnemyPersonality[] = ["balanced", "aggressive", "defensive"];
+
+/**
+ * Every miracle systems/enemyMiracles.ts knows how to cast — its own
+ * branches (火山・最終決戦) plus ENEMY_ATTACK_MIRACLES. Written out rather
+ * than imported so that widening the AI has to be a deliberate edit here
+ * too: this list is the claim, and the test below is what it is worth.
+ */
+const ENEMY_CASTABLE: readonly MiracleId[] = [
+  "volcano", "earthquake",
+  "tsunami", "storm", "firePillar", "hurricane", "plague",
+  "fireRain", "holyWater", "tornado", "fungus", "lightning", "swamp", "whirlpool",
+];
 
 describe("WORLDS", () => {
   it("has at least one selectable world", () => {
@@ -201,6 +215,52 @@ describe("WORLDS", () => {
     for (const world of WORLDS) {
       expect(world.instantDrowning).toBe(world.terrain === "rock");
     }
+  });
+
+  /**
+   * 敵の神技は**プレイヤーの手札とは別のデータ**である（`plan/0166`）。
+   * 資料の面ごとの欄をそのまま転記してあるので、ここで守るのは
+   * 「転記が資料から離れていないか」だけである。
+   */
+  it("keeps the first god harmless, as the guide describes it", () => {
+    // 「土地上下とマグネットのみ。しかも反応が極めて遅い」——プレイヤーには
+    // 火柱もアーマゲドンも配られているが、神は何も撃たない。
+    expect(WORLDS[0].enemyMiracles).toEqual([]);
+    expect(WORLDS[0].allowedMiracles.length).toBeGreaterThan(0);
+    expect(WORLDS[0].enemyCastRate).toBeGreaterThan(1);
+  });
+
+  it("only ever gives a god miracles the AI knows how to cast", () => {
+    for (const world of WORLDS) {
+      for (const miracle of world.enemyMiracles) {
+        expect({ world: world.id, miracle, known: ENEMY_CASTABLE.includes(miracle) }).toEqual({
+          world: world.id,
+          miracle,
+          known: true,
+        });
+      }
+    }
+  });
+
+  /** 資料が英雄を名指ししている面は21面。名指しの無い面は undefined のまま。 */
+  it("names a hero on the stages the guide names one for, and nowhere else", () => {
+    const named = WORLDS.map((world, i) => (world.enemyHero ? i + 1 : 0)).filter(Boolean);
+
+    expect(named).toEqual([16, 18, 19, 22, 25, 26, 27, 28, 29, 31, 33, 34, 35, 39, 40, 41, 42, 43, 45, 47, 48]);
+    for (const world of WORLDS) {
+      if (world.enemyHero) expect(HERO_KINDS).toContain(world.enemyHero);
+    }
+  });
+
+  /**
+   * 「執拗に仕掛けてくる」「ほとんど仕掛けてこない」——頻度は持ち物とは
+   * 別の軸で、資料がそう書いている面だけに付く。
+   */
+  it("only bends the cast rate on the stages the guide remarks on", () => {
+    const bent = WORLDS.map((world, i) => (world.enemyCastRate === undefined ? 0 : i + 1)).filter(Boolean);
+
+    expect(bent).toEqual([1, 19, 23, 37]);
+    expect(WORLDS[36].enemyCastRate).toBeLessThan(1); // No.37「執拗に」
   });
 
   it("gives at least one world instantDrowning", () => {
