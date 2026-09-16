@@ -6,8 +6,7 @@ import {
   MIRACLE_LEVEL_DURATION_STEP,
   MIRACLE_LEVEL_MIN_SCATTER,
 } from "./constants";
-import { MIRACLE_SCHOOL, MIRACLE_SCHOOLS, type MiracleSchool } from "./miracleSchools";
-import type { MiracleId } from "./worlds";
+import { MIRACLE_SCHOOLS, type MiracleSchool } from "./miracleSchools";
 
 /** Experience points earned so far in each of the six schools. */
 export type MiracleExperience = Record<MiracleSchool, number>;
@@ -32,28 +31,24 @@ export function levelOf(experience: MiracleExperience, school: MiracleSchool): n
 }
 
 /**
- * Awards a finished stage's 稲妻マーク to the schools the player actually
- * cast from on it.
+ * Moves one point of a stage's earnings into a school — 原作の経験点は
+ * **プレイヤーが配分する**。
  *
- * 「各カテゴリーのレベルを上げていく」 does not say how the score is split
- * across the six, and the source does not either. **You level what you
- * use** is game2's reading: it keeps the six categories genuinely separate
- * (a pooled score would make the word カテゴリー decorative), it explains why
- * the original bothers to list which miracles each level affects, and it
- * makes the campaign's own hand — which schools a stage deals — decide what
- * a player can train, which is exactly the shape the per-stage tables
- * already have.
+ * 「経験点を**地と気レベルに重点配分**して下さい」(No.22-24)、「**経験点の
+ * 使い道**に迷ったら水レベルを上げると、次の太陽神の宮で役に立ちます」
+ * (No.31-33)。どこへ入れるかを選ぶこと自体が原作の遊びである——次の面が
+ * 何の神かを見て振り分ける。
+ *
+ * これは自動配分（使った系統に勝手に入る）を置き換えたものである。自動配分
+ * は「各カテゴリーのレベルを上げていくことができる」という要約から game2 が
+ * 作ったもので、原文に当たると player が選ぶと書いてあった（`plan/0168`）。
+ *
+ * A stage's pool is its 稲妻マーク count — 「**経験点10点**を取ってクリア
+ * できるでしょう」(No.37-39) against 「稲妻マーク10個」 as the cap: the
+ * marks *are* the points.
  */
-export function awardStage(
-  experience: MiracleExperience,
-  castMiracles: readonly MiracleId[],
-  marks: number,
-): MiracleExperience {
-  const earned = { ...experience };
-  for (const school of new Set(castMiracles.map((miracle) => MIRACLE_SCHOOL[miracle]))) {
-    earned[school] += Math.max(0, marks);
-  }
-  return earned;
+export function allocate(experience: MiracleExperience, school: MiracleSchool, points = 1): MiracleExperience {
+  return { ...experience, [school]: Math.max(0, experience[school] + points) };
 }
 
 /**

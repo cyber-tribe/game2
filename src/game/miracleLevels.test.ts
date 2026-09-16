@@ -3,11 +3,12 @@ import { DEFAULT_FUNGUS_RADIUS } from "../world/heightmap";
 import {
   LIGHTNING_SCATTER,
   MAX_MIRACLE_LEVEL,
+  MAX_STAGE_MARKS,
   MIRACLE_LEVEL_MIN_SCATTER,
   MIRACLE_LEVEL_STEP,
 } from "./constants";
 import {
-  awardStage,
+  allocate,
   decodeExperience,
   durationScaleAt,
   encodeExperience,
@@ -47,46 +48,52 @@ describe("levelOf", () => {
 });
 
 /**
- * 「各カテゴリーのレベルを上げていく」 — game2 reads it as "you level what
- * you use", which is what keeps the six categories from being one pool
- * wearing six names.
+ * 原作の経験点は**プレイヤーが配分する**——「経験点を地と気レベルに重点配分
+ * して下さい」「経験点の使い道に迷ったら水レベルを上げる」。使った系統へ
+ * 自動で入る仕組みは game2 の発明だった（`plan/0168`）。
  */
-describe("awardStage", () => {
-  it("pays the schools of the miracles actually cast", () => {
-    const earned = awardStage(noExperience(), ["lightning", "firePillar"], 7);
+describe("allocate", () => {
+  it("puts a point where it is told", () => {
+    const earned = allocate(noExperience(), "air");
 
-    expect(earned.air).toBe(7);
-    expect(earned.fire).toBe(7);
-    expect(earned.earth).toBe(0);
-  });
-
-  it("pays a school once however many of its miracles were cast", () => {
-    const earned = awardStage(noExperience(), ["lightning", "tornado", "storm"], 5);
-
-    expect(earned.air).toBe(5);
+    expect(earned.air).toBe(1);
+    expect(earned.fire).toBe(0);
   });
 
   it("adds to what was already learned", () => {
-    const earned = awardStage({ ...noExperience(), air: 12 }, ["lightning"], 4);
-
-    expect(earned.air).toBe(16);
+    expect(allocate({ ...noExperience(), air: 12 }, "air").air).toBe(13);
   });
 
-  it("pays nothing for a stage where nothing was cast", () => {
-    expect(awardStage(noExperience(), [], 10)).toEqual(noExperience());
-  });
-
-  it("never takes anything away", () => {
-    const before = { ...noExperience(), air: 30 };
-
-    expect(awardStage(before, ["lightning"], -5).air).toBe(30);
+  it("takes as many points at once as it is given", () => {
+    expect(allocate(noExperience(), "water", 7).water).toBe(7);
   });
 
   it("leaves the experience it was given untouched", () => {
     const before = noExperience();
-    awardStage(before, ["lightning"], 7);
+    allocate(before, "air");
 
     expect(before.air).toBe(0);
+  });
+
+  it("never goes below nothing", () => {
+    expect(allocate(noExperience(), "air", -5).air).toBe(0);
+  });
+
+  /** 「重点配分」——1系統へ寄せれば段が上がる。 */
+  it("raises a level once MIRACLE_LEVEL_STEP points are in one school", () => {
+    let earned = noExperience();
+    for (let i = 0; i < MIRACLE_LEVEL_STEP; i++) earned = allocate(earned, "fire");
+
+    expect(levelOf(earned, "fire")).toBe(2);
+    expect(levelOf(earned, "air")).toBe(1);
+  });
+
+  /** 一面ぶん（稲妻マーク10個）を1系統に寄せても、いきなり最大にはならない。 */
+  it("does not max a school out of one perfect stage", () => {
+    let earned = noExperience();
+    for (let i = 0; i < MAX_STAGE_MARKS; i++) earned = allocate(earned, "fire");
+
+    expect(levelOf(earned, "fire")).toBeLessThan(MAX_MIRACLE_LEVEL);
   });
 });
 
