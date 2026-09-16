@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { World } from "../../ecs";
-import { ADVANCING_HERO_KINDS, HeroCooldown, House, MoveTarget, Owner, Position, Walker, type FactionId, type WalkerState } from "../components";
+import { ADVANCING_HERO_KINDS, FactionState, HeroCooldown, House, MoveTarget, Owner, Position, Walker, type FactionId, type WalkerState } from "../components";
 import { createFaction } from "../faction";
 import { guardianTargetingSystem, heroCooldownSystem, heroAdvanceTargetingSystem } from "./hero";
 
@@ -124,6 +124,44 @@ describe("guardianTargetingSystem", () => {
     const guardian = createWalker(world, "player", 0, 0, "guardian");
     createHouse(world, "player", 0, 0);
     createWalker(world, "enemy", 50, 50); // far outside GUARDIAN_DEFENSE_RADIUS
+
+    guardianTargetingSystem(world, 0);
+
+    expect(world.has(guardian, MoveTarget)).toBe(false);
+  });
+
+  /**
+   * 最終決戦は「住居を捨てて中央へ集まり、**全滅まで戦う**」——守護者だけが
+   * そこに加わらない理由は無い。armageddon.ts は**全ての家を壊す**ので、
+   * 上の「守るものが無ければ立っている」という規則は最終決戦では
+   * **二度と解けない条件**になる。goToShrineSystem の行軍命令も
+   * "seeking" のウォーカーにしか渡らない（守護者の state は "guardian"）ので、
+   * 守護者は盤上に立ったまま、狙いもせず狙われもせずに残る。
+   * 片方の勢力が守護者だけになると getOutcome は永久に決着しない。
+   */
+  it("makes a guardian fight in the final battle, where there are no houses left to defend", () => {
+    const world = new World();
+    const faction = createFaction(world, "player", { x: 0, y: 0 });
+    const state = world.get(faction, FactionState)!;
+    world.add(faction, FactionState, { ...state, behaviorMode: "goToShrine", finalBattle: true });
+    const guardian = createWalker(world, "player", 0, 0, "guardian");
+    const enemy = createWalker(world, "enemy", 30, 0); // far away, and nothing of ours near it
+
+    guardianTargetingSystem(world, 0);
+
+    expect(world.get(guardian, MoveTarget)).toEqual(world.get(enemy, Position));
+  });
+
+  /**
+   * 境界を固定する。上と同じ盤面で、違いは finalBattle だけ——通常の試合中は
+   * 遠くの敵を追いかけない（守護者は襲撃者ではない）。最後の総力戦だけが
+   * 例外である。
+   */
+  it("still stands its ground outside the final battle, however far the enemy is", () => {
+    const world = new World();
+    createFaction(world, "player", { x: 0, y: 0 });
+    const guardian = createWalker(world, "player", 0, 0, "guardian");
+    createWalker(world, "enemy", 30, 0);
 
     guardianTargetingSystem(world, 0);
 
