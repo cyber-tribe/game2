@@ -11,9 +11,18 @@ import type { Point } from "./geometry";
  * leaderSystem so state.leaderId is up to date.
  *
  * **The final battle is not led.** Once finalBattle is set (see
- * armageddon.ts) every walker heads for shrinePosition itself, leader or
- * no leader — 「全ての民が家を捨てて中央に集まり」, and the middle is a
- * place, not a person.
+ * armageddon.ts) every ordinary walker heads for shrinePosition itself,
+ * leader or no leader — 「全ての民が家を捨てて中央に集まり」, and the
+ * middle is a place, not a person.
+ *
+ * "Ordinary" is the part this comment used to leave out, and the omission
+ * misleads: assignTarget below only ever moves a walker whose state is
+ * "seeking", so a hero — whose state is its own HeroKind — is never given
+ * the march order at all. Heroes reach the battle by their own rules
+ * instead (hero.ts: the attacking four hunt the nearest enemy anywhere on
+ * the map, and a guardian joins them once the final battle has taken its
+ * houses away). Read literally, this paragraph says heroes march here;
+ * they do not, and looking for that behaviour in this file is a dead end.
  *
  * That is not a stylistic difference. Leader-following silently requires
  * a live leader, and nothing appoints a new one during the final battle

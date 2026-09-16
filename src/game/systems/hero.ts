@@ -1,5 +1,5 @@
 import type { System, World } from "../../ecs";
-import { HeroCooldown, House, MoveTarget, Owner, Position, Walker, isAdvancingHeroState, type FactionId } from "../components";
+import { FactionState, HeroCooldown, House, MoveTarget, Owner, Position, Walker, isAdvancingHeroState, type FactionId } from "../components";
 import { GUARDIAN_DEFENSE_RADIUS } from "../constants";
 import { distance, type Point } from "./geometry";
 import { findNearestEnemyPosition } from "./fightTargeting";
@@ -59,10 +59,33 @@ export const guardianTargetingSystem: System = (world) => {
     if (world.has(entity, HeroCooldown)) continue;
 
     const owner = world.get(entity, Owner)!;
-    const threat = findNearestThreatToOwnHouses(world, owner.faction, world.get(entity, Position)!);
+    const from = world.get(entity, Position)!;
+    // 最終決戦のあいだは、守る家そのものが無い。armageddon.ts は**両陣営の
+    // 家を全て壊す**（原作「住居を捨てて中央へ集まり、全滅まで戦う」）ので、
+    // 上の「家の近くの脅威だけ」という条件はその瞬間から**二度と満たされ
+    // ない**。守備範囲が空になった守護者は、攻撃側の英雄と同じく最寄りの敵を
+    // 狙う——守るものが無くなった以上、留守番は終わっている。
+    //
+    // 放っておくと本当に立ち尽くす。goToShrineSystem の行軍命令は
+    // "seeking" のウォーカーにしか渡らず、守護者の state は "guardian" で
+    // あるため、中央へも呼ばれない。総力戦に一切参加しないまま盤上に残り、
+    // summarize() はこれを1人と数えるので、通りかかった敵が偶然倒さない
+    // 限り、その勢力は決着の条件から外れ続ける。
+    const threat = isInFinalBattle(world, owner.faction)
+      ? findNearestEnemyPosition(world, owner.faction, from)
+      : findNearestThreatToOwnHouses(world, owner.faction, from);
     if (threat) world.add(entity, MoveTarget, threat);
   }
 };
+
+/** Whether `faction` has been swept into 最終決戦 — see armageddon.ts. */
+function isInFinalBattle(world: World, faction: FactionId): boolean {
+  for (const entity of world.query(FactionState)) {
+    const state = world.get(entity, FactionState)!;
+    if (state.id === faction) return state.finalBattle === true;
+  }
+  return false;
+}
 
 /**
  * Among this faction's own houses that currently have an enemy walker/house
